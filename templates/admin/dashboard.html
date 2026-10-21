@@ -1,155 +1,564 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-5">
-    <div>
-        <h2 class="fw-bold text-brand-black mb-0">Dashboard Operativo</h2>
-        <p class="text-muted">¡Bienvenido al panel central, {{ current_user.nombre }}!</p>
+<style>
+    /* ─── White Canvas & Silver Tech Tokens ─── */
+    .dashboard-wrapper {
+        background-color: #FFFFFF;
+        padding-bottom: 2rem;
+    }
+
+    /* ─── Estilos de Tarjeta con Destello Plateado Metálico ─── */
+    .card-silver-tech {
+        position: relative;
+        background: #FFFFFF !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* Remate superior decorativo en degradado plata metálica */
+    .card-silver-tech::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);
+        opacity: 0.9;
+        transition: height 0.25s ease, opacity 0.25s ease;
+        z-index: 2;
+    }
+
+    /* Destello de color gris claro plateado que viaja a 45 grados */
+    .card-silver-tech::after {
+        content: "";
+        position: absolute;
+        top: -60%;
+        left: -80%;
+        width: 50%;
+        height: 220%;
+        background: linear-gradient(
+            60deg, 
+            rgba(255, 255, 255, 0) 0%, 
+            rgba(226, 232, 240, 0.30) 35%, 
+            rgba(255, 255, 255, 0.95) 50%, 
+            rgba(192, 192, 192, 0.30) 65%, 
+            rgba(255, 255, 255, 0) 100%
+        );
+        transform: rotate(25deg);
+        pointer-events: none;
+        opacity: 0;
+        z-index: 3;
+    }
+
+    /* Hover States con halo de luz plata sutil */
+    .card-silver-tech:hover {
+        transform: translateY(-4px);
+        border-color: #CBD5E1 !important;
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.05), 0 0 22px rgba(192, 192, 192, 0.32);
+    }
+
+    .card-silver-tech:hover::before {
+        height: 4px;
+        opacity: 1;
+    }
+
+    .card-silver-tech:hover::after {
+        opacity: 1;
+        left: 140%;
+        transition: left 0.85s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+
+    /* Iconos Circulares de las Tarjetas */
+    .stat-icon-wrapper {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 50%, #E2E8F0 100%);
+        border: 1px solid #E2E8F0;
+        color: #1A1A1A;
+        font-size: 1.25rem;
+        transition: transform 0.25s ease, background 0.25s ease;
+    }
+
+    .card-silver-tech:hover .stat-icon-wrapper {
+        transform: scale(1.08);
+        border-color: #CBD5E1;
+        background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #CBD5E1 100%);
+    }
+
+    /* Botones de Acción de Tarjeta */
+    .btn-stat-action {
+        background-color: #1A1A1A !important;
+        color: #FFFFFF !important;
+        border: 1px solid #1A1A1A !important;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 0.55rem 1rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        text-decoration: none;
+    }
+
+    .btn-stat-action:hover {
+        background-color: #334155 !important;
+        border-color: #334155 !important;
+        color: #FFFFFF !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    }
+
+    .btn-stat-outline {
+        background-color: #FFFFFF !important;
+        color: #334155 !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 0.55rem 1rem;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        text-decoration: none;
+    }
+
+    .btn-stat-outline:hover {
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
+        border-color: #CBD5E1 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+    }
+
+    /* Filtro Segmented Pills Super Premium */
+    .filter-pill-group {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 999px;
+        padding: 4px;
+        display: inline-flex;
+        align-items: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    }
+
+    .filter-pill {
+        border: none;
+        background: transparent;
+        padding: 6px 16px;
+        border-radius: 999px;
+        font-size: 0.80rem;
+        font-weight: 600;
+        color: #64748B;
+        text-decoration: none;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .filter-pill:hover {
+        color: #0F172A;
+        background: #F8FAFC;
+    }
+
+    .filter-pill.active {
+        background: #1A1A1A;
+        color: #FFFFFF;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .badge-periodo {
+        background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
+        border: 1px solid #E2E8F0;
+        color: #475569;
+        font-size: 0.72rem;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }
+</style>
+
+<div class="dashboard-wrapper">
+    <!-- Header Principal y Barra de Filtros -->
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4 pb-2 border-bottom" style="border-color: #F1F5F9 !important;">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge" style="background: linear-gradient(135deg, #E2E8F0 0%, #CBD5E1 100%); color: #1A1A1A; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; border: 1px solid #CBD5E1;">
+                    ADMIN PRO
+                </span>
+                <span class="text-secondary small fw-medium">&bull; Sistema Central LifeStore</span>
+            </div>
+            <h2 class="fw-bold m-0" style="font-size: 1.85rem; letter-spacing: -0.02em; color: #0F172A;">
+                Dashboard Operativo
+            </h2>
+            <p class="text-secondary small mb-0 mt-1">
+                Supervisión comercial, flujo bancario e inventario en tiempo real.
+            </p>
+        </div>
+
+        <!-- Controles de Período y Botón de Balance -->
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- Segmented Pills: Día / Semana / Quincena / Mes -->
+            <div class="filter-pill-group">
+                <a href="{{ url_for('admin_bp.dashboard', periodo='dia') }}" 
+                   class="filter-pill {% if periodo_actual == 'dia' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-day" style="font-size: 0.75rem;"></i>
+                    <span>Día</span>
+                </a>
+                <a href="{{ url_for('admin_bp.dashboard', periodo='semana') }}" 
+                   class="filter-pill {% if periodo_actual == 'semana' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-week" style="font-size: 0.75rem;"></i>
+                    <span>Semana</span>
+                </a>
+                <a href="{{ url_for('admin_bp.dashboard', periodo='quincena') }}" 
+                   class="filter-pill {% if periodo_actual == 'quincena' %}active{% endif %}">
+                    <i class="fa-solid fa-calendar-days" style="font-size: 0.75rem;"></i>
+                    <span>Quincena</span>
+                </a>
+                <a href="{{ url_for('admin_bp.dashboard', periodo='mes', mes=mes_filtro) }}" 
+                   class="filter-pill {% if periodo_actual == 'mes' %}active{% endif %}">
+                    <i class="fa-regular fa-calendar" style="font-size: 0.75rem;"></i>
+                    <span>Mes</span>
+                </a>
+            </div>
+
+            <!-- Selector de Mes Específico -->
+            <form method="GET" action="{{ url_for('admin_bp.dashboard') }}" class="d-none d-sm-inline-flex align-items-center bg-white border rounded-pill px-3 py-1 shadow-sm" style="border-color: #E2E8F0 !important; height: 38px;">
+                <input type="hidden" name="periodo" value="mes">
+                <i class="fa-regular fa-calendar text-secondary me-2" style="font-size: 0.8rem;"></i>
+                <input type="month" name="mes" class="form-control form-control-sm border-0 shadow-none bg-transparent p-0 fw-bold" style="max-width: 120px; font-size: 0.82rem; color: #0F172A; cursor: pointer;" value="{{ mes_filtro }}" onchange="this.form.submit()">
+            </form>
+
+            <!-- Botón Generar Balance Oficial -->
+            <button type="button" class="btn px-4 rounded-pill fw-bold text-white shadow-sm" style="background-color: #1A1A1A; border: 1px solid #1A1A1A; height: 38px; font-size: 0.84rem; display: inline-flex; align-items: center; gap: 0.5rem;" data-bs-toggle="modal" data-bs-target="#modalBalance">
+                <i class="fa-solid fa-file-invoice-dollar" style="color: #CBD5E1;"></i>
+                <span>Generar Balance</span>
+            </button>
+        </div>
     </div>
-    <div>
-        <form method="GET" action="{{ url_for('admin_bp.dashboard') }}" class="d-inline-flex align-items-center me-3 bg-white border rounded-pill px-3 py-2 shadow-sm">
-            <i class="fa-regular fa-calendar text-brand-pink me-2"></i>
-            <span class="fw-bold text-brand-black me-2 small">Mes:</span>
-            <input type="month" name="mes" class="form-control form-control-sm border-0 shadow-none bg-transparent p-0 text-brand-black fw-bold" style="max-width: 180px; outline: none; cursor: pointer;" value="{{ mes_filtro }}" onchange="this.form.submit()">
-        </form>
-        <button type="button" class="btn btn-dark rounded-pill fw-bold shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#modalBalance">
-            <i class="fa-solid fa-scale-balanced text-brand-pink me-2"></i>Generar Balance
-        </button>
+
+    <!-- Indicador de Período Activo -->
+    <div class="d-flex align-items-center justify-content-between mb-4 px-1">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-secondary small fw-semibold text-uppercase" style="letter-spacing: 0.08em; font-size: 0.72rem;">
+                Visualizando Rango:
+            </span>
+            <span class="badge-periodo">
+                <i class="fa-solid fa-clock-rotate-left me-1" style="color: #94A3B8;"></i> {{ texto_periodo }}
+            </span>
+        </div>
+        <div class="text-muted small" style="font-size: 0.75rem;">
+            Actualizado automáticamente &bull; Colombia (GMT-5)
+        </div>
+    </div>
+
+    <!-- ─── Grilla Principal de Tarjetas (Fila de 4 Columnas) ─── -->
+    <div class="row g-3 mb-4">
+        
+        <!-- 1. Tarjeta: Ingresos Totales por Ventas -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper">
+                            <i class="fa-solid fa-sack-dollar"></i>
+                        </div>
+                        <span class="badge-periodo">{{ texto_periodo }}</span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Ventas Totales
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                        ${{ (total_ventas)|cop }}
+                    </h2>
+                    <p class="text-muted small mb-0 d-flex align-items-center gap-1" style="font-size: 0.78rem;">
+                        <i class="fa-solid fa-receipt" style="color: #94A3B8;"></i>
+                        <span><strong>{{ conteo_ventas }}</strong> ventas registradas</span>
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="{{ url_for('sales_bp.historial') }}" class="btn-stat-action w-100">
+                        <i class="fa-solid fa-receipt" style="font-size: 0.75rem;"></i>
+                        <span>Ver Historial Ventas</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Tarjeta: Bancos & Medios Digitales (NUEVA) -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper" style="background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%);">
+                            <i class="fa-solid fa-building-columns"></i>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                            DIGITAL
+                        </span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Bancos (Recaudo Período)
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                        ${{ (recaudo_bancos_periodo)|cop }}
+                    </h2>
+                    <p class="text-muted small mb-0 d-flex align-items-center gap-1" style="font-size: 0.78rem;">
+                        <i class="fa-solid fa-wallet" style="color: #94A3B8;"></i>
+                        <span>Saldo Total Cuentas: <strong>${{ (saldo_bancos_total)|cop }}</strong></span>
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="{{ url_for('bancos_bp.index') }}" class="btn-stat-action w-100">
+                        <i class="fa-solid fa-arrow-right-arrow-left" style="font-size: 0.75rem;"></i>
+                        <span>Módulo de Bancos</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Tarjeta: Catálogo de Productos & Inventario -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper">
+                            <i class="fa-solid fa-mobile-screen-button"></i>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                            STOCK
+                        </span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Inventario en Catálogo
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                        {{ total_productos }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">SKUs</span>
+                    </h2>
+                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                        Celulares con IMEI y accesorios en tienda.
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="{{ url_for('celulares_bp.inventario') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-boxes-stacked" style="font-size: 0.75rem;"></i>
+                        <span>Ver Inventario Celulares</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Tarjeta: Alertas de Stock Crítico -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper" style="color: #DC2626; border-color: #FEE2E2; background: #FEF2F2;">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #FEF2F2; color: #DC2626; font-size: 0.68rem; border: 1px solid #FEE2E2;">
+                            ATENCIÓN
+                        </span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Alertas de Stock
+                    </div>
+                    <h2 class="fw-bold font-mono my-2 text-danger" style="font-size: 1.75rem; letter-spacing: -0.02em;">
+                        {{ productos_bajo_stock }} <span style="font-size: 1rem; font-weight: 500; color: #EF4444;">críticos</span>
+                    </h2>
+                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                        Existencias reducidas (&le; 10 unidades).
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="/inventory" class="btn-stat-outline w-100 text-danger" style="border-color: #FEE2E2 !important;">
+                        <i class="fa-solid fa-boxes-packing" style="font-size: 0.75rem;"></i>
+                        <span>Reponer Existencias</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Tarjeta: Maneos de Mercancía -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper">
+                            <i class="fa-solid fa-handshake"></i>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                            PRÉSTAMOS
+                        </span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Maneos Activos
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                        {{ maneos_activos }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">docs</span>
+                    </h2>
+                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                        Equipos prestados entre tiendas o locales.
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="{{ url_for('admin_bp.maneos') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-eye" style="font-size: 0.75rem;"></i>
+                        <span>Gestionar Maneos</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. Tarjeta: Directorio Proveedores -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper">
+                            <i class="fa-solid fa-truck-fast"></i>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                            PROVEEDORES
+                        </span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Cuentas Proveedores
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                        {{ proveedores_activos }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">aliados</span>
+                    </h2>
+                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                        Créditos, consignaciones y compras.
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="{{ url_for('providers_bp.list_providers') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-address-book" style="font-size: 0.75rem;"></i>
+                        <span>Directorio Proveedores</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. Tarjeta: Garantías & Servicio Técnico -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                            SOPORTE
+                        </span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Garantías Pendientes
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                        {{ garantias_pendientes }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">casos</span>
+                    </h2>
+                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                        Dispositivos en proceso de revisión técnica.
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="{{ url_for('warranties_bp.index') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-screwdriver-wrench" style="font-size: 0.75rem;"></i>
+                        <span>Panel Garantías</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. Tarjeta: Aprobaciones de Precios -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper">
+                            <i class="fa-solid fa-tags"></i>
+                        </div>
+                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                            PRECIOS
+                        </span>
+                    </div>
+                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                        Aprobaciones Pendientes
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                        {{ aprobaciones_pendientes }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">solicitudes</span>
+                    </h2>
+                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                        Precios especiales solicitados por cajeros.
+                    </p>
+                </div>
+                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                    <a href="{{ url_for('admin_bp.aprobaciones') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-check-double" style="font-size: 0.75rem;"></i>
+                        <span>Autorizar Precios</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
-<!-- Modal Generar Balance Financiero -->
+<!-- Modal Generar Balance Financiero (White Canvas & Silver Tech) -->
 <div class="modal fade" id="modalBalance" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg rounded-4">
-      <div class="modal-header border-bottom-0 pb-0">
-        <h5 class="fw-bold text-brand-black"><i class="fa-solid fa-file-invoice-dollar me-2 text-brand-pink"></i>Balance Financiero y General</h5>
+    <div class="modal-content border shadow-lg rounded-4 bg-white" style="border-color: #E2E8F0 !important; overflow: hidden;">
+      <div style="height: 4px; background: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);"></div>
+      <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #F8FAFC; border: 1px solid #E2E8F0; color: #1A1A1A;">
+                <i class="fa-solid fa-scale-balanced fs-6"></i>
+            </div>
+            <h5 class="fw-bold m-0" style="color: #0F172A;">Estado de Resultados Contable</h5>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form action="{{ url_for('admin_bp.balance_financiero') }}" method="GET">
-          <div class="modal-body">
-              <p class="text-muted small">Selecciona el rango de fechas para cruzar las ventas e ingresos totales contra el Costo Directo y los Gastos Registrados.</p>
+          <div class="modal-body p-4">
+              <p class="text-secondary small mb-4">
+                  Genera el reporte contable auditado cruzando ingresos brutos contra costo directo de mercancía y gastos registrados.
+              </p>
               <div class="mb-3">
-                  <label class="form-label fw-bold text-brand-black small">Fecha de Inicio</label>
-                  <input type="date" name="fecha_inicio" class="form-control" required>
+                  <label class="form-label fw-bold small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem; color: #475569;">Fecha de Inicio</label>
+                  <input type="date" name="fecha_inicio" class="form-control" style="background-color: #FFFFFF !important; border-color: #E2E8F0 !important;" required>
               </div>
-              <div class="mb-4">
-                  <label class="form-label fw-bold text-brand-black small">Fecha de Fin</label>
-                  <input type="date" name="fecha_fin" class="form-control" required>
+              <div class="mb-3">
+                  <label class="form-label fw-bold small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem; color: #475569;">Fecha de Fin</label>
+                  <input type="date" name="fecha_fin" class="form-control" style="background-color: #FFFFFF !important; border-color: #E2E8F0 !important;" required>
               </div>
           </div>
-          <div class="modal-footer border-top-0 pt-0">
-            <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-dark rounded-pill px-4 fw-bold"><i class="fa-solid fa-file-pdf text-brand-pink me-1"></i> Calcular y Validar</button>
+          <div class="modal-footer border-top-0 pt-0 pb-4 px-4 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold" style="border-color: #E2E8F0 !important;" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn px-4 rounded-pill fw-bold text-white shadow-sm" style="background-color: #1A1A1A; border: 1px solid #1A1A1A;">
+                <i class="fa-solid fa-file-pdf me-1" style="color: #CBD5E1;"></i> Calcular Balance
+            </button>
           </div>
       </form>
     </div>
   </div>
-</div>
-
-<!-- Layout de Tarjetas (Fila de 4 Elementos) -->
-<div class="row g-3 mb-4">
-    <!-- 1. Tarjeta: Ingresos Totales (Botones/Textos Azul Turquesa / .btn-blue) -->
-    <div class="col-md-3">
-        <div class="card card-custom h-100 p-4 border border-dark border-2">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <i class="fa-solid fa-sack-dollar fs-1 text-brand-pink"></i>
-                <span class="badge bg-dark rounded-pill">{{ texto_periodo }}</span>
-            </div>
-            <h5 class="text-brand-black fw-bold">Ingresos (Mensual)</h5>
-            <h2 class="fw-bolder text-brand-black">${{ (total_ventas)|cop }}</h2>
-            <p class="text-muted small mb-0"><i class="fa-solid fa-receipt text-brand-pink me-1"></i> {{ conteo_ventas }} ventas realizadas</p>
-            <div class="mt-auto pt-3">
-                <a href="{{ url_for('sales_bp.historial') }}" class="btn btn-dark w-100 rounded-pill fw-bold"><i class="fa-solid fa-file-invoice-dollar text-brand-pink me-2"></i> Ver Historial</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- 2. Tarjeta: Productos en Catálogo (Rosa Pastel / .btn-pink) -->
-    <div class="col-md-3">
-        <div class="card card-custom h-100 p-4 border border-dark border-2">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <i class="fa-solid fa-cubes fs-1 text-brand-pink"></i>
-            </div>
-            <h5 class="text-brand-black fw-bold">Productos en Catálogo</h5>
-            <h2 class="fw-bolder text-brand-black">{{ total_productos }} uds.</h2>
-            <div class="mt-auto pt-4">
-                <a href="/inventory/" class="btn btn-dark w-100 rounded-pill text-white fw-bold"><i class="fa-solid fa-sliders text-brand-pink me-2"></i> Gestionar Inventario</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- 3. Tarjeta: Alertas de Stock (Danger Colors / Bootstrap Nativo) -->
-    <div class="col-md-3">
-        <div class="card card-custom h-100 p-4 border border-dark border-2">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <i class="fa-solid fa-triangle-exclamation fs-1 text-brand-pink"></i>
-            </div>
-            <h5 class="text-brand-black fw-bold">Alertas Críticas de Stock</h5>
-            <h2 class="fw-bolder text-brand-pink">{{ productos_bajo_stock }} productos</h2>
-            <p class="text-muted small">Tienen existencias limitadas (10 o menos unidades).</p>
-            <div class="mt-auto pt-3">
-                <a href="/inventory/" class="btn btn-outline-dark w-100 rounded-pill fw-bold"><i class="fa-solid fa-eye text-brand-pink me-2"></i> Revisar Urgencias</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- 4. Tarjeta: Maneos de Mercancía -->
-    <div class="col-md-3">
-        <div class="card card-custom h-100 p-4 border border-dark border-2">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <i class="fa-solid fa-handshake fs-1 text-brand-pink"></i>
-            </div>
-            <h5 class="text-brand-black fw-bold">Maneos Activos</h5>
-            <h2 class="fw-bolder text-brand-black">{{ maneos_activos }} docs.</h2>
-            <p class="text-muted small">Préstamos vecinos esperando resolución.</p>
-            <div class="mt-auto pt-3">
-                <a href="{{ url_for('admin_bp.maneos') }}" class="btn btn-outline-dark text-dark w-100 rounded-pill fw-bold"><i class="fa-solid fa-eye text-brand-pink me-2"></i> Ver Maneos</a>
-            </div>
-        </div>
-    </div>
-    <!-- 5. Tarjeta: Proveedores -->
-    <div class="col-md-3">
-        <div class="card card-custom h-100 p-4 border border-dark border-2">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <i class="fa-solid fa-truck-fast fs-1 text-brand-pink"></i>
-            </div>
-            <h5 class="text-brand-black fw-bold">Proveedores Activos</h5>
-            <h2 class="fw-bolder text-brand-black">{{ proveedores_activos }} cuentas</h2>
-            <p class="text-muted small">Cuentas por pagar a proveedores.</p>
-            <div class="mt-auto pt-3">
-                <a href="{{ url_for('providers_bp.list_providers') }}" class="btn btn-outline-dark text-dark w-100 rounded-pill fw-bold"><i class="fa-solid fa-eye text-brand-pink me-2"></i> Ver Cuentas</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- 6. Tarjeta: Garantías -->
-    <div class="col-md-3">
-        <div class="card card-custom h-100 p-4 border border-dark border-2">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <i class="fa-solid fa-shield-halved fs-1 text-brand-pink"></i>
-            </div>
-            <h5 class="text-brand-black fw-bold">Garantías Pendientes</h5>
-            <h2 class="fw-bolder text-brand-black">{{ garantias_pendientes }} reportes</h2>
-            <p class="text-muted small">Equipos en proceso de soporte.</p>
-            <div class="mt-auto pt-3">
-                <a href="{{ url_for('warranties_bp.index') }}" class="btn btn-outline-dark text-dark w-100 rounded-pill fw-bold"><i class="fa-solid fa-eye text-brand-pink me-2"></i> Gestionar</a>
-            </div>
-        </div>
-    </div>
-    <!-- 7. Tarjeta: Aprobaciones -->
-    <div class="col-md-3">
-        <div class="card card-custom h-100 p-4 border border-dark border-2">
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <i class="fa-solid fa-tags fs-1 text-brand-pink"></i>
-            </div>
-            <h5 class="text-brand-black fw-bold">Aprobaciones Precio</h5>
-            <h2 class="fw-bolder text-brand-black">{{ aprobaciones_pendientes }} solicitudes</h2>
-            <p class="text-muted small">Descuentos esperando autorización.</p>
-            <div class="mt-auto pt-3">
-                <a href="{{ url_for('admin_bp.aprobaciones') }}" class="btn btn-outline-dark text-dark w-100 rounded-pill fw-bold"><i class="fa-solid fa-eye text-brand-pink me-2"></i> Ver Solicitudes</a>
-            </div>
-        </div>
-    </div>
 </div>
 {% endblock %}

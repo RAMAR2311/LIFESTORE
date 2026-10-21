@@ -104,19 +104,20 @@ def editar_vendedor(id):
         
     return redirect(url_for('admin_bp.vendedores'))
 
+from datetime import datetime, timedelta
+
 @admin_bp.route('/dashboard')
 @login_required
 @admin_required
 def dashboard():
-    # Se obtienen métricas clave para que el administrador tenga un resumen rápido de las operaciones del negocio
-    total_productos = Product.query.count()
-    productos_bajo_stock = Product.query.filter(Product.cantidad_stock <= 10).count()
-    maneos_activos = Maneo.query.filter_by(estado='PENDIENTE').count()
+    from models import Product, Sale, Maneo, Provider, Warranty, PriceApproval, BankAccount, SalePayment
     
-    mes_filtro = request.args.get('mes')
     hoy = obtener_hora_bogota()
-    
-    if mes_filtro:
+    periodo = request.args.get('periodo', 'mes').lower()
+    mes_filtro = request.args.get('mes')
+
+    # 1. Definición del rango temporal según el filtro seleccionado
+    if mes_filtro and periodo == 'mes':
         try:
             año, mes = map(int, mes_filtro.split('-'))
             inicio_periodo = datetime(año, mes, 1, 0, 0, 0)
@@ -124,22 +125,70 @@ def dashboard():
                 fin_periodo = datetime(año + 1, 1, 1, 0, 0, 0)
             else:
                 fin_periodo = datetime(año, mes + 1, 1, 0, 0, 0)
-            texto_periodo = f"{mes_filtro}"
+            texto_periodo = f"Mes {mes_filtro}"
         except Exception:
             inicio_periodo = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            fin_periodo = hoy.replace(year=hoy.year + 1, month=1, day=1) if hoy.month == 12 else hoy.replace(month=hoy.month + 1, day=1)
+            fin_periodo = hoy.replace(year=hoy.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0) if hoy.month == 12 else hoy.replace(month=hoy.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
             mes_filtro = hoy.strftime('%Y-%m')
             texto_periodo = "Mes Actual"
-    else:
-        inicio_periodo = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        fin_periodo = hoy.replace(year=hoy.year + 1, month=1, day=1) if hoy.month == 12 else hoy.replace(month=hoy.month + 1, day=1)
+    elif periodo == 'dia':
+        inicio_periodo = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+        fin_periodo = inicio_periodo + timedelta(days=1)
+        texto_periodo = f"Hoy ({hoy.strftime('%d/%m/%Y')})"
         mes_filtro = hoy.strftime('%Y-%m')
-        texto_periodo = "Mes Actual"
-    
+    elif periodo == 'semana':
+        # Semana actual de lunes a domingo
+        inicio_periodo = (hoy - timedelta(days=hoy.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        fin_periodo = inicio_periodo + timedelta(days=7)
+        domingo = inicio_periodo + timedelta(days=6)
+        texto_periodo = f"Semana ({inicio_periodo.strftime('%d %b')} - {domingo.strftime('%d %b')})"
+        mes_filtro = hoy.strftime('%Y-%m')
+    elif periodo == 'quincena':
+        if hoy.day <= 15:
+            inicio_periodo = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            fin_periodo = hoy.replace(day=16, hour=0, minute=0, second=0, microsecond=0)
+            texto_periodo = f"1ª Quincena (1-15 {hoy.strftime('%b')})"
+        else:
+            inicio_periodo = hoy.replace(day=16, hour=0, minute=0, second=0, microsecond=0)
+            fin_periodo = hoy.replace(year=hoy.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0) if hoy.month == 12 else hoy.replace(month=hoy.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            ultimo_dia = (fin_periodo - timedelta(days=1)).day
+            texto_periodo = f"2ª Quincena (16-{ultimo_dia} {hoy.strftime('%b')})"
+        mes_filtro = hoy.strftime('%Y-%m')
+    else:
+        periodo = 'mes'
+        inicio_periodo = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        fin_periodo = hoy.replace(year=hoy.year + 1, month=1, day=1, hour=0, minute=0, second=0, microsecond=0) if hoy.month == 12 else hoy.replace(month=hoy.month + 1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        mes_filtro = hoy.strftime('%Y-%m')
+        texto_periodo = hoy.strftime('%B %Y').capitalize()
+
+    # 2. Métricas de Ventas en el período
     total_ventas = db.session.query(func.sum(Sale.monto_total)).filter(Sale.fecha_venta >= inicio_periodo, Sale.fecha_venta < fin_periodo).scalar() or 0.0
     conteo_ventas = Sale.query.filter(Sale.fecha_venta >= inicio_periodo, Sale.fecha_venta < fin_periodo).count()
 
-    from models import Provider, Warranty, PriceApproval
+    # 3. Métricas de Bancos y Medios Digitales
+    # Saldo total actual acumulado en cuentas bancarias activas
+    saldo_bancos_total = db.session.query(func.sum(BankAccount.saldo_actual)).filter(BankAccount.tipo != 'efectivo', BankAccount.activo == True).scalar() or 0.0
+    
+    # Recaudos recibidos por bancos en el período (Nequi, Bancolombia, Daviplata, etc.)
+    recaudo_pagos = db.session.query(func.sum(SalePayment.monto))\
+        .join(Sale, SalePayment.sale_id == Sale.id)\
+        .filter(Sale.fecha_venta >= inicio_periodo, Sale.fecha_venta < fin_periodo)\
+        .filter(SalePayment.metodo_pago.notin_(['efectivo', 'retoma']))\
+        .scalar() or 0.0
+        
+    ventas_con_pagos = db.session.query(SalePayment.sale_id).distinct()
+    recaudo_directo = db.session.query(func.sum(Sale.monto_total))\
+        .filter(Sale.fecha_venta >= inicio_periodo, Sale.fecha_venta < fin_periodo)\
+        .filter(~Sale.id.in_(ventas_con_pagos))\
+        .filter(Sale.metodo_pago.notin_(['efectivo', 'retoma']))\
+        .scalar() or 0.0
+        
+    recaudo_bancos_periodo = float(recaudo_pagos) + float(recaudo_directo)
+
+    # 4. Métricas de Inventario y Operaciones
+    total_productos = Product.query.count()
+    productos_bajo_stock = Product.query.filter(Product.cantidad_stock <= 10).count()
+    maneos_activos = Maneo.query.filter_by(estado='PENDIENTE').count()
     proveedores_activos = Provider.query.count()
     garantias_pendientes = Warranty.query.filter_by(resolution='Pendiente').count()
     aprobaciones_pendientes = PriceApproval.query.filter_by(estado='pendiente').count()
@@ -149,6 +198,9 @@ def dashboard():
                            productos_bajo_stock=productos_bajo_stock,
                            total_ventas=total_ventas,
                            conteo_ventas=conteo_ventas,
+                           saldo_bancos_total=saldo_bancos_total,
+                           recaudo_bancos_periodo=recaudo_bancos_periodo,
+                           periodo_actual=periodo,
                            mes_filtro=mes_filtro,
                            texto_periodo=texto_periodo,
                            maneos_activos=maneos_activos,
