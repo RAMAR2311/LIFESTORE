@@ -436,6 +436,54 @@
             border-radius: 10px;
             font-weight: 700;
         }
+
+        /* Subdesplegable anidado / dropdown interno */
+        .sidebar-nested-accordion-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.45rem 0.65rem;
+            color: #334155;
+            font-size: 0.82rem;
+            font-weight: 600;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: left;
+        }
+        .sidebar-nested-accordion-btn:hover {
+            background: #FFFFFF;
+            color: #0F172A;
+            border-color: #E2E8F0;
+        }
+        .sidebar-nested-accordion-btn[aria-expanded="true"] {
+            background: #FFFFFF;
+            color: #0F172A;
+            border-color: #CBD5E1;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+        }
+        .sidebar-nested-accordion-btn .nested-chevron {
+            font-size: 0.68rem;
+            color: #94A3B8;
+            transition: transform 0.2s ease;
+        }
+        .sidebar-nested-accordion-btn[aria-expanded="true"] .nested-chevron {
+            transform: rotate(180deg);
+            color: var(--brand-primary);
+        }
+        .sidebar-nested-submenu {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 0.25rem 0.35rem;
+            margin: 0.2rem 0 0.4rem 0.6rem;
+            border-left: 2px solid #94A3B8;
+            border: 1px solid #E2E8F0;
+            border-left-width: 2.5px;
+            border-left-color: #475569;
+        }
     </style>
 </head>
 <body>
@@ -576,16 +624,26 @@
                                 <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad IMEI
                             </a>
 
-                            <!-- Equipo & Finanzas (Integrado en Administrativo) -->
-                            <a class="sidebar-sublink" href="{{ url_for('admin_bp.asesores') }}">
-                                <i class="fa-solid fa-user-tie me-2" style="width: 16px;"></i> Asesores de Venta
-                            </a>
-                            <a class="sidebar-sublink" href="{{ url_for('admin_bp.ventas_vendedores') }}">
-                                <i class="fa-solid fa-chart-line me-2" style="width: 16px;"></i> Rendimiento Asesores
-                            </a>
-                            <a class="sidebar-sublink" href="/admin/vendedores">
-                                <i class="fa-solid fa-users-gear me-2" style="width: 16px;"></i> Perfiles &amp; Usuarios
-                            </a>
+                            <!-- Desplegable Interno: Gestión de Equipo & Asesores -->
+                            <button class="sidebar-nested-accordion-btn my-1" type="button" data-bs-toggle="collapse" data-bs-target="#subgroupEquipoUsuarios" aria-expanded="false">
+                                <span><i class="fa-solid fa-users-gear me-2" style="width: 16px; color: var(--brand-titanium);"></i> Equipo &amp; Asesores</span>
+                                <i class="fa-solid fa-chevron-down nested-chevron"></i>
+                            </button>
+                            <div class="collapse" id="subgroupEquipoUsuarios">
+                                <div class="sidebar-nested-submenu">
+                                    <a class="sidebar-sublink" href="/admin/vendedores">
+                                        <i class="fa-solid fa-user-shield me-2" style="width: 16px;"></i> Perfiles &amp; Usuarios
+                                    </a>
+                                    <a class="sidebar-sublink" href="{{ url_for('admin_bp.asesores') }}">
+                                        <i class="fa-solid fa-user-tie me-2" style="width: 16px;"></i> Asesores de Venta
+                                    </a>
+                                    <a class="sidebar-sublink" href="{{ url_for('admin_bp.ventas_vendedores') }}">
+                                        <i class="fa-solid fa-chart-line me-2" style="width: 16px;"></i> Rendimiento Asesores
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Otras Operaciones Administrativas -->
                             <a class="sidebar-sublink" href="{{ url_for('admin_bp.aprobaciones') }}">
                                 <i class="fa-solid fa-tags me-2" style="width: 16px;"></i> Aprobaciones Especiales
                             </a>
@@ -750,6 +808,8 @@
                         links.forEach(el => el.style.display = '');
                         sectionLabels.forEach(el => el.style.display = '');
                         accordionBtns.forEach(el => el.style.display = '');
+                        const nestedAccordionBtns = menuContainer.querySelectorAll('.sidebar-nested-accordion-btn');
+                        nestedAccordionBtns.forEach(el => el.style.display = '');
                         return;
                     }
 
@@ -770,6 +830,19 @@
 
                     // Ocultar acordeones si todos sus sublinks están ocultos
                     accordionBtns.forEach(btn => {
+                        const targetId = btn.getAttribute('data-bs-target');
+                        if (targetId) {
+                            const subMenu = document.querySelector(targetId);
+                            if (subMenu) {
+                                const visibleChildren = subMenu.querySelectorAll('.sidebar-sublink[style="display: flex;"]');
+                                btn.style.display = visibleChildren.length > 0 ? 'flex' : 'none';
+                            }
+                        }
+                    });
+
+                    // Ocultar subacordeones anidados si sus sublinks están ocultos
+                    const nestedAccordionBtns = menuContainer.querySelectorAll('.sidebar-nested-accordion-btn');
+                    nestedAccordionBtns.forEach(btn => {
                         const targetId = btn.getAttribute('data-bs-target');
                         if (targetId) {
                             const subMenu = document.querySelector(targetId);
