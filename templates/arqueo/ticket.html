@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket Arqueo {{ fecha }} - Tu Tienda Tecnológica</title>
+    <title>Ticket Arqueo {{ fecha }} - LifeStore - Celulares</title>
     <!-- Fuente Roboto Mono idéntica al ticket de venta 80mm -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -21,8 +21,8 @@
             width: 100%;
             max-width: 380px; /* Ancho térmico 80mm */
             padding: 25px 20px;
-            border: 1px solid #E6F4D7;
-            box-shadow: 0 4px 20px rgba(118, 188, 33, 0.08);
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
             color: #1A1A1A;
             box-sizing: border-box;
         }
@@ -38,7 +38,7 @@
             font-size: 1.25rem;
             font-weight: 800;
             margin: 0;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.12em;
             line-height: 1.2;
             text-transform: uppercase;
         }
@@ -61,7 +61,7 @@
             font-size: 0.85rem;
             font-weight: 700;
             text-transform: uppercase;
-            border-bottom: 2px solid #76BC21;
+            border-bottom: 2px solid #1A1A1A;
             padding-bottom: 4px;
             margin: 14px 0 8px 0;
             color: #1A1A1A;
@@ -136,18 +136,18 @@
             background-color: #FFFFFF;
             padding: 10px 12px;
             border-radius: 6px;
-            border: 2px solid #76BC21;
+            border: 2px solid #1A1A1A;
             margin-top: 8px;
-            color: #111827;
+            color: #0F172A;
         }
 
         .btn-print {
             display: block;
             width: 100%;
             padding: 14px;
-            background-color: #76BC21;
+            background-color: #1A1A1A;
             color: #FFFFFF;
-            border: 2px solid #76BC21;
+            border: 2px solid #1A1A1A;
             font-size: 1rem;
             border-radius: 8px;
             font-weight: bold;
@@ -158,8 +158,8 @@
         }
 
         .btn-print:hover {
-            background-color: #1E5622;
-            border-color: #1E5622;
+            background-color: #334155;
+            border-color: #334155;
             color: #FFFFFF;
         }
 
@@ -212,7 +212,7 @@
 <body>
     <div class="ticket">
         <div class="header">
-            <div class="logo">TU TIENDA TECNOLÓGICA</div>
+            <div class="logo">LIFESTORE - CELULARES</div>
             <div class="subtitle">VENTA DE CELULARES &amp; TECNOLOGÍA</div>
             <div style="font-size: 0.8rem; font-weight: 700; margin: 4px 0;">CIERRE DE CAJA Y DETALLE VENTAS</div>
             <div class="info">FECHA CIERRE: <strong>{{ fecha }}</strong></div>

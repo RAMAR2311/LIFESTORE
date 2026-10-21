@@ -2,9 +2,9 @@
 
 {% block content %}
 <style>
-    /* Estructura Fullscreen Premium Split */
+    /* Estructura 100% White Canvas */
     body {
-        background-color: #FAFCF8 !important;
+        background-color: #FFFFFF !important;
         background-image: none !important;
         overflow-x: hidden;
     }
@@ -18,65 +18,54 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2rem 1rem;
+        padding: 2.5rem 1rem;
+        background-color: #FFFFFF;
     }
 
     .login-master-card {
         background: #FFFFFF;
-        border: 1px solid rgba(118, 188, 33, 0.18);
-        border-radius: 24px;
-        box-shadow: 0 20px 60px rgba(17, 24, 39, 0.07), 0 4px 16px rgba(118, 188, 33, 0.08);
+        border: 1px solid #E2E8F0;
+        border-radius: 20px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.02);
         overflow: hidden;
         width: 100%;
-        max-width: 980px;
-        transition: transform 0.25s ease, box-shadow 0.25s ease;
+        max-width: 940px;
+        position: relative;
     }
 
-    /* Panel Izquierdo: Branding & Logo */
+    /* Remate superior decorativo en degradado plata metálica */
+    .login-master-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);
+        z-index: 10;
+    }
+
+    /* Panel Izquierdo: Branding & Identidad Silver Tech */
     .brand-side {
-        background: linear-gradient(145deg, #0e1e11 0%, #17381b 50%, #1e5622 100%);
-        color: #FFFFFF;
+        background: #FFFFFF;
+        border-right: 1px solid #F1F5F9;
+        color: #0F172A;
         position: relative;
-        overflow: hidden;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         padding: 3.5rem 3rem;
     }
 
-    .brand-side::before {
-        content: "";
-        position: absolute;
-        top: -80px;
-        left: -80px;
-        width: 240px;
-        height: 240px;
-        background: radial-gradient(circle, rgba(118, 188, 33, 0.35) 0%, rgba(118, 188, 33, 0) 70%);
-        border-radius: 50%;
-        pointer-events: none;
-    }
-
-    .brand-side::after {
-        content: "";
-        position: absolute;
-        bottom: -60px;
-        right: -60px;
-        width: 220px;
-        height: 220px;
-        background: radial-gradient(circle, rgba(118, 188, 33, 0.25) 0%, rgba(118, 188, 33, 0) 70%);
-        border-radius: 50%;
-        pointer-events: none;
-    }
-
-    .brand-logo-glow {
-        background: rgba(255, 255, 255, 0.98);
-        padding: 18px 24px;
-        border-radius: 20px;
+    .brand-logo-badge {
+        background: #FFFFFF;
+        padding: 16px 22px;
+        border-radius: 16px;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
-        backdrop-filter: blur(8px);
+        gap: 14px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
         margin-bottom: 2rem;
     }
 
@@ -84,25 +73,26 @@
         display: inline-flex;
         align-items: center;
         gap: 0.65rem;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        padding: 0.55rem 1rem;
-        border-radius: 999px;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        padding: 0.6rem 1rem;
+        border-radius: 10px;
         font-size: 0.8rem;
-        color: #E2E8F0;
-        backdrop-filter: blur(6px);
+        color: #475569;
         margin-bottom: 0.65rem;
-        transition: background 0.2s ease, transform 0.2s ease;
+        transition: all 0.2s ease;
     }
 
     .feature-pill:hover {
-        background: rgba(118, 188, 33, 0.2);
-        border-color: rgba(118, 188, 33, 0.5);
+        background: #F1F5F9;
+        border-color: #CBD5E1;
+        color: #0F172A;
         transform: translateX(4px);
     }
 
     .feature-pill i {
-        color: #76BC21;
+        color: #1A1A1A;
+        width: 16px;
     }
 
     /* Panel Derecho: Formulario */
@@ -120,49 +110,48 @@
     }
 
     .form-side .input-group-text {
-        background: #F8FAFC !important;
-        border: 1.5px solid #E2E8F0 !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
         border-right: none !important;
         color: #64748B !important;
         border-radius: 12px 0 0 12px !important;
         padding-left: 1.15rem;
         padding-right: 1.15rem;
-        transition: border-color 0.2s ease, color 0.2s ease;
+        transition: all 0.2s ease;
     }
 
     .form-side .form-control {
-        background: #F8FAFC !important;
-        border: 1.5px solid #E2E8F0 !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
         border-left: none !important;
         border-radius: 0 12px 12px 0 !important;
         font-size: 0.95rem;
         padding: 0.85rem 1rem 0.85rem 0.2rem;
-        color: #1E293B !important;
+        color: #0F172A !important;
         transition: all 0.2s ease;
     }
 
     .login-input-group:focus-within .input-group-text {
-        border-color: var(--brand-primary) !important;
-        color: var(--brand-primary) !important;
-        background: #FFFFFF !important;
+        border-color: #94A3B8 !important;
+        color: #0F172A !important;
     }
 
     .login-input-group:focus-within .form-control {
-        border-color: var(--brand-primary) !important;
-        background: #FFFFFF !important;
+        border-color: #94A3B8 !important;
         box-shadow: none !important;
     }
 
+    /* Botón CTA Iniciar Sesión (#1A1A1A con efecto hover metálico) */
     .btn-login-premium {
-        background: linear-gradient(135deg, #76BC21 0%, #1E5622 100%) !important;
+        background: #1A1A1A !important;
         color: #FFFFFF !important;
         font-weight: 700;
-        font-size: 0.95rem;
-        letter-spacing: 0.06em;
-        border: none !important;
+        font-size: 0.92rem;
+        letter-spacing: 0.08em;
+        border: 1px solid #1A1A1A !important;
         border-radius: 12px;
-        padding: 0.95rem 1.5rem;
-        box-shadow: 0 8px 24px rgba(118, 188, 33, 0.35);
+        padding: 0.90rem 1.5rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         display: inline-flex;
         align-items: center;
@@ -171,9 +160,10 @@
     }
 
     .btn-login-premium:hover {
-        background: linear-gradient(135deg, #68aa1c 0%, #154219 100%) !important;
+        background: linear-gradient(135deg, #334155 0%, #1A1A1A 100%) !important;
+        border-color: #94A3B8 !important;
         transform: translateY(-2px);
-        box-shadow: 0 12px 28px rgba(118, 188, 33, 0.45);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.20);
         color: #FFFFFF !important;
     }
 
@@ -186,38 +176,40 @@
         align-items: center;
         gap: 6px;
         font-size: 0.72rem;
-        font-weight: 600;
-        color: #76BC21;
-        background: rgba(118, 188, 33, 0.12);
+        font-weight: 700;
+        color: #475569;
+        background: #F8FAFC;
         padding: 4px 10px;
         border-radius: 20px;
-        border: 1px solid rgba(118, 188, 33, 0.25);
+        border: 1px solid #E2E8F0;
+        letter-spacing: 0.05em;
     }
 
     .status-dot {
         width: 7px;
         height: 7px;
-        background-color: #76BC21;
+        background-color: #1A1A1A;
         border-radius: 50%;
-        box-shadow: 0 0 8px #76BC21;
         animation: pulseDot 2s infinite;
     }
 
     @keyframes pulseDot {
         0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.5; transform: scale(1.3); }
+        50% { opacity: 0.4; transform: scale(1.3); }
     }
 
     @media (max-width: 991.98px) {
         .brand-side {
             padding: 2.5rem 2rem;
+            border-right: none;
+            border-bottom: 1px solid #F1F5F9;
             text-align: center;
             align-items: center;
         }
         .form-side {
             padding: 2.5rem 2rem;
         }
-        .brand-logo-glow {
+        .brand-logo-badge {
             margin-bottom: 1.5rem;
         }
     }
@@ -226,49 +218,53 @@
 <div class="login-container-wrapper">
     <div class="login-master-card">
         <div class="row g-0">
-            <!-- Columna Izquierda: Logo & Identidad de Marca Premium -->
+            <!-- Columna Izquierda: Logo & Identidad de Marca LifeStore -->
             <div class="col-lg-5 brand-side">
-                <div class="position-relative" style="z-index: 2;">
+                <div class="position-relative">
                     <!-- Badge superior -->
                     <div class="mb-4">
                         <span class="brand-badge-status">
-                            <span class="status-dot"></span> SISTEMA ACTIVO &bull; POS PRO
+                            <span class="status-dot"></span> SISTEMA ACTIVO &bull; POS &amp; GESTIÓN
                         </span>
                     </div>
 
-                    <!-- Contenedor del Logo Izquierdo -->
-                    <div class="brand-logo-glow">
-                        <img src="{{ url_for('static', filename='img/tutienda.png') }}" 
-                             alt="Tu Tienda Tecnológica" 
-                             style="max-height: 85px; width: auto; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.06));">
+                    <!-- Contenedor del Isotipo Metálico -->
+                    <div class="brand-logo-badge">
+                        <div class="d-flex align-items-center justify-content-center shadow-sm" style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 50%, #CBD5E1 100%); border: 1px solid #CBD5E1;">
+                            <i class="fa-solid fa-mobile-screen fs-4" style="color: #1A1A1A;"></i>
+                        </div>
+                        <div class="text-start">
+                            <div class="brand-title" style="font-size: 1.25rem; line-height: 1.1; color: #0F172A;">LIFESTORE</div>
+                            <div class="brand-subtitle" style="font-size: 0.65rem; color: #64748B;">CELULARES</div>
+                        </div>
                     </div>
 
-                    <h2 class="brand-title text-white mb-2" style="font-size: 1.55rem; letter-spacing: 0.04em;">
-                        Tu Tienda <br class="d-none d-lg-block">Tecnológica
+                    <h2 class="fw-bold mb-2" style="font-size: 1.45rem; letter-spacing: -0.02em; color: #0F172A;">
+                        Gestión Comercial <br class="d-none d-lg-block">&amp; Control POS
                     </h2>
-                    <p class="brand-subtitle text-white-50 mb-4" style="font-size: 0.72rem; letter-spacing: 0.18em;">
-                        VENTA DE CELULARES &amp; TECNOLOGÍA
+                    <p class="text-secondary mb-4 small" style="line-height: 1.5;">
+                        Plataforma centralizada para inventario de celulares por IMEI, ventas y arqueo de caja.
                     </p>
 
                     <!-- Beneficios / Características del Software -->
-                    <div class="d-none d-md-block mt-4 pt-2">
+                    <div class="d-none d-md-block mt-4 pt-1">
                         <div class="feature-pill d-block">
-                            <i class="fa-solid fa-mobile-screen-button"></i> Control Avanzado de Inventario &amp; IMEIs
+                            <i class="fa-solid fa-barcode"></i> Control Avanzado de Inventario &amp; IMEIs
                         </div>
                         <div class="feature-pill d-block">
                             <i class="fa-solid fa-receipt"></i> Ventas, Facturación &amp; Arqueos Diarios
                         </div>
                         <div class="feature-pill d-block">
-                            <i class="fa-solid fa-shield-halved"></i> Acceso Seguro &amp; Auditoría Integral
+                            <i class="fa-solid fa-shield-check"></i> Acceso Seguro &amp; Auditoría Integral
                         </div>
                     </div>
                 </div>
 
                 <!-- Footer inferior del lado izquierdo -->
-                <div class="position-relative mt-4 pt-3 border-top border-white border-opacity-10" style="z-index: 2;">
-                    <div class="d-flex align-items-center justify-content-between text-white-50 small">
-                        <span style="font-size: 0.72rem;">Versión 2.5 Enterprise</span>
-                        <span style="font-size: 0.72rem;"><i class="fa-solid fa-lock text-success me-1"></i> SSL 256-Bit</span>
+                <div class="position-relative mt-4 pt-3 border-top border-light-subtle">
+                    <div class="d-flex align-items-center justify-content-between text-muted small">
+                        <span style="font-size: 0.72rem; color: #64748B;">LifeStore v2.5 Enterprise</span>
+                        <span style="font-size: 0.72rem; color: #64748B;"><i class="fa-solid fa-lock text-dark me-1"></i> SSL 256-Bit</span>
                     </div>
                 </div>
             </div>
@@ -276,14 +272,14 @@
             <!-- Columna Derecha: Formulario de Inicio de Sesión -->
             <div class="col-lg-7 form-side">
                 <div class="mb-4">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.75rem; letter-spacing: 0.1em; color: var(--brand-secondary) !important;">
-                        Bienvenido de nuevo
+                    <span class="text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.12em; color: #64748B;">
+                        Acceso Autorizado
                     </span>
-                    <h3 class="fw-bold text-dark mt-1 mb-2" style="font-family: 'Montserrat', sans-serif; font-size: 1.75rem;">
+                    <h3 class="fw-bold mt-1 mb-2" style="font-family: 'Inter', sans-serif; font-size: 1.70rem; color: #0F172A;">
                         Iniciar Sesión
                     </h3>
                     <p class="text-secondary small mb-0">
-                        Ingresa tus credenciales autorizadas para ingresar a la plataforma.
+                        Ingresa tus credenciales autorizadas para acceder a la plataforma.
                     </p>
                 </div>
 
@@ -291,7 +287,7 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.78rem;">
+                        <label class="form-label fw-semibold text-dark small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.76rem;">
                             Correo Electrónico
                         </label>
                         <div class="input-group login-input-group">
@@ -303,14 +299,14 @@
                                    name="email" 
                                    required 
                                    autofocus
-                                   placeholder="usuario@tutienda.com"
+                                   placeholder="usuario@lifestore.com"
                                    autocomplete="email">
                         </div>
                     </div>
 
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label fw-semibold text-dark small text-uppercase mb-0" style="letter-spacing: 0.05em; font-size: 0.78rem;">
+                            <label class="form-label fw-semibold text-dark small text-uppercase mb-0" style="letter-spacing: 0.05em; font-size: 0.76rem;">
                                 Contraseña
                             </label>
                         </div>
@@ -320,7 +316,7 @@
                             </span>
                             <input type="password" 
                                    class="form-control" 
-                                   id="loginPassword"
+                                   id="loginPassword" 
                                    name="password" 
                                    required 
                                    placeholder="••••••••••••"
@@ -328,7 +324,7 @@
                             <button class="btn btn-outline-secondary border-start-0 border" 
                                     type="button" 
                                     id="togglePassword" 
-                                    style="background: #F8FAFC; border-color: #E2E8F0 !important; border-radius: 0 12px 12px 0; color: #64748B;"
+                                    style="background: #FFFFFF; border-color: #E2E8F0 !important; border-radius: 0 12px 12px 0; color: #64748B;"
                                     title="Mostrar u ocultar contraseña">
                                 <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
                             </button>
@@ -337,7 +333,7 @@
 
                     <div class="d-grid mt-4 pt-2">
                         <button type="submit" class="btn btn-login-premium">
-                            <span>INGRESAR AL SISTEMA</span>
+                            <span>INICIAR SESIÓN</span>
                             <i class="fa-solid fa-arrow-right"></i>
                         </button>
                     </div>
@@ -345,7 +341,7 @@
 
                 <div class="mt-4 pt-3 border-top text-center" style="border-color: #F1F5F9 !important;">
                     <p class="text-muted small mb-0" style="font-size: 0.78rem;">
-                        <i class="fa-solid fa-circle-info text-secondary me-1"></i> ¿Problemas de acceso? Consulta con el Administrador del sistema.
+                        <i class="fa-solid fa-circle-info text-secondary me-1"></i> LifeStore POS &bull; Si tienes problemas de acceso, contacta al Administrador.
                     </p>
                 </div>
             </div>

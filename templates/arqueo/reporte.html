@@ -5,29 +5,29 @@
     <!-- Navbar y Filtros: Ocultos en Impresión -->
     <div class="col-12 d-print-none mb-4">
         <div class="card card-custom p-4 border-0 shadow-sm d-flex justify-content-between align-items-center flex-row">
-            <h4 class="fw-bold m-0 text-brand-pink">
-                <i class="fa-solid fa-file-invoice me-1"></i> Reporte Arqueo Caja
+            <h4 class="fw-bold m-0" style="color: #0F172A;">
+                <i class="fa-solid fa-file-invoice me-1" style="color: #64748B;"></i> Reporte Arqueo Caja
             </h4>
             
             {% if current_user.rol == 'admin' %}
             <form action="{{ url_for('arqueo_bp.reporte') }}" method="GET" class="d-flex align-items-center justify-content-end gap-3 flex-grow-1 mx-4">
-                <label for="fecha_inicio" class="fw-bold text-brand-black m-0">Desde:</label>
+                <label for="fecha_inicio" class="fw-bold text-dark m-0">Desde:</label>
                 <input type="date" name="fecha_inicio" id="fecha_inicio" value="{{ fecha_inicio }}" class="form-control w-auto">
 
-                <label for="fecha_fin" class="fw-bold text-brand-black m-0 ms-2">Hasta:</label>
+                <label for="fecha_fin" class="fw-bold text-dark m-0 ms-2">Hasta:</label>
                 <input type="date" name="fecha_fin" id="fecha_fin" value="{{ fecha_fin }}" class="form-control w-auto">
                 
-                <button type="submit" class="btn btn-outline-secondary rounded-pill px-4">Filtrar</button>
+                <button type="submit" class="btn btn-outline-dark rounded-pill px-4 fw-semibold">Filtrar</button>
             </form>
             {% else %}
             <div class="flex-grow-1 mx-4 text-center">
-                <span class="badge bg-light text-secondary border px-3 py-2">
+                <span class="badge bg-white text-secondary border px-3 py-2" style="border-color: #E5E7EB !important;">
                     <i class="fa-solid fa-calendar-day me-1"></i> Mostrando Arqueo de Hoy ({{ fecha_inicio }})
                 </span>
             </div>
             {% endif %}
 
-            <button onclick="window.print()" class="btn btn-pink px-4 rounded-pill fw-bold">
+            <button onclick="window.print()" class="btn px-4 rounded-pill fw-bold text-white shadow-sm" style="background-color: #1A1A1A; border: 1px solid #1A1A1A;">
                 <i class="fa-solid fa-print me-1"></i> Imprimir Tirilla
             </button>
         </div>
@@ -35,76 +35,76 @@
 
     <!-- Contenido del Reporte EN PANTALLA e IMPRESIÓN A4 -->
     <div class="col-12 col-xl-10">
-        <div class="card bg-white p-5 border-0 shadow-sm rounded-4 printable-document">
+        <div class="card bg-white p-5 border shadow-sm rounded-4 printable-document" style="border-color: #E5E7EB !important;">
             
             <!-- Encabezado Ticket / Documento Contable -->
-            <div class="text-center mb-5 pb-3 border-bottom" style="border-color: var(--brand-border) !important;">
-                <h1 class="fw-bold brand-title mb-0" style="font-size: 1.8rem;">TU TIENDA TECNOLÓGICA</h1>
-                <p class="brand-subtitle mb-2" style="font-size: 0.72rem;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
-                <p class="fw-bold text-brand-black mb-2" style="margin-top: 2px;">NIT: 1013679035-0</p>
-                <h4 class="text-muted fw-semibold">INFORME CONTABLE DE CIERRE DE CAJA (ARQUEO)</h4>
+            <div class="text-center mb-5 pb-3 border-bottom" style="border-color: #CBD5E1 !important;">
+                <h1 class="fw-bold brand-title mb-0" style="font-size: 1.8rem; letter-spacing: 0.12em; color: #0F172A;">LIFESTORE</h1>
+                <p class="brand-subtitle mb-2" style="font-size: 0.72rem; letter-spacing: 0.25em; color: #64748B;">CELULARES</p>
+                <p class="fw-bold mb-2" style="color: #0F172A; margin-top: 2px;">NIT: 1013679035-0</p>
+                <h4 class="text-secondary fw-semibold">INFORME CONTABLE DE CIERRE DE CAJA (ARQUEO)</h4>
                 <p class="mb-0 text-secondary">
                     Período: <strong>{{ fecha_inicio }}</strong> hasta <strong>{{ fecha_fin }}</strong>
                     <br>
                     Generado el: <strong>{{ fecha_generacion }}</strong>
                 </p>
                 {% if current_user.rol != 'admin' %}
-                    <p class="mb-0 text-brand-black fw-bold">Usuario Solicitante: {{ current_user.nombre }}</p>
+                    <p class="mb-0 fw-bold" style="color: #0F172A;">Usuario Solicitante: {{ current_user.nombre }}</p>
                 {% endif %}
             </div>
 
             <!-- Resumen Consolidado de Totales -->
-            <h5 class="fw-bold text-brand-black mb-3">📍 Resumen General del Período Recaudado</h5>
+            <h5 class="fw-bold mb-3" style="color: #0F172A;">📍 Resumen General del Período Recaudado</h5>
             <div class="row g-3 mb-4 resumen-totales">
                 <div class="col-12 col-md-3">
-                    <div class="card p-3 border rounded shadow-sm text-center h-100" style="border-left: 4px solid var(--brand-primary) !important; border-color: var(--brand-border);">
-                        <small class="fw-bold text-uppercase d-block mb-1 text-muted">Venta + Banco Neto</small>
-                        <h4 class="mb-0 fw-bold price-display font-mono">
+                    <div class="card p-3 border rounded shadow-sm text-center h-100 bg-white" style="border-color: #E5E7EB !important; border-top: 3px solid #1A1A1A !important;">
+                        <small class="fw-bold text-uppercase d-block mb-1 text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">Venta + Banco Neto</small>
+                        <h4 class="mb-0 fw-bold font-mono" style="color: #0F172A;">
                             ${{ (resumen.total_recaudado_neto)|cop }}
                         </h4>
                         <small class="d-block mt-1 text-muted" style="font-size:0.7rem;">Total - Gastos</small>
                     </div>
                 </div>
                 <div class="col-12 col-md-3">
-                    <div class="card p-3 border rounded shadow-sm bg-light text-center h-100" style="border-left: 4px solid #dc3545 !important;">
-                        <small class="text-secondary fw-bold text-uppercase d-block mb-1">Total Gastos Operativos</small>
-                        <h4 class="mb-0 text-danger fw-bold">$-{{ (resumen.total_gastos)|cop }}</h4>
+                    <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #dc3545 !important;">
+                        <small class="text-secondary fw-bold text-uppercase d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total Gastos Operativos</small>
+                        <h4 class="mb-0 text-danger fw-bold font-mono">$-{{ (resumen.total_gastos)|cop }}</h4>
                         <small class="text-muted d-block mt-1" style="font-size:0.7rem;">(Efectivo: ${{ (resumen.total_gastos_efectivo)|cop }})</small>
                     </div>
                 </div>
                 <div class="col-12 col-md-3">
-                    <div class="card p-3 border rounded shadow-sm bg-light text-center h-100" style="border-left: 4px solid var(--brand-black) !important;">
-                        <small class="text-secondary fw-bold text-uppercase d-block mb-1">Venta Total</small>
-                        <h4 class="mb-0 text-dark fw-bold" style="font-size: 1.6rem;">${{ (resumen.total_recaudado_bruto)|cop }}</h4>
+                    <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #475569 !important;">
+                        <small class="text-secondary fw-bold text-uppercase d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Venta Total</small>
+                        <h4 class="mb-0 fw-bold font-mono" style="font-size: 1.6rem; color: #0F172A;">${{ (resumen.total_recaudado_bruto)|cop }}</h4>
                         <small class="text-muted d-block mt-1" style="font-size:0.7rem;">Suma de Cash + Bancos</small>
                     </div>
                 </div>
                 <div class="col-12 col-md-3">
-                    <div class="card p-3 border rounded shadow-sm bg-light text-center h-100" style="border-left: 4px solid #ffc107 !important;">
-                        <small class="text-warning text-dark fw-bold d-block mb-1">SOBRANTES ACUMULADOS</small>
-                        <h4 class="mb-0 text-dark fw-bold">${{ (resumen.total_sobrantes)|cop }}</h4>
+                    <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #94A3B8 !important;">
+                        <small class="text-secondary fw-bold d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">SOBRANTES ACUMULADOS</small>
+                        <h4 class="mb-0 fw-bold font-mono" style="color: #0F172A;">${{ (resumen.total_sobrantes)|cop }}</h4>
                         <small class="text-muted d-block mt-1" style="font-size:0.7rem;">Acumulado a favor en cierres</small>
                     </div>
                 </div>
             </div>
 
             <!-- Tabla Desglosada Registro a Registro -->
-            <h5 class="fw-bold text-brand-black mb-3 border-bottom pb-2">📋 Desglose Analítico por Cierres de Día</h5>
+            <h5 class="fw-bold mb-3 border-bottom pb-2" style="color: #0F172A; border-color: #CBD5E1 !important;">📋 Desglose Analítico por Cierres de Día</h5>
             <div class="table-responsive">
-                <table class="table table-bordered table-sm fw-semibold mb-0 table-hover align-middle">
-                    <thead class="table-light text-center text-uppercase" style="font-size: 0.85rem;">
+                <table class="table table-bordered table-sm fw-semibold mb-0 table-hover align-middle bg-white" style="border-color: #E5E7EB;">
+                    <thead class="text-center text-uppercase" style="font-size: 0.80rem; background-color: #FFFFFF !important; color: #64748B !important; border-bottom: 2px solid #CBD5E1 !important;">
                         <tr>
-                            <th width="9%">Fecha</th>
-                            <th width="12%">Cajero(a)</th>
-                            <th width="10%" class="text-primary">Base Inicial</th>
-                            <th width="11%" class="text-dark bg-light border-start border-end">Venta Total</th>
-                            <th width="10%" class="text-success">Ventas Efec</th>
-                            <th width="10%" class="text-info">Bancos</th>
-                            <th width="10%" class="text-danger">Gastos</th>
-                            <th width="11%">Físico Contado</th>
-                            <th width="13%">Diferencia / Sobrante</th>
+                            <th width="9%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Fecha</th>
+                            <th width="12%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Cajero(a)</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Base Inicial</th>
+                            <th width="11%" style="color: #0F172A; border-bottom: 2px solid #CBD5E1;">Venta Total</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Ventas Efec</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Bancos</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Gastos</th>
+                            <th width="11%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Físico Contado</th>
+                            <th width="13%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Diferencia / Sobrante</th>
                             {% if current_user.rol == 'admin' %}
-                            <th width="8%" class="d-print-none">Acciones</th>
+                            <th width="8%" class="d-print-none" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Acciones</th>
                             {% endif %}
                         </tr>
                     </thead>

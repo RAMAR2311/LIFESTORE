@@ -1,13 +1,13 @@
 {
-    "name": "Tu Tienda Tecnológica - Venta de Celulares & Tecnología",
-    "short_name": "Tu Tienda Tecno",
-    "description": "Sistema POS y de gestión comercial de Tu Tienda Tecnológica",
+    "name": "LifeStore - Celulares",
+    "short_name": "LifeStore",
+    "description": "Sistema POS y de gestión comercial de LifeStore - Celulares",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
     "orientation": "any",
     "background_color": "#ffffff",
-    "theme_color": "#76BC21",
+    "theme_color": "#ffffff",
     "icons": [
         {
             "src": "/static/img/icons/icon-192x192.png",

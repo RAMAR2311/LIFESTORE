@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticket de Compra #{{ venta.id }} - Tu Tienda Tecnológica</title>
+    <title>Ticket de Compra #{{ venta.id }} - LifeStore - Celulares</title>
     <!-- Incluir solo la fuente base "Roboto Mono" (Letra de ticketera 80mm) -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
@@ -21,8 +21,8 @@
             width: 100%;
             max-width: 380px; /* Ancho de impresora térmica 80mm */
             padding: 25px 20px;
-            border: 1px solid #E6F4D7;
-            box-shadow: 0 4px 20px rgba(118, 188, 33, 0.08);
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
             color: #1A1A1A;
             box-sizing: border-box;
         }
@@ -38,7 +38,7 @@
             font-size: 1.25rem;
             font-weight: 800;
             margin: 2px 0 1px 0;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.12em;
             line-height: 1.2;
             text-transform: uppercase;
         }
@@ -86,8 +86,8 @@
             background-color: #FFFFFF;
             padding: 10px 12px;
             border-radius: 6px;
-            border: 2px solid #76BC21;
-            color: #111827;
+            border: 2px solid #1A1A1A;
+            color: #0F172A;
         }
 
         .footer {
@@ -100,9 +100,9 @@
             display: block;
             width: 100%;
             padding: 15px;
-            background-color: #76BC21;
+            background-color: #1A1A1A;
             color: #FFFFFF;
-            border: 2px solid #76BC21;
+            border: 2px solid #1A1A1A;
             font-size: 1.05rem;
             border-radius: 8px;
             font-weight: bold;
@@ -113,8 +113,8 @@
         }
 
         .btn-print:hover {
-            background-color: #1E5622;
-            border-color: #1E5622;
+            background-color: #334155;
+            border-color: #334155;
             color: #FFFFFF;
         }
 
@@ -170,8 +170,8 @@
 
 <div class="ticket">
     <div class="header">
-        <h1 class="logo">TU TIENDA TECNOLÓGICA</h1>
-        <p style="font-size: 0.72rem; font-weight: 700; margin: 0 0 6px 0; letter-spacing: 0.15em; text-transform: uppercase;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
+        <h1 class="logo">LIFESTORE - CELULARES</h1>
+        <p style="font-size: 0.72rem; font-weight: 700; margin: 0 0 6px 0; letter-spacing: 0.20em; text-transform: uppercase;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
         <p style="font-size: 0.78rem; font-weight: bold; margin: 0 0 8px 0; letter-spacing: 0.5px;">NIT: 1013679035-0</p>
         
         <div style="border-top: 1px dashed #1A1A1A; padding: 6px 0; font-size: 0.78rem; line-height: 1.4; text-align: left;">
@@ -344,7 +344,7 @@
         <p style="font-size: 0.72rem; line-height: 1.3; text-align: justify; margin: 10px 0; border-top: 1px dashed #1A1A1A; border-bottom: 1px dashed #1A1A1A; padding: 10px 0;">
             <strong>Políticas de Garantía:</strong> Equipos nuevos: garantía de 1 año. Equipos de exhibición: garantía de 8 meses. La remoción, rotura o alteración del sticker de seguridad de la tienda en el equipo anula automáticamente la garantía. No cubre equipos con garantía vencida, reportados por operador, IMEI o serial alterado, daños por golpes, caídas, humedad, líquidos, polvo, manipulación indebida, software modificado, instalaciones o actualizaciones no autorizadas, equipos intervenidos por terceros, pantallas despegadas, manchas negras, líneas en pantalla, rayones o cualquier daño físico. Para hacer efectiva la garantía es obligatorio presentar la factura original. El tiempo de revisión y diagnóstico es de 2 a 3 días hábiles. Si la garantía procede, se reemplazará la pieza defectuosa; si el equipo no puede ser reparado, se realizará el cambio del mismo. El tiempo máximo de reparación es de hasta 15 días hábiles, de conformidad con la Ley 1480 de 2011.
         </p>
-        <p style="font-size: 0.8rem; margin-top: 5px;">Soporte: contacto@tutiendatecnologica.com</p>
+        <p style="font-size: 0.8rem; margin-top: 5px;">Soporte: contacto@lifestore.com</p>
         <p style="font-size: 0.7rem; color: #666; margin-top: 10px; font-weight: bold;">Aliado tecnológico ZENIC S.A.S.</p>
     </div>
 
@@ -358,7 +358,7 @@
                 {% if not phone.startswith('57') and phone|length == 10 %}
                     {% set phone = '57' ~ phone %}
                 {% endif %}
-                {% set mensaje = "Hola " ~ venta.cliente.nombre ~ "! Aquí tienes tu factura digital de Tu Tienda Tecnológica: " ~ request.url %}
+                {% set mensaje = "Hola " ~ venta.cliente.nombre ~ "! Aquí tienes tu factura digital de LifeStore - Celulares: " ~ request.url %}
                 <a href="https://wa.me/{{ phone }}?text={{ mensaje|urlencode }}" 
                    target="_blank" 
                    class="btn-print btn-wa" 

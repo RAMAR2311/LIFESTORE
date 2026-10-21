@@ -84,8 +84,8 @@
 <body onload="window.print()">
 
     <div class="ticket-header text-center border-bottom">
-        <h2 class="fw-bold" style="margin-bottom: 1px; line-height: 1.1; font-size: 1.25rem;">TU TIENDA TECNOLÓGICA</h2>
-        <p class="small fw-bold" style="margin-top: 0; margin-bottom: 2px; letter-spacing: 0.15em; font-size: 0.7rem;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
+        <h2 class="fw-bold" style="margin-bottom: 1px; line-height: 1.1; font-size: 1.25rem; letter-spacing: 0.12em;">LIFESTORE - CELULARES</h2>
+        <p class="small fw-bold" style="margin-top: 0; margin-bottom: 2px; letter-spacing: 0.20em; font-size: 0.7rem;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
         <p class="small fw-bold" style="margin-top: 0; margin-bottom: 4px;">NIT: 1013679035-0</p>
         <p class="small" style="margin-bottom: 4px;">SOPORTE TÉCNICO Y GARANTÍAS</p>
     </div>
@@ -161,7 +161,7 @@
         {% if not phone.startswith('57') and phone|length == 10 %}
             {% set phone = '57' ~ phone %}
         {% endif %}
-        {% set mensaje = "Hola " ~ warranty.sale.cliente.nombre ~ "! Aquí tienes tu ticket de ingreso de garantía en Tu Tienda Tecnológica: " ~ request.url %}
+        {% set mensaje = "Hola " ~ warranty.sale.cliente.nombre ~ "! Aquí tienes tu ticket de ingreso de garantía en LifeStore - Celulares: " ~ request.url %}
         <div class="d-print-none text-center">
             <a href="https://wa.me/{{ phone }}?text={{ mensaje|urlencode }}" 
                target="_blank" 
