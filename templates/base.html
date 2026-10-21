@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <title>LifeStore - Celulares</title>
     <!-- Favicon y PWA -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/icons/icon-192x192.png') }}?v=6">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=6">
-    <link rel="manifest" href="/manifest.json?v=6">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/icons/icon-192x192.png') }}?v=7">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=7">
+    <link rel="manifest" href="/manifest.json?v=7">
     
     <!-- Meta tags para iOS, Android y PWA -->
     <meta name="mobile-web-app-capable" content="yes">
@@ -15,7 +15,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="LifeStore">
     <meta name="application-name" content="LifeStore">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icons/icon-192x192.png') }}?v=6">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icons/icon-192x192.png') }}?v=7">
     <meta name="theme-color" content="#FFFFFF">
 
     <!-- Google Fonts: Inter, Montserrat, JetBrains Mono, Plus Jakarta Sans -->
@@ -455,16 +455,7 @@
 
             <!-- Brand Logo (Centro) -->
             <a class="navbar-brand d-flex align-items-center fw-bold m-0 position-absolute start-50 translate-middle-x text-decoration-none" href="{{ url_for('index') }}" style="max-width: calc(100% - 100px); overflow: hidden;">
-                <div class="d-flex align-items-center">
-                    <!-- Isotipo Metálico LifeStore -->
-                    <div class="d-flex align-items-center justify-content-center me-2 shadow-sm" style="width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 50%, #CBD5E1 100%); border: 1px solid #CBD5E1;">
-                        <i class="fa-solid fa-mobile-screen fs-5" style="color: #1A1A1A;"></i>
-                    </div>
-                    <div class="d-flex flex-column text-start">
-                        <span class="brand-title" style="font-size: 1.15rem; line-height: 1.1;">LIFESTORE</span>
-                        <span class="brand-subtitle d-none d-sm-inline" style="line-height: 1.2;">CELULARES</span>
-                    </div>
-                </div>
+                <img src="{{ url_for('static', filename='img/lifestore_logo.png') }}" alt="LifeStore - Celulares" style="height: 36px; width: auto; object-fit: contain;">
             </a>
 
             <!-- Spacer derecho para equilibrar flex -->
