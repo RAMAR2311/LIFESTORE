@@ -1515,9 +1515,14 @@
                     {% else %}
                     <!-- Badge fijo para Vendedor o Bodeguero -->
                     <div class="d-none d-sm-flex align-items-center">
-                        <span class="badge bg-light text-dark border rounded-pill px-3 py-1 shadow-sm d-flex align-items-center gap-1" style="font-size: 0.78rem;">
-                            <i class="fa-solid fa-location-dot text-primary"></i>
-                            <span>{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
+                        <span class="badge rounded-pill px-3 py-1 shadow-sm d-flex align-items-center gap-1.5" 
+                              style="font-size: 0.78rem; font-weight: 700; color: #1e293b !important; background-color: #f1f5f9 !important; border: 1px solid #cbd5e1 !important;">
+                            {% if current_user.branch and current_user.branch.tipo == 'bodega' %}
+                                <span style="font-size: 0.85rem;">📦</span>
+                            {% else %}
+                                <i class="fa-solid fa-location-dot text-primary"></i>
+                            {% endif %}
+                            <span style="color: #0f172a !important; font-weight: 700;">{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
                         </span>
                     </div>
                     {% endif %}
@@ -1798,47 +1803,35 @@
                     </a>
 
                 {% elif current_user.rol == 'bodega' %}
-                    <!-- SECCIÓN: BODEGA -->
-                    <div class="sidebar-section-label">Control Bodega</div>
-                    <a class="sidebar-link" href="{{ url_for('bodega_bp.dashboard') }}">
-                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-boxes-stacked"></i></div>
-                        <span>Panel Bodega</span>
-                    </a>
+                    <!-- SECCIÓN: BODEGA (LOGÍSTICA & TRASLADOS) -->
+                    <div class="sidebar-section-label">Gestión de Inventario</div>
                     <a class="sidebar-link" href="{{ url_for('inventory_bp.index') }}">
-                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-box"></i></div>
-                        <span>Mi Inventario</span>
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-boxes-stacked"></i></div>
+                        <span>Inventario General</span>
                     </a>
+                    <a class="sidebar-link" href="{{ url_for('celulares_bp.inventario') }}">
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-mobile-screen"></i></div>
+                        <span>Inventario Celulares</span>
+                    </a>
+
+                    <div class="sidebar-section-label">Logística y Despachos</div>
                     <a class="sidebar-link d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
-                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-truck-moving"></i></div> Traslados</span>
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-truck-moving"></i></div> Traslados</span>
                         {% if pending_transfers_count > 0 %}
                             <span class="badge bg-danger rounded-pill">{{ pending_transfers_count }}</span>
                         {% endif %}
                     </a>
+                    <a class="sidebar-link" href="{{ url_for('transfers_bp.nuevo') }}">
+                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-plus"></i></div>
+                        <span>Crear Traslado</span>
+                    </a>
                     <a class="sidebar-link" href="{{ url_for('transfers_bp.trazabilidad') }}">
-                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-timeline"></i></div>
+                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-timeline"></i></div>
                         <span>Bitácora Trazabilidad</span>
                     </a>
-                    <a class="sidebar-link" href="{{ url_for('bodega_bp.caja_rapida') }}">
-                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-store"></i></div>
-                        <span>Caja Rápida (POS)</span>
-                    </a>
-
-                    <div class="sidebar-section-label">Clientes &amp; Pagos</div>
-                    <a class="sidebar-link" href="{{ url_for('bodega_bp.clientes') }}">
-                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-address-book"></i></div>
-                        <span>Directorio Clientes</span>
-                    </a>
-                    <a class="sidebar-link" href="{{ url_for('bodega_bp.nuevo_cliente') }}">
-                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-user-plus"></i></div>
-                        <span>Registrar Cliente</span>
-                    </a>
-                    <a class="sidebar-link" href="{{ url_for('bodega_bp.nueva_factura') }}">
-                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-file-invoice"></i></div>
-                        <span>Factura Manual</span>
-                    </a>
-                    <a class="sidebar-link" href="{{ url_for('bodega_bp.modulo_abonos') }}">
-                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-money-bill-transfer"></i></div>
-                        <span>Módulo de Abonos</span>
+                    <a class="sidebar-link" href="{{ url_for('inventory_bp.historial_ajustes') }}">
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-receipt"></i></div>
+                        <span>Kardex / Ajustes</span>
                     </a>
 
                 {% elif current_user.rol == 'vendedor_bodega' %}

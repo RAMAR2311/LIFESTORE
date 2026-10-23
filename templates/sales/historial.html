@@ -3,9 +3,10 @@
 {% block content %}
 <div class="row mb-4">
     <div class="col-12 d-flex justify-content-between align-items-center mb-4">
-        <!-- Título con acento Azul Turquesa según reglas de Branding (.text-brand-blue es #A3D8DE) -->
-        <h2 class="fw-bolder m-0" style="color: var(--brand-blue);">
-            <i class="fa-solid fa-clock-rotate-left me-2"></i>Historial de Operaciones
+        <!-- Título Principal -->
+        <h2 class="fw-bolder text-brand-black m-0 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-primary"></i>
+            <span>Historial de Operaciones</span>
         </h2>
         <div class="d-flex align-items-center gap-2 d-print-none flex-wrap">
             <a href="{{ url_for('sales_bp.exportar_excel', fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}" class="btn btn-success rounded-pill fw-bold px-4 shadow-sm">
@@ -32,85 +33,207 @@
         {% endif %}
     </div>
 
-    <!-- UI: Resumen Financiero Dinámico (Tarjetas) -->
-    <div class="col-6 col-md-2 mb-3">
-        <div class="card card-custom h-100" style="border-left: 4px solid var(--brand-blue) !important;">
-            <div class="card-body py-2 ps-2 d-flex flex-column justify-content-between">
-                <div>
-                    <p class="text-muted fw-bold text-uppercase mb-0" style="font-size: 0.65rem;"><i class="fa-solid fa-money-bills me-1"></i> Efectivo</p>
-                    <h5 class="fw-bolder m-0" style="color: var(--brand-blue); font-size: 1.1rem;">${{ (total_efectivo)|cop }}</h5>
+    <!-- UI: Resumen Financiero Dinámico (Tarjetas de Métodos de Pago) -->
+    <style>
+        .finance-card {
+            position: relative;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 1rem 1.1rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .finance-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3.5px;
+            background: var(--card-accent, #3b82f6);
+            border-radius: 16px 16px 0 0;
+        }
+        .finance-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+            border-color: #cbd5e1;
+        }
+        .finance-card .icon-chip {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            background: var(--card-bg-subtle, #eff6ff);
+            color: var(--card-accent, #3b82f6);
+            transition: transform 0.2s ease;
+        }
+        .finance-card:hover .icon-chip {
+            transform: scale(1.1);
+        }
+        .finance-card .amount-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+        .finance-card .btn-card-action {
+            font-size: 0.73rem;
+            font-weight: 700;
+            color: var(--card-accent, #3b82f6);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin-top: 0.5rem;
+            transition: gap 0.2s ease, opacity 0.2s ease;
+        }
+        .finance-card:hover .btn-card-action {
+            gap: 7px;
+        }
+        
+        /* Dark Theme Support */
+        [data-theme="dark"] .finance-card {
+            background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%) !important;
+            border-color: rgba(255, 255, 255, 0.09) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+        }
+        [data-theme="dark"] .finance-card:hover {
+            border-color: rgba(255, 255, 255, 0.22) !important;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
+        }
+        [data-theme="dark"] .finance-card .amount-display {
+            color: #f8fafc !important;
+        }
+        [data-theme="dark"] .finance-card .text-muted {
+            color: #94a3b8 !important;
+        }
+    </style>
+
+    <!-- 1. Efectivo -->
+    <div class="col-6 col-lg-2 col-md-4 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #059669; --card-bg-subtle: #ecfdf5;" onclick="filtrarTabla('efectivo')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Efectivo</span>
+                    <div class="icon-chip"><i class="fa-solid fa-money-bills"></i></div>
                 </div>
-                <button class="btn btn-link btn-sm p-0 text-start text-decoration-none mt-1 fw-semibold d-print-none" style="font-size: 0.75rem; color: var(--brand-blue);" onclick="filtrarTabla('efectivo')">Ver operaciones &raquo;</button>
+                <div class="amount-display">${{ (total_efectivo)|cop }}</div>
             </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
         </div>
     </div>
     
-    <div class="col-6 col-md-2 mb-3">
-        <div class="card card-custom h-100" style="border-left: 4px solid #fd7e14 !important;">
-            <div class="card-body py-2 ps-2 d-flex flex-column justify-content-between">
-                <div>
-                    <p class="text-muted fw-bold text-uppercase mb-0" style="font-size: 0.65rem;"><i class="fa-solid fa-building-columns me-1"></i> Bancolombia</p>
-                    <h5 class="fw-bolder m-0" style="color: #fd7e14; font-size: 1.1rem;">${{ (total_bancolombia)|cop }}</h5>
+    <!-- 2. Bancolombia -->
+    <div class="col-6 col-lg-2 col-md-4 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #ea580c; --card-bg-subtle: #fff7ed;" onclick="filtrarTabla('bancolombia')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Bancolombia</span>
+                    <div class="icon-chip"><i class="fa-solid fa-building-columns"></i></div>
                 </div>
-                <button class="btn btn-link btn-sm p-0 text-start text-decoration-none mt-1 fw-semibold d-print-none" style="font-size: 0.75rem; color: #fd7e14;" onclick="filtrarTabla('bancolombia')">Ver operaciones &raquo;</button>
+                <div class="amount-display">${{ (total_bancolombia)|cop }}</div>
             </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
         </div>
     </div>
 
-    <div class="col-6 col-md-2 mb-3">
-        <div class="card card-custom h-100" style="border-left: 4px solid #dc3545 !important;">
-            <div class="card-body py-2 ps-2 d-flex flex-column justify-content-between">
-                <div>
-                    <p class="text-muted fw-bold text-uppercase mb-0" style="font-size: 0.65rem;"><i class="fa-solid fa-mobile-screen me-1"></i> Daviplata</p>
-                    <h5 class="fw-bolder m-0" style="color: #dc3545; font-size: 1.1rem;">${{ (total_daviplata)|cop }}</h5>
+    <!-- 3. Daviplata -->
+    <div class="col-6 col-lg-2 col-md-4 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #e11d48; --card-bg-subtle: #fff1f2;" onclick="filtrarTabla('daviplata')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Daviplata</span>
+                    <div class="icon-chip"><i class="fa-solid fa-mobile-screen"></i></div>
                 </div>
-                <button class="btn btn-link btn-sm p-0 text-start text-decoration-none mt-1 fw-semibold d-print-none" style="font-size: 0.75rem; color: #dc3545;" onclick="filtrarTabla('daviplata')">Ver operaciones &raquo;</button>
+                <div class="amount-display">${{ (total_daviplata)|cop }}</div>
             </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
         </div>
     </div>
 
-    <div class="col-6 col-md-2 mb-3">
-        <div class="card card-custom h-100" style="border-left: 4px solid #20c997 !important;">
-            <div class="card-body py-2 ps-2 d-flex flex-column justify-content-between">
-                <div>
-                    <p class="text-muted fw-bold text-uppercase mb-0" style="font-size: 0.65rem;"><i class="fa-solid fa-credit-card me-1"></i> T. Crédito</p>
-                    <h5 class="fw-bolder m-0" style="color: #20c997; font-size: 1.1rem;">${{ (total_tarjeta_credito)|cop }}</h5>
+    <!-- 4. Tarjeta de Crédito -->
+    <div class="col-6 col-lg-2 col-md-4 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #0d9488; --card-bg-subtle: #f0fdfa;" onclick="filtrarTabla('tarjeta_credito')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">T. Crédito</span>
+                    <div class="icon-chip"><i class="fa-solid fa-credit-card"></i></div>
                 </div>
-                <button class="btn btn-link btn-sm p-0 text-start text-decoration-none mt-1 fw-semibold d-print-none" style="font-size: 0.75rem; color: #20c997;" onclick="filtrarTabla('tarjeta_credito')">Ver operaciones &raquo;</button>
+                <div class="amount-display">${{ (total_tarjeta_credito)|cop }}</div>
             </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
         </div>
     </div>
 
-    <div class="col-6 col-md-2 mb-3">
-        <div class="card card-custom h-100" style="border-left: 4px solid #6f42c1 !important;">
-            <div class="card-body py-2 ps-2 d-flex flex-column justify-content-between">
-                <div>
-                    <p class="text-muted fw-bold text-uppercase mb-0" style="font-size: 0.65rem;"><i class="fa-solid fa-cart-shopping me-1"></i> Addi</p>
-                    <h5 class="fw-bolder m-0" style="color: #6f42c1; font-size: 1.1rem;">${{ (total_addi)|cop }}</h5>
+    <!-- 5. Addi -->
+    <div class="col-6 col-lg-2 col-md-4 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #7c3aed; --card-bg-subtle: #f5f3ff;" onclick="filtrarTabla('addi')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Addi</span>
+                    <div class="icon-chip"><i class="fa-solid fa-bag-shopping"></i></div>
                 </div>
-                <button class="btn btn-link btn-sm p-0 text-start text-decoration-none mt-1 fw-semibold d-print-none" style="font-size: 0.75rem; color: #6f42c1;" onclick="filtrarTabla('addi')">Ver operaciones &raquo;</button>
+                <div class="amount-display">${{ (total_addi)|cop }}</div>
             </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
         </div>
     </div>
 
-    <div class="col-6 col-md-2 mb-3">
-        <div class="card card-custom h-100" style="border-left: 4px solid #198754 !important;">
-            <div class="card-body py-2 ps-2 d-flex flex-column justify-content-between">
-                <div>
-                    <p class="text-muted fw-bold text-uppercase mb-0" style="font-size: 0.65rem;"><i class="fa-solid fa-id-card me-1"></i> Sitecredito</p>
-                    <h5 class="fw-bolder m-0" style="color: #198754; font-size: 1.1rem;">${{ (total_sitecredito)|cop }}</h5>
+    <!-- 6. Sistecredito -->
+    <div class="col-6 col-lg-2 col-md-4 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #2563eb; --card-bg-subtle: #eff6ff;" onclick="filtrarTabla('sitecredito')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Sistecredito</span>
+                    <div class="icon-chip"><i class="fa-solid fa-id-card"></i></div>
                 </div>
-                <button class="btn btn-link btn-sm p-0 text-start text-decoration-none mt-1 fw-semibold d-print-none" style="font-size: 0.75rem; color: #198754;" onclick="filtrarTabla('sitecredito')">Ver operaciones &raquo;</button>
+                <div class="amount-display">${{ (total_sitecredito)|cop }}</div>
             </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
         </div>
     </div>
 
     {% if total_otros > 0 %}
+    <!-- Otros / Históricos -->
     <div class="col-12 mb-3">
-        <div class="card card-custom h-100" style="border-left: 4px solid var(--brand-pink) !important;">
-            <div class="card-body py-2 ps-3">
-                <p class="text-muted fw-bold text-uppercase mb-0" style="font-size: 0.65rem;"><i class="fa-solid fa-clock-rotate-left me-1"></i> Otros / Históricos</p>
-                <h5 class="fw-bolder m-0" style="color: var(--brand-pink); font-size: 1.1rem;">${{ (total_otros)|cop }}</h5>
+        <div class="finance-card p-3" style="--card-accent: #64748b; --card-bg-subtle: #f1f5f9;">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-chip"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    <div>
+                        <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Otros / Pagos Históricos</span>
+                        <div class="amount-display fs-5">${{ (total_otros)|cop }}</div>
+                    </div>
+                </div>
+                <span class="badge rounded-pill bg-light text-muted border px-3 py-1.5 small fw-semibold">
+                    Registros anteriores
+                </span>
             </div>
         </div>
     </div>
@@ -275,8 +398,8 @@
                                                                 {% set p_nombre = d.nombre_manual ~ ' (Externo/Manual)' %}
                                                             {% elif d.variant_id %}
                                                                 {% set vari = d.variante %}
-                                                                {% set prod = d.producto or (vari.producto if vari else None) %}
-                                                                {% set c_u = (vari.precio_costo if (vari and vari.precio_costo is not None) else (prod.precio_costo if prod else 0)) or 0 %}
+                                                                {% set prod = d.producto or (vari.producto if vari else none) %}
+                                                                {% set c_u = (vari.precio_costo if (vari and vari.precio_costo is not none) else (prod.precio_costo if prod else 0)) or 0 %}
                                                                 {% set p_nombre = (prod.nombre if prod else 'Producto') ~ ' [' ~ (vari.nombre_variante if vari else '') ~ ']' %}
                                                             {% elif d.product_id %}
                                                                 {% set prod = d.producto %}

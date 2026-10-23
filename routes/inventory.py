@@ -46,9 +46,17 @@ def index():
     elif current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
         active_b_id = current_user.branch_id
 
-    base_query = Product.query.filter_by(tipo_inventario=tipo)
+    if current_user.rol == 'bodega':
+        base_query = Product.query.filter(Product.tipo_inventario.in_(['tienda', 'bodega']))
+        if not active_b_id:
+            bodega_b = Branch.query.filter_by(tipo='bodega', activa=True).first()
+            active_b_id = bodega_b.id if bodega_b else 2
+    elif current_user.rol == 'vendedor_bodega':
+        base_query = Product.query.filter_by(tipo_inventario='bodega')
+    else:
+        base_query = Product.query.filter_by(tipo_inventario='tienda')
 
-    # Si es vendedor, solo puede ver productos con stock > 0 en su sucursal asignada
+    # Si es vendedor de tienda, solo puede ver productos con stock > 0 en su sucursal asignada
     if current_user.rol == 'vendedor':
         if not active_b_id:
             # Si el vendedor no tiene sucursal asignada, se le asigna la principal o no ve nada
@@ -685,7 +693,8 @@ def importar_inventario():
         if 'subcategoria' not in df.columns:
             df['subcategoria'] = ''
             
-        tipo = 'bodega' if current_user.rol == 'bodega' else 'tienda'
+        tipo = 'bodega' if current_user.rol in ['bodega', 'vendedor_bodega'] else 'tienda'
+        target_branch_id = _resolve_target_branch_id(request.form.get('branch_id'))
         creados = 0
         actualizados = 0
         
@@ -717,18 +726,24 @@ def importar_inventario():
                     if variante:
                         # Actualizar variante existente
                         stock_anterior = variante.cantidad_stock
-                        variante.cantidad_stock += cant
                         variante.precio_costo = costo
                         variante.precio_minimo = minimo
                         variante.precio_sugerido = sugerido
+
+                        # Multisucursal: Stock en la sede destino
+                        b_stock = get_or_create_branch_stock(target_branch_id, prod.id, variante.id)
+                        stock_ant_local = b_stock.cantidad
+                        b_stock.cantidad += cant
+                        sync_global_product_stock(prod.id, variante.id)
                         
                         if cant > 0:
                             ajuste = StockAdjustment(
                                 product_id=prod.id,
                                 admin_id=current_user.id,
+                                branch_id=target_branch_id,
                                 tipo_movimiento=f'Ingreso Masivo Subcategoría {subcat_val}',
-                                stock_anterior=stock_anterior,
-                                stock_nuevo=variante.cantidad_stock
+                                stock_anterior=stock_ant_local,
+                                stock_nuevo=b_stock.cantidad
                             )
                             db.session.add(ajuste)
                         actualizados += 1
@@ -743,10 +758,18 @@ def importar_inventario():
                             precio_sugerido=sugerido
                         )
                         db.session.add(nueva_variante)
+                        db.session.flush()
+
+                        # Multisucursal
+                        b_stock = get_or_create_branch_stock(target_branch_id, prod.id, nueva_variante.id)
+                        b_stock.cantidad = cant
+                        sync_global_product_stock(prod.id, nueva_variante.id)
+
                         # También sumar al historial para el Kardex
                         ajuste = StockAdjustment(
                             product_id=prod.id,
                             admin_id=current_user.id,
+                            branch_id=target_branch_id,
                             tipo_movimiento=f'Creación Excel Subcategoría {subcat_val}',
                             stock_anterior=0,
                             stock_nuevo=cant
@@ -756,20 +779,25 @@ def importar_inventario():
                 else:
                     # Sin variante, actualizar producto base
                     stock_anterior = prod.cantidad_stock
-                    prod.cantidad_stock += cant
                     prod.precio_costo = costo
                     prod.precio_minimo = minimo
                     prod.precio_sugerido = sugerido
                     prod.nombre = nombre_val 
                     prod.observacion = obs_val
                     
+                    b_stock = get_or_create_branch_stock(target_branch_id, prod.id, None)
+                    stock_ant_local = b_stock.cantidad
+                    b_stock.cantidad += cant
+                    sync_global_product_stock(prod.id, None)
+
                     if cant > 0:
                         ajuste = StockAdjustment(
                             product_id=prod.id,
                             admin_id=current_user.id,
+                            branch_id=target_branch_id,
                             tipo_movimiento='Suma por Ingreso Masivo (Excel)',
-                            stock_anterior=stock_anterior,
-                            stock_nuevo=prod.cantidad_stock
+                            stock_anterior=stock_ant_local,
+                            stock_nuevo=b_stock.cantidad
                         )
                         db.session.add(ajuste)
                     actualizados += 1
@@ -779,7 +807,7 @@ def importar_inventario():
                     sku=sku_raw,
                     nombre=nombre_val,
                     tipo_inventario=tipo,
-                    cantidad_stock=cant if not subcat_val else 0, # Si provee subcat, todo el stock se va a la subcat
+                    cantidad_stock=0,
                     precio_costo=costo,
                     precio_minimo=minimo,
                     precio_sugerido=sugerido,
@@ -799,22 +827,33 @@ def importar_inventario():
                         precio_sugerido=sugerido
                     )
                     db.session.add(nueva_variante)
+                    db.session.flush()
+
+                    b_stock = get_or_create_branch_stock(target_branch_id, nuevo_prod.id, nueva_variante.id)
+                    b_stock.cantidad = cant
+                    sync_global_product_stock(nuevo_prod.id, nueva_variante.id)
                     
                     ajuste = StockAdjustment(
                         product_id=nuevo_prod.id,
                         admin_id=current_user.id,
+                        branch_id=target_branch_id,
                         tipo_movimiento=f'Cr. Inicial Excel + Subcat {subcat_val}',
                         stock_anterior=0,
                         stock_nuevo=cant
                     )
                     db.session.add(ajuste)
                 else:
+                    b_stock = get_or_create_branch_stock(target_branch_id, nuevo_prod.id, None)
+                    b_stock.cantidad = cant
+                    sync_global_product_stock(nuevo_prod.id, None)
+
                     ajuste = StockAdjustment(
                         product_id=nuevo_prod.id,
                         admin_id=current_user.id,
+                        branch_id=target_branch_id,
                         tipo_movimiento='Creación Inicial (Excel)',
                         stock_anterior=0,
-                        stock_nuevo=nuevo_prod.cantidad_stock
+                        stock_nuevo=cant
                     )
                     db.session.add(ajuste)
                 creados += 1

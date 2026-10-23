@@ -150,6 +150,8 @@ def inventario():
                 break
         celular_ubicaciones[c.id] = ubicacion
 
+    sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+
     return render_template('celulares/inventario.html', 
                            celulares=paginacion.items,
                            paginacion=paginacion,
@@ -162,7 +164,9 @@ def inventario():
                            costo_total=costo_total,
                            ventas_estimadas=ventas_estimadas,
                            celulares_en_maneo=celulares_en_maneo,
-                           celular_ubicaciones=celular_ubicaciones)
+                           celular_ubicaciones=celular_ubicaciones,
+                           sucursales_activas=sucursales_activas,
+                           active_b_id=active_b_id)
 
 @celulares_bp.route('/prestar/<int:id>', methods=['POST'])
 @login_required
@@ -759,6 +763,23 @@ def importar_excel():
             )
             
             db.session.add(nuevo)
+            db.session.flush()
+
+            # Multisucursal: Asignar a sucursal de destino y registrar en Kardex
+            target_branch_id = _resolve_celular_branch_id(request.form.get('branch_id'))
+            b_stock = get_or_create_branch_stock(target_branch_id, nuevo.id, None)
+            b_stock.cantidad = 1
+            sync_global_product_stock(nuevo.id, None)
+
+            ajuste = StockAdjustment(
+                product_id=nuevo.id,
+                admin_id=current_user.id,
+                branch_id=target_branch_id,
+                tipo_movimiento='Ingreso Masivo Celulares (Excel)',
+                stock_anterior=0,
+                stock_nuevo=1
+            )
+            db.session.add(ajuste)
             exitosos += 1
             
         db.session.commit()

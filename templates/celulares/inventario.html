@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="fw-bold text-brand-black m-0">Inventario de Celulares</h2>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-truck-moving me-1"></i> Trasladar Celulares
+        </a>
         <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalImportarExcel">
             <i class="fa-solid fa-file-excel me-1"></i> Importar Excel
         </button>
@@ -30,6 +33,20 @@
                         <i class="fa-solid fa-download me-1"></i> Descargar Plantilla de Ejemplo
                     </a>
                     
+                    {% if current_user.rol == 'admin' %}
+                    <div class="mb-3 text-start">
+                        <label class="form-label fw-bold"><i class="fa-solid fa-location-dot text-primary me-1"></i> Sucursal o Bodega de Destino</label>
+                        <select name="branch_id" class="form-select bg-light border-0 shadow-sm fw-semibold">
+                            {% for b in sucursales_activas %}
+                                <option value="{{ b.id }}" {% if active_b_id == b.id %}selected{% elif b.tipo == 'bodega' %}selected{% endif %}>
+                                    {{ b.nombre }} ({{ b.codigo }}) - {{ b.tipo|capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted d-block mt-1">Los teléfonos y sus seriales IMEI quedarán asignados a esta sede.</small>
+                    </div>
+                    {% endif %}
+
                     <div class="mb-3 text-start">
                         <label for="archivo_excel" class="form-label fw-bold">Archivo Excel (.xlsx, .xls)</label>
                         <input class="form-control" type="file" id="archivo_excel" name="archivo_excel" accept=".xlsx, .xls" required>
@@ -191,11 +208,19 @@
                     <td class="text-center">
                         {% set loc = celular_ubicaciones.get(c.id) if celular_ubicaciones else none %}
                         {% if loc %}
-                            <span class="badge {% if loc.tipo == 'bodega' %}bg-purple text-white{% else %}bg-dark text-white{% endif %} rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.72rem;">
-                                {% if loc.tipo == 'bodega' %}📦{% else %}📍{% endif %} {{ loc.nombre }}
-                            </span>
+                            {% if loc.tipo == 'bodega' %}
+                                <span class="badge rounded-pill px-2.5 py-1 fw-bold shadow-sm d-inline-flex align-items-center gap-1" 
+                                      style="font-size: 0.74rem; background-color: #f3e8ff !important; color: #6b21a8 !important; border: 1px solid #d8b4fe !important;">
+                                    <span>📦</span> <span>{{ loc.nombre }}</span>
+                                </span>
+                            {% else %}
+                                <span class="badge rounded-pill px-2.5 py-1 fw-bold shadow-sm d-inline-flex align-items-center gap-1" 
+                                      style="font-size: 0.74rem; background-color: #e0f2fe !important; color: #0369a1 !important; border: 1px solid #bae6fd !important;">
+                                    <span>📍</span> <span>{{ loc.nombre }}</span>
+                                </span>
+                            {% endif %}
                         {% else %}
-                            <span class="badge bg-light text-muted border rounded-pill px-2 py-1" style="font-size: 0.7rem;">-</span>
+                            <span class="badge rounded-pill px-2 py-1" style="font-size: 0.7rem; background-color: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;">-</span>
                         {% endif %}
                     </td>
                     <td class="text-truncate" style="max-width: 120px;" title="{{ c.proveedor or '-' }}">{{ c.proveedor or '-' }}</td>
@@ -230,6 +255,10 @@
                             <span class="badge bg-dark fw-bold shadow-sm rounded-pill px-3 py-1">VENDIDO</span>
                         {% else %}
                             <div class="d-flex justify-content-center gap-1">
+                                <!-- Botón Rápido: Trasladar Equipo Directo -->
+                                <a href="{{ url_for('transfers_bp.nuevo', imei=c.imei) }}" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Trasladar este Celular (IMEI: {{ c.imei }})">
+                                    <i class="fa-solid fa-truck-moving" style="font-size: 0.75rem;"></i>
+                                </a>
                                 <!-- Botón Rápido: Prestar a Local Vecino (Maneo) -->
                                 <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Prestar a Local Vecino (Maneo)" data-bs-toggle="modal" data-bs-target="#modalPrestarCelular{{ c.id }}">
                                     <i class="fa-solid fa-handshake text-dark" style="font-size: 0.75rem;"></i>

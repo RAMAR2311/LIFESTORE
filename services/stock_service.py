@@ -83,12 +83,25 @@ def get_product_stock_distribution(product_id, variant_id=None):
             BranchStock.product_id == product_id
         )
         if variant_id is None:
-            query = query.filter(BranchStock.variant_id.is_(None))
+            # Si el producto tiene variantes registradas, sumamos todas las variantes de esa sucursal
+            from models import ProductVariant
+            tiene_vars = ProductVariant.query.filter_by(product_id=product_id).first()
+            if tiene_vars:
+                query = query.filter(BranchStock.variant_id.isnot(None))
+                cant = db.session.query(func.coalesce(func.sum(BranchStock.cantidad), 0)).filter(
+                    BranchStock.branch_id == b.id,
+                    BranchStock.product_id == product_id,
+                    BranchStock.variant_id.isnot(None)
+                ).scalar() or 0
+            else:
+                query = query.filter(BranchStock.variant_id.is_(None))
+                bs = query.first()
+                cant = bs.cantidad if bs else 0
         else:
             query = query.filter(BranchStock.variant_id == variant_id)
+            bs = query.first()
+            cant = bs.cantidad if bs else 0
         
-        bs = query.first()
-        cant = bs.cantidad if bs else 0
         distribucion.append({
             'branch_id': b.id,
             'branch_name': b.nombre,

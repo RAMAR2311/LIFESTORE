@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="fw-bold text-brand-black m-0">Inventario Central</h2>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-truck-moving me-1"></i> Trasladar Mercancía
+        </a>
         <button type="button" class="btn btn-outline-success rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#importarModal">
             <i class="fa-solid fa-file-excel me-1"></i> Importar Masivo
         </button>
@@ -141,6 +144,9 @@
                     </td>
                     <td class="text-center">
                         <div class="d-flex justify-content-center align-items-center gap-2 text-nowrap">
+                            <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id) }}" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Trasladar este Producto">
+                                <i class="fa-solid fa-truck-moving"></i>
+                            </a>
                             <button type="button" class="btn btn-sm btn-outline-dark rounded-pill fw-bold shadow-sm" title="Gestionar Subcategorías" data-bs-toggle="modal" data-bs-target="#variantesModal{{ p.id }}">
                                 <i class="fa-solid fa-sitemap me-1"></i> Variantes
                             </button>
@@ -171,6 +177,7 @@
                                         <th class="text-end">Costo Unitario</th>
                                         <th class="text-end text-success">Valor Invertido (Costo)</th>
                                         <th class="text-end">Sugerido</th>
+                                        <th class="text-center" width="100">Trasladar</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -187,6 +194,11 @@
                                         <td class="text-end text-muted">${{ (v.precio_costo or p.precio_costo)|cop }}</td>
                                         <td class="text-end fw-bold text-success">${{ ((v.precio_costo or p.precio_costo) * v.cantidad_stock)|cop }}</td>
                                         <td class="text-end text-muted">${{ (v.precio_sugerido or p.precio_sugerido)|cop }}</td>
+                                        <td class="text-center">
+                                            <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id, variant_id=v.id) }}" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.75rem;" title="Trasladar esta variante">
+                                                <i class="fa-solid fa-truck-moving me-1"></i> Enviar
+                                            </a>
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -275,6 +287,20 @@
                     <a href="{{ url_for('inventory_bp.descargar_plantilla') }}" class="btn btn-outline-secondary rounded-pill fw-bold w-100 mb-4 text-start shadow-sm">
                         <i class="fa-solid fa-download ms-2 me-2"></i> 1. Descargar Plantilla de Ejemplo
                     </a>
+
+                    {% if current_user.rol == 'admin' %}
+                    <div class="text-start mb-3">
+                        <label class="form-label fw-bold"><i class="fa-solid fa-location-dot text-primary me-1"></i>Sucursal o Bodega de Destino</label>
+                        <select name="branch_id" class="form-select bg-light border-0 shadow-sm fw-semibold">
+                            {% for b in todas_sucursales %}
+                                <option value="{{ b.id }}" {% if active_b_id == b.id %}selected{% elif b.tipo == 'bodega' %}selected{% endif %}>
+                                    {{ b.nombre }} ({{ b.codigo }}) - {{ b.tipo|capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted d-block mt-1">El stock cargado se registrará en esta sede.</small>
+                    </div>
+                    {% endif %}
 
                     <div class="text-start mb-2">
                         <label class="form-label fw-bold">2. Subir archivo rellenado</label>

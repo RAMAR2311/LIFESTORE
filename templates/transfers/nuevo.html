@@ -359,9 +359,43 @@ function eliminarFila(btn) {
     actualizarContadorItems();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const initialOrigin = obtenerSedeOrigenId();
-    cargarProductosOrigen(initialOrigin);
+    await cargarProductosOrigen(initialOrigin);
+
+    // Si viene un IMEI preseleccionado desde inventario
+    const preImei = "{{ pre_imei or '' }}";
+    const preProdId = "{{ pre_product_id or '' }}";
+    const preVarId = "{{ pre_variant_id or '' }}";
+
+    if (preImei) {
+        const scannerInput = document.getElementById('imeiScannerInput');
+        if (scannerInput) {
+            scannerInput.value = preImei;
+            escanearImei();
+        }
+    } else if (preProdId) {
+        // Pre-cargar accesorio/producto
+        agregarFilaProducto();
+        setTimeout(() => {
+            const container = document.getElementById('itemsContainer');
+            const lastRow = container.querySelector('.item-transfer-row:last-child');
+            if (lastRow) {
+                const select = lastRow.querySelector('.select-producto');
+                if (select) {
+                    const expectedVal = preVarId ? `${preProdId}|${preVarId}` : `${preProdId}|`;
+                    // Buscar coincidencia exacta o por ID producto
+                    for (let opt of select.options) {
+                        if (opt.value === expectedVal || (!preVarId && opt.value.startsWith(`${preProdId}|`))) {
+                            select.value = opt.value;
+                            onSelectProducto(select);
+                            break;
+                        }
+                    }
+                }
+            }
+        }, 300);
+    }
 
     // Enter en input de escáner para pistolas de código de barras
     const scannerInput = document.getElementById('imeiScannerInput');
@@ -372,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 escanearImei();
             }
         });
-        scannerInput.focus();
+        if (!preImei) scannerInput.focus();
     }
 });
 </script>

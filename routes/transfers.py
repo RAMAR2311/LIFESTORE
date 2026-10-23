@@ -167,11 +167,20 @@ def nuevo():
 
     # Para el formulario GET: lista de productos disponibles en el origen
     origen_id_inicial = user_branch_id if current_user.rol != 'admin' else (session.get('active_branch_id') or 1)
+    
+    # Parámetros para pre-cargar ítems desde inventario
+    pre_product_id = request.args.get('product_id', type=int)
+    pre_variant_id = request.args.get('variant_id', type=int)
+    pre_imei = request.args.get('imei', '').strip()
+
     return render_template(
         'transfers/nuevo.html',
         sucursales=sucursales_activas,
         user_branch_id=user_branch_id,
-        origen_id_inicial=origen_id_inicial
+        origen_id_inicial=origen_id_inicial,
+        pre_product_id=pre_product_id,
+        pre_variant_id=pre_variant_id,
+        pre_imei=pre_imei
     )
 
 @transfers_bp.route('/<int:id>/accept', methods=['POST'])
