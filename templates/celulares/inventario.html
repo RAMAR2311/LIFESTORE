@@ -163,7 +163,7 @@
                     <th class="py-2 fw-bold">BAT.</th>
                     <th class="py-2 fw-bold">COLOR</th>
                     <th class="py-2 fw-bold">IMEI 1</th>
-                    <th class="py-2 fw-bold">IMEI 2</th>
+                    <th class="py-2 fw-bold text-center">SEDE</th>
                     <th class="py-2 fw-bold">PROVEEDOR</th>
                     <th class="py-2 fw-bold">INVENTARIO</th>
                     {% if estado == 'vendidos' %}
@@ -188,7 +188,16 @@
                     <td>{{ c.bateria or '-' }}</td>
                     <td>{{ c.color or '-' }}</td>
                     <td class="text-muted font-monospace">{{ c.imei or '-' }}</td>
-                    <td class="text-muted font-monospace">{{ c.imei2 or '-' }}</td>
+                    <td class="text-center">
+                        {% set loc = celular_ubicaciones.get(c.id) if celular_ubicaciones else none %}
+                        {% if loc %}
+                            <span class="badge {% if loc.tipo == 'bodega' %}bg-purple text-white{% else %}bg-dark text-white{% endif %} rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.72rem;">
+                                {% if loc.tipo == 'bodega' %}📦{% else %}📍{% endif %} {{ loc.nombre }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-light text-muted border rounded-pill px-2 py-1" style="font-size: 0.7rem;">-</span>
+                        {% endif %}
+                    </td>
                     <td class="text-truncate" style="max-width: 120px;" title="{{ c.proveedor or '-' }}">{{ c.proveedor or '-' }}</td>
                     <td class="text-truncate" style="max-width: 100px;" title="{{ c.inventario or '-' }}">{{ c.inventario or '-' }}</td>
                     <td>

@@ -40,6 +40,25 @@ def index():
         else:
             fecha_obj = obtener_hora_bogota()
 
+        # Determinar branch_id para el gasto
+        from models import Branch
+        from flask import session
+        if current_user.rol in ['vendedor', 'bodega']:
+            gasto_branch_id = current_user.branch_id
+            if not gasto_branch_id:
+                b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+                gasto_branch_id = b_def.id if b_def else 1
+        else:
+            active_b = session.get('active_branch_id')
+            if active_b:
+                gasto_branch_id = int(active_b)
+            else:
+                b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+                gasto_branch_id = b_def.id if b_def else 1
+
+        b_obj = Branch.query.get(gasto_branch_id)
+        gasto_branch_nombre = b_obj.nombre if b_obj else 'PRINCIPAL'
+
         try:
             from services.bank_service import registrar_movimiento_banco
             for monto, metodo in zip(montos, metodos_pago):
@@ -53,7 +72,8 @@ def index():
                         monto=valor_float,
                         metodo_pago=metodo,
                         fecha_gasto=fecha_obj,
-                        sucursal='PRINCIPAL'
+                        sucursal=gasto_branch_nombre,
+                        branch_id=gasto_branch_id
                     )
                     db.session.add(nuevo_gasto)
                     db.session.flush()
@@ -92,10 +112,19 @@ def index():
         extract('year', Expense.fecha_gasto) == anio_actual
     )
     
-    # Restricción de visibilidad: 
-    # Si no es administrador, SOLAMENTE puede ver los gastos que haya registrado él mismo.
-    if current_user.rol != 'admin':
-        query = query.filter(Expense.usuario_id == current_user.id)
+    # Restricción de visibilidad por Sucursal / Rol: 
+    # Vendedor solo puede ver y listar los gastos de su propia sucursal
+    from flask import session
+    if current_user.rol == 'vendedor':
+        if current_user.branch_id:
+            query = query.filter(Expense.branch_id == current_user.branch_id)
+        else:
+            query = query.filter(Expense.usuario_id == current_user.id)
+    else:
+        # Admin y Bodega: si seleccionaron una sucursal en el switcher global, filtrar por esa sucursal
+        active_b_id = session.get('active_branch_id')
+        if active_b_id:
+            query = query.filter(Expense.branch_id == int(active_b_id))
         
     gastos_mes = query.order_by(Expense.fecha_gasto.desc()).all()
 

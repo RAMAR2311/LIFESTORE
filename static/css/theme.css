@@ -1,0 +1,272 @@
+/* ==========================================================================
+   NORMALIZACIÓN GLOBAL DEFINITIVA MODO OSCURO (SILVER TECH / OBSIDIAN)
+   Aplica transversalmente a TODO el sistema LifeStore (100% de rutas y módulos)
+   ========================================================================== */
+
+/* 1. Tipografía Base y Jerarquía Universal */
+[data-theme="dark"] body {
+    color: #cbd5e1 !important;
+    background: radial-gradient(circle at 50% 0%, #111827 0%, #090d16 100%) !important;
+    background-color: #090d16 !important;
+}
+
+[data-theme="dark"] h1, 
+[data-theme="dark"] h2, 
+[data-theme="dark"] h3, 
+[data-theme="dark"] h4, 
+[data-theme="dark"] h5, 
+[data-theme="dark"] h6,
+[data-theme="dark"] .h1, 
+[data-theme="dark"] .h2, 
+[data-theme="dark"] .h3, 
+[data-theme="dark"] .h4, 
+[data-theme="dark"] .h5, 
+[data-theme="dark"] .h6 {
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] p, 
+[data-theme="dark"] label:not(.btn):not(.badge),
+[data-theme="dark"] .form-label {
+    color: #e2e8f0 !important;
+}
+
+/* Rescate universal de textos apagados o invisibles */
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] small.text-muted,
+[data-theme="dark"] .text-black-50,
+[data-theme="dark"] .text-secondary {
+    color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .text-dark,
+[data-theme="dark"] .text-brand-black {
+    color: #ffffff !important;
+}
+
+/* 2. Tarjetas, Paneles y Contenedores (.card, .panel, .box, .bg-white) */
+[data-theme="dark"] .card, 
+[data-theme="dark"] .card-custom,
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .card-body,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .box {
+    background-color: #111827 !important;
+    border-color: rgba(226, 232, 240, 0.12) !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .card-custom {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .card-header {
+    background-color: #0f172a !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] .card-footer {
+    background-color: #0f172a !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #e2e8f0 !important;
+}
+
+/* Evitar bloques bg-light cegadores */
+[data-theme="dark"] .bg-light {
+    background-color: #1e293b !important;
+    color: #cbd5e1 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 3. Tablas de Datos en Todo el Sistema (table, .table) */
+[data-theme="dark"] table,
+[data-theme="dark"] .table,
+[data-theme="dark"] .table-custom {
+    color: #e2e8f0 !important;
+    background-color: transparent !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] table thead th,
+[data-theme="dark"] .table thead th,
+[data-theme="dark"] .table-custom thead th {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.15) !important;
+    border-top: none !important;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+}
+
+[data-theme="dark"] table tbody td,
+[data-theme="dark"] .table tbody td,
+[data-theme="dark"] .table-custom tbody td {
+    background-color: transparent !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    vertical-align: middle;
+}
+
+[data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > *,
+[data-theme="dark"] table.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .table-hover > tbody > tr:hover > *,
+[data-theme="dark"] table.table-hover tbody tr:hover td {
+    background-color: rgba(255, 255, 255, 0.07) !important;
+    color: #ffffff !important;
+}
+
+/* 4. Formularios, Inputs y Selectores (.form-control, .form-select, .input-group) */
+[data-theme="dark"] .form-control, 
+[data-theme="dark"] .form-select, 
+[data-theme="dark"] textarea.form-control,
+[data-theme="dark"] select.form-select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] input[type="date"],
+[data-theme="dark"] input[type="email"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="search"] {
+    background-color: #1e293b !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+    border-radius: 10px;
+}
+
+[data-theme="dark"] ::placeholder,
+[data-theme="dark"] .form-control::placeholder,
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+}
+
+[data-theme="dark"] .form-control:focus, 
+[data-theme="dark"] .form-select:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+    background-color: #1e293b !important;
+    border-color: #94a3b8 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 0.25rem rgba(148, 163, 184, 0.25) !important;
+}
+
+[data-theme="dark"] select option {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .input-group-text {
+    background-color: #0f172a !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    color: #94a3b8 !important;
+}
+
+/* 5. Modales, Dropdowns y Menús Emergentes */
+[data-theme="dark"] .modal-content, 
+[data-theme="dark"] .dropdown-menu {
+    background-color: #0f172a !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+    background-color: #0b0f19 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: #f8fafc !important;
+}
+
+[data-theme="dark"] .modal-body {
+    background-color: #0f172a !important;
+    color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .dropdown-item {
+    color: #cbd5e1 !important;
+    padding: 0.5rem 1rem;
+    transition: all 0.15s ease;
+}
+
+[data-theme="dark"] .dropdown-item:hover,
+[data-theme="dark"] .dropdown-item:focus {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .dropdown-divider {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 6. Badges y Etiquetas de Estado (.badge) */
+.badge {
+    font-weight: 600 !important;
+    padding: 0.4em 0.75em !important;
+    border-radius: 9999px !important;
+    letter-spacing: 0.02em;
+}
+
+[data-theme="dark"] .badge.bg-success,
+[data-theme="dark"] .badge.text-success {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34d399 !important;
+    border: 1px solid rgba(52, 211, 153, 0.3) !important;
+}
+
+[data-theme="dark"] .badge.bg-danger,
+[data-theme="dark"] .badge.text-danger {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    color: #f87171 !important;
+    border: 1px solid rgba(248, 113, 113, 0.3) !important;
+}
+
+[data-theme="dark"] .badge.bg-warning,
+[data-theme="dark"] .badge.text-warning {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #fbbf24 !important;
+    border: 1px solid rgba(251, 191, 36, 0.3) !important;
+}
+
+[data-theme="dark"] .badge.bg-info,
+[data-theme="dark"] .badge.text-info {
+    background-color: rgba(14, 165, 233, 0.15) !important;
+    color: #38bdf8 !important;
+    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+}
+
+[data-theme="dark"] .badge.bg-secondary,
+[data-theme="dark"] .badge.bg-dark {
+    background-color: rgba(148, 163, 184, 0.15) !important;
+    color: #e2e8f0 !important;
+    border: 1px solid rgba(226, 232, 240, 0.2) !important;
+}
+
+[data-theme="dark"] .badge.bg-primary {
+    background-color: rgba(99, 102, 241, 0.18) !important;
+    color: #a5b4fc !important;
+    border: 1px solid rgba(165, 180, 252, 0.3) !important;
+}
+
+/* List groups y elementos comunes */
+[data-theme="dark"] .list-group-item {
+    background-color: transparent !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .border-light {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] hr {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    opacity: 1 !important;
+}

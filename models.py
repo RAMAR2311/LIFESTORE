@@ -9,6 +9,165 @@ def obtener_hora_bogota():
     """Inyecta el uso de red horario en Colombia a nivel de sistema operativo."""
     return datetime.now(pytz.timezone('America/Bogota')).replace(tzinfo=None)
 
+class Branch(db.Model):
+    __tablename__ = 'branches'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False, unique=True)
+    codigo = db.Column(db.String(20), nullable=False, unique=True)
+    tipo = db.Column(db.String(20), nullable=False, default='tienda')  # 'tienda' o 'bodega'
+    direccion = db.Column(db.String(200), nullable=True)
+    telefono = db.Column(db.String(50), nullable=True)
+    activa = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=obtener_hora_bogota)
+
+    # Campos comerciales independientes para facturación multisede
+    nombre_comercial = db.Column(db.String(150), nullable=True)
+    nit = db.Column(db.String(50), nullable=True)
+    prefijo_factura = db.Column(db.String(10), default='FAC', nullable=False)
+    ultimo_consecutivo = db.Column(db.Integer, default=0, nullable=False)
+    logo_url = db.Column(db.String(255), nullable=True)
+    resolucion_dian = db.Column(db.Text, nullable=True)
+
+    # Relaciones inversas
+    usuarios = db.relationship('User', backref='branch', lazy=True)
+    ventas = db.relationship('Sale', backref='branch', lazy=True)
+    arqueos = db.relationship('ArqueoCaja', backref='branch', lazy=True)
+    turnos_caja = db.relationship('CashShift', backref='branch', lazy=True)
+    ajustes_stock = db.relationship('StockAdjustment', backref='branch', lazy=True)
+    maneos = db.relationship('Maneo', backref='branch', lazy=True)
+    gastos = db.relationship('Expense', backref='branch', lazy=True)
+    garantias = db.relationship('Warranty', backref='branch', lazy=True)
+    retomas = db.relationship('Retoma', backref='branch', lazy=True)
+    stocks = db.relationship('BranchStock', backref='branch', lazy=True, cascade='all, delete-orphan')
+
+    def __init__(self, **kwargs):
+        super(Branch, self).__init__(**kwargs)
+
+
+class CashShift(db.Model):
+    """Modelo para control de apertura y cierre de turno de caja por sucursal."""
+    __tablename__ = 'cash_shifts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False, index=True)
+    opened_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    closed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    base_inicial_efectivo = db.Column(db.Numeric(14, 2), nullable=False, default=0.0)
+    asesores_ids = db.Column(db.Text, nullable=True) # JSON o lista separada por comas de IDs de asesores de turno
+    estado = db.Column(db.String(20), nullable=False, default='ABIERTA', index=True) # 'ABIERTA', 'CERRADA'
+    fecha_apertura = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False)
+    fecha_cierre = db.Column(db.DateTime, nullable=True)
+    notas_apertura = db.Column(db.Text, nullable=True)
+    arqueo_id = db.Column(db.Integer, db.ForeignKey('arqueo_caja.id'), nullable=True)
+    apertura_tardia = db.Column(db.Boolean, default=False, nullable=False)
+    minutos_retraso_apertura = db.Column(db.Integer, default=0, nullable=False)
+    cierre_tardio = db.Column(db.Boolean, default=False, nullable=False)
+    minutos_retraso_cierre = db.Column(db.Integer, default=0, nullable=False)
+
+    opened_by = db.relationship('User', foreign_keys=[opened_by_id], backref='turnos_abiertos')
+    closed_by = db.relationship('User', foreign_keys=[closed_by_id], backref='turnos_cerrados')
+    arqueo = db.relationship('ArqueoCaja', foreign_keys=[arqueo_id], backref=db.backref('turno_rel', uselist=False))
+
+    def __init__(self, **kwargs):
+        super(CashShift, self).__init__(**kwargs)
+
+    @property
+    def lista_asesores_ids(self):
+        if not self.asesores_ids:
+            return []
+        import json
+        try:
+            return json.loads(self.asesores_ids)
+        except Exception:
+            return [int(x.strip()) for x in self.asesores_ids.split(',') if x.strip().isdigit()]
+
+    @property
+    def asesores_obj(self):
+        ids = self.lista_asesores_ids
+        if not ids:
+            return []
+        return Asesor.query.filter(Asesor.id.in_(ids)).all()
+
+
+
+class BranchStock(db.Model):
+    __tablename__ = 'branch_stocks'
+
+    id = db.Column(db.Integer, primary_key=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    variant_id = db.Column(db.Integer, db.ForeignKey('product_variants.id'), nullable=True, index=True)
+    cantidad = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, default=obtener_hora_bogota, onupdate=obtener_hora_bogota)
+
+    product = db.relationship('Product', backref=db.backref('branch_stocks', lazy=True, cascade='all, delete-orphan'))
+    variant = db.relationship('ProductVariant', backref=db.backref('branch_stocks', lazy=True, cascade='all, delete-orphan'))
+
+    __table_args__ = (
+        db.UniqueConstraint('branch_id', 'product_id', 'variant_id', name='uq_branch_product_variant'),
+    )
+
+    def __init__(self, **kwargs):
+        super(BranchStock, self).__init__(**kwargs)
+
+
+class StockTransfer(db.Model):
+    __tablename__ = 'stock_transfers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    origin_branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False)
+    destination_branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    received_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    
+    # Responsables explícitos de custodia física
+    enviado_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    recibido_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    observaciones_entrega = db.Column(db.Text, nullable=True)
+    observaciones_recepcion = db.Column(db.Text, nullable=True)
+
+    status = db.Column(db.String(20), nullable=False, default='PENDIENTE')  # 'PENDIENTE', 'ACEPTADO', 'RECHAZADO'
+    notas = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=obtener_hora_bogota)
+    resolved_at = db.Column(db.DateTime, nullable=True)
+
+    origin_branch = db.relationship('Branch', foreign_keys=[origin_branch_id], backref=db.backref('transfers_sent', lazy=True))
+    destination_branch = db.relationship('Branch', foreign_keys=[destination_branch_id], backref=db.backref('transfers_received', lazy=True))
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref=db.backref('transfers_created', lazy=True))
+    received_by = db.relationship('User', foreign_keys=[received_by_id], backref=db.backref('transfers_received_user', lazy=True))
+    enviado_por = db.relationship('User', foreign_keys=[enviado_por_id], backref=db.backref('traslados_despachados', lazy=True))
+    recibido_por = db.relationship('User', foreign_keys=[recibido_por_id], backref=db.backref('traslados_recibidos', lazy=True))
+    items = db.relationship('StockTransferItem', backref='transfer', lazy=True, cascade='all, delete-orphan')
+
+    def __init__(self, **kwargs):
+        super(StockTransfer, self).__init__(**kwargs)
+
+    @property
+    def usuario_despacha(self):
+        return self.enviado_por or self.created_by
+
+    @property
+    def usuario_recibe(self):
+        return self.recibido_por or self.received_by
+
+
+class StockTransferItem(db.Model):
+    __tablename__ = 'stock_transfer_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    transfer_id = db.Column(db.Integer, db.ForeignKey('stock_transfers.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    variant_id = db.Column(db.Integer, db.ForeignKey('product_variants.id'), nullable=True)
+    cantidad = db.Column(db.Integer, nullable=False)
+
+    product = db.relationship('Product')
+    variant = db.relationship('ProductVariant')
+
+    def __init__(self, **kwargs):
+        super(StockTransferItem, self).__init__(**kwargs)
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
@@ -19,17 +178,19 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     rol = db.Column(db.String(50), nullable=False, default='vendedor')
     sucursal = db.Column(db.String(100), nullable=False, default='PRINCIPAL')
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     
-    ventas = db.relationship('Sale', backref='vendedor', lazy=True)
+    ventas = db.relationship('Sale', foreign_keys='Sale.vendedor_id', backref='vendedor', lazy=True)
     ajustes_stock = db.relationship('StockAdjustment', backref='admin', lazy=True)
-    arqueos = db.relationship('ArqueoCaja', backref='cajero', lazy=True)
+    arqueos = db.relationship('ArqueoCaja', foreign_keys='ArqueoCaja.vendedor_id', backref='cajero', lazy=True, overlaps="arqueos_registrados,vendedor")
 
-    def __init__(self, nombre=None, email=None, telefono=None, password_hash=None, rol=None, **kwargs):
+    def __init__(self, nombre=None, email=None, telefono=None, password_hash=None, rol=None, branch_id=None, **kwargs):
         if nombre is not None: kwargs['nombre'] = nombre
         if email is not None: kwargs['email'] = email
         if telefono is not None: kwargs['telefono'] = telefono
         if password_hash is not None: kwargs['password_hash'] = password_hash
         if rol is not None: kwargs['rol'] = rol
+        if branch_id is not None: kwargs['branch_id'] = branch_id
         if 'sucursal' in kwargs: pass
         super(User, self).__init__(**kwargs)
 
@@ -147,10 +308,14 @@ class Sale(db.Model):
     metodo_pago = db.Column(db.String(50), nullable=False, default='efectivo')
     tipo_venta = db.Column(db.String(50), nullable=False, server_default='general') # 'general' o 'celulares'
     sucursal = db.Column(db.String(100), nullable=False, default='PRINCIPAL')
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+    numero_factura = db.Column(db.String(50), nullable=True, index=True) # ej: "FAC-1", "SUR-102"
+    shift_id = db.Column(db.Integer, db.ForeignKey('cash_shifts.id'), nullable=True, index=True)
     
     detalles = db.relationship('SaleDetail', backref='venta', lazy=True, cascade="all, delete-orphan")
     pagos = db.relationship('SalePayment', backref='venta', lazy=True, cascade="all, delete-orphan")
     cliente = db.relationship('SaleClient', backref='venta', lazy=True, cascade="all, delete-orphan", uselist=False)
+    turno = db.relationship('CashShift', backref=db.backref('ventas', lazy=True))
     asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=True)
     asesor = db.relationship('Asesor', backref=db.backref('ventas', lazy=True))
     provider_id = db.Column(db.Integer, db.ForeignKey('providers.id'), nullable=True)
@@ -179,8 +344,12 @@ class SalePayment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
-    metodo_pago = db.Column(db.String(50), nullable=False)  # efectivo, nequi, bancolombia, daviplata
+    metodo_pago = db.Column(db.String(50), nullable=False)  # efectivo, nequi, bancolombia, daviplata, abono_tercero
     monto = db.Column(db.Numeric(10, 2), nullable=False)
+    provider_id = db.Column(db.Integer, db.ForeignKey('providers.id'), nullable=True)
+    comprobante = db.Column(db.String(255), nullable=True)
+
+    provider = db.relationship('Provider', backref=db.backref('sale_payments', lazy=True))
 
     def __init__(self, **kwargs):
         super(SalePayment, self).__init__(**kwargs)
@@ -228,6 +397,7 @@ class StockAdjustment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     admin_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     tipo_movimiento = db.Column(db.String(100), nullable=True) # Ej: Creación Inicial, Ajuste Manual
     stock_anterior = db.Column(db.Integer, nullable=False)
     stock_nuevo = db.Column(db.Integer, nullable=False)
@@ -258,6 +428,7 @@ class Retoma(db.Model):
     producto_generado_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
     fecha_registro = db.Column(db.DateTime, default=obtener_hora_bogota)
     vendedor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
 
     venta = db.relationship('Sale', backref='retomas_asociadas', lazy=True)
     vendedor = db.relationship('User', backref='retomas_registradas', lazy=True)
@@ -274,6 +445,7 @@ class ArqueoCaja(db.Model):
     fecha_arqueo = db.Column(db.Date, nullable=False)
     tipo_arqueo = db.Column(db.String(50), nullable=False, server_default='general') # 'general' o 'celulares'
     sucursal = db.Column(db.String(100), nullable=False, default='PRINCIPAL')
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     base_inicial = db.Column(db.Numeric(14, 2), nullable=False, default=0.0)
     gastos_del_dia = db.Column(db.Numeric(14, 2), nullable=False, default=0.0)
     observaciones_gastos = db.Column(db.String(255), nullable=True)
@@ -285,12 +457,20 @@ class ArqueoCaja(db.Model):
     efectivo_fisico = db.Column(db.Numeric(14, 2), nullable=True, default=0.0)
     diferencia = db.Column(db.Numeric(14, 2), nullable=True, default=0.0)
     observacion_diferencia = db.Column(db.Text, nullable=True)
+    shift_id = db.Column(db.Integer, db.ForeignKey('cash_shifts.id'), nullable=True, index=True)
+    closed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True) # Responsable específico de cierre y conteo
     fecha_creacion = db.Column(db.DateTime, default=obtener_hora_bogota)
 
-    vendedor = db.relationship('User', backref='arqueos_registrados', lazy=True)
+    vendedor = db.relationship('User', foreign_keys=[vendedor_id], backref=db.backref('arqueos_registrados', overlaps="arqueos,cajero"), lazy=True, overlaps="arqueos,cajero")
+    closed_by = db.relationship('User', foreign_keys=[closed_by_id], backref=db.backref('arqueos_cerrados_custodia', lazy=True))
 
     def __init__(self, **kwargs):
         super(ArqueoCaja, self).__init__(**kwargs)
+
+    @property
+    def cajero_cierre(self):
+        """Retorna el usuario responsable que contó el efectivo y ejecutó el arqueo."""
+        return self.closed_by or self.vendedor
 
 
 class SobranteLog(db.Model):
@@ -320,6 +500,7 @@ class Maneo(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
     variant_id = db.Column(db.Integer, db.ForeignKey('product_variants.id'), nullable=True)
     local_vecino = db.Column(db.String(150), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     cantidad = db.Column(db.Integer, nullable=False)
     estado = db.Column(db.String(50), nullable=False, default='PENDIENTE') # PENDIENTE, FACTURADO, DEVUELTO
     fecha_prestamo = db.Column(db.DateTime, default=obtener_hora_bogota)
@@ -342,6 +523,7 @@ class Expense(db.Model):
     monto = db.Column(db.Numeric(10, 2), nullable=False)
     metodo_pago = db.Column(db.String(50), nullable=False, default='efectivo')
     sucursal = db.Column(db.String(100), nullable=False, default='PRINCIPAL')
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     fecha_gasto = db.Column(db.DateTime, default=obtener_hora_bogota)
 
     usuario = db.relationship('User', backref='gastos', lazy=True)
@@ -547,6 +729,7 @@ class Warranty(db.Model):
     __tablename__ = 'warranties'
     id = db.Column(db.Integer, primary_key=True)
     sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
     nombre_manual = db.Column(db.String(200), nullable=True)
     quantity = db.Column(db.Integer, default=1)
@@ -555,9 +738,23 @@ class Warranty(db.Model):
     admin_notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=obtener_hora_bogota)
 
+    # Trazabilidad y Custodia: Recepción
+    recibido_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    estado_estetico = db.Column(db.String(100), nullable=True) # ej: 'Excelente', 'Buen Estado', 'Rayones Leves', 'Golpes Visibles'
+    detalles_esteticos = db.Column(db.Text, nullable=True)
+    porcentaje_bateria = db.Column(db.String(20), nullable=True)
+    motivo_reportado = db.Column(db.Text, nullable=True)
+
+    # Trazabilidad y Custodia: Entrega al Cliente
+    entregado_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    fecha_entrega = db.Column(db.DateTime, nullable=True)
+    firma_o_soporte_entrega = db.Column(db.String(255), nullable=True)
+
     # Relaciones
     sale = db.relationship('Sale', backref=db.backref('warranties', lazy=True))
     product = db.relationship('Product', backref=db.backref('warranties', lazy=True))
+    recibido_por = db.relationship('User', foreign_keys=[recibido_por_id], backref=db.backref('garantias_recibidas', lazy=True))
+    entregado_por = db.relationship('User', foreign_keys=[entregado_por_id], backref=db.backref('garantias_entregadas', lazy=True))
 
     @property
     def tiempo_transcurrido(self):
@@ -703,4 +900,60 @@ class BankTransaction(db.Model):
 
     def __init__(self, **kwargs):
         super(BankTransaction, self).__init__(**kwargs)
+
+
+class CommissionPayment(db.Model):
+    """Modelo para registrar anticipos y liquidaciones de comisiones a asesores."""
+    __tablename__ = 'commission_payments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=False, index=True)
+    monto = db.Column(db.Numeric(14, 2), nullable=False)
+    tipo_pago = db.Column(db.String(50), nullable=False)  # 'ANTICIPO', 'LIQUIDACION_TOTAL'
+    metodo_pago = db.Column(db.String(50), nullable=False, default='efectivo') # 'efectivo', 'nequi', 'bancolombia', 'daviplata'
+    fecha_pago = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False)
+    registrado_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    notas = db.Column(db.Text, nullable=True)
+
+    asesor = db.relationship('Asesor', backref=db.backref('pagos_comisiones', lazy=True, cascade='all, delete-orphan'))
+    registrado_por = db.relationship('User', backref='comisiones_registradas', lazy=True)
+
+    def __init__(self, **kwargs):
+        super(CommissionPayment, self).__init__(**kwargs)
+
+
+class AuditLog(db.Model):
+    """Bitácora y registro de decisiones administrativas de alto impacto y custodia."""
+    __tablename__ = 'audit_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(100), nullable=False, index=True) # ej. 'APROBACION_PRECIO_MINIMO', 'CANCELACION_VENTA', 'REAPERTURA_TURNO', 'AUTORIZACION_CAMBIO'
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    target_id = db.Column(db.Integer, nullable=True) # ID del registro afectado (Venta, Turno, Garantía, etc.)
+    target_type = db.Column(db.String(50), nullable=True) # 'SALE', 'CASH_SHIFT', 'DISCOUNT_APPROVAL', 'WARRANTY', 'TRANSFER'
+    timestamp = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False, index=True)
+    motivo = db.Column(db.Text, nullable=False) # Justificación obligatoria
+    detalles = db.Column(db.Text, nullable=True) # Contexto o datos adicionales en JSON / texto
+
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('auditorias_realizadas', lazy='dynamic'))
+
+    def __init__(self, **kwargs):
+        super(AuditLog, self).__init__(**kwargs)
+
+    @classmethod
+    def registrar(cls, action, user_id, motivo, target_id=None, target_type=None, detalles=None):
+        """Helper para registrar rápidamente un evento de auditoría administrativa."""
+        log = cls(
+            action=action,
+            user_id=user_id,
+            target_id=target_id,
+            target_type=target_type,
+            motivo=motivo,
+            detalles=detalles,
+            timestamp=obtener_hora_bogota()
+        )
+        db.session.add(log)
+        return log
+
+
 

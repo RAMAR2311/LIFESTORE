@@ -1,24 +1,100 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    /* Estilos específicos de Caja Visual - Silver Tech */
+    .product-card {
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.15);
+        border-color: #94A3B8 !important;
+    }
+    [data-theme="dark"] .product-card {
+        background-color: #111827 !important;
+        border: 1px solid rgba(226, 232, 240, 0.15) !important;
+    }
+    [data-theme="dark"] .product-card:hover {
+        border-color: rgba(226, 232, 240, 0.4) !important;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    .product-img-box {
+        background: #F1F5F9;
+        border-bottom: 1px solid #E2E8F0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .product-img-box .placeholder-icon {
+        color: #64748B;
+    }
+    [data-theme="dark"] .product-img-box {
+        background: linear-gradient(145deg, #1E293B, #0F172A) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+    [data-theme="dark"] .product-img-box .placeholder-icon {
+        color: #94A3B8 !important;
+    }
+    .product-card .card-title {
+        font-weight: 600;
+        color: var(--text-primary) !important;
+    }
+    [data-theme="dark"] .product-card .card-title {
+        color: #FFFFFF !important;
+    }
+    .product-sku, .product-stock {
+        color: #64748B;
+        font-size: 0.8rem;
+    }
+    [data-theme="dark"] .product-sku, 
+    [data-theme="dark"] .product-stock {
+        color: #CBD5E1 !important;
+    }
+    .product-price {
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        color: #10B981 !important; /* Esmeralda luminoso */
+    }
+</style>
 <div class="row h-100 g-4">
     <!-- Panel Izquierdo: Catálogo de Productos -->
     <div class="col-lg-8 d-flex flex-column h-100">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-store text-brand-pink me-2"></i> Caja Rápida Visual</h2>
-            <button class="btn btn-outline-success rounded-3 px-3 shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#modalProductoExterno" title="Ingresar Producto Externo">
-                <i class="fa-solid fa-mobile-screen-button me-1"></i> Externo
-            </button>
-            <button class="btn btn-outline-info rounded-3 px-3 shadow-sm ms-2" type="button" data-bs-toggle="modal" data-bs-target="#modalAccesorioExterno" title="Ingresar Accesorio Externo">
-                <i class="fa-solid fa-mobile-retro me-1"></i> Acc. Externo
-            </button>
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-store text-brand-pink me-2"></i> Caja Rápida Visual</h2>
+                {% if sucursal_actual %}
+                <small class="text-muted">
+                    <i class="fa-solid fa-location-dot text-primary me-1"></i>Sede: <strong>{{ sucursal_actual.nombre }}</strong> ({{ sucursal_actual.prefijo_factura or 'FAC' }})
+                    {% if turno_activo %}
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill ms-2">
+                        <i class="fa-solid fa-circle text-success me-1" style="font-size: 8px;"></i>Turno Abierto ({{ turno_activo.fecha_apertura.strftime('%I:%M %p') }})
+                    </span>
+                    {% elif sucursal_actual.tipo == 'bodega' %}
+                    <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill ms-2">
+                        <i class="fa-solid fa-boxes-stacked text-info me-1" style="font-size: 8px;"></i>Bodega (Exenta de Turno)
+                    </span>
+                    {% endif %}
+                </small>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-success rounded-3 px-3 shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#modalProductoExterno" title="Ingresar Producto Externo">
+                    <i class="fa-solid fa-mobile-screen-button me-1"></i> Externo
+                </button>
+                <button class="btn btn-outline-info rounded-3 px-3 shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#modalAccesorioExterno" title="Ingresar Accesorio Externo">
+                    <i class="fa-solid fa-mobile-retro me-1"></i> Acc. Externo
+                </button>
+            </div>
         </div>
 
         <!-- Buscador de productos -->
         <div class="mb-4">
-            <div class="input-group input-group-lg shadow-sm rounded-pill border">
-                <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                <input type="text" id="productSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Buscar producto por nombre, SKU o IMEI..." style="border-radius: 0 50px 50px 0;">
+            <div class="search-bar-silver">
+                <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="productSearch" placeholder="Buscar producto por nombre, SKU o IMEI..." autocomplete="off">
             </div>
         </div>
 
@@ -38,25 +114,25 @@
                      data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario, "imei": p.imei, "imei2": p.imei2, "inventario": p.inventario}|tojson|safe }}'
                      data-variants='{{ vars_data|tojson|safe }}'
                      onclick="handleProductClick(this)">
-                    <div class="ratio ratio-1x1 bg-light rounded-top d-flex align-items-center justify-content-center overflow-hidden">
+                    <div class="ratio ratio-1x1 product-img-box rounded-top">
                         {% if p.imagen %}
                             <img src="{{ url_for('static', filename='uploads/' + p.imagen) }}" alt="{{ p.nombre }}" style="object-fit: cover; width: 100%; height: 100%;">
                         {% else %}
-                            <span class="text-muted small text-center pt-4"><i class="fa-solid fa-image fa-2x mb-2 text-black-50"></i><br>Sin Imagen</span>
+                            <span class="small text-center pt-2 placeholder-icon"><i class="fa-solid fa-image fa-2x mb-1 d-block opacity-50"></i>Sin Imagen</span>
                         {% endif %}
                     </div>
                     <div class="card-body p-3 text-center d-flex flex-column justify-content-between">
                         <div>
-                            <h6 class="card-title fw-bold text-dark text-truncate mb-1" title="{{ p.nombre }}">{{ p.nombre }}</h6>
+                            <h6 class="card-title text-truncate mb-1" title="{{ p.nombre }}">{{ p.nombre }}</h6>
                             {% if p.tipo_inventario == 'celulares' and p.imei %}
-                                <small class="text-muted d-block mb-2">IMEI: {{ p.imei }}</small>
+                                <small class="product-sku d-block mb-2 font-mono">IMEI: {{ p.imei }}</small>
                             {% else %}
-                                <small class="text-muted d-block mb-2">{{ p.sku }}</small>
+                                <small class="product-sku d-block mb-2">{{ p.sku }}</small>
                             {% endif %}
                         </div>
                         <div>
-                            <h5 class="fw-bolder mb-1" style="color: var(--brand-pink);">${{ p.precio_sugerido|cop }}</h5>
-                            <small class="text-muted"><i class="fa-solid fa-box text-secondary"></i> {{ total_stock }} en stock</small>
+                            <h5 class="product-price mb-1">${{ p.precio_sugerido|cop }}</h5>
+                            <small class="product-stock"><i class="fa-solid fa-box me-1"></i>{{ total_stock }} en stock</small>
                         </div>
                     </div>
                 </div>
@@ -72,24 +148,24 @@
 
     <!-- Panel Derecho: Carrito -->
     <div class="col-lg-4">
-        <div class="card card-custom p-4 position-sticky" style="top: 100px; height: 100%;">
+        <div class="card card-custom checkout-panel pos-cart p-4 position-sticky" style="top: 100px; height: 100%;">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold m-0"><i class="fa-solid fa-cart-shopping text-brand-blue me-2"></i> Balance</h5>
-                <span class="badge bg-secondary rounded-pill" id="total_items">0 items</span>
+                <h5 class="fw-bold m-0 text-brand-black"><i class="fa-solid fa-cart-shopping text-brand-pink me-2"></i> Balance</h5>
+                <span class="badge rounded-pill bg-dark border border-secondary text-light px-3" id="total_items">0 items</span>
             </div>
             
             <div class="card-body p-0 overflow-auto mb-3" style="max-height: 40vh;" id="cartContainer">
                 <ul class="list-group list-group-flush" id="cart_body">
                     <!-- Javascript inyectará items aquí -->
-                    <li class="list-group-item text-center py-5 text-muted" id="empty_cart_msg">
-                        <i class="fa-solid fa-basket-shopping fa-3x mb-3 text-black-50"></i><br>Tu carrito está vacío.
+                    <li class="cart-empty-box my-2" id="empty_cart_msg">
+                        <i class="fa-solid fa-basket-shopping fa-3x mb-3 d-block opacity-75"></i>Tu carrito está vacío.
                     </li>
                 </ul>
             </div>
 
             <div class="d-flex justify-content-between mb-2">
-                <span class="text-muted fw-bold align-self-center">Subtotal:</span>
-                <span class="fw-bold fs-4 text-dark" id="subtotal_amount">$0</span>
+                <span class="checkout-label align-self-center">Subtotal:</span>
+                <span class="fw-bold fs-4 checkout-total-val" id="subtotal_amount">$0</span>
             </div>
 
             <div class="mb-2 text-danger" id="retoma_discount_row" style="display: none !important;">
@@ -97,75 +173,101 @@
                     <span class="fw-bold align-self-center"><i class="fa-solid fa-recycle me-1"></i> Retomas (<span id="retomas_count">0</span>):</span>
                     <span class="fw-bold fs-5" id="retoma_amount">-$0</span>
                 </div>
-                <div id="retomas_list_container" class="ps-2 border-start border-2 border-danger ms-1 mb-2 bg-light rounded p-2" style="font-size: 0.85rem;">
+                <div id="retomas_list_container" class="ps-2 border-start border-2 border-danger ms-1 mb-2 rounded p-2" style="font-size: 0.85rem; background: rgba(239, 68, 68, 0.08);">
                     <!-- Lista dinámica de retomas -->
                 </div>
             </div>
 
-            <div class="d-flex justify-content-between mb-4 border-top pt-2" style="border-color: var(--brand-border) !important;">
-                <span class="text-muted fw-bold align-self-center">Total a Cobrar:</span>
-                <span class="fw-bolder fs-1 price-display font-mono" id="total_amount">$0</span>
+            <div class="d-flex justify-content-between mb-4 border-top pt-2" style="border-color: rgba(226, 232, 240, 0.15) !important;">
+                <span class="checkout-total-label align-self-center">Total a Cobrar:</span>
+                <span class="fw-bolder fs-1 checkout-total-val price-display font-mono" id="total_amount">$0</span>
             </div>
 
-            <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold w-100 mb-4" onclick="abrirModalRetoma()">
-                <i class="fa-solid fa-recycle me-1"></i> Añadir Equipo en Retoma
+            <button type="button" class="btn btn-outline-light btn-sm rounded-pill fw-bold w-100 mb-4" onclick="abrirModalRetoma()" style="border-color: rgba(226, 232, 240, 0.25);">
+                <i class="fa-solid fa-recycle me-1 text-warning"></i> Añadir Equipo en Retoma
             </button>
 
             {% if current_user.rol == 'admin' %}
             <div class="mb-3">
-                <label class="form-label text-muted fw-semibold small">Fecha de Venta:</label>
-                <input type="date" id="fecha_venta_input" class="form-control form-control-sm bg-light border-0 shadow-sm" value="{{ hoy }}">
+                <label class="form-label checkout-label small">Fecha de Venta:</label>
+                <input type="date" id="fecha_venta_input" class="form-control form-control-sm pos-input shadow-sm" value="{{ hoy }}">
             </div>
             {% endif %}
 
             <!-- Toggle: Pago Único vs Pago Dividido -->
-            <!-- Selector de Asesor (Obligatorio) -->
+            <!-- Selector de Asesor (Obligatorio en tienda, exento en bodega) -->
+            {% if not sucursal_actual or sucursal_actual.tipo == 'tienda' %}
             <div class="mb-3">
-                <label class="form-label fw-bold text-brand-black small text-uppercase mb-2"><i class="fa-solid fa-user-tie me-1"></i> Asesor de Venta</label>
-                <select id="asesor-vendedor" class="form-select form-select-lg border-0 shadow-sm bg-light" required style="cursor: pointer;">
+                <label class="form-label checkout-label small mb-2"><i class="fa-solid fa-user-tie me-1"></i> Asesor de Venta</label>
+                <select id="asesor-vendedor" class="form-select form-select-lg pos-select shadow-sm" required style="cursor: pointer;">
                     <option value="" disabled selected>-- Seleccionar Asesor --</option>
                     {% for a in asesores %}
                         <option value="{{ a.id }}">{{ a.nombre }}</option>
                     {% endfor %}
                 </select>
             </div>
-
-            <!-- Selector de Proveedor removido -->
+            {% else %}
+            <div class="mb-3">
+                <div class="p-2 px-3 rounded border text-muted small" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de selección de asesores</strong>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Método de Pago -->
             <div class="mb-3">
-                <div class="d-flex align-items-center gap-3 mb-3">
-                    <label class="form-label fw-bold text-brand-black small text-uppercase m-0">Método de Pago</label>
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <label class="form-label checkout-label m-0">Método de Pago</label>
                     <div class="form-check form-switch ms-auto">
                         <input class="form-check-input" type="checkbox" id="toggle_pago_mixto" style="cursor: pointer; width: 3rem; height: 1.5rem;">
-                        <label class="form-check-label fw-bold small text-muted" for="toggle_pago_mixto" style="cursor: pointer;">Dividir Pago</label>
+                        <label class="form-check-label fw-bold small checkout-label" for="toggle_pago_mixto" style="cursor: pointer;">Dividir Pago</label>
                     </div>
                 </div>
             </div>
 
             <!-- Modo 1: Pago Único (por defecto) -->
             <div id="pago_unico_section">
-                <select id="metodo-pago" class="form-select form-select-lg border-0 shadow-sm bg-light mb-3" style="cursor: pointer;">
+                <select id="metodo-pago" class="form-select form-select-lg pos-select shadow-sm mb-3" style="cursor: pointer;" onchange="toggleCamposAbonoTerceroUnico(this.value)">
                     <option value="efectivo">💵 Efectivo</option>
+                    <option value="nequi">🟣 Nequi</option>
                     <option value="bancolombia">🏦 Bancolombia</option>
                     <option value="daviplata">📲 Daviplata</option>
-                    <option value="tarjeta_credito">💳 T. Crédito</option>
+                    <option value="bolt">⚡ Bolt (Datáfono)</option>
                     <option value="addi">🛒 Addi</option>
-                    <option value="sitecredito">💳 Sitecredito</option>
+                    <option value="sistecredito">💳 Sistecrédito</option>
+                    <option value="abono_tercero">🤝 Abono a Terceros / Proveedor</option>
                 </select>
+
+                <!-- Campos específicos para Abono a Terceros / Proveedor (Pago Único) -->
+                <div id="campos_abono_tercero_unico" class="card border p-3 mb-3 rounded-3" style="display: none; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.3) !important;">
+                    <div class="fw-bold small mb-2 text-warning"><i class="fa-solid fa-handshake me-1"></i> Datos del Abono a Proveedor:</div>
+                    <div class="mb-2">
+                        <label class="form-label extra-small fw-bold checkout-label mb-1">Proveedor Destinatario <span class="text-danger">*</span></label>
+                        <select id="abono_provider_id_unico" class="form-select form-select-sm pos-select">
+                            <option value="" disabled selected>-- Seleccionar Proveedor Destinatario --</option>
+                            {% for prov in providers %}
+                                <option value="{{ prov.id }}">{{ prov.nombre }} (Saldo: ${{ prov.saldo_pendiente|cop }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label extra-small fw-bold checkout-label mb-1">Comprobante / Soporte Transacción <span class="text-danger">*</span></label>
+                        <input type="text" id="abono_comprobante_unico" class="form-control form-control-sm pos-input" placeholder="Ej: Transf. Nequi #849302 / Ref. Bancolombia">
+                    </div>
+                </div>
             </div>
 
             <!-- Modo 2: Pago Dividido/Mixto (oculto por defecto) -->
             <div id="pago_mixto_section" style="display: none;">
                 <!-- Indicador visual del saldo restante -->
-                <div class="alert border-0 shadow-sm py-2 px-3 mb-3" id="saldo_restante_alert" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                <div class="alert border-0 shadow-sm py-2 px-3 mb-3" id="saldo_restante_alert" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1) !important;">
                     <div class="d-flex justify-content-between align-items-center">
-                        <small class="fw-bold text-muted text-uppercase"><i class="fa-solid fa-scale-balanced me-1"></i> Saldo por cubrir:</small>
-                        <span class="fw-bolder fs-5" id="saldo_restante" style="color: var(--brand-blue);">$0</span>
+                        <small class="fw-bold checkout-label text-uppercase"><i class="fa-solid fa-scale-balanced me-1"></i> Saldo por cubrir:</small>
+                        <span class="fw-bolder fs-5 text-brand-black" id="saldo_restante">$0</span>
                     </div>
                     <!-- Barra de progreso visual -->
-                    <div class="progress mt-2" style="height: 6px; border-radius: 10px;">
-                        <div class="progress-bar" id="barra_progreso_pago" role="progressbar" style="width: 0%; background: linear-gradient(90deg, #A3D8DE, #7BC8D0); border-radius: 10px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div class="progress mt-2" style="height: 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.1);">
+                        <div class="progress-bar" id="barra_progreso_pago" role="progressbar" style="width: 0%; background: linear-gradient(90deg, #f8fafc, #cbd5e1); border-radius: 10px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                 </div>
 
@@ -174,17 +276,17 @@
                     <!-- Se inyecta dinámicamente -->
                 </div>
 
-                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold w-100" id="btn_agregar_pago">
+                <button type="button" class="btn btn-outline-light btn-sm rounded-pill fw-bold w-100" id="btn_agregar_pago" style="border-color: rgba(255, 255, 255, 0.2); color: #cbd5e1;">
                     <i class="fa-solid fa-plus me-1"></i> Agregar otro método de pago
                 </button>
             </div>
 
             <!-- Botón de Cobro Masivo -->
             <div class="d-grid gap-2 mt-auto">
-                <button type="button" class="btn btn-blue btn-lg rounded-3 py-3 shadow-sm text-uppercase" id="btn_process_sale">
+                <button type="button" class="btn-checkout-primary shadow-sm" id="btn_process_sale">
                     <i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro
                 </button>
-                <button type="button" class="btn btn-light mt-2 fw-bold text-muted" id="btn_clear_cart">
+                <button type="button" class="btn-checkout-secondary mt-2" id="btn_clear_cart">
                     Limpiar Venta
                 </button>
             </div>
@@ -527,15 +629,29 @@
     let retomasLista = [];
     let editRetomaIndex = -1;
 
-    let pagosMixtos = [];
+    const LISTA_PROVEEDORES = [
+        {% for prov in providers %}
+        { id: {{ prov.id }}, nombre: {{ prov.nombre|tojson }}, saldo: {{ prov.saldo_pendiente|int }} },
+        {% endfor %}
+    ];
+
     const METODOS_DISPONIBLES = [
         { value: 'efectivo',        label: '💵 Efectivo' },
+        { value: 'nequi',           label: '🟣 Nequi' },
         { value: 'bancolombia',     label: '🏦 Bancolombia' },
         { value: 'daviplata',       label: '📲 Daviplata' },
-        { value: 'tarjeta_credito', label: '💳 T. Crédito' },
+        { value: 'bolt',            label: '⚡ Bolt (Datáfono)' },
         { value: 'addi',            label: '🛒 Addi' },
-        { value: 'sitecredito',     label: '💳 Sitecredito' }
+        { value: 'sistecredito',    label: '💳 Sistecrédito' },
+        { value: 'abono_tercero',   label: '🤝 Abono a Terceros / Proveedor' }
     ];
+
+    function toggleCamposAbonoTerceroUnico(valor) {
+        const divAbono = document.getElementById('campos_abono_tercero_unico');
+        if (divAbono) {
+            divAbono.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+        }
+    }
 
     function formatoCOP(valor) {
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor);
@@ -682,8 +798,8 @@
 
         if (carrito.length === 0) {
             tbody.innerHTML = `
-            <li class="list-group-item text-center py-5 text-muted" id="empty_cart_msg">
-                <i class="fa-solid fa-basket-shopping fa-3x mb-3 text-black-50"></i><br>Tu carrito está vacío.
+            <li class="cart-empty-box my-2" id="empty_cart_msg">
+                <i class="fa-solid fa-basket-shopping fa-3x mb-3 d-block opacity-75"></i>Tu carrito está vacío.
             </li>`;
             subtotalAmountEl.innerText = '$0';
             totalAmountEl.innerText = '$0';
@@ -699,23 +815,24 @@
             totalItems += item.cantidad;
 
             const li = document.createElement('li');
-            li.className = 'list-group-item px-3 py-3';
+            li.className = 'list-group-item px-3 py-3 border-bottom';
+            li.style.borderColor = 'rgba(255, 255, 255, 0.08)';
             let precioInputState = item.es_obsequio ? 'disabled' : '';
-            let isObsequioClass = item.es_obsequio ? 'text-success' : 'text-muted';
+            let isObsequioClass = item.es_obsequio ? 'text-success' : 'checkout-label';
 
             let imeiHtml = '';
             if (item.tipo_inventario === 'celulares') {
                 let imei1_str = item.imei ? `IMEI 1: ${item.imei}` : 'IMEI 1: N/D';
                 let imei2_str = item.imei2 ? `, IMEI 2: ${item.imei2}` : '';
                 let inv_str = item.inventario ? ` | Inv: ${item.inventario}` : '';
-                imeiHtml = `<small class="text-secondary d-block fw-normal mt-1" style="font-size: 0.75rem;"><i class="fa-solid fa-mobile-screen-button me-1"></i>${imei1_str}${imei2_str}${inv_str}</small>`;
+                imeiHtml = `<small class="product-sku d-block fw-normal mt-1" style="font-size: 0.75rem;"><i class="fa-solid fa-mobile-screen-button me-1"></i>${imei1_str}${imei2_str}${inv_str}</small>`;
             }
 
             li.innerHTML = `
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div class="fw-bold text-dark text-truncate" style="max-width: 70%;">
+                    <div class="fw-bold text-brand-black text-truncate" style="max-width: 70%;">
                         ${item.nombre}
-                        <small class="text-muted d-block fw-normal" style="font-size: 0.75rem;">${item.sku}</small>
+                        <small class="product-sku d-block fw-normal" style="font-size: 0.75rem;">${item.sku}</small>
                         ${imeiHtml}
                         ${item.es_obsequio ? '<span class="badge bg-success bg-opacity-10 text-success mt-1"><i class="fa-solid fa-gift me-1"></i>Obsequio</span>' : ''}
                     </div>
@@ -732,12 +849,12 @@
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <div class="input-group input-group-sm flex-grow-1 me-2" style="max-width: 110px;">
-                        <span class="input-group-text bg-light text-muted border-0 px-2">Cant</span>
-                        <input type="number" class="form-control text-center fw-bold border-0 bg-light px-1" value="${item.cantidad}" onchange="updateCartItem(${index}, this.value)">
+                        <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.75rem;">Cant</span>
+                        <input type="number" class="form-control pos-input text-center fw-bold border-0 px-1" value="${item.cantidad}" onchange="updateCartItem(${index}, this.value)">
                     </div>
                     <div class="input-group input-group-sm flex-grow-1" style="max-width: 140px;">
-                        <span class="input-group-text bg-light text-muted border-0 px-2">$</span>
-                        <input type="number" class="form-control text-end fw-bold border-0 bg-light px-2 text-brand-black" value="${Math.round(item.precio_final)}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
+                        <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.75rem;">$</span>
+                        <input type="number" class="form-control pos-input text-end fw-bold border-0 px-2 text-brand-black" value="${Math.round(item.precio_final)}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
                     </div>
                 </div>
             `;
@@ -831,9 +948,17 @@
     function actualizarPagoParcial(index, campo, valor) {
         if (campo === 'metodo_pago') {
             pagosMixtos[index].metodo_pago = valor;
+            renderizarPagosMixtos();
+            return;
         }
         if (campo === 'monto') {
             pagosMixtos[index].monto = parseFloat(valor) || 0;
+        }
+        if (campo === 'provider_id') {
+            pagosMixtos[index].provider_id = valor ? parseInt(valor) : null;
+        }
+        if (campo === 'comprobante') {
+            pagosMixtos[index].comprobante = valor.trim();
         }
         actualizarSaldoRestante();
     }
@@ -887,23 +1012,54 @@
 
         pagosMixtos.forEach((pago, index) => {
             const div = document.createElement('div');
-            div.className = 'pago-item d-flex gap-2 align-items-center';
+            div.className = 'pago-item p-2 rounded-3 border mb-2';
+            div.style.background = 'rgba(255, 255, 255, 0.04)';
+            div.style.borderColor = 'rgba(255, 255, 255, 0.12)';
             
             let optionsHtml = METODOS_DISPONIBLES.map(m => 
                 `<option value="${m.value}" ${m.value === pago.metodo_pago ? 'selected' : ''}>${m.label}</option>`
             ).join('');
 
+            let abonoCamposHtml = '';
+            if (pago.metodo_pago === 'abono_tercero') {
+                let provOptions = LISTA_PROVEEDORES.map(pr => 
+                    `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
+                ).join('');
+
+                abonoCamposHtml = `
+                    <div class="p-2 mt-2 rounded border" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3) !important;">
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <label class="extra-small fw-bold checkout-label mb-1 d-block">Proveedor Destinatario *</label>
+                                <select class="form-select form-select-sm pos-select" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
+                                    <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
+                                    ${provOptions}
+                                </select>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="extra-small fw-bold checkout-label mb-1 d-block">Soporte / Comprobante *</label>
+                                <input type="text" class="form-control form-control-sm pos-input" placeholder="Ej: Transf. Nequi #849302" 
+                                       value="${pago.comprobante || ''}" oninput="actualizarPagoParcial(${index}, 'comprobante', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             div.innerHTML = `
-                <select class="form-select form-select-sm border-0 shadow-sm bg-light" style="cursor: pointer; flex: 1;" onchange="actualizarPagoParcial(${index}, 'metodo_pago', this.value)">
-                    ${optionsHtml}
-                </select>
-                <div class="input-group input-group-sm shadow-sm" style="flex: 1.5;">
-                    <span class="input-group-text bg-white border-0 text-muted">$</span>
-                    <input type="number" class="form-control border-0 fw-bold text-end" value="${pago.monto || ''}" placeholder="0" onchange="actualizarPagoParcial(${index}, 'monto', this.value)" onkeyup="actualizarPagoParcial(${index}, 'monto', this.value)">
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm pos-select" style="cursor: pointer; flex: 1;" onchange="actualizarPagoParcial(${index}, 'metodo_pago', this.value)">
+                        ${optionsHtml}
+                    </select>
+                    <div class="input-group input-group-sm shadow-sm" style="flex: 1.5;">
+                        <span class="input-group-text pos-input border-0 text-muted">$</span>
+                        <input type="number" class="form-control pos-input border-0 fw-bold text-end text-brand-black" value="${pago.monto || ''}" placeholder="0" onchange="actualizarPagoParcial(${index}, 'monto', this.value)" onkeyup="actualizarPagoParcial(${index}, 'monto', this.value)">
+                    </div>
+                    <button type="button" class="btn btn-sm text-danger border-0 bg-transparent p-1" onclick="eliminarPagoParcial(${index})">
+                        <i class="fa-solid fa-circle-xmark fs-5"></i>
+                    </button>
                 </div>
-                <button type="button" class="btn btn-sm text-danger border-0 bg-transparent p-1" onclick="eliminarPagoParcial(${index})">
-                    <i class="fa-solid fa-circle-xmark fs-5"></i>
-                </button>
+                ${abonoCamposHtml}
             `;
             container.appendChild(div);
         });
@@ -1139,10 +1295,11 @@
 
 
     async function procesarPagoGlobal(datosCliente = null) {
+        const esBodega = {% if sucursal_actual and sucursal_actual.tipo == 'bodega' %}true{% else %}false{% endif %};
         const asesorSelect = document.getElementById('asesor-vendedor');
-        const asesorId = asesorSelect ? asesorSelect.value : null;
+        const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
 
-        if (!asesorId) {
+        if (!esBodega && !asesorId) {
             return alert('⚠️ Por favor, selecciona el asesor que realizó la venta antes de continuar.');
         }
 
@@ -1157,10 +1314,20 @@
                 if (!p.monto || p.monto <= 0) {
                     return alert(`El pago #${i + 1} (${p.metodo_pago}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
                 }
+                if (p.metodo_pago === 'abono_tercero') {
+                    if (!p.provider_id) {
+                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere seleccionar el Proveedor destinatario.`);
+                    }
+                    if (!p.comprobante || !p.comprobante.trim()) {
+                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere el número de comprobante o soporte.`);
+                    }
+                }
                 sumaPagos += p.monto;
                 pagosPayload.push({
                     metodo_pago: p.metodo_pago,
-                    monto: Math.round(p.monto)
+                    monto: Math.round(p.monto),
+                    provider_id: p.metodo_pago === 'abono_tercero' ? p.provider_id : null,
+                    comprobante: p.metodo_pago === 'abono_tercero' ? p.comprobante : null
                 });
             }
             if (Math.round(sumaPagos) !== Math.round(granTotal)) {
@@ -1169,14 +1336,33 @@
             }
         } else {
             const metodoPago = document.getElementById('metodo-pago').value;
+            let providerIdUnico = null;
+            let comprobanteUnico = null;
+
+            if (metodoPago === 'abono_tercero') {
+                const provSelect = document.getElementById('abono_provider_id_unico');
+                const compInput = document.getElementById('abono_comprobante_unico');
+                providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
+                comprobanteUnico = compInput && compInput.value ? compInput.value.trim() : null;
+
+                if (!providerIdUnico) {
+                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
+                }
+                if (!comprobanteUnico) {
+                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes ingresar el comprobante o soporte de la transacción.');
+                }
+            }
+
             pagosPayload.push({
                 metodo_pago: metodoPago,
-                monto: Math.round(granTotal)
+                monto: Math.round(granTotal),
+                provider_id: providerIdUnico,
+                comprobante: comprobanteUnico
             });
         }
 
         const payload = {
-            asesor_id: parseInt(asesorId),
+            asesor_id: asesorId ? parseInt(asesorId) : null,
             provider_id: null,
             items: carrito.map(item => ({
                 product_id: item.product_id,

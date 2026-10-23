@@ -83,52 +83,101 @@ def aprobar_retoma(id):
     if bateria_input:
         retoma.bateria = bateria_input
 
-    nuevo_sku = f"RET-{retoma.id}-{obtener_hora_bogota().strftime('%Y%m%d%H%M%S')}"
-
-    imei1_val = retoma.imei1.strip() if retoma.imei1 else None
-    imei2_val = retoma.imei2.strip() if retoma.imei2 else None
-
-    if imei1_val:
-        prod_existente = Product.query.filter_by(imei=imei1_val).first()
-        if prod_existente:
-            if prod_existente.cantidad_stock == 0:
-                # Reingreso de celular vendido previamente: actualizar su IMEI histórico para liberar el IMEI único
-                prod_existente.imei = f"{imei1_val}-OLD-{prod_existente.id}"
-            else:
-                flash(f'El IMEI "{imei1_val}" ya está registrado y activo en el inventario ({prod_existente.nombre}).', 'danger')
-                return redirect(url_for('retomas_bp.cuarentena'))
-
-    nuevo_producto = Product(
-        nombre=nombre_definitivo,
-        sku=nuevo_sku,
-        tipo_inventario='celulares',
-        inventario=inventario_input,
-        cantidad_stock=1,
-        precio_costo=retoma.valor_retoma + arreglos_val,
-        precio_minimo=Decimal(precio_minimo),
-        precio_sugerido=Decimal(precio_sugerido),
-        observacion=retoma.observaciones,
-        imei=imei1_val,
-        imei2=imei2_val,
-        color=retoma.color,
-        bateria=bateria_input or retoma.bateria,
-        memoria=retoma.memoria,
-        proveedor=retoma.proveedor or 'Cliente',
-        marca=retoma.marca or '',
-        modelo_celular=retoma.modelo,
-        estado_celular='Usado'
-    )
+    # Determinar la sucursal de destino para la retoma
+    target_branch_id = retoma.branch_id
+    if not target_branch_id:
+        target_branch_id = current_user.branch_id or 1
     
+    from models import Branch, StockAdjustment
+    from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
+
+    branch_obj = Branch.query.get(target_branch_id)
+    branch_nom = branch_obj.nombre if branch_obj else 'Principal'
+
+    costo_total_retoma = retoma.valor_retoma + arreglos_val
+    precio_min_dec = Decimal(precio_minimo)
+    precio_sug_dec = Decimal(precio_sugerido)
+
     try:
-        db.session.add(nuevo_producto)
-        db.session.flush()
-        retoma.producto_generado_id = nuevo_producto.id
+        producto_final = None
+        es_reingreso = False
+
+        if imei1_val:
+            prod_existente = Product.query.filter_by(imei=imei1_val).first()
+            if prod_existente:
+                if prod_existente.total_stock > 0 or prod_existente.cantidad_stock > 0:
+                    flash(f'El IMEI "{imei1_val}" ya está registrado y activo con stock en el inventario ({prod_existente.nombre}).', 'danger')
+                    return redirect(url_for('retomas_bp.cuarentena'))
+                
+                # REINGRESO INTELIGENTE DE IMEI EXISTENTE:
+                # NO duplicar el Product (evita violar unique constraint).
+                # Se reactiva el producto existente con nuevos datos y +1 stock en la sucursal de retoma.
+                prod_existente.nombre = nombre_definitivo
+                prod_existente.precio_costo = costo_total_retoma
+                prod_existente.precio_minimo = precio_min_dec
+                prod_existente.precio_sugerido = precio_sug_dec
+                prod_existente.estado_celular = 'Usado'
+                prod_existente.inventario = inventario_input
+                if bateria_input:
+                    prod_existente.bateria = bateria_input
+                if retoma.observaciones:
+                    prod_existente.observacion = f"{prod_existente.observacion or ''} | Retoma #{retoma.id}: {retoma.observaciones}".strip(' |')
+                
+                producto_final = prod_existente
+                es_reingreso = True
+
+        if not producto_final:
+            nuevo_sku = f"RET-{retoma.id}-{obtener_hora_bogota().strftime('%Y%m%d%H%M%S')}"
+            producto_final = Product(
+                nombre=nombre_definitivo,
+                sku=nuevo_sku,
+                tipo_inventario='celulares',
+                inventario=inventario_input,
+                cantidad_stock=0, # Se actualizará vía BranchStock + sync_global
+                precio_costo=costo_total_retoma,
+                precio_minimo=precio_min_dec,
+                precio_sugerido=precio_sug_dec,
+                observacion=retoma.observaciones,
+                imei=imei1_val,
+                imei2=imei2_val,
+                color=retoma.color,
+                bateria=bateria_input or retoma.bateria,
+                memoria=retoma.memoria,
+                proveedor=retoma.proveedor or 'Cliente',
+                marca=retoma.marca or '',
+                modelo_celular=retoma.modelo,
+                estado_celular='Usado'
+            )
+            db.session.add(producto_final)
+            db.session.flush()
+
+        # Sumar +1 en BranchStock para la sucursal donde se recibió la retoma
+        b_stock = get_or_create_branch_stock(target_branch_id, producto_final.id, None, for_update=True)
+        stock_ant = b_stock.cantidad
+        b_stock.cantidad += 1
+        sync_global_product_stock(producto_final.id, None)
+
+        # Registrar StockAdjustment con branch_id
+        tipo_mov = 'REINGRESO_RETOMA' if es_reingreso else 'INGRESO_RETOMA'
+        ajuste = StockAdjustment(
+            product_id=producto_final.id,
+            admin_id=current_user.id,
+            branch_id=target_branch_id,
+            tipo_movimiento=f"{tipo_mov} (Retoma #{retoma.id} en {branch_nom})",
+            stock_anterior=stock_ant,
+            stock_nuevo=b_stock.cantidad
+        )
+        db.session.add(ajuste)
+
+        retoma.producto_generado_id = producto_final.id
         retoma.estado = 'aprobado'
         db.session.commit()
-        flash('Retoma aprobada y producto generado exitosamente.', 'success')
+        
+        msg = f'Retoma aprobada con éxito como {"reingreso de celular previo" if es_reingreso else "nuevo producto"} en sucursal {branch_nom}.'
+        flash(msg, 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al generar producto: {str(e)}', 'danger')
+        flash(f'Error al procesar la aprobación de la retoma: {str(e)}', 'danger')
         
     return redirect(url_for('retomas_bp.cuarentena'))
 

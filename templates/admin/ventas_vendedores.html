@@ -1,16 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Venta de Asesores - RedCover{% endblock %}
+{% block title %}Venta y Liquidación de Asesores - LifeStore{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row mb-4 align-items-center">
-        <div class="col-md-6">
+        <div class="col-md-7">
             <h2 class="fw-bold mb-0 text-brand-black">
-                <i class="fa-solid fa-chart-line text-brand-pink me-2"></i>Venta de Asesores
+                <i class="fa-solid fa-chart-line text-brand-pink me-2"></i>Liquidación de Comisiones de Asesores
             </h2>
-            <p class="text-muted">Consulta de ventas por asesor y mes seleccionado.</p>
+            <p class="text-muted">Cálculo porcentual de vitrina, bolsa 15% de retomas, anticipos y recibos de pago.</p>
         </div>
+        {% if asesor_filtro %}
+        <div class="col-md-5 text-md-end">
+            <button type="button" class="btn btn-warning rounded-pill px-3 py-2 fw-bold shadow-sm me-2" data-bs-toggle="modal" data-bs-target="#modalAnticipo">
+                <i class="fa-solid fa-hand-holding-dollar me-1"></i> Registrar Anticipo
+            </button>
+            <button type="button" class="btn btn-success rounded-pill px-3 py-2 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalLiquidar" {% if saldo_pendiente <= 0 %}disabled{% endif %}>
+                <i class="fa-solid fa-money-bill-transfer me-1"></i> Liquidar Saldo Total (${{ saldo_pendiente|cop }})
+            </button>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Filtros de Consulta -->
@@ -29,19 +39,20 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-bold">Seleccionar Mes <span class="text-danger">*</span></label>
+                    <label class="form-label fw-bold">Mes de Liquidación <span class="text-danger">*</span></label>
                     <input type="month" name="mes" class="form-control bg-light" value="{{ mes_seleccionado }}" required>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label fw-bold">Comisión por Celular ($)</label>
+                    <label class="form-label fw-bold">Comisión Vitrina (%)</label>
                     <div class="input-group">
-                        <span class="input-group-text bg-light">$</span>
-                        <input type="number" name="valor_comision" class="form-control bg-light fw-bold text-success" value="{{ valor_comision or 20000 }}" step="1000">
+                        <input type="number" name="porcentaje_comision" class="form-control bg-light fw-bold text-primary" 
+                               value="{{ porcentaje_comision or 2.0 }}" step="0.1" min="0" max="100">
+                        <span class="input-group-text bg-light fw-bold">%</span>
                     </div>
                 </div>
                 <div class="col-md-2">
                     <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow-sm">
-                        <i class="fa-solid fa-magnifying-glass me-1"></i> Consultar
+                        <i class="fa-solid fa-calculator me-1"></i> Calcular
                     </button>
                 </div>
             </form>
@@ -50,134 +61,408 @@
 
     {% if asesor_id %}
         {% if asesor_filtro %}
-            <!-- Tarjetas de Resumen del Asesor enfocadas en Celulares y Comisión -->
+            <!-- Tarjetas de Resumen y Estado de Cuenta -->
             <div class="row g-3 mb-4">
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
-                        <div class="text-uppercase fw-bold text-muted small mb-1">Asesor Consultado</div>
-                        <h4 class="fw-bold text-brand-black mb-0">{{ asesor_filtro.nombre }}</h4>
-                        <span class="badge bg-secondary mt-2 w-auto align-self-start">Asesor de Ventas</span>
+                <div class="col-lg-2 col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 p-3 bg-white h-100">
+                        <div class="text-uppercase fw-bold text-muted extra-small mb-1">Asesor</div>
+                        <h5 class="fw-bold text-brand-black mb-1 text-truncate" title="{{ asesor_filtro.nombre }}">{{ asesor_filtro.nombre }}</h5>
+                        <span class="badge bg-secondary w-auto align-self-start">Comercial</span>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white border-start border-5 border-primary">
-                        <div class="text-uppercase fw-bold text-primary small mb-1"><i class="fa-solid fa-mobile-screen-button me-1"></i> Celulares Vendidos</div>
-                        <h2 class="fw-bold text-primary mb-0">{{ total_celulares_mes }} <span class="fs-6 font-normal">uds</span></h2>
-                        <span class="text-muted extra-small mt-1 d-block">Monto: ${{ total_monto_celulares|cop }}</span>
+                <div class="col-lg-2 col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-info h-100">
+                        <div class="text-uppercase fw-bold text-info extra-small mb-1">Vitrina ({{ porcentaje_comision }}%)</div>
+                        <h4 class="fw-bold text-info mb-0">${{ total_comision_vitrina|cop }}</h4>
+                        <span class="text-muted extra-small mt-1 d-block">Base: ${{ total_monto_vitrina|cop }}</span>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white border-start border-5 border-success">
-                        <div class="text-uppercase fw-bold text-success small mb-1"><i class="fa-solid fa-hand-holding-dollar me-1"></i> Comisión por Celulares</div>
-                        <h2 class="fw-bold text-success mb-0">${{ total_comision_mes|cop }}</h2>
-                        <span class="text-muted extra-small mt-1 d-block">${{ valor_comision|cop }} por cada celular</span>
+                <div class="col-lg-2 col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-primary h-100">
+                        <div class="text-uppercase fw-bold text-primary extra-small mb-1">Bolsa Retomas (15%)</div>
+                        <h4 class="fw-bold text-primary mb-0">${{ total_comision_retomas|cop }}</h4>
+                        <span class="text-muted extra-small mt-1 d-block">En {{ retomas_procesadas|length }} retomas</span>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card border-0 shadow-sm rounded-4 p-4 bg-white">
-                        <div class="text-uppercase fw-bold text-muted small mb-1">Total Facturación Mes</div>
-                        <h3 class="fw-bold text-dark mb-0">${{ total_ventas_mes|cop }}</h3>
-                        <span class="text-muted extra-small mt-1 d-block">En {{ ventas|length }} facturas totales</span>
+                <div class="col-lg-2 col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-success h-100">
+                        <div class="text-uppercase fw-bold text-success extra-small mb-1">Total Generado</div>
+                        <h4 class="fw-bold text-success mb-0">${{ total_comision_mes|cop }}</h4>
+                        <span class="text-muted extra-small mt-1 d-block">Vitrina + Retomas</span>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-warning h-100">
+                        <div class="text-uppercase fw-bold text-warning extra-small mb-1">Anticipos / Pagos</div>
+                        <h4 class="fw-bold text-warning mb-0">${{ (total_anticipos + total_liquidado)|cop }}</h4>
+                        <span class="text-muted extra-small mt-1 d-block">{{ pagos_comisiones|length }} abono(s)</span>
+                    </div>
+                </div>
+                <div class="col-lg-2 col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 {% if saldo_pendiente > 0 %}border-danger bg-danger bg-opacity-10{% else %}border-secondary{% endif %} h-100">
+                        <div class="text-uppercase fw-bold {% if saldo_pendiente > 0 %}text-danger{% else %}text-muted{% endif %} extra-small mb-1">Saldo por Pagar</div>
+                        <h4 class="fw-bold {% if saldo_pendiente > 0 %}text-danger{% else %}text-muted{% endif %} mb-0">${{ saldo_pendiente|cop }}</h4>
+                        <span class="extra-small mt-1 d-block {% if saldo_pendiente > 0 %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+                            {% if saldo_pendiente > 0 %}Pendiente de giro{% else %}Al día / Liquidado{% endif %}
+                        </span>
                     </div>
                 </div>
             </div>
 
-            <!-- Listado de Ventas -->
-            <div class="card card-custom border-0 shadow-sm">
-                <div class="card-header bg-white border-0 py-3 ps-4 d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold m-0 text-brand-black">
-                        <i class="fa-solid fa-list me-2 text-brand-blue"></i>Detalle de Ventas del Período
-                    </h5>
-                    <span class="badge bg-light text-dark border px-3 py-2">
-                        Comisión unitaria: <strong>${{ valor_comision|cop }}</strong> / celular
-                    </span>
+            <!-- Pestañas de Detalle -->
+            <ul class="nav nav-pills mb-3 gap-2" id="comisionesTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active rounded-pill fw-bold px-4" id="vitrina-tab" data-bs-toggle="pill" data-bs-target="#vitrina-content" type="button" role="tab">
+                        <i class="fa-solid fa-store me-1"></i> Ventas de Vitrina ({{ ventas_procesadas|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link rounded-pill fw-bold px-4" id="retomas-tab" data-bs-toggle="pill" data-bs-target="#retomas-content" type="button" role="tab">
+                        <i class="fa-solid fa-recycle me-1"></i> Bolsa de Retomas 15% ({{ retomas_procesadas|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link rounded-pill fw-bold px-4" id="pagos-tab" data-bs-toggle="pill" data-bs-target="#pagos-content" type="button" role="tab">
+                        <i class="fa-solid fa-receipt me-1"></i> Historial de Anticipos y Liquidaciones ({{ pagos_comisiones|length }})
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="comisionesTabsContent">
+                <!-- 1. Pestaña: Ventas de Vitrina -->
+                <div class="tab-pane fade show active" id="vitrina-content" role="tabpanel">
+                    <div class="card card-custom border-0 shadow-sm">
+                        <div class="card-header bg-white border-0 py-3 ps-4 d-flex justify-content-between align-items-center">
+                            <h5 class="fw-bold m-0 text-brand-black">
+                                <i class="fa-solid fa-cart-shopping me-2 text-brand-blue"></i>Ventas Directas de Vitrina
+                            </h5>
+                            <span class="badge bg-light text-dark border px-3 py-2">
+                                Porcentaje aplicado: <strong>{{ porcentaje_comision }}%</strong> sobre ventas
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                                    <thead class="table-light text-uppercase" style="font-size: 0.78rem;">
+                                        <tr>
+                                            <th class="ps-4" width="8%">Factura</th>
+                                            <th width="14%">Fecha y Hora</th>
+                                            <th width="14%">Cajero</th>
+                                            <th width="32%">Productos Vendidos</th>
+                                            <th class="text-end" width="12%">Base Vitrina</th>
+                                            <th class="text-center" width="10%">Comisión ({{ porcentaje_comision }}%)</th>
+                                            <th class="text-center pe-4" width="10%">Ticket</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for item in ventas_procesadas %}
+                                        {% set venta = item.sale %}
+                                        <tr>
+                                            <td class="ps-4">
+                                                <span class="badge bg-primary rounded-pill">#{{ venta.id }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold text-dark">{{ venta.fecha_venta.strftime('%d/%m/%Y') }}</div>
+                                                <div class="small text-muted">{{ venta.fecha_venta.strftime('%I:%M %p') }}</div>
+                                            </td>
+                                            <td class="fw-semibold text-secondary">
+                                                {{ venta.vendedor.nombre if venta.vendedor else 'N/A' }}
+                                            </td>
+                                            <td>
+                                                <ul class="list-unstyled mb-0 extra-small text-muted ps-1">
+                                                    {% for prod in item.items_list %}
+                                                    <li>• <strong>{{ prod.nombre }}</strong> (x{{ prod.cantidad }}) - ${{ prod.subtotal|cop }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </td>
+                                            <td class="text-end fw-bold text-dark">
+                                                ${{ item.monto_vitrina|cop }}
+                                            </td>
+                                            <td class="text-center fw-bold text-success">
+                                                +${{ item.comision_venta|cop }}
+                                            </td>
+                                            <td class="text-center pe-4">
+                                                <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=venta.id) }}"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-dark rounded-pill px-3">
+                                                    <i class="fa-solid fa-receipt me-1"></i> Ver
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="7" class="text-center py-5 text-muted">
+                                                <i class="fa-solid fa-folder-open fs-2 mb-2 d-block opacity-50"></i>
+                                                No se encontraron ventas de vitrina para este asesor en el mes seleccionado.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
-                            <thead class="table-light text-uppercase" style="font-size: 0.78rem;">
-                                <tr>
-                                    <th class="ps-4" width="8%">Factura</th>
-                                    <th width="12%">Fecha y Hora</th>
-                                    <th width="12%">Cajero</th>
-                                    <th width="32%">Celulares Vendidos en Factura</th>
-                                    <th class="text-center" width="12%">Comisión Venta</th>
-                                    <th class="text-end" width="12%">Total Facturado</th>
-                                    <th class="text-center pe-4" width="12%">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in ventas_procesadas %}
-                                {% set venta = item.sale %}
-                                <tr>
-                                    <td class="ps-4">
-                                        <span class="badge bg-primary rounded-pill">#{{ venta.id }}</span>
-                                    </td>
-                                    <td>
-                                        <div class="fw-semibold text-dark">{{ venta.fecha_venta.strftime('%d/%m/%Y') }}</div>
-                                        <div class="small text-muted">{{ venta.fecha_venta.strftime('%I:%M %p') }}</div>
-                                    </td>
-                                    <td class="fw-semibold text-secondary">
-                                        {{ venta.vendedor.nombre if venta.vendedor else 'N/A' }}
-                                    </td>
-                                    <td>
-                                        {% if item.cant_celulares > 0 %}
-                                            <div class="d-flex align-items-center gap-2 mb-1">
-                                                <span class="badge bg-success rounded-pill px-2 py-1">
-                                                    <i class="fa-solid fa-mobile-screen me-1"></i> {{ item.cant_celulares }} Celular{% if item.cant_celulares > 1 %}es{% endif %}
-                                                </span>
-                                                <span class="small fw-bold text-success">${{ item.monto_celulares|cop }}</span>
-                                            </div>
-                                            <ul class="list-unstyled mb-0 extra-small text-muted ps-1">
-                                                {% for cel in item.celulares_list %}
-                                                <li>• <strong>{{ cel.nombre }}</strong> (IMEI: {{ cel.imei }})</li>
-                                                {% endfor %}
-                                            </ul>
+
+                <!-- 2. Pestaña: Bolsa de Retomas 15% -->
+                <div class="tab-pane fade" id="retomas-content" role="tabpanel">
+                    <div class="card card-custom border-0 shadow-sm">
+                        <div class="card-header bg-white border-0 py-3 ps-4 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="fw-bold m-0 text-brand-black">
+                                    <i class="fa-solid fa-recycle me-2 text-success"></i>Bolsa del 15% en Venta de Retomas
+                                </h5>
+                                <small class="text-muted">Calculada sobre: (Precio Venta - Costo Retoma - Reparaciones/Accesorios) y dividida entre los asesores del turno.</small>
+                            </div>
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2 fw-bold">
+                                Total Asesor en Retomas: ${{ total_comision_retomas|cop }}
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                                    <thead class="table-light text-uppercase" style="font-size: 0.78rem;">
+                                        <tr>
+                                            <th class="ps-4" width="8%">Venta</th>
+                                            <th width="20%">Equipo Retoma</th>
+                                            <th class="text-end" width="12%">Precio Venta</th>
+                                            <th class="text-end" width="12%">Costo Retoma</th>
+                                            <th class="text-end" width="10%">Arreglos</th>
+                                            <th class="text-end" width="12%">Utilidad Neta</th>
+                                            <th class="text-center" width="12%">Bolsa 15% Total</th>
+                                            <th class="text-center pe-4" width="14%">Cuota Ganada Asesor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for ret in retomas_procesadas %}
+                                        <tr>
+                                            <td class="ps-4">
+                                                <span class="badge bg-secondary rounded-pill">#{{ ret.venta.id }}</span>
+                                                <div class="extra-small text-muted">{{ ret.venta.fecha_venta.strftime('%d/%m/%Y') }}</div>
+                                            </td>
+                                            <td>
+                                                <strong class="text-dark">{{ ret.producto_nombre }}</strong>
+                                                <div class="extra-small text-muted">IMEI: {{ ret.retoma.imei1 or 'N/A' }}</div>
+                                            </td>
+                                            <td class="text-end fw-semibold text-dark">${{ ret.precio_venta|cop }}</td>
+                                            <td class="text-end text-danger">-${{ ret.costo_retoma|cop }}</td>
+                                            <td class="text-end text-muted">-${{ ret.arreglos|cop }}</td>
+                                            <td class="text-end fw-bold text-primary">${{ ret.utilidad_neta|cop }}</td>
+                                            <td class="text-center">
+                                                <span class="badge bg-light text-dark border">${{ ret.bolsa_total|cop }}</span>
+                                                <div class="extra-small text-muted mt-1">{{ ret.num_asesores }} asesor(es) en turno</div>
+                                            </td>
+                                            <td class="text-center pe-4 fw-bold text-success fs-6">
+                                                +${{ ret.cuota_asesor|cop }}
+                                            </td>
+                                        </tr>
                                         {% else %}
-                                            <span class="badge bg-secondary bg-opacity-20 text-muted border px-2 py-1">
-                                                <i class="fa-solid fa-headphones me-1"></i> Solo Accesorios / Sin Celulares
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-center fw-bold text-primary">
-                                        {% if item.cant_celulares > 0 %}
-                                            +${{ item.comision_venta|cop }}
+                                        <tr>
+                                            <td colspan="8" class="text-center py-5 text-muted">
+                                                <i class="fa-solid fa-recycle fs-2 mb-2 d-block opacity-50"></i>
+                                                No hay operaciones de retomas vendidas en los turnos donde participó el asesor este mes.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Pestaña: Historial de Anticipos y Pagos -->
+                <div class="tab-pane fade" id="pagos-content" role="tabpanel">
+                    <div class="card card-custom border-0 shadow-sm">
+                        <div class="card-header bg-white border-0 py-3 ps-4 d-flex justify-content-between align-items-center">
+                            <h5 class="fw-bold m-0 text-brand-black">
+                                <i class="fa-solid fa-file-invoice-dollar me-2 text-warning"></i>Historial de Pagos y Comprobantes
+                            </h5>
+                            <span class="badge bg-warning bg-opacity-25 text-dark border px-3 py-2 fw-bold">
+                                Total Pagado: ${{ (total_anticipos + total_liquidado)|cop }}
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                                    <thead class="table-light text-uppercase" style="font-size: 0.78rem;">
+                                        <tr>
+                                            <th class="ps-4" width="10%">Folio</th>
+                                            <th width="15%">Fecha y Hora</th>
+                                            <th width="15%">Tipo de Pago</th>
+                                            <th width="15%">Método</th>
+                                            <th class="text-end" width="15%">Monto Pagado</th>
+                                            <th width="18%">Registrado Por / Notas</th>
+                                            <th class="text-center pe-4" width="12%">Comprobante</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for p in pagos_comisiones %}
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-secondary">
+                                                REC-COM-{{ '%05d' % p.id }}
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold text-dark">{{ p.fecha_pago.strftime('%d/%m/%Y') }}</div>
+                                                <div class="extra-small text-muted">{{ p.fecha_pago.strftime('%I:%M %p') }}</div>
+                                            </td>
+                                            <td>
+                                                {% if p.tipo_pago == 'ANTICIPO' %}
+                                                    <span class="badge bg-warning text-dark"><i class="fa-solid fa-hand-holding-dollar me-1"></i> Anticipo</span>
+                                                {% else %}
+                                                    <span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i> Liquidación Total</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light text-dark border text-capitalize">{{ p.metodo_pago }}</span>
+                                            </td>
+                                            <td class="text-end fw-bold text-success fs-6">
+                                                ${{ p.monto|cop }}
+                                            </td>
+                                            <td>
+                                                <div class="extra-small fw-semibold text-dark">{{ p.registrado_por.nombre if p.registrado_por else 'Admin' }}</div>
+                                                <div class="extra-small text-muted text-truncate" style="max-width: 180px;">{{ p.notas or 'Sin notas' }}</div>
+                                            </td>
+                                            <td class="text-center pe-4">
+                                                <a href="{{ url_for('admin_bp.recibo_comision', payment_id=p.id) }}"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm">
+                                                    <i class="fa-solid fa-print me-1"></i> Recibo
+                                                </a>
+                                            </td>
+                                        </tr>
                                         {% else %}
-                                            <span class="text-muted fw-normal">$0</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end fw-bold text-dark">
-                                        ${{ venta.monto_total|cop }}
-                                    </td>
-                                    <td class="text-center">
-                                        <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=venta.id) }}"
-                                           target="_blank"
-                                           class="btn btn-sm btn-outline-dark rounded-pill px-3">
-                                            <i class="fa-solid fa-receipt me-1"></i> Ticket
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr>
-                                    <td colspan="7" class="text-center py-5 text-muted">
-                                        <i class="fa-solid fa-folder-open fs-2 mb-2 d-block opacity-50"></i>
-                                        No se encontraron ventas para este asesor en el mes seleccionado.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                        <tr>
+                                            <td colspan="7" class="text-center py-5 text-muted">
+                                                <i class="fa-solid fa-receipt fs-2 mb-2 d-block opacity-50"></i>
+                                                No se han registrado anticipos ni pagos de comisiones para este asesor en el mes seleccionado.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Modal: Registrar Anticipo -->
+            <div class="modal fade" id="modalAnticipo" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow rounded-4">
+                        <form method="POST" action="{{ url_for('admin_bp.registrar_anticipo_comision') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="asesor_id" value="{{ asesor_filtro.id }}">
+                            <input type="hidden" name="mes" value="{{ mes_seleccionado }}">
+                            <input type="hidden" name="porcentaje_comision" value="{{ porcentaje_comision }}">
+                            
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold text-dark">
+                                    <i class="fa-solid fa-hand-holding-dollar text-warning me-2"></i>Registrar Anticipo de Comisión
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body py-4">
+                                <p class="text-muted small mb-3">
+                                    Asesor beneficiario: <strong>{{ asesor_filtro.nombre }}</strong><br>
+                                    Saldo actual pendiente: <span class="fw-bold text-primary">${{ saldo_pendiente|cop }}</span>
+                                </p>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Monto del Anticipo ($) <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light">$</span>
+                                        <input type="number" name="monto" class="form-control bg-light fw-bold text-success fs-5" 
+                                               placeholder="0" min="1" step="1000" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Método de Pago <span class="text-danger">*</span></label>
+                                    <select name="metodo_pago" class="form-select bg-light" required>
+                                        <option value="efectivo" selected>💵 Efectivo</option>
+                                        <option value="nequi">🟣 Nequi</option>
+                                        <option value="bancolombia">🏦 Bancolombia</option>
+                                        <option value="daviplata">📲 Daviplata</option>
+                                        <option value="transferencia">🏛️ Transferencia Bancaria</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Notas / Observaciones</label>
+                                    <textarea name="notas" class="form-control bg-light" rows="2" placeholder="Ej: Anticipo solicitado para transporte/gastos personales"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm">
+                                    <i class="fa-solid fa-check me-1"></i> Guardar y Generar Recibo
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: Liquidar Saldo Total -->
+            <div class="modal fade" id="modalLiquidar" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-0 shadow rounded-4">
+                        <form method="POST" action="{{ url_for('admin_bp.liquidar_saldo_comision') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="asesor_id" value="{{ asesor_filtro.id }}">
+                            <input type="hidden" name="mes" value="{{ mes_seleccionado }}">
+                            <input type="hidden" name="porcentaje_comision" value="{{ porcentaje_comision }}">
+                            
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold text-dark">
+                                    <i class="fa-solid fa-money-bill-transfer text-success me-2"></i>Liquidar Saldo Total de Comisión
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body py-4">
+                                <div class="alert alert-success border-0 rounded-3 mb-3">
+                                    <div class="extra-small text-uppercase fw-bold text-muted">Monto total pendiente a saldar:</div>
+                                    <h3 class="fw-bold text-success mb-0">${{ saldo_pendiente|cop }}</h3>
+                                    <input type="hidden" name="monto" value="{{ saldo_pendiente|int }}">
+                                </div>
+                                <p class="text-muted small">
+                                    Esta acción registrará la liquidación definitiva de comisiones para <strong>{{ asesor_filtro.nombre }}</strong> correspondiente a <strong>{{ mes_seleccionado }}</strong>.
+                                </p>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Método de Pago <span class="text-danger">*</span></label>
+                                    <select name="metodo_pago" class="form-select bg-light" required>
+                                        <option value="efectivo" selected>💵 Efectivo</option>
+                                        <option value="nequi">🟣 Nequi</option>
+                                        <option value="bancolombia">🏦 Bancolombia</option>
+                                        <option value="daviplata">📲 Daviplata</option>
+                                        <option value="transferencia">🏛️ Transferencia Bancaria</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Notas / Observaciones</label>
+                                    <textarea name="notas" class="form-control bg-light" rows="2" placeholder="Ej: Liquidación final de comisiones mes {{ mes_seleccionado }}"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                                    <i class="fa-solid fa-check me-1"></i> Confirmar Liquidación
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
         {% else %}
-            <div class="alert alert-warning border-0">Asesor no encontrado.</div>
+            <div class="alert alert-warning border-0 rounded-4 p-4 shadow-sm">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i> Asesor no encontrado o inactivo.
+            </div>
         {% endif %}
     {% else %}
         <div class="card border-0 shadow-sm p-5 text-center rounded-4 bg-white">
             <i class="fa-solid fa-chart-pie fs-1 text-muted mb-3 opacity-50"></i>
-            <h5 class="fw-bold text-secondary">Consulta de Rendimiento Contable</h5>
-            <p class="text-muted mb-0">Selecciona un asesor y un período mensual para visualizar su reporte de ventas.</p>
+            <h5 class="fw-bold text-secondary">Liquidación y Reporte de Comisiones</h5>
+            <p class="text-muted mb-0">Selecciona un asesor y un período mensual para visualizar su cálculo de vitrina, retomas y saldo pendiente.</p>
         </div>
     {% endif %}
 </div>

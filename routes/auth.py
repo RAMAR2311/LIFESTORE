@@ -8,15 +8,16 @@ auth_bp = Blueprint('auth_bp', __name__)
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+        email = (request.form.get('email') or '').strip().lower()
+        password = (request.form.get('password') or '').strip()
         
-        # Consultamos el usuario
-        user = User.query.filter_by(email=email).first()
+        # Consultamos el usuario insensible a mayúsculas
+        from sqlalchemy import func
+        user = User.query.filter(func.lower(User.email) == email).first()
         
         # Validar contraseña cifrada
         if user and check_password_hash(user.password_hash, password):
-            login_user(user) # Iniciar sesión del lado del servidor persistente
+            login_user(user, remember=True) # Iniciar sesión del lado del servidor persistente
             flash('¡Sesión iniciada con éxito!', 'success')
             
             # Redirección inteligente basada en ROL o hacia la raíz para delegar el control

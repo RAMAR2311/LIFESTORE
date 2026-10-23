@@ -1,4 +1,4 @@
-"""ZENIC — Asistente IA del sistema RedCover.
+"""ZENIC — Asistente IA del sistema LifeStore.
 
 Arquitectura:
   1. El modelo recibe un resumen compacto del sistema + un catálogo de herramientas.
@@ -1573,7 +1573,7 @@ def _resumen_sistema() -> str:
         pass
 
     ahora = obtener_hora_bogota()
-    return f"""Eres ZENIC, el asistente de IA del sistema de gestión RedCover, una tienda de \
+    return f"""Eres ZENIC, el asistente de IA del sistema de gestión LifeStore, una tienda de \
 telefonía y accesorios en Colombia. Hablas con {current_user.nombre} (administrador, \
 sucursal {_sucursal_default()}).
 

@@ -16,39 +16,53 @@
         <table class="table table-hover align-middle mb-0 text-center w-100" style="font-size: 0.9rem;">
             <thead class="bg-light text-nowrap">
                 <tr>
-                    <th class="ps-4 text-start">RECIBIDO</th>
+                    <th class="ps-4 text-start">FECHA / INGRESO</th>
                     <th class="text-start">FACTURA / CLIENTE</th>
                     <th>ARTÍCULO / IMEI</th>
-                    <th>MOTIVO (CLIENTE)</th>
+                    <th>CUSTODIA (RECEPCIÓN / ENTREGA)</th>
                     <th>ESTADO</th>
-                    <th class="text-end pe-4">TICKET</th>
+                    <th class="text-end pe-4">ACCIONES</th>
                 </tr>
             </thead>
             <tbody class="text-nowrap">
                 {% for w in warranties %}
                 <tr>
                     <td class="ps-4 text-start">
-                        <div class="fw-bold text-dark">{{ w.created_at.strftime('%d/%m/%Y') }}</div>
+                        <div class="fw-bold text-dark">{{ w.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
                         <div class="small text-muted">{{ w.tiempo_transcurrido }}</div>
                     </td>
                     <td class="text-start">
                         <div class="fw-bold">Fac #{{ w.sale_id }}</div>
                         <div class="small text-muted">{{ w.sale.cliente.nombre if w.sale and w.sale.cliente else 'Sin cliente' }}</div>
                     </td>
-                    <td class="text-start" style="max-width: 200px;">
-                        <div class="text-truncate" title="{{ w.product.nombre if w.product else w.nombre_manual }}">
+                    <td class="text-start" style="max-width: 220px;">
+                        <div class="text-truncate fw-semibold" title="{{ w.product.nombre if w.product else w.nombre_manual }}">
                             {{ w.product.nombre if w.product else w.nombre_manual }}
                         </div>
+                        {% if w.product and w.product.imei %}
+                            <small class="badge bg-dark text-white font-mono px-2 py-0">IMEI: {{ w.product.imei }}</small>
+                        {% endif %}
+                        <div class="text-truncate text-muted small mt-1" title="{{ w.motivo_reportado or w.reason }}">
+                            <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>{{ w.motivo_reportado or w.reason }}
+                        </div>
                     </td>
-                    <td class="text-start" style="max-width: 250px;">
-                        <div class="text-truncate text-muted" title="{{ w.reason }}">{{ w.reason }}</div>
-                        {% if w.admin_notes %}
-                        <div class="text-truncate text-danger small mt-1" title="{{ w.admin_notes }}"><i class="fa-solid fa-comment-dots"></i> {{ w.admin_notes }}</div>
+                    <td class="text-start">
+                        <div>
+                            <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50 small">
+                                <i class="fa-solid fa-user-shield text-primary me-1"></i> Recibió: <strong>{{ w.recibido_por.nombre_completo or w.recibido_por.username if w.recibido_por else 'Asesor Tienda' }}</strong>
+                            </span>
+                        </div>
+                        {% if w.entregado_por %}
+                            <div class="mt-1">
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-50 small">
+                                    <i class="fa-solid fa-circle-check me-1"></i> Entregó: <strong>{{ w.entregado_por.nombre_completo or w.entregado_por.username }}</strong>
+                                </span>
+                            </div>
                         {% endif %}
                     </td>
                     <td>
                         {% set estado = w.estado_actual %}
-                        <div class="dropdown">
+                        <div class="dropdown d-inline-block">
                             <button class="btn btn-sm dropdown-toggle rounded-pill px-3 fw-bold
                                 {% if estado == 'Pendiente' %}btn-warning text-dark
                                 {% elif estado == 'Demorado' %}btn-danger
@@ -59,15 +73,59 @@
                             </button>
                             <ul class="dropdown-menu shadow-sm border-0">
                                 <li><a class="dropdown-item fw-bold text-warning" href="#" onclick="updateWarrantyStatus({{ w.id }}, 'Pendiente')"><i class="fa-solid fa-clock me-2"></i> Pendiente</a></li>
-                                <li><a class="dropdown-item fw-bold text-success" href="#" onclick="updateWarrantyStatus({{ w.id }}, 'Entregada')"><i class="fa-solid fa-check me-2"></i> Entregada</a></li>
                                 <li><a class="dropdown-item fw-bold text-danger" href="#" onclick="updateWarrantyStatus({{ w.id }}, 'Rechazada')"><i class="fa-solid fa-xmark me-2"></i> Rechazada</a></li>
                             </ul>
                         </div>
                     </td>
                     <td class="text-end pe-4">
-                        <a href="{{ url_for('warranties_bp.ticket', id=w.id) }}" target="_blank" class="btn btn-sm btn-outline-dark rounded-pill px-3" title="Imprimir Ticket">
-                            <i class="fa-solid fa-print"></i>
-                        </a>
+                        <div class="d-flex justify-content-end gap-1">
+                            {% if w.resolution != 'Entregada' %}
+                                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalEntregar{{ w.id }}" title="Entregar al Cliente">
+                                    <i class="fa-solid fa-hand-holding-hand me-1"></i> Entregar
+                                </button>
+                            {% endif %}
+                            <a href="{{ url_for('warranties_bp.ticket', id=w.id) }}" target="_blank" class="btn btn-sm btn-outline-dark rounded-pill px-3" title="Imprimir Ticket">
+                                <i class="fa-solid fa-print"></i>
+                            </a>
+                        </div>
+
+                        <!-- Modal Entregar Garantía -->
+                        <div class="modal fade" id="modalEntregar{{ w.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered text-start">
+                                <div class="modal-content border-0 shadow">
+                                    <form method="POST" action="{{ url_for('warranties_bp.entregar_garantia', id=w.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <div class="modal-header bg-success text-white border-0">
+                                            <h5 class="modal-title fw-bold"><i class="fa-solid fa-clipboard-check me-2"></i>Entrega a Satisfacción #{{ w.id }}</h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <div class="card p-3 mb-3 bg-light border-0 rounded-3">
+                                                <div class="small text-muted mb-1">Custodio que Entrega la Solución:</div>
+                                                <div class="fw-bold text-dark fs-6">
+                                                    <i class="fa-solid fa-user-check text-success me-1"></i> {{ current_user.nombre_completo or current_user.username }}
+                                                </div>
+                                                <div class="small text-muted mt-1">Cliente: <strong>{{ w.sale.cliente.nombre if w.sale and w.sale.cliente else 'Cliente Directo' }}</strong></div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label small fw-bold">Soporte o Confirmación de Recibido a Satisfacción</label>
+                                                <input type="text" name="soporte_entrega" class="form-control" placeholder="Ej: Cédula física verificada, firma en comprobante físico #..." required>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small fw-bold">Notas Técnicas de Entrega (Opcional)</label>
+                                                <textarea name="notas_entrega" class="form-control" rows="2" placeholder="Ej: Se entrega equipo probado frente al cliente, pantalla y batería 100% operativos."></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer border-0">
+                                            <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                                                <i class="fa-solid fa-check me-1"></i> Confirmar Entrega
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
@@ -127,6 +185,41 @@
                             <select name="detail_index" id="selectProduct" class="form-select border-success shadow-sm" required>
                                 <option value="" disabled selected>-- Seleccione un producto de esta factura --</option>
                             </select>
+                        </div>
+
+                        <!-- Checklist Inicial de Recepción Física y Custodia -->
+                        <div class="card p-3 mb-3 bg-light border-0 rounded-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
+                                <span class="fw-bold small text-uppercase text-muted">
+                                    <i class="fa-solid fa-user-shield text-warning me-1"></i> Custodio Receptor (Punto de Venta)
+                                </span>
+                                <span class="badge bg-dark text-white rounded-pill px-2 py-1">
+                                    {{ current_user.nombre_completo or current_user.username }}
+                                </span>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold mb-1">Estado Estético Inicial *</label>
+                                    <select name="estado_estetico" class="form-select form-select-sm" required>
+                                        <option value="Excelente (Sin rayones ni marcas)">Excelente (Sin rayones ni marcas)</option>
+                                        <option value="Bueno (Uso normal, micro-rayones)" selected>Bueno (Uso normal, micro-rayones)</option>
+                                        <option value="Rayones visibles en pantalla/tapa">Rayones visibles en pantalla/tapa</option>
+                                        <option value="Golpes en bordes / Bisel hendido">Golpes en bordes / Bisel hendido</option>
+                                        <option value="Fisura o rotura física evidente">Fisura o rotura física evidente</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold mb-1">Nivel de Batería (%)</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text"><i class="fa-solid fa-battery-half text-success"></i></span>
+                                        <input type="number" name="porcentaje_bateria" class="form-control" min="0" max="100" placeholder="Ej: 85">
+                                    </div>
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <label class="form-label small fw-bold mb-1">Detalles de Rayones, Golpes y Accesorios Entregados</label>
+                                    <input type="text" name="detalles_esteticos" class="form-control form-control-sm" placeholder="Ej: Protector de vidrio fisurado, rayón en bisel, sin cargador...">
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="mb-3">

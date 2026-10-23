@@ -17,6 +17,20 @@
                 <h5 class="fw-bold mb-3 border-bottom pb-2">Datos del Dispositivo</h5>
                 
                 <div class="row mb-4">
+                    {% if not celular and sucursales %}
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase"><i class="fa-solid fa-location-dot text-primary me-1"></i> Sucursal Destino de Ingreso</label>
+                        <select name="branch_id" class="form-select bg-light border fw-semibold shadow-sm">
+                            {% for b in sucursales %}
+                                <option value="{{ b.id }}" {% if default_branch_id and default_branch_id == b.id %}selected{% endif %}>
+                                    {{ b.nombre }} ({{ b.codigo }}) - Tipo: {{ b.tipo|capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">El equipo se alojará en el inventario de esta sede o bodega.</small>
+                    </div>
+                    {% endif %}
+
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-bold small text-muted text-uppercase">Tipo de Dispositivo</label>
                         {% set current_tipo = 'Celular' %}

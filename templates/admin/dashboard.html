@@ -4,108 +4,192 @@
 <style>
     /* ─── White Canvas & Silver Tech Tokens ─── */
     .dashboard-wrapper {
-        background-color: #FFFFFF;
+        background-color: transparent;
         padding-bottom: 2rem;
     }
 
-    /* ─── Estilos de Tarjeta con Destello Plateado Metálico ─── */
+    /* ─── Tarjetas Ultra Modernas con Contornos Plateados y Destellos Metálicos ─── */
+    /* ─── Tarjetas Ultra Modernas con Contornos Plateados y Destellos Metálicos ─── */
     .card-silver-tech {
         position: relative;
-        background: #FFFFFF !important;
-        border: 1px solid #E5E7EB !important;
-        border-radius: 18px;
+        background: linear-gradient(165deg, #FFFFFF 0%, #F8FAFC 100%) !important;
+        border: 2px solid #CBD5E1 !important;
+        border-radius: 20px;
         overflow: hidden;
-        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.03);
-        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 10px 28px -6px rgba(15, 23, 42, 0.10), 0 0 0 1.5px rgba(203, 213, 225, 0.9), 0 0 22px rgba(148, 163, 184, 0.25) !important;
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
     }
 
-    /* Remate superior decorativo en degradado plata metálica */
+    /* Borde superior con bisel cromado reflectante plateado */
     .card-silver-tech::before {
         content: "";
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        height: 3px;
-        background: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);
-        opacity: 0.9;
-        transition: height 0.25s ease, opacity 0.25s ease;
-        z-index: 2;
+        height: 5px;
+        background: linear-gradient(90deg, #94A3B8 0%, #FFFFFF 30%, #CBD5E1 55%, #FFFFFF 75%, #94A3B8 100%);
+        box-shadow: 0 1px 8px rgba(255, 255, 255, 0.9), 0 0 12px rgba(203, 213, 225, 0.8);
+        z-index: 4;
     }
 
-    /* Destello de color gris claro plateado que viaja a 45 grados */
+    /* Destello plateado viajero continuo */
     .card-silver-tech::after {
         content: "";
         position: absolute;
         top: -60%;
-        left: -80%;
+        left: -120%;
         width: 50%;
         height: 220%;
         background: linear-gradient(
             60deg, 
             rgba(255, 255, 255, 0) 0%, 
-            rgba(226, 232, 240, 0.30) 35%, 
+            rgba(255, 255, 255, 0.3) 35%, 
             rgba(255, 255, 255, 0.95) 50%, 
-            rgba(192, 192, 192, 0.30) 65%, 
+            rgba(203, 213, 225, 0.5) 65%, 
             rgba(255, 255, 255, 0) 100%
         );
         transform: rotate(25deg);
         pointer-events: none;
-        opacity: 0;
+        opacity: 0.65;
+        animation: silverSheen 6s infinite ease-in-out;
         z-index: 3;
     }
 
-    /* Hover States con halo de luz plata sutil */
+    @keyframes silverSheen {
+        0% { left: -120%; opacity: 0.2; }
+        20% { left: 140%; opacity: 0.9; }
+        100% { left: 140%; opacity: 0; }
+    }
+
     .card-silver-tech:hover {
-        transform: translateY(-4px);
-        border-color: #CBD5E1 !important;
-        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.05), 0 0 22px rgba(192, 192, 192, 0.32);
+        transform: translateY(-6px);
+        border-color: #94A3B8 !important;
+        box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.18), 0 0 0 2px #94A3B8, 0 0 28px rgba(148, 163, 184, 0.45) !important;
     }
 
-    .card-silver-tech:hover::before {
-        height: 4px;
-        opacity: 1;
+    /* MODO OSCURO: Titanio Profundo con Contornos Plateados Cromados y Destellos */
+    [data-theme="dark"] .card-silver-tech {
+        background: linear-gradient(165deg, #151D2F 0%, #0F172A 100%) !important;
+        border: 2px solid #475569 !important;
+        box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.85), 0 0 0 1.5px rgba(148, 163, 184, 0.4), 0 0 24px rgba(203, 213, 225, 0.15) !important;
     }
 
-    .card-silver-tech:hover::after {
-        opacity: 1;
-        left: 140%;
-        transition: left 0.85s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    [data-theme="dark"] .card-silver-tech::before {
+        background: linear-gradient(90deg, #475569 0%, #FFFFFF 25%, #CBD5E1 50%, #FFFFFF 75%, #475569 100%);
+        box-shadow: 0 1px 12px rgba(255, 255, 255, 0.8), 0 0 16px rgba(203, 213, 225, 0.5);
     }
 
-    /* Iconos Circulares de las Tarjetas */
+    [data-theme="dark"] .card-silver-tech::after {
+        background: linear-gradient(
+            60deg, 
+            rgba(255, 255, 255, 0) 0%, 
+            rgba(203, 213, 225, 0.2) 35%, 
+            rgba(255, 255, 255, 0.8) 50%, 
+            rgba(148, 163, 184, 0.3) 65%, 
+            rgba(255, 255, 255, 0) 100%
+        );
+    }
+
+    [data-theme="dark"] .card-silver-tech:hover {
+        border-color: #94A3B8 !important;
+        box-shadow: 0 24px 45px -8px rgba(0, 0, 0, 0.95), 0 0 0 2px #E2E8F0, 0 0 32px rgba(226, 232, 240, 0.35) !important;
+    }
+
+    /* Iconos Circulares de las Tarjetas con Alto Contraste */
     .stat-icon-wrapper {
         width: 48px;
         height: 48px;
-        border-radius: 12px;
+        border-radius: 14px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 50%, #E2E8F0 100%);
+        background: #F1F5F9;
         border: 1px solid #E2E8F0;
-        color: #1A1A1A;
+        color: #0F172A;
         font-size: 1.25rem;
         transition: transform 0.25s ease, background 0.25s ease;
     }
 
-    .card-silver-tech:hover .stat-icon-wrapper {
-        transform: scale(1.08);
-        border-color: #CBD5E1;
-        background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #CBD5E1 100%);
+    [data-theme="dark"] .stat-icon-wrapper {
+        background: #1E293B !important;
+        border-color: #334155 !important;
+        color: #F8FAFC !important;
     }
 
-    /* Botones de Acción de Tarjeta */
-    .btn-stat-action {
-        background-color: #1A1A1A !important;
-        color: #FFFFFF !important;
-        border: 1px solid #1A1A1A !important;
-        border-radius: 10px;
-        font-weight: 600;
+    .card-silver-tech:hover .stat-icon-wrapper {
+        transform: scale(1.08);
+    }
+
+    /* Títulos de Categoría en Tarjeta */
+    .card-cat-title {
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #64748B;
+    }
+
+    [data-theme="dark"] .card-cat-title {
+        color: #CBD5E1 !important;
+    }
+
+    /* Textos descriptivos debajo del número grande */
+    .card-subtext {
         font-size: 0.82rem;
-        padding: 0.55rem 1rem;
+        color: #64748B;
+        font-weight: 500;
+    }
+
+    [data-theme="dark"] .card-subtext {
+        color: #94A3B8 !important;
+    }
+
+    [data-theme="dark"] .card-subtext strong {
+        color: #F8FAFC !important;
+    }
+
+    /* Badges de Estado en Tarjetas */
+    .card-status-badge {
+        font-size: 0.70rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #F1F5F9;
+        color: #334155;
+        border: 1px solid #E2E8F0;
+    }
+
+    [data-theme="dark"] .card-status-badge {
+        background: #1E293B !important;
+        color: #E2E8F0 !important;
+        border-color: #334155 !important;
+    }
+
+    /* Divisores internos de tarjeta */
+    .card-divider {
+        border-top: 1px solid #F1F5F9;
+        margin-top: 1.25rem;
+        padding-top: 0.75rem;
+    }
+
+    [data-theme="dark"] .card-divider {
+        border-top-color: #1F2937 !important;
+    }
+
+    /* Botones de Acción Primarios de Tarjeta (Ver Historial, Módulo Bancos) */
+    .btn-stat-action {
+        background: #0F172A !important;
+        color: #FFFFFF !important;
+        border: 1px solid #0F172A !important;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.84rem;
+        padding: 0.6rem 1rem;
         transition: all 0.2s ease;
         display: inline-flex;
         align-items: center;
@@ -115,21 +199,31 @@
     }
 
     .btn-stat-action:hover {
-        background-color: #334155 !important;
-        border-color: #334155 !important;
-        color: #FFFFFF !important;
+        background: #1E293B !important;
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
     }
 
+    [data-theme="dark"] .btn-stat-action {
+        background: #F8FAFC !important;
+        color: #090D14 !important;
+        border-color: #F8FAFC !important;
+    }
+
+    [data-theme="dark"] .btn-stat-action:hover {
+        background: #FFFFFF !important;
+        box-shadow: 0 4px 16px rgba(255, 255, 255, 0.2);
+    }
+
+    /* Botones Secundarios / Outline de Tarjeta */
     .btn-stat-outline {
-        background-color: #FFFFFF !important;
-        color: #334155 !important;
+        background: #FFFFFF !important;
+        color: #1E293B !important;
         border: 1px solid #E2E8F0 !important;
-        border-radius: 10px;
+        border-radius: 12px;
         font-weight: 600;
-        font-size: 0.82rem;
-        padding: 0.55rem 1rem;
+        font-size: 0.84rem;
+        padding: 0.6rem 1rem;
         transition: all 0.2s ease;
         display: inline-flex;
         align-items: center;
@@ -139,22 +233,106 @@
     }
 
     .btn-stat-outline:hover {
-        background-color: #F8FAFC !important;
-        color: #0F172A !important;
+        background: #F8FAFC !important;
         border-color: #CBD5E1 !important;
         transform: translateY(-1px);
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
 
-    /* Filtro Segmented Pills Super Premium */
+    [data-theme="dark"] .btn-stat-outline {
+        background: #1A2233 !important;
+        color: #F8FAFC !important;
+        border: 1px solid #334155 !important;
+    }
+
+    [data-theme="dark"] .btn-stat-outline:hover {
+        background: #243047 !important;
+        border-color: #64748B !important;
+        color: #FFFFFF !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
     .filter-pill-group {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
+        background: var(--brand-card-bg, #FFFFFF);
+        border: 1.5px solid #CBD5E1;
         border-radius: 999px;
         padding: 4px;
         display: inline-flex;
         align-items: center;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04), 0 0 10px rgba(203, 213, 225, 0.4);
+    }
+
+    [data-theme="dark"] .filter-pill-group {
+        border-color: #334155;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(148, 163, 184, 0.15);
+    }
+
+    .filter-month-box {
+        background: var(--brand-card-bg, #FFFFFF);
+        border: 1.5px solid #CBD5E1 !important;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04), 0 0 10px rgba(203, 213, 225, 0.3);
+    }
+    .filter-month-box:hover {
+        border-color: #94A3B8 !important;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08), 0 0 15px rgba(203, 213, 225, 0.6);
+    }
+
+    [data-theme="dark"] .filter-month-box {
+        border-color: #334155 !important;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    }
+    [data-theme="dark"] .filter-month-box:hover {
+        border-color: #64748B !important;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7), 0 0 15px rgba(148, 163, 184, 0.25);
+    }
+
+    .filter-month-icon {
+        color: var(--text-secondary, #64748B);
+    }
+    .filter-month-input {
+        width: 165px;
+        max-width: 180px;
+        font-size: 0.85rem;
+        color: var(--text-primary, #0F172A) !important;
+        cursor: pointer;
+        font-family: 'Inter', sans-serif;
+        outline: none;
+        letter-spacing: -0.01em;
+    }
+    .filter-month-input::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+    }
+    [data-theme="dark"] .filter-month-input::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+        opacity: 0.9;
+    }
+    .btn-generate-balance {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
+        border: 1.5px solid #475569 !important;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.25), 0 0 10px rgba(148, 163, 184, 0.2) !important;
+        transition: all 0.25s ease;
+    }
+    .btn-generate-balance:hover {
+        background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important;
+        border-color: #CBD5E1 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.35), 0 0 18px rgba(226, 232, 240, 0.4) !important;
+    }
+    [data-theme="dark"] .btn-generate-balance {
+        background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 100%) !important;
+        color: #0F172A !important;
+        border: 1.5px solid #CBD5E1 !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), 0 0 15px rgba(255, 255, 255, 0.2) !important;
+    }
+    [data-theme="dark"] .btn-generate-balance i {
+        color: #475569 !important;
+    }
+    [data-theme="dark"] .btn-generate-balance:hover {
+        background: #FFFFFF !important;
+        box-shadow: 0 6px 24px rgba(255, 255, 255, 0.4), 0 0 20px rgba(255, 255, 255, 0.6) !important;
     }
 
     .filter-pill {
@@ -172,43 +350,61 @@
         gap: 6px;
     }
 
+    [data-theme="dark"] .filter-pill {
+        color: #94A3B8;
+    }
+
     .filter-pill:hover {
-        color: #0F172A;
-        background: #F8FAFC;
+        color: var(--text-primary, #0F172A);
+        background: rgba(148, 163, 184, 0.12);
     }
 
     .filter-pill.active {
-        background: #1A1A1A;
-        color: #FFFFFF;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        background: #0F172A;
+        color: #FFFFFF !important;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25), 0 0 8px rgba(203, 213, 225, 0.4);
+    }
+
+    [data-theme="dark"] .filter-pill.active {
+        background: #FFFFFF !important;
+        color: #090D14 !important;
+        box-shadow: 0 2px 12px rgba(255, 255, 255, 0.35);
     }
 
     .badge-periodo {
-        background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%);
-        border: 1px solid #E2E8F0;
-        color: #475569;
-        font-size: 0.72rem;
-        padding: 4px 10px;
+        background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 50%, #CBD5E1 100%);
+        border: 1.5px solid #CBD5E1;
+        color: #0F172A;
+        font-size: 0.74rem;
+        padding: 5px 14px;
         border-radius: 20px;
         font-weight: 700;
         letter-spacing: 0.03em;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 10px rgba(203, 213, 225, 0.35);
+    }
+
+    [data-theme="dark"] .badge-periodo {
+        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+        border-color: #475569;
+        color: #FFFFFF;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 12px rgba(148, 163, 184, 0.2);
     }
 </style>
 
 <div class="dashboard-wrapper">
     <!-- Header Principal y Barra de Filtros -->
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4 pb-2 border-bottom" style="border-color: #F1F5F9 !important;">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3 mb-4 pb-2 border-bottom" style="border-color: var(--brand-border-subtle, #F1F5F9) !important;">
         <div>
             <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge" style="background: linear-gradient(135deg, #E2E8F0 0%, #CBD5E1 100%); color: #1A1A1A; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; border: 1px solid #CBD5E1;">
+                <span class="badge" style="background: linear-gradient(135deg, #CBD5E1 0%, #94A3B8 100%); color: #0F172A; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; border: 1px solid rgba(255,255,255,0.2);">
                     ADMIN PRO
                 </span>
                 <span class="text-secondary small fw-medium">&bull; Sistema Central LifeStore</span>
             </div>
-            <h2 class="fw-bold m-0" style="font-size: 1.85rem; letter-spacing: -0.02em; color: #0F172A;">
+            <h2 class="fw-bold m-0" style="font-size: 1.85rem; letter-spacing: -0.02em; color: var(--text-primary);">
                 Dashboard Operativo
             </h2>
-            <p class="text-secondary small mb-0 mt-1">
+            <p class="small mb-0 mt-1" style="color: var(--text-secondary);">
                 Supervisión comercial, flujo bancario e inventario en tiempo real.
             </p>
         </div>
@@ -240,14 +436,14 @@
             </div>
 
             <!-- Selector de Mes Específico -->
-            <form method="GET" action="{{ url_for('admin_bp.dashboard') }}" class="d-none d-sm-inline-flex align-items-center bg-white border rounded-pill px-3 py-1 shadow-sm" style="border-color: #E2E8F0 !important; height: 38px;">
+            <form method="GET" action="{{ url_for('admin_bp.dashboard') }}" class="d-none d-sm-inline-flex align-items-center filter-month-box border rounded-pill px-3 py-1 shadow-sm" style="height: 38px;">
                 <input type="hidden" name="periodo" value="mes">
-                <i class="fa-regular fa-calendar text-secondary me-2" style="font-size: 0.8rem;"></i>
-                <input type="month" name="mes" class="form-control form-control-sm border-0 shadow-none bg-transparent p-0 fw-bold" style="max-width: 120px; font-size: 0.82rem; color: #0F172A; cursor: pointer;" value="{{ mes_filtro }}" onchange="this.form.submit()">
+                <i class="fa-regular fa-calendar filter-month-icon me-2" style="font-size: 0.85rem;"></i>
+                <input type="month" name="mes" class="filter-month-input border-0 shadow-none bg-transparent p-0 fw-bold" value="{{ mes_filtro }}" onchange="this.form.submit()" title="Filtrar por mes">
             </form>
 
             <!-- Botón Generar Balance Oficial -->
-            <button type="button" class="btn px-4 rounded-pill fw-bold text-white shadow-sm" style="background-color: #1A1A1A; border: 1px solid #1A1A1A; height: 38px; font-size: 0.84rem; display: inline-flex; align-items: center; gap: 0.5rem;" data-bs-toggle="modal" data-bs-target="#modalBalance">
+            <button type="button" class="btn px-4 rounded-pill fw-bold text-white shadow-sm btn-generate-balance" style="height: 38px; font-size: 0.84rem; display: inline-flex; align-items: center; gap: 0.5rem;" data-bs-toggle="modal" data-bs-target="#modalBalance">
                 <i class="fa-solid fa-file-invoice-dollar" style="color: #CBD5E1;"></i>
                 <span>Generar Balance</span>
             </button>
@@ -257,17 +453,177 @@
     <!-- Indicador de Período Activo -->
     <div class="d-flex align-items-center justify-content-between mb-4 px-1">
         <div class="d-flex align-items-center gap-2">
-            <span class="text-secondary small fw-semibold text-uppercase" style="letter-spacing: 0.08em; font-size: 0.72rem;">
+            <span class="small fw-bold text-uppercase" style="letter-spacing: 0.08em; font-size: 0.72rem; color: var(--text-secondary);">
                 Visualizando Rango:
             </span>
             <span class="badge-periodo">
-                <i class="fa-solid fa-clock-rotate-left me-1" style="color: #94A3B8;"></i> {{ texto_periodo }}
+                <i class="fa-solid fa-clock-rotate-left me-1"></i> {{ texto_periodo }}
             </span>
         </div>
-        <div class="text-muted small" style="font-size: 0.75rem;">
+        <div class="small" style="font-size: 0.75rem; color: var(--text-secondary);">
             Actualizado automáticamente &bull; Colombia (GMT-5)
         </div>
     </div>
+
+    {% if turnos_con_alerta %}
+    <!-- ─── Barra de Alerta Táctica Ejecutiva (Compacta, Metalizada y Elegante) ─── -->
+    <style>
+        .tactical-shift-alert {
+            background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
+            border: 1px solid #CBD5E1;
+            border-radius: 16px;
+            box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.25s ease;
+        }
+        .tactical-shift-alert::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(180deg, #F59E0B 0%, #F97316 100%);
+        }
+        [data-theme="dark"] .tactical-shift-alert {
+            background: linear-gradient(135deg, #111622 0%, #0D1117 100%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        [data-theme="dark"] .tactical-shift-alert::before {
+            background: linear-gradient(180deg, #F59E0B 0%, #EA580C 100%);
+        }
+
+        .tactical-shift-pill {
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 12px;
+            padding: 8px 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.82rem;
+            color: #0F172A;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+            transition: all 0.2s ease;
+        }
+        .tactical-shift-pill:hover {
+            border-color: #94A3B8;
+            transform: translateY(-1px);
+        }
+        [data-theme="dark"] .tactical-shift-pill {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #FFFFFF;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        [data-theme="dark"] .tactical-shift-pill:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+        .tactical-shift-pill .shift-meta {
+            color: #475569;
+        }
+        [data-theme="dark"] .tactical-shift-pill .shift-meta {
+            color: #94A3B8;
+        }
+        .badge-burnt-red {
+            background: rgba(220, 38, 38, 0.12);
+            color: #B91C1C;
+            border: 1px solid rgba(220, 38, 38, 0.3);
+            font-size: 0.72rem;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            font-weight: 700;
+        }
+        [data-theme="dark"] .badge-burnt-red {
+            background: rgba(239, 68, 68, 0.18);
+            color: #FCA5A5;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+        .badge-amber-warm {
+            background: rgba(245, 158, 11, 0.12);
+            color: #B45309;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            font-size: 0.72rem;
+            padding: 3px 8px;
+            border-radius: 9999px;
+            font-weight: 700;
+        }
+        [data-theme="dark"] .badge-amber-warm {
+            background: rgba(245, 158, 11, 0.18);
+            color: #FCD34D;
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+    </style>
+
+    <div class="tactical-shift-alert mb-4 p-3 ps-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-3">
+                <span class="d-inline-flex align-items-center justify-content-center rounded-circle" 
+                      style="width: 32px; height: 32px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
+                    <i class="fa-solid fa-triangle-exclamation" style="color: #F59E0B; font-size: 0.85rem;"></i>
+                </span>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-bold text-uppercase" style="font-size: 0.78rem; letter-spacing: 0.08em; color: var(--text-primary);">
+                            Alerta Táctica de Horarios
+                        </span>
+                        <span class="badge bg-warning bg-opacity-25 text-warning-emphasis border border-warning border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.70rem;">
+                            {{ turnos_con_alerta|length }} turno(s) con desfase
+                        </span>
+                    </div>
+                    <div class="shift-meta extra-small" style="font-size: 0.75rem;">
+                        Puntos de venta con apertura tardía (> 09:30 AM) o cierre posterior al límite oficial (> 07:30 PM).
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <a href="{{ url_for('arqueo_bp.auditoria_turnos') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-bold" style="font-size: 0.78rem;">
+                    <i class="fa-solid fa-clipboard-list me-1"></i> Auditoría Completa
+                </a>
+            </div>
+        </div>
+
+        <!-- Chips / Tarjetas Horizontales de Cada Sucursal Afectada -->
+        <div class="d-flex flex-wrap gap-2 mt-3 pt-2 border-top" style="border-color: var(--brand-border-subtle) !important;">
+            {% for t in turnos_con_alerta %}
+            <div class="tactical-shift-pill flex-grow-1">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-dark text-white font-monospace rounded-pill px-2 py-1" style="font-size: 0.72rem;">{{ t.branch.codigo }}</span>
+                    <strong class="text-truncate" style="max-width: 140px;">{{ t.branch.nombre }}</strong>
+                </div>
+
+                <div class="d-flex align-items-center gap-1">
+                    {% if t.apertura_tardia %}
+                    <span class="badge-burnt-red" title="Apertura a las {{ t.fecha_apertura.strftime('%I:%M %p') }}">
+                        <i class="fa-solid fa-arrow-up-right-dots me-1"></i>+{{ t.minutos_retraso_apertura }}m Apertura
+                    </span>
+                    {% endif %}
+                    {% if t.cierre_tardio %}
+                    <span class="badge-amber-warm" title="Cierre a las {{ t.fecha_cierre.strftime('%I:%M %p') if t.fecha_cierre else 'Pendiente' }}">
+                        <i class="fa-solid fa-clock me-1"></i>+{{ t.minutos_retraso_cierre }}m Cierre
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="shift-meta extra-small d-none d-md-inline" style="font-size: 0.75rem;">
+                    <i class="fa-solid fa-user-check me-1 opacity-75"></i>Cajero: <strong>{{ t.opened_by.nombre }}</strong>
+                    {% set as_ids = t.lista_asesores_ids %}
+                    {% if as_ids %}
+                    &bull; Asesores: 
+                    {% for aid in as_ids %}
+                        <span class="fw-semibold">{{ todos_asesores_map.get(aid, '#' ~ aid) }}</span>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- ─── Grilla Principal de Tarjetas (Fila de 4 Columnas) ─── -->
     <div class="row g-3 mb-4">
@@ -282,18 +638,18 @@
                         </div>
                         <span class="badge-periodo">{{ texto_periodo }}</span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Ventas Totales
                     </div>
-                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
                         ${{ (total_ventas)|cop }}
                     </h2>
-                    <p class="text-muted small mb-0 d-flex align-items-center gap-1" style="font-size: 0.78rem;">
-                        <i class="fa-solid fa-receipt" style="color: #94A3B8;"></i>
+                    <p class="card-subtext mb-0 d-flex align-items-center gap-1">
+                        <i class="fa-solid fa-receipt" style="color: var(--brand-secondary);"></i>
                         <span><strong>{{ conteo_ventas }}</strong> ventas registradas</span>
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                <div class="card-divider">
                     <a href="{{ url_for('sales_bp.historial') }}" class="btn-stat-action w-100">
                         <i class="fa-solid fa-receipt" style="font-size: 0.75rem;"></i>
                         <span>Ver Historial Ventas</span>
@@ -307,25 +663,25 @@
             <div class="card-silver-tech h-100 p-4">
                 <div>
                     <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="stat-icon-wrapper" style="background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 100%);">
+                        <div class="stat-icon-wrapper">
                             <i class="fa-solid fa-building-columns"></i>
                         </div>
-                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                        <span class="card-status-badge">
                             DIGITAL
                         </span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Bancos (Recaudo Período)
                     </div>
-                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
                         ${{ (recaudo_bancos_periodo)|cop }}
                     </h2>
-                    <p class="text-muted small mb-0 d-flex align-items-center gap-1" style="font-size: 0.78rem;">
-                        <i class="fa-solid fa-wallet" style="color: #94A3B8;"></i>
+                    <p class="card-subtext mb-0 d-flex align-items-center gap-1">
+                        <i class="fa-solid fa-wallet" style="color: var(--brand-secondary);"></i>
                         <span>Saldo Total Cuentas: <strong>${{ (saldo_bancos_total)|cop }}</strong></span>
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                <div class="card-divider">
                     <a href="{{ url_for('bancos_bp.index') }}" class="btn-stat-action w-100">
                         <i class="fa-solid fa-arrow-right-arrow-left" style="font-size: 0.75rem;"></i>
                         <span>Módulo de Bancos</span>
@@ -342,21 +698,21 @@
                         <div class="stat-icon-wrapper">
                             <i class="fa-solid fa-mobile-screen-button"></i>
                         </div>
-                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                        <span class="card-status-badge">
                             STOCK
                         </span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Inventario en Catálogo
                     </div>
-                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
-                        {{ total_productos }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">SKUs</span>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ total_productos }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">SKUs</span>
                     </h2>
-                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                    <p class="card-subtext mb-0">
                         Celulares con IMEI y accesorios en tienda.
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                <div class="card-divider">
                     <a href="{{ url_for('celulares_bp.inventario') }}" class="btn-stat-outline w-100">
                         <i class="fa-solid fa-boxes-stacked" style="font-size: 0.75rem;"></i>
                         <span>Ver Inventario Celulares</span>
@@ -370,25 +726,25 @@
             <div class="card-silver-tech h-100 p-4">
                 <div>
                     <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="stat-icon-wrapper" style="color: #DC2626; border-color: #FEE2E2; background: #FEF2F2;">
+                        <div class="stat-icon-wrapper" style="color: #EF4444; border-color: rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.1);">
                             <i class="fa-solid fa-triangle-exclamation"></i>
                         </div>
-                        <span class="badge rounded-pill" style="background: #FEF2F2; color: #DC2626; font-size: 0.68rem; border: 1px solid #FEE2E2;">
+                        <span class="card-status-badge" style="background: rgba(239, 68, 68, 0.12); color: #EF4444; border-color: rgba(239, 68, 68, 0.3);">
                             ATENCIÓN
                         </span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Alertas de Stock
                     </div>
-                    <h2 class="fw-bold font-mono my-2 text-danger" style="font-size: 1.75rem; letter-spacing: -0.02em;">
+                    <h2 class="fw-bold font-mono my-2 text-danger" style="font-size: 1.85rem; letter-spacing: -0.02em;">
                         {{ productos_bajo_stock }} <span style="font-size: 1rem; font-weight: 500; color: #EF4444;">críticos</span>
                     </h2>
-                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                    <p class="card-subtext mb-0">
                         Existencias reducidas (&le; 10 unidades).
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
-                    <a href="/inventory" class="btn-stat-outline w-100 text-danger" style="border-color: #FEE2E2 !important;">
+                <div class="card-divider">
+                    <a href="/inventory" class="btn-stat-outline w-100 text-danger" style="border-color: rgba(239, 68, 68, 0.3) !important;">
                         <i class="fa-solid fa-boxes-packing" style="font-size: 0.75rem;"></i>
                         <span>Reponer Existencias</span>
                     </a>
@@ -404,21 +760,21 @@
                         <div class="stat-icon-wrapper">
                             <i class="fa-solid fa-handshake"></i>
                         </div>
-                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                        <span class="card-status-badge">
                             PRÉSTAMOS
                         </span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Maneos Activos
                     </div>
-                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
-                        {{ maneos_activos }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">docs</span>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ maneos_activos }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">docs</span>
                     </h2>
-                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                    <p class="card-subtext mb-0">
                         Equipos prestados entre tiendas o locales.
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                <div class="card-divider">
                     <a href="{{ url_for('admin_bp.maneos') }}" class="btn-stat-outline w-100">
                         <i class="fa-solid fa-eye" style="font-size: 0.75rem;"></i>
                         <span>Gestionar Maneos</span>
@@ -435,21 +791,21 @@
                         <div class="stat-icon-wrapper">
                             <i class="fa-solid fa-truck-fast"></i>
                         </div>
-                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                        <span class="card-status-badge">
                             PROVEEDORES
                         </span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Cuentas Proveedores
                     </div>
-                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
-                        {{ proveedores_activos }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">aliados</span>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ proveedores_activos }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">aliados</span>
                     </h2>
-                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                    <p class="card-subtext mb-0">
                         Créditos, consignaciones y compras.
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                <div class="card-divider">
                     <a href="{{ url_for('providers_bp.list_providers') }}" class="btn-stat-outline w-100">
                         <i class="fa-solid fa-address-book" style="font-size: 0.75rem;"></i>
                         <span>Directorio Proveedores</span>
@@ -466,21 +822,21 @@
                         <div class="stat-icon-wrapper">
                             <i class="fa-solid fa-shield-halved"></i>
                         </div>
-                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                        <span class="card-status-badge">
                             SOPORTE
                         </span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Garantías Pendientes
                     </div>
-                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
-                        {{ garantias_pendientes }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">casos</span>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ garantias_pendientes }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">casos</span>
                     </h2>
-                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                    <p class="card-subtext mb-0">
                         Dispositivos en proceso de revisión técnica.
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                <div class="card-divider">
                     <a href="{{ url_for('warranties_bp.index') }}" class="btn-stat-outline w-100">
                         <i class="fa-solid fa-screwdriver-wrench" style="font-size: 0.75rem;"></i>
                         <span>Panel Garantías</span>
@@ -497,21 +853,21 @@
                         <div class="stat-icon-wrapper">
                             <i class="fa-solid fa-tags"></i>
                         </div>
-                        <span class="badge rounded-pill" style="background: #F1F5F9; color: #475569; font-size: 0.68rem; border: 1px solid #E2E8F0;">
+                        <span class="card-status-badge">
                             PRECIOS
                         </span>
                     </div>
-                    <div class="text-secondary small fw-bold text-uppercase" style="letter-spacing: 0.05em; font-size: 0.72rem;">
+                    <div class="card-cat-title">
                         Aprobaciones Pendientes
                     </div>
-                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.75rem; color: #0F172A; letter-spacing: -0.02em;">
-                        {{ aprobaciones_pendientes }} <span style="font-size: 1rem; font-weight: 500; color: #64748B;">solicitudes</span>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ aprobaciones_pendientes }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">solicitudes</span>
                     </h2>
-                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
+                    <p class="card-subtext mb-0">
                         Precios especiales solicitados por cajeros.
                     </p>
                 </div>
-                <div class="mt-4 pt-2 border-top" style="border-color: #F1F5F9 !important;">
+                <div class="card-divider">
                     <a href="{{ url_for('admin_bp.aprobaciones') }}" class="btn-stat-outline w-100">
                         <i class="fa-solid fa-check-double" style="font-size: 0.75rem;"></i>
                         <span>Autorizar Precios</span>
@@ -521,19 +877,320 @@
         </div>
 
     </div>
+
+    <!-- ─── SECCIÓN: TRASLADOS DEL DÍA & FLUJO EN TIEMPO REAL (FASE 4) ─── -->
+    <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+        <div>
+            <h4 class="fw-bold mb-1" style="color: var(--text-primary); letter-spacing: -0.02em;">
+                <i class="fa-solid fa-truck-ramp-box text-primary me-2"></i>Traslados del Día y Flujo de Mercancía
+            </h4>
+            <p class="text-muted small mb-0">Control diario en tiempo real de mercancía en tránsito, despachos de bodega y recepciones.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('transfers_bp.trazabilidad') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
+                <i class="fa-solid fa-timeline me-1"></i> Bitácora Trazabilidad
+            </a>
+            <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">
+                <i class="fa-solid fa-plus me-1"></i> Despachar Traslado
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- KPI 1: En Tránsito (Pendientes) -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper" style="color: #F59E0B; border-color: rgba(245, 158, 11, 0.25); background: rgba(245, 158, 11, 0.1);">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </div>
+                        <span class="card-status-badge" style="background: rgba(245, 158, 11, 0.12); color: #D97706; border-color: rgba(245, 158, 11, 0.3);">
+                            EN TRÁNSITO
+                        </span>
+                    </div>
+                    <div class="card-cat-title">
+                        En Tránsito (Pendientes)
+                    </div>
+                    <h2 class="fw-bold font-mono my-2 {% if traslados_pendientes_count > 0 %}text-warning{% endif %}" style="font-size: 1.85rem; letter-spacing: -0.02em;">
+                        {{ traslados_pendientes_count }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">guías</span>
+                    </h2>
+                    <p class="card-subtext mb-0">
+                        Esperando recepción física y confirmación.
+                    </p>
+                </div>
+                <div class="card-divider">
+                    <a href="{{ url_for('transfers_bp.index', tab='pendientes') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-inbox" style="font-size: 0.75rem;"></i>
+                        <span>Revisar Pendientes</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 2: Enviados Hoy hacia Tiendas -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper" style="color: #3B82F6; border-color: rgba(59, 130, 246, 0.25); background: rgba(59, 130, 246, 0.1);">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </div>
+                        <span class="card-status-badge" style="background: rgba(59, 130, 246, 0.12); color: #2563EB; border-color: rgba(59, 130, 246, 0.3);">
+                            DESPACHOS HOY
+                        </span>
+                    </div>
+                    <div class="card-cat-title">
+                        Enviados hacia Tiendas
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ enviados_hoy_tiendas }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">salidas</span>
+                    </h2>
+                    <p class="card-subtext mb-0">
+                        Mercancía salida de bodega a locales en la jornada.
+                    </p>
+                </div>
+                <div class="card-divider">
+                    <a href="{{ url_for('transfers_bp.index', tab='enviados') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-route" style="font-size: 0.75rem;"></i>
+                        <span>Ver Envíos</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 3: Devoluciones / Retornos a Bodega Hoy -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper" style="color: #8B5CF6; border-color: rgba(139, 92, 246, 0.25); background: rgba(139, 92, 246, 0.1);">
+                            <i class="fa-solid fa-warehouse"></i>
+                        </div>
+                        <span class="card-status-badge" style="background: rgba(139, 92, 246, 0.12); color: #7C3AED; border-color: rgba(139, 92, 246, 0.3);">
+                            RETORNOS HOY
+                        </span>
+                    </div>
+                    <div class="card-cat-title">
+                        Retornos a Bodega Central
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ retornos_hoy_bodega }} <span style="font-size: 1rem; font-weight: 500; color: var(--brand-secondary);">retornos</span>
+                    </h2>
+                    <p class="card-subtext mb-0">
+                        Reingresos o devoluciones desde tiendas hoy.
+                    </p>
+                </div>
+                <div class="card-divider">
+                    <a href="{{ url_for('transfers_bp.index') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-arrow-right-to-city" style="font-size: 0.75rem;"></i>
+                        <span>Supervisar Bodega</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 4: Completados y Tasa de Éxito Hoy -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card-silver-tech h-100 p-4">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="stat-icon-wrapper" style="color: #10B981; border-color: rgba(16, 185, 129, 0.25); background: rgba(16, 185, 129, 0.1);">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <span class="card-status-badge" style="background: rgba(16, 185, 129, 0.12); color: #059669; border-color: rgba(16, 185, 129, 0.3);">
+                            RECEPCIÓN HOY
+                        </span>
+                    </div>
+                    <div class="card-cat-title">
+                        Éxito de Recepción
+                    </div>
+                    <h2 class="fw-bold font-mono my-2" style="font-size: 1.85rem; color: var(--text-primary); letter-spacing: -0.02em;">
+                        {{ tasa_exito_recepcion }}% <span style="font-size: 0.9rem; font-weight: 500; color: var(--brand-secondary);">({{ completados_hoy }} ok / {{ rechazados_hoy }} rech)</span>
+                    </h2>
+                    <p class="card-subtext mb-0">
+                        Tasa de aceptación efectiva de traslados hoy.
+                    </p>
+                </div>
+                <div class="card-divider">
+                    <a href="{{ url_for('transfers_bp.index', tab='historial') }}" class="btn-stat-outline w-100">
+                        <i class="fa-solid fa-list-check" style="font-size: 0.75rem;"></i>
+                        <span>Historial Diario</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── TABLA RÁPIDA: TRASLADOS ACTIVOS Y DE LA JORNADA ─── -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card card-silver-tech border-0 shadow-sm rounded-4 overflow-hidden p-0">
+                <div class="p-3 px-4 d-flex justify-content-between align-items-center border-bottom" style="background: rgba(248, 250, 252, 0.8);">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-dark rounded-pill px-3 py-1 font-mono">HOY</span>
+                        <h6 class="fw-bold m-0" style="color: var(--text-primary);">Traslados Activos y de la Jornada</h6>
+                    </div>
+                    <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-sm btn-link text-decoration-none fw-semibold">
+                        Ver todos en módulo <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+                <div class="table-responsive p-0">
+                    <table class="table table-hover align-middle m-0" style="font-size: 0.88rem;">
+                        <thead style="background: rgba(241, 245, 249, 0.6); font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;">
+                            <tr>
+                                <th class="ps-4">ID</th>
+                                <th>RUTA (ORIGEN ➔ DESTINO)</th>
+                                <th>RESPONSABLE</th>
+                                <th class="text-center">ÍTEMS</th>
+                                <th class="text-center">ESTADO</th>
+                                <th>HORA</th>
+                                <th class="text-end pe-4">ACCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in traslados_jornada %}
+                            <tr>
+                                <td class="ps-4 fw-bold font-mono">#{{ t.id }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-light text-dark border px-2 py-1">
+                                            {{ t.origin_branch.nombre }}
+                                        </span>
+                                        <i class="fa-solid fa-arrow-right text-muted small"></i>
+                                        <span class="badge bg-light text-dark border px-2 py-1">
+                                            {{ t.destination_branch.nombre }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="fw-semibold">{{ t.created_by.nombre if t.created_by else 'Sistema' }}</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border rounded-pill px-2.5">
+                                        {{ t.items|length }} prod.
+                                    </span>
+                                </td>
+                                <td class="text-center">
+                                    {% if t.status == 'PENDIENTE' %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2.5 py-1">
+                                            <i class="fa-solid fa-clock me-1"></i> En Tránsito
+                                        </span>
+                                    {% elif t.status == 'ACEPTADO' %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2.5 py-1">
+                                            <i class="fa-solid fa-check me-1"></i> Aceptado
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2.5 py-1">
+                                            <i class="fa-solid fa-xmark me-1"></i> Rechazado
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted font-mono">{{ t.created_at.strftime('%H:%M') }}</small>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <div class="d-inline-flex gap-1">
+                                        <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-0.5" title="Ver Detalle">
+                                            <i class="fa-solid fa-eye"></i>
+                                        </a>
+                                        {% if t.status == 'PENDIENTE' and (current_user.rol == 'admin' or current_user.branch_id == t.destination_branch_id) %}
+                                            <form method="POST" action="{{ url_for('transfers_bp.accept', id=t.id) }}" class="d-inline" onsubmit="return confirm('¿Aceptar traslado #{{ t.id }} e ingresar stock a esta sede?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-2.5 py-0.5 fw-bold" title="Aceptar">
+                                                    <i class="fa-solid fa-check"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-muted">
+                                    <i class="fa-solid fa-box-open me-2"></i>No se registran traslados en la jornada de hoy.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if not active_branch_obj and comparativa_sucursales %}
+    <!-- ─── Resumen Comparativo por Sucursal (Vista Consolidada Global) ─── -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card card-custom border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="p-4 d-flex justify-content-between align-items-center border-bottom bg-light">
+                    <div>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-1 mb-1">
+                            <i class="fa-solid fa-code-compare me-1"></i> MULTI-SEDE
+                        </span>
+                        <h5 class="fw-bold m-0 text-dark">Rendimiento Comparativo por Sucursal</h5>
+                        <p class="text-muted small m-0">Ventas, transacciones y gastos por sede física en el período actual.</p>
+                    </div>
+                    <a href="{{ url_for('admin_bp.sucursales') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                        <i class="fa-solid fa-store me-1"></i> Ver Sucursales
+                    </a>
+                </div>
+                <div class="table-responsive p-0">
+                    <table class="table table-hover align-middle m-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">SUCURSAL</th>
+                                <th>CÓDIGO</th>
+                                <th>TIPO</th>
+                                <th class="text-center">VENTAS (#)</th>
+                                <th class="text-end">TOTAL VENTAS</th>
+                                <th class="text-end">GASTOS OPERATIVOS</th>
+                                <th class="text-end pe-4">BALANCE OPERATIVO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cs in comparativa_sucursales %}
+                            {% set bal_op = cs.ventas_total - cs.gastos_total %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark">
+                                    <i class="fa-solid fa-shop me-2 text-primary"></i>{{ cs.nombre }}
+                                </td>
+                                <td><span class="badge bg-secondary rounded-pill">{{ cs.codigo }}</span></td>
+                                <td>
+                                    <span class="badge {{ 'bg-success' if cs.tipo == 'tienda' else 'bg-warning text-dark' }} rounded-pill text-uppercase" style="font-size: 0.7rem;">
+                                        {{ cs.tipo }}
+                                    </span>
+                                </td>
+                                <td class="text-center fw-bold">{{ cs.conteo_ventas }}</td>
+                                <td class="text-end fw-bold text-success">${{ cs.ventas_total | cop }}</td>
+                                <td class="text-end text-danger">${{ cs.gastos_total | cop }}</td>
+                                <td class="text-end pe-4 fw-bold {{ 'text-primary' if bal_op >= 0 else 'text-danger' }}">
+                                    ${{ bal_op | cop }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
 
-<!-- Modal Generar Balance Financiero (White Canvas & Silver Tech) -->
+<!-- Modal Generar Balance Financiero (Silver Tech Modern) -->
 <div class="modal fade" id="modalBalance" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border shadow-lg rounded-4 bg-white" style="border-color: #E2E8F0 !important; overflow: hidden;">
+    <div class="modal-content border shadow-lg rounded-4" style="background-color: var(--brand-card-bg); border-color: var(--brand-border) !important; color: var(--text-primary); overflow: hidden;">
       <div style="height: 4px; background: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);"></div>
       <div class="modal-header border-bottom-0 pb-0 pt-4 px-4">
         <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #F8FAFC; border: 1px solid #E2E8F0; color: #1A1A1A;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: var(--brand-border-subtle); border: 1px solid var(--brand-border); color: var(--text-primary);">
                 <i class="fa-solid fa-scale-balanced fs-6"></i>
             </div>
-            <h5 class="fw-bold m-0" style="color: #0F172A;">Estado de Resultados Contable</h5>
+            <h5 class="fw-bold m-0" style="color: var(--text-primary);">Estado de Resultados Contable</h5>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -543,17 +1200,17 @@
                   Genera el reporte contable auditado cruzando ingresos brutos contra costo directo de mercancía y gastos registrados.
               </p>
               <div class="mb-3">
-                  <label class="form-label fw-bold small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem; color: #475569;">Fecha de Inicio</label>
-                  <input type="date" name="fecha_inicio" class="form-control" style="background-color: #FFFFFF !important; border-color: #E2E8F0 !important;" required>
+                  <label class="form-label fw-bold small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem; color: var(--text-secondary);">Fecha de Inicio</label>
+                  <input type="date" name="fecha_inicio" class="form-control" required>
               </div>
               <div class="mb-3">
-                  <label class="form-label fw-bold small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem; color: #475569;">Fecha de Fin</label>
-                  <input type="date" name="fecha_fin" class="form-control" style="background-color: #FFFFFF !important; border-color: #E2E8F0 !important;" required>
+                  <label class="form-label fw-bold small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.75rem; color: var(--text-secondary);">Fecha de Fin</label>
+                  <input type="date" name="fecha_fin" class="form-control" required>
               </div>
           </div>
           <div class="modal-footer border-top-0 pt-0 pb-4 px-4 d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold" style="border-color: #E2E8F0 !important;" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn px-4 rounded-pill fw-bold text-white shadow-sm" style="background-color: #1A1A1A; border: 1px solid #1A1A1A;">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-generate-balance px-4 rounded-pill fw-bold text-white shadow-sm">
                 <i class="fa-solid fa-file-pdf me-1" style="color: #CBD5E1;"></i> Calcular Balance
             </button>
           </div>

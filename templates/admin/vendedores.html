@@ -29,7 +29,7 @@
                 
                 <div class="mb-3">
                     <label class="form-label text-brand-black fw-semibold small">Correo Empresarial (Login)</label>
-                    <input type="email" name="email" class="form-control bg-light border-0 py-2" required placeholder="ventas@redcover.com">
+                    <input type="email" name="email" class="form-control bg-light border-0 py-2" required placeholder="ventas@lifestore.com">
                 </div>
                 
                 <div class="mb-3">
@@ -39,13 +39,28 @@
                 
                 <div class="mb-3">
                     <label class="form-label text-brand-black fw-semibold small">Asignar Rol / Perfil de Usuario</label>
-                                <select name="rol" class="form-select bg-light border-0 py-2" required>
-                                    <option value="" disabled selected>Selecciona un perfil...</option>
-                                    <option value="admin">Administrador del Sistema</option>
-                                    <option value="vendedor">Vendedor (Cajas/Tienda)</option>
-                                    <option value="bodega">Encargado de Bodega</option>
-                                    <option value="vendedor_bodega">Vendedor de Bodega</option>
-                                </select>
+                    <select name="rol" class="form-select bg-light border-0 py-2" required>
+                        <option value="" disabled selected>Selecciona un perfil...</option>
+                        <option value="admin">Administrador del Sistema</option>
+                        <option value="vendedor">Vendedor (Cajas/Tienda)</option>
+                        <option value="bodega">Encargado de Bodega</option>
+                        <option value="vendedor_bodega">Vendedor de Bodega</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">
+                        Sucursal Asignada <span class="text-danger fw-bold">* (Obligatoria para Vendedor / Bodega)</span>
+                    </label>
+                    <select name="branch_id" class="form-select bg-light border-0 py-2">
+                        <option value="">(Sin asignar / Global para Admin)</option>
+                        {% for suc in sucursales %}
+                        <option value="{{ suc.id }}">
+                            {{ suc.nombre }} [{{ suc.codigo }}] ({{ 'Tienda' if suc.tipo == 'tienda' else 'Bodega' }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text small text-muted">Obligatorio para roles Vendedor o Bodega. Para Admin es opcional.</div>
                 </div>
 
                 <div class="mb-4">
@@ -75,8 +90,9 @@
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-4">NOMBRE DE EMPLEADO</th>
-                            <th>EMAIL (CREDENCIAL DE ACCESO)</th>
+                            <th>EMAIL (LOGIN)</th>
                             <th>ROL / PERFIL</th>
+                            <th>SEDE / SUCURSAL</th>
                             <th class="text-center">STATUS</th>
                             <th class="text-center pe-4">ACCIONES</th>
                         </tr>
@@ -99,11 +115,22 @@
                                     {{ vendedor.rol }}
                                 {% endif %}
                             </td>
+                            <td>
+                                {% if vendedor.branch %}
+                                    <span class="badge bg-light text-dark border rounded-pill px-2 py-1">
+                                        <i class="fa-solid fa-location-dot text-primary me-1"></i>{{ vendedor.branch.nombre }}
+                                    </span>
+                                {% elif vendedor.rol == 'admin' %}
+                                    <span class="badge bg-dark text-white rounded-pill px-2 py-1">Global / Todas</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-muted border rounded-pill px-2 py-1">Sin Asignar</span>
+                                {% endif %}
+                            </td>
                             <td class="text-center">
                                 <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2 w-100">Activo</span>
                             </td>
                             <td class="text-center pe-4 d-flex justify-content-center gap-2">
-                                <button type="button" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" title="Editar trabajador" data-bs-toggle="modal" data-bs-target="#editModal{{ vendedor.id }}">
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" title="Editar y Rotar Sede" data-bs-toggle="modal" data-bs-target="#editModal{{ vendedor.id }}">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
                                 <form action="{{ url_for('admin_bp.eliminar_vendedor', id=vendedor.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas eliminar a este trabajador? Esta acción no se puede deshacer.');">
@@ -145,6 +172,19 @@
                                                     <option value="bodega" {% if vendedor.rol == 'bodega' %}selected{% endif %}>Encargado de Bodega</option>
                                                     <option value="vendedor_bodega" {% if vendedor.rol == 'vendedor_bodega' %}selected{% endif %}>Vendedor de Bodega</option>
                                                 </select>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label text-brand-black fw-semibold small">Asignar Sede / Rotación</label>
+                                                <select name="branch_id" class="form-select bg-light border-0 py-2">
+                                                    <option value="" {% if not vendedor.branch_id %}selected{% endif %}>(Sin Asignar / Consolidado Global para Admin)</option>
+                                                    {% for suc in sucursales %}
+                                                    <option value="{{ suc.id }}" {% if vendedor.branch_id == suc.id %}selected{% endif %}>
+                                                        {{ suc.nombre }} [{{ suc.codigo }}] ({{ 'Tienda' if suc.tipo == 'tienda' else 'Bodega' }})
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                                <div class="form-text small">Cambia la sede para rotar vendedores entre locales al instante.</div>
                                             </div>
 
                                             <div class="mb-3">

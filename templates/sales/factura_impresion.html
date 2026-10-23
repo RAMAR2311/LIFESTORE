@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprobante de Venta {{ venta.numero_factura or ('#' ~ venta.id) }} - {{ venta.branch.nombre_comercial if (venta.branch and venta.branch.nombre_comercial) else (venta.branch.nombre if venta.branch else 'LifeStore') }}</title>
+    <!-- Fuente Inter limpia y profesional -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome para íconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #0F172A;
+            --muted: #64748B;
+            --border: #CBD5E1;
+            --bg-soft: #F8FAFC;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            background-color: #F1F5F9;
+            color: #0F172A;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        /* Contenedor tamaño Carta/A4 optimizado para 1 SOLA CARA */
+        .sheet-container {
+            width: 100%;
+            max-width: 820px;
+            background: #FFFFFF;
+            padding: 24px 30px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        /* HEADER MULTISEDE DINÁMICO */
+        .factura-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 12px;
+            margin-bottom: 14px;
+            gap: 20px;
+        }
+
+        .brand-info {
+            flex: 1;
+        }
+
+        .brand-logo {
+            max-height: 54px;
+            max-width: 200px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .brand-title {
+            font-size: 1.35rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+            color: var(--primary);
+            margin: 0 0 2px 0;
+            line-height: 1.15;
+        }
+
+        .brand-meta {
+            font-size: 0.78rem;
+            color: var(--muted);
+            line-height: 1.35;
+        }
+
+        .invoice-badge-box {
+            text-align: right;
+            min-width: 210px;
+        }
+
+        .invoice-type {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .invoice-number {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #2563EB;
+            margin: 0 0 4px 0;
+            line-height: 1.1;
+        }
+
+        .invoice-date {
+            font-size: 0.76rem;
+            color: var(--muted);
+            line-height: 1.3;
+        }
+
+        /* META GRID: DATOS CLIENTE Y OPERATIVO */
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            background: var(--bg-soft);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            font-size: 0.8rem;
+        }
+
+        .meta-col p {
+            margin: 0 0 3px 0;
+            line-height: 1.35;
+        }
+
+        .meta-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 4px !important;
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 2px;
+        }
+
+        /* TABLA DE PRODUCTOS COMPACTA */
+        .table-products {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            margin-bottom: 12px;
+        }
+
+        .table-products thead th {
+            background: #0F172A;
+            color: #FFFFFF;
+            padding: 6px 8px;
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            border: none;
+        }
+
+        .table-products tbody td {
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+            line-height: 1.25;
+        }
+
+        .table-products tbody tr:last-child td {
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .prod-title {
+            font-weight: 700;
+            color: #0F172A;
+        }
+
+        .prod-specs {
+            font-size: 0.72rem;
+            color: #475569;
+            margin-top: 2px;
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        /* CUADRO DESTACADO DE RETOMA */
+        .retoma-box {
+            background: #FEF2F2;
+            border: 1px solid #FECACA;
+            border-left: 4px solid #DC2626;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+            font-size: 0.78rem;
+        }
+
+        .retoma-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            color: #991B1B;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            letter-spacing: 0.04em;
+        }
+
+        .retoma-item {
+            display: flex;
+            justify-content: space-between;
+            color: #7F1D1D;
+            line-height: 1.3;
+        }
+
+        /* TOTALES Y PAGOS COMPACTOS */
+        .summary-section {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 16px;
+            margin-bottom: 12px;
+            align-items: start;
+        }
+
+        .payments-block {
+            background: var(--bg-soft);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.78rem;
+        }
+
+        .payments-title {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 4px;
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 2px;
+        }
+
+        .payment-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-weight: 500;
+        }
+
+        .totals-table {
+            width: 100%;
+            font-size: 0.84rem;
+            border-collapse: collapse;
+        }
+
+        .totals-table td {
+            padding: 3px 0;
+        }
+
+        .totals-table .total-highlight {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--primary);
+            border-top: 2px solid var(--primary);
+            padding-top: 5px;
+        }
+
+        /* GARANTÍA LEGAL Y FIRMAS (AL PIE EN EL FRENTE) */
+        .legal-block {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.68rem;
+            line-height: 1.35;
+            color: #334155;
+            text-align: justify;
+            margin-bottom: 12px;
+            background: #FAFAFA;
+        }
+
+        .legal-title {
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+            color: var(--primary);
+            font-size: 0.7rem;
+        }
+
+        .signatures-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 20px;
+            padding-top: 5px;
+        }
+
+        .signature-line {
+            border-top: 1.5px solid #0F172A;
+            text-align: center;
+            padding-top: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #0F172A;
+            line-height: 1.25;
+        }
+
+        .btn-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-top: 18px;
+            justify-content: center;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 18px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            border-radius: 9999px;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-print-dark {
+            background: #0F172A;
+            color: #FFFFFF;
+        }
+        .btn-print-dark:hover { background: #334155; color: #FFFFFF; }
+
+        .btn-wa {
+            background: #25D366;
+            color: #FFFFFF;
+        }
+        .btn-wa:hover { background: #1EBE5D; color: #FFFFFF; }
+
+        .btn-back {
+            background: #E2E8F0;
+            color: #1E293B;
+        }
+        .btn-back:hover { background: #CBD5E1; color: #0F172A; }
+
+        /* REGLAS ESTRICTAS DE IMPRESIÓN: 1 SOLA CARA SIN DESBORDES */
+        @media print {
+            @page {
+                size: letter portrait;
+                margin: 8mm 8mm 8mm 8mm;
+            }
+
+            body {
+                background: #FFFFFF !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                min-height: auto !important;
+                height: auto !important;
+                display: block !important;
+                -webkit-print-color-adjust: exact !important;
+            }
+
+            .sheet-container {
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                page-break-after: avoid !important;
+            }
+
+            .btn-toolbar, .d-print-none {
+                display: none !important;
+            }
+
+            * {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+{% set sede = venta.branch %}
+<div class="sheet-container">
+    <!-- ENCABEZADO COMERCIAL POR SEDE -->
+    <div class="factura-header">
+        <div class="brand-info">
+            {% if sede and sede.logo_url %}
+                <img src="{{ sede.logo_url }}" alt="{{ sede.nombre_comercial or sede.nombre }}" class="brand-logo">
+            {% else %}
+                <img src="{{ url_for('static', filename='img/lifestore_logo_print.png') }}" alt="LifeStore" class="brand-logo" onerror="this.style.display='none';">
+            {% endif %}
+            
+            <h1 class="brand-title">{{ (sede.nombre_comercial if (sede and sede.nombre_comercial) else (sede.nombre if sede else 'LIFESTORE')).upper() }}</h1>
+            
+            <div class="brand-meta">
+                {% if sede and sede.nit %}<div><strong>NIT / CC:</strong> {{ sede.nit }}</div>{% endif %}
+                <div><i class="fa-solid fa-location-dot" style="font-size: 10px;"></i> {{ (sede.direccion if (sede and sede.direccion) else 'Principal') }}</div>
+                {% if sede and sede.telefono %}<div><i class="fa-solid fa-phone" style="font-size: 10px;"></i> {{ sede.telefono }}</div>{% endif %}
+                {% if sede and sede.resolucion_dian %}
+                <div style="font-size: 0.7rem; color: #475569; margin-top: 1px;">{{ sede.resolucion_dian }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="invoice-badge-box">
+            <div class="invoice-type">Documento Equivalente / Factura</div>
+            <div class="invoice-number">{{ venta.numero_factura or ('#' ~ "{:05d}".format(venta.id)) }}</div>
+            <div class="invoice-date">
+                <div><strong>Fecha:</strong> {{ venta.fecha_venta.strftime('%d/%m/%Y %I:%M %p') }}</div>
+                <div><strong>Sede:</strong> {{ (sede.nombre if sede else (venta.sucursal or 'Principal')) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUADRO DE METADATOS: CLIENTE & ATENCIÓN COMERCIAL -->
+    <div class="meta-grid">
+        <div class="meta-col">
+            <p class="meta-title"><i class="fa-solid fa-user me-1"></i> Datos del Cliente</p>
+            {% if venta.cliente %}
+                <p><strong>Cliente:</strong> {{ venta.cliente.nombre }}</p>
+                <p><strong>C.C. / NIT:</strong> {{ venta.cliente.documento }}</p>
+                <p><strong>Teléfono:</strong> {{ venta.cliente.telefono }}{% if venta.cliente.direccion %} &bull; <strong>Dir:</strong> {{ venta.cliente.direccion }}{% endif %}</p>
+            {% else %}
+                <p><strong>Cliente:</strong> Consumidor Final / Mostrador</p>
+                <p><strong>Documento:</strong> 222222222222</p>
+                <p><strong>Teléfono:</strong> N/A</p>
+            {% endif %}
+        </div>
+
+        <div class="meta-col">
+            <p class="meta-title"><i class="fa-solid fa-id-badge me-1"></i> Responsables de Atención</p>
+            <p><strong>Cajero:</strong> {{ venta.vendedor.nombre }}</p>
+            <p><strong>Asesor Principal:</strong> {{ venta.asesor.nombre if venta.asesor else 'Ventas Mostrador' }}</p>
+            {% if venta.turno and venta.turno.asesores_obj %}
+            <p style="font-size: 0.72rem; color: #475569;">
+                <strong>Turno:</strong> {{ venta.turno.asesores_obj|map(attribute='nombre')|join(', ') }}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TABLA DE PRODUCTOS / SERVICIOS VENDIDOS -->
+    <table class="table-products">
+        <thead>
+            <tr>
+                <th style="width: 40px; text-align: center;">Cant</th>
+                <th style="width: 100px;">SKU / Ref</th>
+                <th>Descripción / IMEI / Especificaciones</th>
+                <th style="width: 100px; text-align: right;">Unitario</th>
+                <th style="width: 110px; text-align: right;">Importe</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detalle in venta.detalles %}
+            {% set prod = detalle.producto %}
+            {% if not prod and detalle.variante and detalle.variante.producto %}
+                {% set prod = detalle.variante.producto %}
+            {% endif %}
+            <tr>
+                <td style="text-align: center; font-weight: 700;">{{ detalle.cantidad_vendida }}</td>
+                <td style="font-family: 'Roboto Mono', monospace; font-size: 0.72rem;">
+                    {{ (prod.sku if prod else 'EXTERNO') }}
+                </td>
+                <td>
+                    <div class="prod-title">
+                        {% if prod %}
+                            {{ prod.nombre }}
+                            {% if detalle.variante %} - <span style="font-weight: 500;">{{ detalle.variante.nombre_variante }}</span>{% endif %}
+                        {% elif detalle.nombre_manual %}
+                            {{ detalle.nombre_manual }}
+                        {% else %}
+                            Ítem ID #{{ detalle.product_id or 'S/N' }}
+                        {% endif %}
+                    </div>
+                    {% if prod and prod.tipo_inventario == 'celulares' %}
+                    <div class="prod-specs">
+                        {% if prod.memoria %}[{{ prod.memoria }}] {% endif %}
+                        {% if prod.color %}{{ prod.color }} {% endif %}
+                        {% if prod.bateria %}| Batería: {{ prod.bateria }}% {% endif %}
+                        {% if prod.imei %}| IMEI 1: {{ prod.imei }}{% endif %}
+                        {% if prod.imei2 %}| IMEI 2: {{ prod.imei2 }}{% endif %}
+                    </div>
+                    {% endif %}
+                </td>
+                <td style="text-align: right; font-family: 'Roboto Mono', monospace;">
+                    ${{ detalle.precio_venta_final|cop }}
+                </td>
+                <td style="text-align: right; font-weight: 700; font-family: 'Roboto Mono', monospace;">
+                    {% if detalle.precio_venta_final == 0 %}
+                        <span style="color: #10B981;">OBSEQUIO</span>
+                    {% else %}
+                        ${{ (detalle.precio_venta_final * detalle.cantidad_vendida)|cop }}
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- CUADRO DESTACADO DE RETOMA (SI APLICA) -->
+    {% if venta.retomas_asociadas %}
+    <div class="retoma-box">
+        <div class="retoma-header">
+            <span><i class="fa-solid fa-recycle me-1"></i> Dispositivos Recibidos en Retoma (Parte de Pago)</span>
+            <span>Total Retomas: -${{ (venta.retomas_asociadas|sum(attribute='valor_retoma'))|cop }}</span>
+        </div>
+        {% for retoma in venta.retomas_asociadas %}
+        <div class="retoma-item">
+            <span>
+                &bull; <strong>{{ retoma.modelo }}</strong> 
+                (IMEI 1: {{ retoma.imei1 }}{% if retoma.imei2 %} | IMEI 2: {{ retoma.imei2 }}{% endif %})
+                {% if retoma.color %}[{{ retoma.color }}]{% endif %}
+                {% if retoma.memoria %}[{{ retoma.memoria }}]{% endif %}
+            </span>
+            <span style="font-weight: 700; font-family: 'Roboto Mono', monospace;">-${{ retoma.valor_retoma|cop }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- TOTALES Y DESGLOSE DE MÉTODOS DE PAGO -->
+    <div class="summary-section">
+        <!-- Formas de Pago Aplicadas -->
+        <div class="payments-block">
+            <div class="payments-title"><i class="fa-solid fa-credit-card me-1"></i> Desglose de Pago</div>
+            {% if venta.pagos and venta.pagos|length > 0 %}
+                {% for pago in venta.pagos %}
+                <div class="payment-row">
+                    <span style="text-transform: capitalize;">
+                        {% if pago.metodo_pago == 'efectivo' %}<i class="fa-solid fa-money-bill-wave me-1 text-success"></i> Efectivo
+                        {% elif pago.metodo_pago == 'nequi' %}<i class="fa-solid fa-mobile-screen me-1 text-purple"></i> Nequi
+                        {% elif pago.metodo_pago == 'bancolombia' %}<i class="fa-solid fa-building-columns me-1 text-warning"></i> Bancolombia
+                        {% elif pago.metodo_pago == 'daviplata' %}<i class="fa-solid fa-mobile-retro me-1 text-danger"></i> Daviplata
+                        {% elif pago.metodo_pago == 'bolt' %}<i class="fa-solid fa-bolt me-1 text-warning"></i> Bolt
+                        {% elif pago.metodo_pago == 'addi' %}<i class="fa-solid fa-cart-shopping me-1 text-info"></i> Addi
+                        {% elif pago.metodo_pago == 'sistecredito' %}<i class="fa-solid fa-id-card me-1 text-primary"></i> Sistecrédito
+                        {% else %}{{ pago.metodo_pago }}
+                        {% endif %}
+                    </span>
+                    <span style="font-family: 'Roboto Mono', monospace;">${{ pago.monto|cop }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="payment-row">
+                    <span style="text-transform: capitalize;">{{ venta.metodo_pago }}</span>
+                    <span style="font-family: 'Roboto Mono', monospace;">${{ venta.monto_total|cop }}</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Columna de Totales -->
+        <div>
+            {% set ns = namespace(subtotal=venta.monto_total) %}
+            {% for r in venta.retomas_asociadas %}
+                {% set ns.subtotal = ns.subtotal + r.valor_retoma %}
+            {% endfor %}
+
+            <table class="totals-table">
+                {% if venta.retomas_asociadas %}
+                <tr>
+                    <td class="text-muted">Subtotal Productos:</td>
+                    <td style="text-align: right; font-family: 'Roboto Mono', monospace;">${{ ns.subtotal|cop }}</td>
+                </tr>
+                <tr>
+                    <td style="color: #DC2626;">Descuento por Retoma:</td>
+                    <td style="text-align: right; color: #DC2626; font-family: 'Roboto Mono', monospace;">
+                        -${{ (venta.retomas_asociadas|sum(attribute='valor_retoma'))|cop }}
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td class="total-highlight">TOTAL A PAGAR:</td>
+                    <td class="total-highlight" style="text-align: right; font-family: 'Roboto Mono', monospace;">
+                        ${{ venta.monto_total|cop }}
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- CERTIFICADO DE GARANTÍA COMPACTO AL FRENTE (LEY 1480 DE 2011) -->
+    <div class="legal-block">
+        <div class="legal-title"><i class="fa-solid fa-shield-halved me-1"></i> Certificado y Términos de Garantía Legal</div>
+        Equipos nuevos: Garantía legal de 1 año. Equipos de exhibición o seminuevos: Garantía de 6 meses. La remoción, rotura o alteración de los sellos/stickers de seguridad de la tienda anula de manera inmediata e irrevocable la garantía. La garantía <strong>NO cubre</strong>: daños ocasionados por golpes, caídas, fisuras, humedad, inmersión en líquidos, polvo, manipulación indebida, pantallas rotas/manchadas/con líneas verticales o display despegado, sobrecargas eléctricas, ni software modificado (jailbreak, root o instalaciones no autorizadas). Para radicación es indispensable la presentación de este documento. Diagnóstico en 2 a 3 días hábiles; reposición o reparación conforme a la Ley 1480 de 2011 (Estatuto del Consumidor).
+    </div>
+
+    <!-- LÍNEAS DE FIRMA AL FRENTE -->
+    <div class="signatures-row">
+        <div class="signature-line">
+            Entregado por: {{ venta.vendedor.nombre }}<br>
+            <span style="font-size: 0.68rem; color: #64748B;">Responsable de Tienda / Despacho</span>
+        </div>
+        <div class="signature-line">
+            Recibido a conformidad (Firma y Cédula)<br>
+            <span style="font-size: 0.68rem; color: #64748B;">Acepto especificaciones, IMEI y términos de garantía</span>
+        </div>
+    </div>
+
+    <!-- BARRA DE ACCIONES (NO IMPRESA) -->
+    <div class="btn-toolbar d-print-none">
+        <button class="btn-action btn-print-dark" onclick="window.print()">
+            <i class="fa-solid fa-print"></i> Imprimir Comprobante (1 Cara)
+        </button>
+
+        {% if venta.cliente and venta.cliente.telefono %}
+            {% set phone = venta.cliente.telefono|replace(' ', '')|replace('*', '')|replace('-', '')|replace('+', '') %}
+            {% if not phone.startswith('57') and phone|length == 10 %}
+                {% set phone = '57' ~ phone %}
+            {% endif %}
+            {% set msj = "Hola " ~ venta.cliente.nombre ~ "! Adjuntamos tu comprobante digital y certificado de garantía de " ~ (sede.nombre_comercial if (sede and sede.nombre_comercial) else 'LifeStore') ~ ": " ~ request.url %}
+            <a href="https://wa.me/{{ phone }}?text={{ msj|urlencode }}" target="_blank" class="btn-action btn-wa">
+                <i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp
+            </a>
+        {% endif %}
+
+        <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=venta.id, format='ticket') }}" target="_blank" class="btn-action btn-back">
+            <i class="fa-solid fa-receipt"></i> Ver Formato Térmico 80mm
+        </a>
+
+        <a href="{{ url_for('sales_bp.caja_visual') }}" class="btn-action btn-back">
+            <i class="fa-solid fa-store"></i> Volver al POS
+        </a>
+    </div>
+</div>
+
+<script>
+    // Sugerencia automática de impresión al cargar
+    window.onload = function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('autoprint') === '1') {
+            setTimeout(() => { window.print(); }, 500);
+        }
+    };
+</script>
+
+</body>
+</html>

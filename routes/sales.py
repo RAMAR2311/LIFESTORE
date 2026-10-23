@@ -1,6 +1,6 @@
-from flask import Blueprint, request, jsonify, flash, redirect, render_template, abort, url_for, send_file
+from flask import Blueprint, request, jsonify, flash, redirect, render_template, abort, url_for, send_file, session, current_app
 from flask_login import login_required, current_user
-from models import db, Product, ProductVariant, Sale, SaleDetail, SalePayment, SaleClient, Expense, Retoma, obtener_hora_bogota, PriceApproval, Asesor, Provider
+from models import db, Product, ProductVariant, Sale, SaleDetail, SalePayment, SaleClient, Expense, Retoma, obtener_hora_bogota, PriceApproval, Asesor, Provider, Branch, BranchStock, CashShift
 from decorators import admin_required
 from decimal import Decimal
 from datetime import datetime, timedelta
@@ -9,13 +9,28 @@ from sqlalchemy.orm import joinedload
 
 sales_bp = Blueprint('sales_bp', __name__)
 
+def obtener_turno_sucursal(branch_id):
+    """Verifica si existe un turno de caja abierto en la sucursal."""
+    return CashShift.query.filter_by(branch_id=branch_id, estado='ABIERTA').first()
+
 @sales_bp.route('/nueva', methods=['GET', 'POST'])
 @login_required # Importante: Te bloqueará el acceso si no hay current_user logeado (Flask-Login)
 def procesar_venta():
     if request.method == 'GET':
+        # Validar turno de caja abierto ÚNICAMENTE si la sucursal es de tipo 'tienda'
+        # Las sucursales con tipo == 'bodega' quedan completamente exentas
+        user_branch_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else (session.get('active_branch_id') or 1)
+        user_branch = Branch.query.get(user_branch_id)
+        es_tienda = bool(user_branch and user_branch.tipo == 'tienda')
+        turno_activo = obtener_turno_sucursal(user_branch_id) if es_tienda else None
+
+        if es_tienda and not turno_activo and current_user.rol == 'vendedor':
+            flash(f"Atención: La tienda '{user_branch.nombre}' requiere la Apertura de Caja de tu turno antes de comenzar a registrar ventas.", "warning")
+            return redirect(url_for('arqueo_bp.abrir_turno'))
+
         asesores = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre).all()
         providers = Provider.query.order_by(Provider.nombre).all()
-        return render_template('sales/nueva.html', asesores=asesores, providers=providers)
+        return render_template('sales/nueva.html', asesores=asesores, providers=providers, turno_activo=turno_activo, sucursal_actual=user_branch)
 
     """
     Se espera que los datos vengan en el cuerpo de la petición (JSON)
@@ -93,6 +108,42 @@ def procesar_venta():
         
         tipo_venta_detectado = tipo_venta_detectado or 'general'
 
+        # Determinar la Sucursal de la Venta (sale_branch_id)
+        if current_user.rol in ['vendedor', 'bodega']:
+            sale_branch_id = current_user.branch_id
+            if not sale_branch_id:
+                branch_defecto = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+                sale_branch_id = branch_defecto.id if branch_defecto else 1
+        else:
+            # Para administradores: usa sucursal activa seleccionada o 'Principal'
+            active_b = session.get('active_branch_id')
+            if active_b:
+                sale_branch_id = int(active_b)
+            else:
+                branch_princ = Branch.query.filter((Branch.nombre.ilike('%principal%')) | (Branch.codigo == 'LOC1')).first()
+                if not branch_princ:
+                    branch_princ = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+                sale_branch_id = branch_princ.id if branch_princ else 1
+
+        sale_branch = Branch.query.with_for_update().get(sale_branch_id)
+        if not sale_branch:
+            return jsonify({'error': 'La sucursal asignada a la venta no existe.'}), 400
+        sale_branch_nombre = sale_branch.nombre
+
+        # Validar turno de caja abierto ÚNICAMENTE si la sucursal es de tipo 'tienda'
+        # Las bodegas quedan completamente exentas de turnos, bases iniciales y asignación de asesores
+        if sale_branch.tipo == 'tienda':
+            turno_activo = CashShift.query.filter_by(branch_id=sale_branch_id, estado='ABIERTA').first()
+            if not turno_activo and current_user.rol == 'vendedor':
+                return jsonify({'error': f"Caja cerrada: La tienda '{sale_branch_nombre}' requiere un turno de caja abierto para registrar ventas. Debe abrir turno primero."}), 403
+        else:
+            turno_activo = None
+
+        # Consecutivo por Sede seguro y atómico con with_for_update
+        sale_branch.ultimo_consecutivo = (sale_branch.ultimo_consecutivo or 0) + 1
+        prefijo_sede = sale_branch.prefijo_factura or 'FAC'
+        numero_factura_generado = f"{prefijo_sede}-{sale_branch.ultimo_consecutivo}"
+
         nueva_venta = Sale(
             vendedor_id=current_user.id,
             asesor_id=asesor_id,
@@ -101,12 +152,17 @@ def procesar_venta():
             metodo_pago=metodo_pago_principal,
             fecha_venta=fecha_venta_obj,
             tipo_venta=tipo_venta_detectado,
-            sucursal='PRINCIPAL'
+            sucursal=sale_branch_nombre,
+            branch_id=sale_branch_id,
+            numero_factura=numero_factura_generado,
+            shift_id=turno_activo.id if turno_activo else None
         )
         db.session.add(nueva_venta)
         db.session.flush()
 
         monto_total = Decimal('0.00')
+
+        from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 
         for item in items:
             product_id = item.get('product_id')
@@ -145,52 +201,68 @@ def procesar_venta():
                         descripcion=f"Pago por producto manual prestado: {nombre_manual}",
                         monto=(precio_costo_manual * cantidad_vendida),
                         fecha_gasto=fecha_venta_obj,
-                        sucursal='PRINCIPAL'
+                        sucursal=sale_branch_nombre,
+                        branch_id=sale_branch_id
                     )
                     db.session.add(gasto_externo)
             else:
-                # Producto del inventario propio
+                # Producto del inventario propio con bloqueo a nivel de sucursal
                 producto = Product.query.with_for_update().get(product_id)
                 
                 if not producto:
                     raise ValueError(f"El producto con ID {product_id} no existe.")
 
+                # Bloqueo y validación de stock local en BranchStock
+                branch_stock = get_or_create_branch_stock(sale_branch_id, producto.id, variant_id, for_update=True)
+                
                 if variant_id:
                     variante = ProductVariant.query.with_for_update().get(variant_id)
                     if not variante:
                         raise ValueError(f"La variante con ID {variant_id} no existe.")
-                    if cantidad_vendida > variante.cantidad_stock:
-                        raise ValueError(f"Stock insuficiente para la variante '{variante.nombre_variante}' de '{producto.nombre}'. Solicitado: {cantidad_vendida}, Disponible: {variante.cantidad_stock}.")
                     
-                    stock_anterior = variante.cantidad_stock
-                    variante.cantidad_stock -= cantidad_vendida
-                    producto.cantidad_stock -= cantidad_vendida # Sincronizar producto base
+                    if branch_stock.cantidad < cantidad_vendida:
+                        raise ValueError(
+                            f"Stock insuficiente en la sucursal '{sale_branch_nombre}' para '{producto.nombre} ({variante.nombre_variante})'. "
+                            f"Disponible local: {branch_stock.cantidad}, Solicitado: {cantidad_vendida}."
+                        )
+                    
+                    stock_anterior_local = branch_stock.cantidad
+                    branch_stock.cantidad -= cantidad_vendida
+                    sync_global_product_stock(producto.id, variant_id)
+
                     precio_limite_autorizado = variante.precio_costo if current_user.rol == 'admin' else variante.precio_minimo
                     
                     from models import StockAdjustment
                     ajuste = StockAdjustment(
                         product_id=producto.id,
                         admin_id=current_user.id,
-                        tipo_movimiento=f"Venta Tienda (Subcat: {variante.nombre_variante})",
-                        stock_anterior=stock_anterior,
-                        stock_nuevo=variante.cantidad_stock
+                        branch_id=sale_branch_id,
+                        tipo_movimiento=f"Venta Tienda (Subcat: {variante.nombre_variante}) #{nueva_venta.id}",
+                        stock_anterior=stock_anterior_local,
+                        stock_nuevo=branch_stock.cantidad
                     )
                     db.session.add(ajuste)
                 else:
-                    if cantidad_vendida > producto.cantidad_stock:
-                        raise ValueError(f"Stock insuficiente para el producto '{producto.nombre}'. Solicitado: {cantidad_vendida}, Disponible: {producto.cantidad_stock}.")
+                    if branch_stock.cantidad < cantidad_vendida:
+                        raise ValueError(
+                            f"Stock insuficiente en la sucursal '{sale_branch_nombre}' para '{producto.nombre}'. "
+                            f"Disponible local: {branch_stock.cantidad}, Solicitado: {cantidad_vendida}."
+                        )
                     
-                    stock_anterior = producto.cantidad_stock
-                    producto.cantidad_stock -= cantidad_vendida
+                    stock_anterior_local = branch_stock.cantidad
+                    branch_stock.cantidad -= cantidad_vendida
+                    sync_global_product_stock(producto.id, None)
+
                     precio_limite_autorizado = producto.precio_costo if current_user.rol == 'admin' else producto.precio_minimo
                     
                     from models import StockAdjustment
                     ajuste = StockAdjustment(
                         product_id=producto.id,
                         admin_id=current_user.id,
-                        tipo_movimiento="Venta Tienda",
-                        stock_anterior=stock_anterior,
-                        stock_nuevo=producto.cantidad_stock
+                        branch_id=sale_branch_id,
+                        tipo_movimiento=f"Venta Tienda #{nueva_venta.id}",
+                        stock_anterior=stock_anterior_local,
+                        stock_nuevo=branch_stock.cantidad
                     )
                     db.session.add(ajuste)
 
@@ -205,7 +277,7 @@ def procesar_venta():
                     precio_venta_final=precio_venta_final
                 )
                 db.session.add(detalle)
-                db.session.flush() # Importante para tener el id de la venta si se quisiera, pero ya lo tenemos en nueva_venta.id
+                db.session.flush()
                 
                 # Facturación automática al proveedor para productos asociados a un proveedor
                 if producto.proveedor and producto.tipo_inventario in ['celulares', 'externos']:
@@ -224,9 +296,6 @@ def procesar_venta():
                             descripcion=f"Venta #{nueva_venta.id}"
                         )
                         db.session.add(factura_prov)
-                
-                # Para añadir el ID de la venta al tipo de movimiento ahora que la venta tiene ID asignado:
-                ajuste.tipo_movimiento = f"{ajuste.tipo_movimiento} #{nueva_venta.id}"
                 
                 monto_total += (precio_venta_final * cantidad_vendida)
 
@@ -255,6 +324,8 @@ def procesar_venta():
         for pago_info in pagos_data:
             metodo = pago_info.get('metodo_pago', 'efectivo')
             monto_pago = pago_info.get('monto')
+            p_provider_id = pago_info.get('provider_id') or provider_id
+            p_comprobante = pago_info.get('comprobante', '').strip() if pago_info.get('comprobante') else None
             
             if monto_pago is None:
                 # Si solo hay un pago sin monto explícito, asignar el total completo
@@ -267,10 +338,33 @@ def procesar_venta():
                     continue # Salto el pago si el total a pagar es 0 (ej. cubierto 100% por retoma)
                 raise ValueError(f"El monto del pago por '{metodo}' debe ser mayor a 0.")
             
+            # Validación y contabilidad para Método de Pago: Abono a Terceros / Proveedor
+            if metodo == 'abono_tercero':
+                if not p_provider_id:
+                    raise ValueError("El método 'Abono a Terceros / Proveedor' exige obligatoriamente seleccionar el Proveedor destinatario.")
+                if not p_comprobante:
+                    raise ValueError("El método 'Abono a Terceros / Proveedor' exige obligatoriamente adjuntar el número o foto de soporte/comprobante.")
+                
+                prov_dest = Provider.query.get(p_provider_id)
+                if not prov_dest:
+                    raise ValueError(f"El proveedor seleccionado (ID {p_provider_id}) no existe en el sistema.")
+                
+                from models import ProviderPayment
+                nuevo_abono_prov = ProviderPayment(
+                    provider_id=prov_dest.id,
+                    monto_abonado=monto_pago,
+                    metodo_pago='abono_tercero',
+                    observacion=f"Abono directo por Venta #{nueva_venta.id} - Soporte: {p_comprobante}",
+                    fecha_pago=fecha_venta_obj
+                )
+                db.session.add(nuevo_abono_prov)
+
             pago = SalePayment(
                 sale_id=nueva_venta.id,
                 metodo_pago=metodo,
-                monto=monto_pago
+                monto=monto_pago,
+                provider_id=p_provider_id if metodo == 'abono_tercero' else None,
+                comprobante=p_comprobante if metodo == 'abono_tercero' else None
             )
             db.session.add(pago)
             total_pagos += monto_pago
@@ -317,6 +411,7 @@ def procesar_venta():
 
             retoma_registro = Retoma(
                 sale_id=nueva_venta.id,
+                branch_id=sale_branch_id,
                 modelo=modelo_val,
                 marca=r_item.get('marca', '').strip(),
                 proveedor='Cliente',
@@ -349,6 +444,7 @@ def procesar_venta():
             'success': True, 
             'message': 'Venta registrada e inventario descontado con éxito.',
             'sale_id': nueva_venta.id,
+            'numero_factura': nueva_venta.numero_factura,
             'total': str(monto_total)
         }), 201
 
@@ -388,28 +484,69 @@ def api_buscar_producto(sku):
         else:
             return jsonify({'error': 'Código SKU o IMEI no encontrado en el sistema'}), 404
         
+    # Determinar sucursal para consulta de stock
+    active_b_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else session.get('active_branch_id')
+    
+    if active_b_id:
+        from services.stock_service import get_or_create_branch_stock
+        stock_prod_local = get_or_create_branch_stock(int(active_b_id), producto.id, None).cantidad
+        variantes_data = []
+        for v in producto.variantes:
+            v_stock_local = get_or_create_branch_stock(int(active_b_id), producto.id, v.id).cantidad
+            variantes_data.append({
+                "id": v.id,
+                "nombre": v.nombre_variante,
+                "stock": v_stock_local,
+                "precio_minimo": float(v.precio_minimo or producto.precio_minimo),
+                "precio_limite": float(v.precio_costo or producto.precio_costo) if current_user.rol == 'admin' else float(v.precio_minimo or producto.precio_minimo),
+                "precio_sugerido": float(v.precio_sugerido or producto.precio_sugerido)
+            })
+        stock_disponible = stock_prod_local if not producto.variantes else sum(vd['stock'] for vd in variantes_data)
+    else:
+        stock_disponible = producto.total_stock
+        variantes_data = [
+            {
+                "id": v.id,
+                "nombre": v.nombre_variante,
+                "stock": v.cantidad_stock,
+                "precio_minimo": float(v.precio_minimo or producto.precio_minimo),
+                "precio_limite": float(v.precio_costo or producto.precio_costo) if current_user.rol == 'admin' else float(v.precio_minimo or producto.precio_minimo),
+                "precio_sugerido": float(v.precio_sugerido or producto.precio_sugerido)
+            }
+            for v in producto.variantes
+        ]
+
     return jsonify({
         'id': producto.id,
         'nombre': producto.nombre,
         'sku': producto.sku,
         'tipo_inventario': producto.tipo_inventario,
-        'cantidad_stock': producto.total_stock,
+        'cantidad_stock': stock_disponible,
         'precio_minimo': float(producto.precio_minimo),
         'precio_limite': float(producto.precio_costo) if current_user.rol == 'admin' else float(producto.precio_minimo),
         'precio_sugerido': float(producto.precio_sugerido),
         'imei': producto.imei,
         'imei2': producto.imei2,
-        'variantes': [{"id": v.id, "nombre": v.nombre_variante, "stock": v.cantidad_stock, "precio_minimo": float(v.precio_minimo or producto.precio_minimo), "precio_limite": float(v.precio_costo or producto.precio_costo) if current_user.rol == 'admin' else float(v.precio_minimo or producto.precio_minimo), "precio_sugerido": float(v.precio_sugerido or producto.precio_sugerido)} for v in producto.variantes],
+        'variantes': variantes_data,
         'auto_select_variant': auto_select_variant
     })
 
-# Ruta para la Impresión del formato Térmico (Ticket)
+# Ruta para la Impresión del formato de Factura/Recibo POS y Garantía Multisede
 @sales_bp.route('/recibo/<int:sale_id>', methods=['GET'])
 @login_required # Proteger confidencialidad del cajero
 def imprimir_ticket(sale_id):
     # Regla: Retorna 404 si alguien ingresa un ID falso
     venta = Sale.query.get_or_404(sale_id)
-    return render_template('sales/ticket.html', venta=venta)
+    formato = request.args.get('format', 'factura')
+    if formato == 'ticket':
+        return render_template('sales/ticket.html', venta=venta)
+    return render_template('sales/factura_impresion.html', venta=venta)
+
+@sales_bp.route('/factura/<int:sale_id>', methods=['GET'])
+@login_required
+def imprimir_factura(sale_id):
+    venta = Sale.query.get_or_404(sale_id)
+    return render_template('sales/factura_impresion.html', venta=venta)
 
 # Endpoint Historial de Ventas (Administradores)
 @sales_bp.route('/historial', methods=['GET'])
@@ -760,6 +897,18 @@ def eliminar_venta(sale_id):
                 db.session.delete(retoma)
 
         # Eliminar Venta y Detalles (Cascada)
+        from models import AuditLog
+        motivo_anulacion = request.form.get('motivo_anulacion', 'Cancelación y reversión de inventario por decisión administrativa')
+        monto_anulado = float(venta.monto_total or 0)
+        
+        AuditLog.registrar(
+            action='CANCELACION_VENTA',
+            user_id=current_user.id,
+            motivo=f'Anulación total de Factura #{sale_id} por ${monto_anulado:,.2f}. Motivo: {motivo_anulacion}',
+            target_id=sale_id,
+            target_type='SALE'
+        )
+
         db.session.delete(venta)
         db.session.commit()
         flash('Venta anulada y stock devuelto exitosamente.', 'success')
@@ -784,6 +933,13 @@ def catalogo():
         Product.tipo_inventario.in_(['tienda', 'celulares']),
         Product.cantidad_stock > 0
     )
+
+    if current_user.rol == 'vendedor':
+        user_branch_id = current_user.branch_id or 1
+        base_query = base_query.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == user_branch_id)
+        ).filter(BranchStock.cantidad > 0)
     
     if query_str:
         # Motor de similitud Case-Insensitive (Like)
@@ -804,15 +960,43 @@ def catalogo():
 def caja_visual():
     from models import obtener_hora_bogota
     hoy_bogota = obtener_hora_bogota()
-    productos_query = Product.query.filter(Product.tipo_inventario.in_(['tienda', 'celulares'])).order_by(Product.nombre.asc()).all()
     
-    # Filtrar para mostrar solo los que tienen stock
-    productos = [p for p in productos_query if p.total_stock > 0]
+    user_branch_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else (session.get('active_branch_id') or 1)
+    sucursal_obj = Branch.query.get(user_branch_id)
+    es_tienda = bool(sucursal_obj and sucursal_obj.tipo == 'tienda')
+    turno_activo = obtener_turno_sucursal(user_branch_id) if es_tienda else None
+
+    # Exigencia de apertura de caja y asesores aplica ÚNICAMENTE a sucursales de tipo 'tienda'
+    if es_tienda and not turno_activo and current_user.rol == 'vendedor':
+        flash(f"Debes abrir turno de caja antes de realizar ventas en la tienda '{sucursal_obj.nombre}'.", "warning")
+        return redirect(url_for('arqueo_bp.abrir_turno'))
+
+    if current_user.rol == 'vendedor':
+        productos_query = Product.query.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == user_branch_id)
+        ).filter(
+            Product.tipo_inventario.in_(['tienda', 'celulares']),
+            BranchStock.cantidad > 0
+        ).order_by(Product.nombre.asc()).all()
+        productos = productos_query
+    else:
+        productos_query = Product.query.filter(Product.tipo_inventario.in_(['tienda', 'celulares'])).order_by(Product.nombre.asc()).all()
+        productos = [p for p in productos_query if p.total_stock > 0]
     
     asesores = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre).all()
     providers = Provider.query.order_by(Provider.nombre).all()
+    sucursal_obj = Branch.query.get(user_branch_id)
     
-    return render_template('sales/caja_visual.html', productos=productos, asesores=asesores, providers=providers, hoy=hoy_bogota.strftime('%Y-%m-%d'))
+    return render_template(
+        'sales/caja_visual.html', 
+        productos=productos, 
+        asesores=asesores, 
+        providers=providers, 
+        hoy=hoy_bogota.strftime('%Y-%m-%d'),
+        turno_activo=turno_activo,
+        sucursal_actual=sucursal_obj
+    )
 
 
 # Endpoint para Editar Métodos de Pago y Valor de Venta

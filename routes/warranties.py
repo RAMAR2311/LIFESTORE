@@ -1,19 +1,30 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 from flask_login import login_required, current_user
-from models import db, Sale, SaleDetail, Warranty, Product, SaleClient
+from models import db, Sale, SaleDetail, Warranty, Product, SaleClient, Branch
 
 warranties_bp = Blueprint('warranties_bp', __name__)
 
 @warranties_bp.route('/')
 @login_required
 def index():
-    # Solo administradores (o ajusta según tu lógica de permisos)
-    if current_user.rol not in ['admin', 'vendedor']:
+    if current_user.rol not in ['admin', 'vendedor', 'bodega']:
         flash('Acceso denegado.', 'danger')
         return redirect(url_for('index'))
     
-    # Listado de garantías registradas
-    warranties = Warranty.query.order_by(Warranty.created_at.desc()).all()
+    query = Warranty.query
+    
+    # Restricción de Sucursales:
+    # Vendedor solo ve las garantías radicadas en su sucursal
+    if current_user.rol == 'vendedor':
+        if current_user.branch_id:
+            query = query.filter(Warranty.branch_id == current_user.branch_id)
+    else:
+        # Admin y Bodega: si seleccionaron una sucursal en el switcher global, filtrar por esa sucursal
+        active_b_id = session.get('active_branch_id')
+        if active_b_id:
+            query = query.filter(Warranty.branch_id == int(active_b_id))
+
+    warranties = query.order_by(Warranty.created_at.desc()).all()
     return render_template('warranties/index.html', warranties=warranties)
 
 @warranties_bp.route('/api/search', methods=['GET'])
@@ -31,16 +42,12 @@ def search_sale():
 
     # 2. Si no se encontró, buscar por Cédula de cliente
     if not sale:
-        # Encontramos la factura más reciente asociada a esa cédula
         client = SaleClient.query.filter_by(documento=query).order_by(SaleClient.id.desc()).first()
         if client:
             sale = client.venta
 
-    # 3. Si no se encontró, buscar por IMEI en SaleDetail (productos que tienen IMEI guardado)
+    # 3. Si no se encontró, buscar por IMEI en SaleDetail
     if not sale:
-        # Algunos productos pueden haber sido guardados con el IMEI en 'nombre_manual' o en atributos del producto.
-        # Buscamos en SaleDetail donde el producto tenga ese IMEI o el nombre incluya el IMEI.
-        # Para celulares, el IMEI suele estar en el campo 'imei' del Product o en un registro especial.
         detail = SaleDetail.query.join(Product).filter(
             db.or_(
                 Product.imei == query,
@@ -67,6 +74,7 @@ def search_sale():
 
     client_doc = sale.cliente.documento if sale.cliente else 'N/A'
     client_name = sale.cliente.nombre if sale.cliente else 'N/A'
+    sucursal_origen = sale.branch.nombre if getattr(sale, 'branch', None) else (sale.sucursal or 'Principal')
 
     return jsonify({
         'success': True,
@@ -75,7 +83,8 @@ def search_sale():
             'fecha': sale.fecha_venta.strftime('%d/%m/%Y %I:%M %p'),
             'total': str(sale.monto_total),
             'cliente_doc': client_doc,
-            'cliente_nombre': client_name
+            'cliente_nombre': client_name,
+            'sucursal': sucursal_origen
         },
         'details': details_data
     })
@@ -98,17 +107,41 @@ def create_warranty():
 
     product_id = int(product_id_str) if product_id_str != 'None' else None
 
+    # Determinar la sucursal física donde se radica el reclamo
+    if current_user.rol in ['vendedor', 'bodega']:
+        receiving_branch_id = current_user.branch_id
+        if not receiving_branch_id:
+            branch_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            receiving_branch_id = branch_def.id if branch_def else 1
+    else:
+        active_b = session.get('active_branch_id')
+        if active_b:
+            receiving_branch_id = int(active_b)
+        else:
+            branch_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            receiving_branch_id = branch_def.id if branch_def else 1
+
+    # Checklist inicial de recepción
+    estado_estetico = request.form.get('estado_estetico', 'Bueno').strip()
+    detalles_esteticos = request.form.get('detalles_esteticos', '').strip()
+    porcentaje_bateria = request.form.get('porcentaje_bateria', type=int)
+
     warranty = Warranty()
     warranty.sale_id = sale_id
+    warranty.branch_id = receiving_branch_id
     warranty.product_id = product_id
     warranty.nombre_manual = nombre_manual
     warranty.quantity = 1
     warranty.reason = reason
+    warranty.motivo_reportado = reason
+    warranty.recibido_por_id = current_user.id
+    warranty.estado_estetico = estado_estetico
+    warranty.detalles_esteticos = detalles_esteticos
+    warranty.porcentaje_bateria = porcentaje_bateria
     db.session.add(warranty)
     db.session.commit()
 
-    flash('Garantía registrada exitosamente.', 'success')
-    # Redirigir a la vista de impresión del ticket
+    flash('Garantía registrada exitosamente con checklist inicial de custodia.', 'success')
     return redirect(url_for('warranties_bp.ticket', id=warranty.id))
 
 @warranties_bp.route('/ticket/<int:id>')
@@ -117,9 +150,37 @@ def ticket(id):
     warranty = Warranty.query.get_or_404(id)
     return render_template('warranties/ticket.html', warranty=warranty)
 
+@warranties_bp.route('/entregar/<int:id>', methods=['POST'])
+@login_required
+def entregar_garantia(id):
+    from models import obtener_hora_bogota, AuditLog
+    warranty = Warranty.query.get_or_404(id)
+    soporte = request.form.get('soporte_entrega', '').strip()
+    notas = request.form.get('notas_entrega', '').strip()
+
+    warranty.resolution = 'Entregada'
+    warranty.entregado_por_id = current_user.id
+    warranty.fecha_entrega = obtener_hora_bogota()
+    warranty.firma_o_soporte_entrega = soporte or 'Entregado a conformidad y satisfacción del cliente'
+    if notas:
+        warranty.admin_notes = f"Entrega: {notas} | {warranty.admin_notes or ''}".strip()
+
+    AuditLog.registrar(
+        action='ENTREGA_GARANTIA',
+        user_id=current_user.id,
+        motivo=f'Entrega y liquidación física de garantía #{warranty.id}. Soporte: {warranty.firma_o_soporte_entrega}',
+        target_id=warranty.id,
+        target_type='WARRANTY'
+    )
+    db.session.commit()
+
+    flash(f'Garantía #{warranty.id} marcada como ENTREGADA a satisfacción del cliente.', 'success')
+    return redirect(url_for('warranties_bp.index'))
+
 @warranties_bp.route('/api/update_status/<int:id>', methods=['POST'])
 @login_required
 def update_status(id):
+    from models import obtener_hora_bogota, AuditLog
     warranty = Warranty.query.get_or_404(id)
     data = request.get_json()
     new_status = data.get('status')
@@ -127,6 +188,10 @@ def update_status(id):
     
     if new_status:
         warranty.resolution = new_status
+        if new_status == 'Entregada' and not warranty.entregado_por_id:
+            warranty.entregado_por_id = current_user.id
+            warranty.fecha_entrega = obtener_hora_bogota()
+            warranty.firma_o_soporte_entrega = 'Entregado a conformidad en punto de venta'
         if admin_notes:
             warranty.admin_notes = admin_notes
         db.session.commit()

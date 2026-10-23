@@ -212,12 +212,22 @@
 <body>
     <div class="ticket">
         <div class="header">
-            <div class="logo">LIFESTORE - CELULARES</div>
+            <div style="margin-bottom: 8px;">
+                <img src="{{ url_for('static', filename='img/lifestore_logo_print.png') }}" alt="LifeStore" style="max-width: 170px; width: 80%; height: auto; object-fit: contain; filter: grayscale(100%) contrast(150%);">
+            </div>
             <div class="subtitle">VENTA DE CELULARES &amp; TECNOLOGÍA</div>
             <div style="font-size: 0.8rem; font-weight: 700; margin: 4px 0;">CIERRE DE CAJA Y DETALLE VENTAS</div>
             <div class="info">FECHA CIERRE: <strong>{{ fecha }}</strong></div>
             <div class="info">SEDE: <strong>TIENDA PRINCIPAL</strong></div>
             <div class="info">EMISIÓN: {{ fecha_generacion }}</div>
+        </div>
+
+        <!-- CUSTODIA Y AUDITORÍA DE TURNO -->
+        <div class="section-title">AUDITORÍA Y CUSTODIA DE CAJA</div>
+        <div style="font-size: 0.75rem; line-height: 1.35; margin-bottom: 8px; border-bottom: 1px dashed #333; padding-bottom: 6px; text-align: left;">
+            <div>• <strong>Apertura realizada por:</strong> {{ (turno.opened_by.nombre_completo or turno.opened_by.username) if (turno and turno.opened_by) else ((arqueo.vendedor.nombre_completo or arqueo.vendedor.username) if (arqueo and arqueo.vendedor) else 'Cajero Apertura') }}</div>
+            <div>• <strong>Asesores de turno:</strong> {{ asesores_nombres|join(', ') if asesores_nombres else 'Personal general de tienda' }}</div>
+            <div>• <strong>Arqueo y Cierre efectuado por:</strong> {{ (arqueo.closed_by.nombre_completo or arqueo.closed_by.username) if (arqueo and arqueo.closed_by) else ((turno.closed_by.nombre_completo or turno.closed_by.username) if (turno and turno.closed_by) else (current_user.nombre_completo or current_user.username)) }}</div>
         </div>
 
         <!-- RESUMEN FINANCIERO DE CAJA -->
@@ -276,6 +286,11 @@
             {% if arqueo.observacion_diferencia %}
             <div style="font-size: 0.72rem; margin-top: 4px; font-style: italic; border-top: 1px solid #ddd; padding-top: 3px;">
                 <strong>Nota:</strong> {{ arqueo.observacion_diferencia }}
+            </div>
+            {% endif %}
+            {% if arqueo.diferencia and arqueo.diferencia != 0 %}
+            <div style="font-size: 0.72rem; margin-top: 5px; border-top: 1px dashed #721c24; padding-top: 4px; font-weight: bold; color: #721c24; text-align: left;">
+                ⚠️ CUSTODIO RESPONSABLE DEL CIERRE: {{ (arqueo.closed_by.nombre_completo or arqueo.closed_by.username) if (arqueo and arqueo.closed_by) else ((turno.closed_by.nombre_completo or turno.closed_by.username) if (turno and turno.closed_by) else (current_user.nombre_completo or current_user.username)) }}
             </div>
             {% endif %}
         </div>

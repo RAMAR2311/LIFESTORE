@@ -14,31 +14,31 @@ def seed_data():
         print("Iniciando la inserción de datos de prueba...")
 
         # 1. Crear Vendedores / Usuarios de prueba si no existen
-        admin = User.query.filter_by(email="admin@redcover.com").first()
+        admin = User.query.filter_by(email="admin@lifestore.com").first()
         if not admin:
             admin = User(
-                nombre="Administrador Principal",
-                email="admin@redcover.com",
+                nombre="Administrador LifeStore",
+                email="admin@lifestore.com",
                 telefono="3001234567",
                 rol="admin",
                 sucursal="PRINCIPAL",
-                password_hash=generate_password_hash("admin123")
+                password_hash=generate_password_hash("Admin123")
             )
             db.session.add(admin)
-            print("Administrador creado: admin@redcover.com / admin123")
+            print("Administrador creado: admin@lifestore.com / Admin123")
 
-        vendedor = User.query.filter_by(email="vendedor@redcover.com").first()
+        vendedor = User.query.filter_by(email="vendedor@lifestore.com").first()
         if not vendedor:
             vendedor = User(
                 nombre="Cajero Central",
-                email="vendedor@redcover.com",
+                email="vendedor@lifestore.com",
                 telefono="3007654321",
                 rol="vendedor",
                 sucursal="PRINCIPAL",
                 password_hash=generate_password_hash("ventas123")
             )
             db.session.add(vendedor)
-            print("Vendedor creado: vendedor@redcover.com / ventas123")
+            print("Vendedor creado: vendedor@lifestore.com / ventas123")
 
         db.session.commit()
 
@@ -291,8 +291,8 @@ def seed_data():
 
         print("\n¡Datos de prueba sembrados exitosamente!")
         print("Usuarios de prueba para login:")
-        print("- Admin: admin@redcover.com / contraseña: admin123")
-        print("- Vendedor: vendedor@redcover.com / contraseña: ventas123")
+        print("- Admin: admin@lifestore.com / contraseña: Admin123")
+        print("- Vendedor: vendedor@lifestore.com / contraseña: ventas123")
 
 if __name__ == '__main__':
     seed_data()

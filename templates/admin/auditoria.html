@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold text-brand-black m-0">
+            <i class="fa-solid fa-fingerprint text-primary me-2"></i>Bitácora de Auditoría y Custodia Administrativa
+        </h2>
+        <p class="text-muted small mb-0">Registro inmutable de decisiones de alto impacto, autorizaciones de precios, anulaciones y movimientos de custodia.</p>
+    </div>
+    <a href="{{ url_for('admin_bp.dashboard') }}" class="btn btn-outline-secondary rounded-pill px-4 fw-bold">
+        <i class="fa-solid fa-arrow-left me-1"></i> Volver al Dashboard
+    </a>
+</div>
+
+<!-- Filtros de Auditoría -->
+<div class="card card-custom p-3 mb-4 shadow-sm border-0">
+    <form method="GET" action="{{ url_for('admin_bp.auditoria') }}" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small fw-bold text-uppercase text-muted">Tipo de Decisión / Acción</label>
+            <select name="accion" class="form-select form-select-sm pos-input">
+                <option value="">-- Todas las Acciones --</option>
+                {% for code, label in acciones_disponibles %}
+                    <option value="{{ code }}" {% if filtro_accion == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-bold text-uppercase text-muted">Responsable / Custodio</label>
+            <select name="usuario_id" class="form-select form-select-sm pos-input">
+                <option value="">-- Todos los Usuarios --</option>
+                {% for u in usuarios %}
+                    <option value="{{ u.id }}" {% if filtro_usuario == u.id %}selected{% endif %}>
+                        {{ u.nombre }} ({{ u.rol|capitalize }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small fw-bold text-uppercase text-muted">Fecha Exacta</label>
+            <input type="date" name="fecha" value="{{ filtro_fecha }}" class="form-control form-control-sm pos-input">
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm rounded-pill fw-bold w-100 shadow-sm">
+                <i class="fa-solid fa-filter me-1"></i> Filtrar
+            </button>
+            <a href="{{ url_for('admin_bp.auditoria') }}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" title="Limpiar Filtros">
+                <i class="fa-solid fa-rotate-left"></i>
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Tabla de Registros de Auditoría -->
+<div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0 align-middle">
+            <thead class="bg-dark text-white">
+                <tr>
+                    <th width="160" class="ps-4">FECHA / HORA</th>
+                    <th width="200">ACCIÓN ADMINISTRATIVA</th>
+                    <th width="180">RESPONSABLE</th>
+                    <th width="140">REGISTRO</th>
+                    <th class="pe-4">JUSTIFICACIÓN ESCRITA / MOTIVO</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for l in logs.items %}
+                <tr>
+                    <td class="ps-4 text-nowrap">
+                        <div class="fw-bold text-brand-black">{{ l.timestamp.strftime('%d/%m/%Y') }}</div>
+                        <small class="text-muted font-mono"><i class="fa-regular fa-clock me-1"></i>{{ l.timestamp.strftime('%I:%M:%S %p') }}</small>
+                    </td>
+                    <td>
+                        {% if l.action == 'APROBACION_PRECIO_MINIMO' %}
+                            <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-50 px-2 py-1 rounded-pill fw-bold">
+                                <i class="fa-solid fa-tag me-1"></i> Aprobación Descuento
+                            </span>
+                        {% elif l.action == 'RECHAZO_PRECIO_MINIMO' %}
+                            <span class="badge bg-danger bg-opacity-15 text-danger border border-danger border-opacity-50 px-2 py-1 rounded-pill fw-bold">
+                                <i class="fa-solid fa-ban me-1"></i> Rechazo Descuento
+                            </span>
+                        {% elif l.action == 'CANCELACION_VENTA' %}
+                            <span class="badge bg-danger text-white px-2 py-1 rounded-pill fw-bold shadow-sm">
+                                <i class="fa-solid fa-rectangle-xmark me-1"></i> Cancelación Venta
+                            </span>
+                        {% elif l.action == 'RECEPCION_TRASLADO' %}
+                            <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-50 px-2 py-1 rounded-pill fw-bold">
+                                <i class="fa-solid fa-truck-ramp-box me-1"></i> Recepción Traslado
+                            </span>
+                        {% elif l.action == 'RECHAZO_TRASLADO' %}
+                            <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-50 px-2 py-1 rounded-pill fw-bold">
+                                <i class="fa-solid fa-truck-arrow-right me-1"></i> Rechazo Traslado
+                            </span>
+                        {% elif l.action == 'ENTREGA_GARANTIA' %}
+                            <span class="badge bg-primary bg-opacity-15 text-primary border border-primary border-opacity-50 px-2 py-1 rounded-pill fw-bold">
+                                <i class="fa-solid fa-shield-check me-1"></i> Entrega Garantía
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50 px-2 py-1 rounded-pill fw-bold">
+                                <i class="fa-solid fa-asterisk me-1"></i> {{ l.action }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="fw-bold text-dark d-flex align-items-center gap-1">
+                            <i class="fa-solid fa-user-shield text-primary small"></i>
+                            {{ l.user.nombre_completo or l.user.username }}
+                        </div>
+                        <small class="badge bg-secondary bg-opacity-10 text-muted border border-secondary border-opacity-25">{{ l.user.rol|capitalize }}</small>
+                    </td>
+                    <td>
+                        {% if l.target_type and l.target_id %}
+                            <span class="badge bg-dark text-white font-mono px-2 py-1">
+                                {{ l.target_type }} #{{ l.target_id }}
+                            </span>
+                        {% elif l.target_id %}
+                            <span class="badge bg-dark text-white font-mono px-2 py-1">#{{ l.target_id }}</span>
+                        {% else %}
+                            <span class="text-muted small">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-4">
+                        <div class="small fw-semibold text-brand-black" style="word-break: break-word;">
+                            {{ l.motivo }}
+                        </div>
+                        {% if l.detalles %}
+                            <small class="text-muted d-block mt-1 font-mono" style="font-size: 0.75rem;">
+                                {{ l.detalles }}
+                            </small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-shield-halved fs-1 mb-3 opacity-25"></i>
+                        <p class="mb-0 fw-semibold">No se encontraron registros de auditoría con los filtros aplicados.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginación -->
+    {% if logs.pages > 1 %}
+    <div class="p-3 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <small class="text-muted">Mostrando página {{ logs.page }} de {{ logs.pages }} ({{ logs.total }} registros)</small>
+        <ul class="pagination pagination-sm m-0">
+            {% if logs.has_prev %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('admin_bp.auditoria', page=logs.prev_num, accion=filtro_accion, usuario_id=filtro_usuario, fecha=filtro_fecha) }}">« Anterior</a></li>
+            {% endif %}
+            <li class="page-item active"><span class="page-link">{{ logs.page }}</span></li>
+            {% if logs.has_next %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('admin_bp.auditoria', page=logs.next_num, accion=filtro_accion, usuario_id=filtro_usuario, fecha=filtro_fecha) }}">Siguiente »</a></li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

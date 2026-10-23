@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-light rounded-circle me-3 border-0 shadow-sm"><i class="fa-solid fa-arrow-left"></i></a>
+            <div>
+                <h2 class="fw-bold text-brand-black mb-0"><i class="fa-solid fa-truck-ramp-box text-brand-pink me-2"></i>Crear Traslado de Mercancía</h2>
+                <p class="text-muted small mb-0">Despacho ágil de teléfonos celulares por escaneo de IMEI y accesorios hacia otra sucursal o bodega.</p>
+            </div>
+        </div>
+
+        <div class="card card-custom p-4 border-0 shadow-sm">
+            <form method="POST" id="transferForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                <!-- Sucursal Origen y Destino -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small text-uppercase checkout-label">
+                            <i class="fa-solid fa-arrow-up-from-bracket text-danger me-1"></i> Sucursal de Origen (Remitente)
+                        </label>
+                        {% if current_user.rol == 'admin' %}
+                            <select name="origin_branch_id" id="originBranchSelect" class="form-select pos-select fw-semibold" onchange="onCambioSucursalOrigen(this.value)" required>
+                                {% for b in sucursales %}
+                                    <option value="{{ b.id }}" {% if origen_id_inicial == b.id %}selected{% endif %}>
+                                        {{ b.nombre }} ({{ b.codigo }}) - {{ b.tipo|capitalize }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        {% else %}
+                            <select name="origin_branch_id_disabled" class="form-select pos-select fw-semibold" disabled>
+                                {% for b in sucursales %}
+                                    {% if b.id == user_branch_id %}
+                                        <option value="{{ b.id }}" selected>{{ b.nombre }} ({{ b.codigo }})</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                            <input type="hidden" name="origin_branch_id" id="originBranchHidden" value="{{ user_branch_id }}">
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small text-uppercase checkout-label">
+                            <i class="fa-solid fa-arrow-down-to-bracket text-success me-1"></i> Sucursal de Destino (Receptor)
+                        </label>
+                        <select name="destination_branch_id" id="destinationBranchSelect" class="form-select pos-select fw-semibold" required>
+                            <option value="">-- Seleccionar Destino --</option>
+                            {% for b in sucursales %}
+                                <option value="{{ b.id }}">
+                                    {{ b.nombre }} ({{ b.codigo }}) - {{ b.tipo|capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 1. Barra de Escaneo Rápido de IMEI -->
+                <div class="card p-3 mb-4 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(226, 232, 240, 0.25);">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <label class="form-label fw-bold small text-uppercase text-brand-black m-0">
+                            <i class="fa-solid fa-barcode text-primary me-1"></i> Escaneo Rápido de Celulares (Pistola / Lector)
+                        </label>
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2">Lectura Directa</span>
+                    </div>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-8">
+                            <div class="input-group">
+                                <span class="input-group-text pos-input border-end-0 px-3 text-muted">
+                                    <i class="fa-solid fa-camera text-primary"></i>
+                                </span>
+                                <input type="text" id="imeiScannerInput" class="form-control pos-input border-start-0 ps-2 fw-bold font-mono" 
+                                       placeholder="📷 Escanear o digitar IMEI y presionar Enter..." autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-primary w-100 fw-bold rounded-pill shadow-sm" id="btnAgregarImei" onclick="escanearImei()">
+                                <i class="fa-solid fa-mobile-screen-button me-1"></i> + Agregar Teléfono
+                            </button>
+                        </div>
+                    </div>
+                    <div id="imeiFeedbackAlert" class="mt-2 small d-none" role="alert"></div>
+                </div>
+
+                <!-- Lista de Productos a Trasladar -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2" style="border-color: rgba(226, 232, 240, 0.15) !important;">
+                        <h5 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-boxes-packing text-primary me-2"></i>Productos a Trasladar (<span id="itemsCounter">0</span>)</h5>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold" onclick="agregarFilaProducto()">
+                            <i class="fa-solid fa-plus me-1"></i> + Añadir Accesorio / Lote
+                        </button>
+                    </div>
+
+                    <div id="itemsContainer" class="d-flex flex-column gap-2">
+                        <!-- Las filas se agregan dinámicamente con JS -->
+                    </div>
+
+                    <div id="emptyItemsNotice" class="text-center py-4 rounded-3 text-muted" style="background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(226, 232, 240, 0.15);">
+                        <i class="fa-solid fa-cart-flatbed fs-2 mb-2 opacity-50"></i>
+                        <p class="small mb-0">Escanea un <strong>IMEI</strong> arriba o haz clic en <strong>"+ Añadir Accesorio / Lote"</strong> para cargar ítems al traslado.</p>
+                    </div>
+                </div>
+
+                <!-- Custodia y Observaciones de Entrega -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-bold small text-uppercase checkout-label m-0">Observaciones de Despacho / Entrega (Custodio)</label>
+                        <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50 small">
+                            <i class="fa-solid fa-user-shield me-1 text-primary"></i> Despacha: <strong>{{ current_user.nombre_completo or current_user.username }}</strong>
+                        </span>
+                    </div>
+                    <textarea name="observaciones_entrega" class="form-control pos-input" rows="2" placeholder="Ej: Paquete verificado físicamente, embalado con precinto de seguridad, enviado con mensajero..."></textarea>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-3" style="border-color: rgba(226, 232, 240, 0.15) !important;">
+                    <a href="{{ url_for('transfers_bp.index') }}" class="btn-checkout-secondary px-4 text-center" style="max-width: 140px;">Cancelar</a>
+                    <button type="submit" class="btn-checkout-primary px-5 fw-bold shadow-sm" style="max-width: 260px;">
+                        <i class="fa-solid fa-paper-plane me-1"></i> Enviar Traslado
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let productosDisponibles = [];
+
+function obtenerSedeOrigenId() {
+    const originSelect = document.getElementById('originBranchSelect');
+    if (originSelect) return originSelect.value;
+    const originHidden = document.getElementById('originBranchHidden');
+    if (originHidden) return originHidden.value;
+    return "{{ user_branch_id }}";
+}
+
+function onCambioSucursalOrigen(branchId) {
+    cargarProductosOrigen(branchId);
+    // Limpiar aviso de feedback de escaneo
+    const feedback = document.getElementById('imeiFeedbackAlert');
+    if (feedback) feedback.classList.add('d-none');
+}
+
+function cargarProductosOrigen(branchId) {
+    if (!branchId) return;
+    fetch(`/transfers/api/productos-origen?branch_id=${branchId}`)
+        .then(res => res.json())
+        .then(data => {
+            productosDisponibles = data;
+            // Actualizar opciones en todas las filas activas que tengan select
+            document.querySelectorAll('.producto-select').forEach(sel => {
+                const currentVal = sel.value;
+                actualizarOpcionesSelect(sel, currentVal);
+            });
+        })
+        .catch(err => console.error("Error al cargar productos de origen:", err));
+}
+
+function actualizarOpcionesSelect(sel, currentVal = "") {
+    sel.innerHTML = '<option value="">-- Seleccionar Accesorio / Producto con Stock --</option>';
+    productosDisponibles.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = `${p.product_id}|${p.variant_id || ''}`;
+        opt.dataset.stock = p.stock_disponible;
+        opt.textContent = `${p.nombre} (Stock: ${p.stock_disponible})`;
+        if (opt.value === currentVal) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+function mostrarFeedbackImei(mensaje, tipo = 'info') {
+    const alertEl = document.getElementById('imeiFeedbackAlert');
+    if (!alertEl) return;
+    alertEl.className = `mt-2 small alert alert-${tipo} py-2 px-3 mb-0 d-block`;
+    alertEl.innerHTML = `<i class="fa-solid ${tipo === 'success' ? 'fa-circle-check text-success' : tipo === 'danger' ? 'fa-triangle-exclamation text-danger' : 'fa-circle-info'} me-1"></i> ${mensaje}`;
+}
+
+function actualizarContadorItems() {
+    const count = document.querySelectorAll('.item-transfer-row').length;
+    const counterEl = document.getElementById('itemsCounter');
+    if (counterEl) counterEl.textContent = count;
+    const notice = document.getElementById('emptyItemsNotice');
+    if (notice) {
+        if (count === 0) notice.classList.remove('d-none');
+        else notice.classList.add('d-none');
+    }
+}
+
+// 2. Escaneo y validación en vivo por IMEI
+async function escanearImei() {
+    const input = document.getElementById('imeiScannerInput');
+    const imei = (input.value || '').trim();
+    const branchId = obtenerSedeOrigenId();
+
+    if (!imei) {
+        mostrarFeedbackImei('Ingresa o escanea un número de IMEI válido.', 'warning');
+        input.focus();
+        return;
+    }
+
+    if (!branchId) {
+        mostrarFeedbackImei('Selecciona primero la sucursal de origen.', 'warning');
+        return;
+    }
+
+    // Validar duplicado en la lista actual
+    const filasExistentes = document.querySelectorAll('.item-transfer-row');
+    for (let f of filasExistentes) {
+        if (f.dataset.imei && f.dataset.imei.toLowerCase() === imei.toLowerCase()) {
+            mostrarFeedbackImei(`El teléfono con IMEI "${imei}" ya está agregado en este traslado.`, 'warning');
+            input.value = '';
+            input.focus();
+            return;
+        }
+    }
+
+    const btn = document.getElementById('btnAgregarImei');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Buscando...';
+
+    try {
+        const response = await fetch(`/transfers/api/buscar-imei?imei=${encodeURIComponent(imei)}&branch_id=${branchId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+            mostrarFeedbackImei(data.error || 'No se pudo validar el IMEI.', 'danger');
+            input.select();
+            input.focus();
+            return;
+        }
+
+        // 3. Inserción Automática del teléfono en la lista
+        insertarFilaCelular(data);
+        mostrarFeedbackImei(`✓ ${data.marca ? data.marca + ' ' : ''}${data.modelo_celular || data.nombre} (IMEI: ${data.imei}) agregado correctamente.`, 'success');
+        input.value = '';
+        input.focus();
+
+    } catch (err) {
+        console.error('Error al consultar IMEI:', err);
+        mostrarFeedbackImei('Error de conexión al validar el IMEI.', 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function insertarFilaCelular(data) {
+    const container = document.getElementById('itemsContainer');
+    const row = document.createElement('div');
+    row.className = 'card border p-3 shadow-sm item-transfer-row rounded-3 mb-2';
+    row.dataset.imei = data.imei.toLowerCase();
+    row.dataset.prodId = data.id;
+    row.style.background = 'rgba(16, 185, 129, 0.05)';
+    row.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+
+    const colorStr = data.color ? ` | Color: ${data.color}` : '';
+    const memStr = data.memoria ? ` | Capacidad: ${data.memoria}` : '';
+    const marcaStr = data.marca ? `${data.marca} ` : '';
+    const modelStr = data.modelo_celular || data.nombre;
+
+    row.innerHTML = `
+        <div class="row g-2 align-items-center">
+            <div class="col-md-7">
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2">
+                        <i class="fa-solid fa-mobile-screen-button me-1"></i>Celular (IMEI)
+                    </span>
+                    <span class="font-mono small fw-bold text-brand-black">IMEI: ${data.imei}</span>
+                </div>
+                <div class="fw-bold text-brand-black fs-6">${marcaStr}${modelStr}</div>
+                <small class="product-sku d-block">${data.nombre}${colorStr}${memStr}</small>
+                <input type="hidden" name="product_id[]" value="${data.id}" class="input-prod-id">
+                <input type="hidden" name="variant_id[]" value="" class="input-var-id">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold checkout-label">Cantidad (Fijada)</label>
+                <div class="input-group input-group-sm">
+                    <input type="number" name="cantidad[]" class="form-control text-center fw-bold pos-input" value="1" readonly style="pointer-events: none; background: rgba(255,255,255,0.06);" title="Los celulares se trasladan por unidad única">
+                    <span class="input-group-text pos-input border-0">1 Unid</span>
+                </div>
+            </div>
+            <div class="col-md-2 text-end pt-3">
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="eliminarFila(this)" title="Quitar equipo">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(row);
+    actualizarContadorItems();
+}
+
+// 4. Compatibilidad con Accesorios (Lotes y cantidades múltiples)
+function agregarFilaProducto() {
+    const container = document.getElementById('itemsContainer');
+    const row = document.createElement('div');
+    row.className = 'card border p-3 shadow-sm item-transfer-row rounded-3 mb-2';
+    row.innerHTML = `
+        <div class="row g-2 align-items-center">
+            <div class="col-md-7">
+                <label class="form-label small fw-bold checkout-label">Accesorio / Producto por Lote</label>
+                <select class="form-select form-select-sm producto-select pos-select fw-semibold" onchange="onSelectProducto(this)" required>
+                    <option value="">-- Seleccionar Accesorio / Producto con Stock --</option>
+                </select>
+                <input type="hidden" name="product_id[]" class="input-prod-id">
+                <input type="hidden" name="variant_id[]" class="input-var-id">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold checkout-label">Cantidad a Trasladar</label>
+                <div class="input-group input-group-sm">
+                    <input type="number" name="cantidad[]" class="form-control text-center fw-bold pos-input input-cantidad" min="1" value="1" required>
+                    <span class="input-group-text pos-input stock-max-badge">Max: -</span>
+                </div>
+            </div>
+            <div class="col-md-2 text-end pt-3">
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="eliminarFila(this)" title="Quitar producto">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(row);
+
+    const newSel = row.querySelector('.producto-select');
+    actualizarOpcionesSelect(newSel);
+    actualizarContadorItems();
+}
+
+function onSelectProducto(selectEl) {
+    const row = selectEl.closest('.item-transfer-row');
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const val = selectEl.value;
+
+    if (!val) {
+        row.querySelector('.input-prod-id').value = '';
+        row.querySelector('.input-var-id').value = '';
+        row.querySelector('.stock-max-badge').textContent = 'Max: -';
+        return;
+    }
+
+    const parts = val.split('|');
+    row.querySelector('.input-prod-id').value = parts[0];
+    row.querySelector('.input-var-id').value = parts[1] || '';
+
+    const maxStock = parseInt(selectedOption.dataset.stock || 1);
+    const cantInput = row.querySelector('.input-cantidad');
+    cantInput.max = maxStock;
+    if (parseInt(cantInput.value) > maxStock) {
+        cantInput.value = maxStock;
+    }
+    row.querySelector('.stock-max-badge').textContent = `Max: ${maxStock}`;
+}
+
+function eliminarFila(btn) {
+    const row = btn.closest('.item-transfer-row');
+    row.remove();
+    actualizarContadorItems();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const initialOrigin = obtenerSedeOrigenId();
+    cargarProductosOrigen(initialOrigin);
+
+    // Enter en input de escáner para pistolas de código de barras
+    const scannerInput = document.getElementById('imeiScannerInput');
+    if (scannerInput) {
+        scannerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                escanearImei();
+            }
+        });
+        scannerInput.focus();
+    }
+});
+</script>
+{% endblock %}

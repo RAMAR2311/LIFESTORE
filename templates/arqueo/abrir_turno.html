@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+    <div class="col-lg-7 col-md-9">
+        <div class="card card-custom border-0 shadow-lg p-4 p-md-5 rounded-4">
+            <div class="text-center mb-4">
+                <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center p-3 mb-3" style="width: 70px; height: 70px;">
+                    <i class="fa-solid fa-cash-register fs-2"></i>
+                </div>
+                <h3 class="fw-bolder text-brand-black mb-1">Apertura de Turno de Caja</h3>
+                <p class="text-muted small">
+                    Inicia el turno operativo registrando la base de efectivo y los asesores presentes.
+                </p>
+                <div class="badge bg-light text-dark border px-3 py-2 rounded-pill fs-6 mt-1">
+                    <i class="fa-solid fa-store text-primary me-2"></i><strong>Sucursal:</strong> {{ sucursal.nombre }} [{{ sucursal.codigo }}]
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('arqueo_bp.abrir_turno') }}" id="formAbrirTurno">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                <!-- Base Inicial de Efectivo -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-dark fs-6">
+                        <i class="fa-solid fa-money-bill-wave text-success me-2"></i>Base Inicial en Efectivo <span class="text-danger">*</span>
+                    </label>
+                    <div class="input-group input-group-lg shadow-sm rounded-3">
+                        <span class="input-group-text bg-success bg-opacity-10 border-success border-end-0 text-success fw-bold">$</span>
+                        <input type="number" 
+                               name="base_inicial_efectivo" 
+                               id="base_inicial_efectivo" 
+                               class="form-control border-success border-start-0 ps-0 fw-bolder fs-3 text-success" 
+                               placeholder="Ej: 200000" 
+                               min="0" 
+                               step="1000" 
+                               required 
+                               autofocus>
+                    </div>
+                    <div class="form-text small text-muted">Monto físico de billetes y monedas con el que se arranca la caja hoy.</div>
+                </div>
+
+                <!-- Checklist Interactivo de Asesores Activos -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold text-dark m-0 fs-6">
+                            <i class="fa-solid fa-users text-primary me-2"></i>Asesores Responsables en este Turno
+                        </label>
+                        <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill px-3 py-1 small">
+                            <span id="asesores_count">0</span> seleccionados
+                        </span>
+                    </div>
+                    <div class="border rounded-3 p-3 bg-light" style="max-height: 250px; overflow-y: auto;">
+                        {% if asesores %}
+                        <div class="row g-2">
+                            {% for a in asesores %}
+                            <div class="col-md-6">
+                                <div class="form-check p-2 bg-white rounded border d-flex align-items-center h-100 shadow-sm-hover cursor-pointer" onclick="toggleCheckbox('asesor_{{ a.id }}')">
+                                    <input class="form-check-input ms-1 me-2 asesor-check" 
+                                           type="checkbox" 
+                                           name="asesores_ids" 
+                                           value="{{ a.id }}" 
+                                           id="asesor_{{ a.id }}"
+                                           onclick="event.stopPropagation(); updateCount();">
+                                    <label class="form-check-label fw-semibold text-dark w-100 cursor-pointer" for="asesor_{{ a.id }}" onclick="event.stopPropagation();">
+                                        {{ a.nombre }}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted small m-0 text-center py-3">No hay asesores comerciales registrados en el sistema.</p>
+                        {% endif %}
+                    </div>
+                    <div class="form-text small text-muted">Selecciona los asesores que estarán atendiendo y generando ventas durante este turno.</div>
+                </div>
+
+                <!-- Notas Opcionales de Apertura -->
+                <div class="mb-4">
+                    <label class="form-label fw-semibold text-dark small">Notas de Apertura / Novedades (Opcional)</label>
+                    <textarea name="notas_apertura" class="form-control bg-light border-0 py-2" rows="2" placeholder="Ej: Recibido sin billetes de $50.000, cambio surtido..."></textarea>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-dark py-3 rounded-pill fw-bold fs-5 shadow">
+                        <i class="fa-solid fa-key me-2 text-warning"></i> Confirmar y Abrir Turno
+                    </button>
+                    <a href="/admin/dashboard" class="btn btn-link text-muted text-decoration-none small text-center mt-2">
+                        Cancelar y volver al panel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleCheckbox(id) {
+    const cb = document.getElementById(id);
+    if (cb) {
+        cb.checked = !cb.checked;
+        updateCount();
+    }
+}
+function updateCount() {
+    const checks = document.querySelectorAll('.asesor-check:checked');
+    const badge = document.getElementById('asesores_count');
+    if (badge) badge.textContent = checks.length;
+}
+</script>
+{% endblock %}

@@ -170,9 +170,26 @@
 
 <div class="ticket">
     <div class="header">
-        <h1 class="logo">LIFESTORE - CELULARES</h1>
-        <p style="font-size: 0.72rem; font-weight: 700; margin: 0 0 6px 0; letter-spacing: 0.20em; text-transform: uppercase;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
-        <p style="font-size: 0.78rem; font-weight: bold; margin: 0 0 8px 0; letter-spacing: 0.5px;">NIT: 1013679035-0</p>
+        <div style="margin-bottom: 8px; display: flex; justify-content: center; align-items: center;">
+            {% set sede = venta.branch %}
+            {% if sede and sede.logo_url %}
+                <img src="{{ sede.logo_url }}" alt="{{ sede.nombre_comercial or sede.nombre }}" style="max-height: 52px; max-width: 170px; width: auto; height: auto; object-fit: contain; filter: grayscale(100%) contrast(140%);">
+            {% else %}
+                <img src="{{ url_for('static', filename='img/lifestore_logo_print.png') }}" alt="LifeStore" style="max-height: 52px; max-width: 170px; width: auto; height: auto; object-fit: contain; filter: grayscale(100%) contrast(150%);">
+            {% endif %}
+        </div>
+        <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px;">{{ (sede.nombre_comercial or sede.nombre or 'LIFESTORE')|upper }}</div>
+        <p style="font-size: 0.72rem; font-weight: 700; margin: 0 0 3px 0; letter-spacing: 0.15em; text-transform: uppercase;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
+        <p style="font-size: 0.78rem; font-weight: bold; margin: 0 0 3px 0; letter-spacing: 0.5px;">NIT: {{ (sede.nit if sede and sede.nit else '1013679035-0') }}</p>
+        {% if sede and sede.direccion %}
+            <p style="font-size: 0.74rem; margin: 0 0 2px 0; color: #333;">{{ sede.direccion }}</p>
+        {% endif %}
+        {% if sede and sede.telefono %}
+            <p style="font-size: 0.74rem; margin: 0 0 4px 0; color: #333;">Tel: {{ sede.telefono }}</p>
+        {% endif %}
+        {% if sede and sede.resolucion_dian %}
+            <p style="font-size: 0.68rem; margin: 2px 0 6px 0; font-style: italic; line-height: 1.2;">{{ sede.resolucion_dian }}</p>
+        {% endif %}
         
         <div style="border-top: 1px dashed #1A1A1A; padding: 6px 0; font-size: 0.78rem; line-height: 1.4; text-align: left;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">

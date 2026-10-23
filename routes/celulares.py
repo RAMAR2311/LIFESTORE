@@ -1,7 +1,8 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file, session
 from flask_login import login_required, current_user
 from sqlalchemy import or_
-from models import db, Product, Sale, SaleDetail, SalePayment, ProductVariant, ArqueoCaja, Maneo, StockAdjustment
+from models import db, Product, Sale, SaleDetail, SalePayment, ProductVariant, ArqueoCaja, Maneo, StockAdjustment, Branch, BranchStock
+from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 from decorators import admin_required
 from datetime import datetime
 import pytz
@@ -10,6 +11,25 @@ from werkzeug.utils import secure_filename
 from decimal import Decimal
 
 celulares_bp = Blueprint('celulares_bp', __name__)
+
+def _resolve_celular_branch_id(form_branch_id=None):
+    if current_user.rol == 'bodega':
+        if current_user.branch_id:
+            return current_user.branch_id
+        bodega_b = Branch.query.filter_by(tipo='bodega', activa=True).first()
+        if bodega_b:
+            return bodega_b.id
+    elif current_user.rol == 'vendedor':
+        if current_user.branch_id:
+            return current_user.branch_id
+
+    if form_branch_id:
+        return int(form_branch_id)
+    if session.get('active_branch_id'):
+        return int(session['active_branch_id'])
+
+    default_b = Branch.query.filter_by(activa=True).first()
+    return default_b.id if default_b else 1
 
 def obtener_hora_bogota():
     return datetime.now(pytz.timezone('America/Bogota')).replace(tzinfo=None)
@@ -54,13 +74,37 @@ def inventario():
         Product.maneos.any(Maneo.estado == 'PENDIENTE')
     ).count()
 
+    active_b_id = None
+    if current_user.rol == 'admin':
+        active_b_id = session.get('active_branch_id')
+    elif current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
+        active_b_id = current_user.branch_id
+
     from sqlalchemy.orm import selectinload, joinedload
 
     # Base query for table with eager loading of ventas and maneos
     base_query = Product.query.options(
         selectinload(Product.detalles_venta).joinedload(SaleDetail.venta),
-        selectinload(Product.maneos)
+        selectinload(Product.maneos),
+        selectinload(Product.branch_stocks).joinedload(BranchStock.branch)
     ).filter_by(tipo_inventario='celulares')
+
+    # Rol vendedor: aislamiento estricto por sucursal
+    if current_user.rol == 'vendedor':
+        if not active_b_id:
+            default_b = Branch.query.filter_by(tipo='tienda', activa=True).first()
+            active_b_id = default_b.id if default_b else 1
+        
+        base_query = base_query.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
+        ).filter(BranchStock.cantidad > 0)
+    elif current_user.rol == 'admin' and active_b_id is not None:
+        # Si el admin filtró una sucursal específica
+        base_query = base_query.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
+        ).filter(BranchStock.cantidad > 0)
 
     if estado == 'activos':
         base_query = base_query.filter(Product.cantidad_stock > 0)
@@ -91,6 +135,21 @@ def inventario():
         page=page, per_page=per_page, error_out=False
     )
 
+    # Mapa de ubicación actual (sucursal con cantidad > 0) para cada celular
+    celular_ubicaciones = {}
+    for c in paginacion.items:
+        # Buscar en sus branch_stocks la que tenga cantidad > 0
+        ubicacion = None
+        for bs in c.branch_stocks:
+            if bs.cantidad > 0 and bs.branch:
+                ubicacion = {
+                    'nombre': bs.branch.nombre,
+                    'codigo': bs.branch.codigo,
+                    'tipo': bs.branch.tipo
+                }
+                break
+        celular_ubicaciones[c.id] = ubicacion
+
     return render_template('celulares/inventario.html', 
                            celulares=paginacion.items,
                            paginacion=paginacion,
@@ -102,7 +161,8 @@ def inventario():
                            stock_activo=stock_activo,
                            costo_total=costo_total,
                            ventas_estimadas=ventas_estimadas,
-                           celulares_en_maneo=celulares_en_maneo)
+                           celulares_en_maneo=celulares_en_maneo,
+                           celular_ubicaciones=celular_ubicaciones)
 
 @celulares_bp.route('/prestar/<int:id>', methods=['POST'])
 @login_required
@@ -218,8 +278,26 @@ def nuevo_celular():
             imagen=imagen_filename
         )
         
+        target_branch_id = _resolve_celular_branch_id(request.form.get('branch_id'))
+
         try:
             db.session.add(nuevo)
+            db.session.flush()
+
+            # Asignar a la sucursal seleccionada
+            b_stock = get_or_create_branch_stock(target_branch_id, nuevo.id, None)
+            b_stock.cantidad = 1
+            sync_global_product_stock(nuevo.id, None)
+
+            ajuste = StockAdjustment(
+                product_id=nuevo.id,
+                admin_id=current_user.id,
+                branch_id=target_branch_id,
+                tipo_movimiento='Ingreso Dispositivo Celular',
+                stock_anterior=0,
+                stock_nuevo=1
+            )
+            db.session.add(ajuste)
             db.session.commit()
             flash(f'{tipo_dispositivo} ingresado al inventario exitosamente.', 'success')
             return redirect(url_for('celulares_bp.inventario'))
@@ -231,7 +309,9 @@ def nuevo_celular():
             db.session.rollback()
             flash(f'Error al registrar el dispositivo: {str(e)}', 'danger')
 
-    return render_template('celulares/form_celular.html', celular=None)
+    sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    default_branch_id = _resolve_celular_branch_id()
+    return render_template('celulares/form_celular.html', celular=None, sucursales=sucursales_activas, default_branch_id=default_branch_id)
 
 @celulares_bp.route('/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -732,10 +812,12 @@ def trazabilidad():
                 'imei2': p_latest.imei2,
                 'proveedor': p_latest.proveedor,
                 'inventario': p_latest.inventario,
-                'stock_actual': p_latest.cantidad_stock,
+                'stock_actual': p_latest.total_stock,
                 'precio_costo': p_latest.precio_costo,
                 'precio_sugerido': p_latest.precio_sugerido
             }
+
+        p_ids = [p.id for p in productos]
 
         # Evento 1: Ingreso a inventario (para cada producto encontrado)
         for p in productos:
@@ -751,13 +833,62 @@ def trazabilidad():
                     'Inventario': p.inventario or 'N/A',
                     'Precio Costo': f"${float(p.precio_costo or 0):,.0f}".replace(',', '.'),
                     'Precio Sugerido': f"${float(p.precio_sugerido or 0):,.0f}".replace(',', '.'),
-                    'Estado Stock': 'En Stock (Disponible)' if p.cantidad_stock > 0 else 'Agotado (Vendido)'
+                    'Estado Stock': 'En Stock (Disponible)' if p.total_stock > 0 else 'Agotado (Vendido)'
                 }
             })
 
+        # Evento 1.1: Ajustes e Ingresos de Stock (StockAdjustment) con sucursal
+        from models import StockAdjustment
+        if p_ids:
+            ajustes = StockAdjustment.query.filter(StockAdjustment.product_id.in_(p_ids)).all()
+            for aj in ajustes:
+                branch_name = aj.branch.nombre if aj.branch else 'Sede Central'
+                admin_name = aj.admin.nombre if aj.admin else 'Sistema'
+                eventos.append({
+                    'tipo': 'AJUSTE_STOCK',
+                    'titulo': f'Movimiento: {aj.tipo_movimiento}',
+                    'fecha': aj.fecha_ajuste,
+                    'icono': 'fa-solid fa-sliders text-secondary',
+                    'badge_color': 'bg-secondary text-white',
+                    'detalles': {
+                        'Sucursal': branch_name,
+                        'Registrado por': admin_name,
+                        'Stock Anterior': aj.stock_anterior,
+                        'Stock Nuevo': aj.stock_nuevo,
+                        'Tipo': aj.tipo_movimiento
+                    }
+                })
+
+        # Evento 1.2: Traslados entre sedes (StockTransferItem -> StockTransfer)
+        from models import StockTransferItem, StockTransfer
+        if p_ids:
+            transf_items = StockTransferItem.query.filter(StockTransferItem.product_id.in_(p_ids)).all()
+            for ti in transf_items:
+                t = ti.transferencia
+                if t:
+                    origen_nom = t.origen.nombre if t.origen else 'N/A'
+                    destino_nom = t.destino.nombre if t.destino else 'N/A'
+                    solicitante = t.solicitante.nombre if t.solicitante else 'N/A'
+                    receptor = t.receptor.nombre if t.receptor else 'Pendiente'
+                    eventos.append({
+                        'tipo': 'TRASLADO',
+                        'titulo': f'Traslado entre Sedes: {origen_nom} ➔ {destino_nom}',
+                        'fecha': t.fecha_creacion,
+                        'icono': 'fa-solid fa-truck-arrow-right text-info',
+                        'badge_color': 'bg-info text-dark',
+                        'detalles': {
+                            'Transferencia': f"#{t.id} - {t.numero_guia}",
+                            'Ruta': f"{origen_nom} ➔ {destino_nom}",
+                            'Estado': t.estado.upper(),
+                            'Cantidad': ti.cantidad,
+                            'Enviado por': solicitante,
+                            'Recibido por': receptor,
+                            'Fecha Recibido': t.fecha_recepcion.strftime('%d/%m/%Y %H:%M') if t.fecha_recepcion else 'Pendiente'
+                        }
+                    })
+
         # 2. Buscar Ventas (SaleDetail) vinculadas a los productos o al IMEI
         from models import ProviderInvoice
-        p_ids = [p.id for p in productos]
         
         # Buscar también productos hermanos (ej. si existió con -EXT o duplicado)
         hermanos = Product.query.filter(
@@ -786,6 +917,8 @@ def trazabilidad():
             cliente_nombre = 'Cliente General'
             if hasattr(v, 'cliente') and v.cliente:
                 cliente_nombre = f"{v.cliente.nombre} (Doc: {v.cliente.documento})"
+            
+            branch_venta = v.branch.nombre if getattr(v, 'branch', None) else (v.sucursal or 'N/A')
                 
             eventos.append({
                 'tipo': 'VENTA',
@@ -798,7 +931,7 @@ def trazabilidad():
                     'Factura': f"#{v.id}",
                     'Cliente': cliente_nombre,
                     'Vendedor': v.vendedor.nombre if v.vendedor else 'N/A',
-                    'Sucursal': v.sucursal or 'N/A',
+                    'Sucursal': branch_venta,
                     'Precio Venta Final': f"${float(d.precio_venta_final or 0):,.0f}".replace(',', '.'),
                     'Método de Pago': v.metodo_pago_display,
                     'OK Contabilidad': 'SÍ' if d.ok_contabilidad else 'NO',
@@ -822,6 +955,8 @@ def trazabilidad():
                     if hasattr(v, 'cliente') and v.cliente:
                         cliente_nombre = f"{v.cliente.nombre} (Doc: {v.cliente.documento})"
                     
+                    branch_venta = v.branch.nombre if getattr(v, 'branch', None) else (v.sucursal or 'N/A')
+
                     eventos.append({
                         'tipo': 'VENTA',
                         'titulo': f'Venta de Celular (Factura #{v.id})',
@@ -833,7 +968,7 @@ def trazabilidad():
                             'Factura': f"#{v.id}",
                             'Cliente': cliente_nombre,
                             'Vendedor': v.vendedor.nombre if v.vendedor else 'N/A',
-                            'Sucursal': v.sucursal or 'N/A',
+                            'Sucursal': branch_venta,
                             'Monto Venta': f"${float(v.monto_total or 0):,.0f}".replace(',', '.'),
                             'Método de Pago': v.metodo_pago_display,
                             'Proveedor Liquidado': inv.provider.nombre if inv.provider else 'N/A'
@@ -852,6 +987,7 @@ def trazabilidad():
         ).all()
 
         for r in retomas:
+            branch_retoma = r.branch.nombre if getattr(r, 'branch', None) else (r.venta.sucursal if r.venta else 'N/A')
             eventos.append({
                 'tipo': 'RETOMA',
                 'titulo': f'Recibido como Retoma (Retoma #{r.id})',
@@ -861,6 +997,7 @@ def trazabilidad():
                 'sale_id': r.sale_id,
                 'detalles': {
                     'Equipo Entregado': f"{r.marca or ''} {r.modelo}".strip(),
+                    'Sucursal Receptor': branch_retoma,
                     'Valor de Retoma': f"${float(r.valor_retoma or 0):,.0f}".replace(',', '.'),
                     'Costo Arreglos': f"${float(r.arreglos or 0):,.0f}".replace(',', '.'),
                     'Vendedor Receptor': r.vendedor.nombre if r.vendedor else 'N/A',
@@ -873,6 +1010,7 @@ def trazabilidad():
         # 4. Buscar Préstamos de Maneo vinculados
         for p in productos:
             for m in p.maneos:
+                branch_maneo = m.branch.nombre if getattr(m, 'branch', None) else 'N/A'
                 eventos.append({
                     'tipo': 'MANEO',
                     'titulo': f'Préstamo a Local Vecino ({m.local_vecino})',
@@ -880,12 +1018,42 @@ def trazabilidad():
                     'icono': 'fa-solid fa-handshake text-info',
                     'badge_color': 'bg-info text-dark',
                     'detalles': {
+                        'Sucursal Origen': branch_maneo,
                         'Local Receptor': m.local_vecino,
                         'Estado': m.estado,
                         'Fecha Préstamo': m.fecha_prestamo.strftime('%d/%m/%Y %H:%M') if m.fecha_prestamo else 'N/A',
                         'Fecha Resolución': m.fecha_resolucion.strftime('%d/%m/%Y %H:%M') if m.fecha_resolucion else 'Pendiente'
                     }
                 })
+
+        # 5. Buscar Garantías vinculadas a las ventas del IMEI o producto
+        from models import Warranty
+        warranties_encontradas = []
+        if p_ids:
+            warranties_encontradas.extend(Warranty.query.filter(Warranty.product_id.in_(p_ids)).all())
+        if ventas_procesadas:
+            w_ventas = Warranty.query.filter(Warranty.sale_id.in_(list(ventas_procesadas))).all()
+            for wv in w_ventas:
+                if wv not in warranties_encontradas:
+                    warranties_encontradas.append(wv)
+        
+        for w in warranties_encontradas:
+            branch_garantia = w.branch.nombre if getattr(w, 'branch', None) else 'N/A'
+            eventos.append({
+                'tipo': 'GARANTIA',
+                'titulo': f'Reclamo de Garantía #{w.id}',
+                'fecha': w.created_at,
+                'icono': 'fa-solid fa-shield-halved text-danger',
+                'badge_color': 'bg-danger text-white',
+                'detalles': {
+                    'Garantía': f"#{w.id}",
+                    'Sucursal Receptora': branch_garantia,
+                    'Motivo': w.reason,
+                    'Estado': w.resolution,
+                    'Factura Venta': f"#{w.sale_id}" if w.sale_id else 'N/A',
+                    'Notas': w.admin_notes or 'Sin observaciones'
+                }
+            })
 
         # Ordenar eventos cronológicamente (de más antiguo a más reciente)
         eventos.sort(key=lambda x: x['fecha'] if x['fecha'] else datetime.min)

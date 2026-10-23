@@ -66,13 +66,35 @@
                         <small><strong>{{ p.sku }}</strong></small>
                     </td>
                     <td class="fw-semibold text-brand-black">{{ p.nombre }}</td>
-                    <td>
-                        <!-- Regla Estricta: Badge rojo si el stock <= 3 -->
-                        {% if p.total_stock <= 3 %}
-                            <span class="badge bg-brand-pink text-white rounded-pill px-3 py-2 shadow-sm"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ p.total_stock }} (Bajo)</span>
+                    <td class="text-center">
+                        {% set p_stock_info = stock_por_producto.get(p.id) if stock_por_producto else none %}
+                        {% set st_display = p_stock_info.local_stock if p_stock_info else p.total_stock %}
+                        
+                        {% if current_user.rol == 'vendedor' %}
+                            <!-- Rol vendedor: Solo ve el stock de su sucursal -->
+                            {% if st_display <= 3 %}
+                                <span class="badge bg-brand-pink text-white rounded-pill px-3 py-2 shadow-sm"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ st_display }} (Bajo)</span>
+                            {% else %}
+                                <span class="badge bg-light text-brand-black border border-dark rounded-pill px-3 py-2 fw-bold">{{ st_display }} uds.</span>
+                            {% endif %}
                         {% else %}
-                            <!-- Badge en negro para stock normal -->
-                            <span class="badge bg-light text-brand-black border border-dark rounded-pill px-3 py-2 fw-bold">{{ p.total_stock }} uds.</span>
+                            <!-- Admin / Bodega: Stock y desglose por sucursal -->
+                            {% if st_display <= 3 %}
+                                <span class="badge bg-brand-pink text-white rounded-pill px-3 py-2 shadow-sm"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ st_display }} uds.</span>
+                            {% else %}
+                                <span class="badge bg-light text-brand-black border border-dark rounded-pill px-3 py-2 fw-bold">{{ st_display }} uds.</span>
+                            {% endif %}
+
+                            <!-- Desglose por sucursales -->
+                            {% if p_stock_info and p_stock_info.distribucion %}
+                            <div class="mt-1 d-flex flex-wrap justify-content-center gap-1" style="font-size: 0.7rem;">
+                                {% for d in p_stock_info.distribucion %}
+                                    <span class="badge {% if d.cantidad > 0 %}bg-dark-subtle text-dark border{% else %}text-muted bg-light border-0{% endif %} px-2 py-0" title="{{ d.branch_name }}: {{ d.cantidad }}">
+                                        {{ d.branch_code }}: <strong>{{ d.cantidad }}</strong>
+                                    </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         {% endif %}
                     </td>
                     <td class="text-end fw-bold" style="color: var(--brand-pink);">

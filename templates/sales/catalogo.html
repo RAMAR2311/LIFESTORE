@@ -1,26 +1,25 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row mb-5">
+<div class="row mb-4">
     <div class="col-12">
-        <!-- Titular Simple y Limpio, el color de marca A3D8DE acentúa el Logo -->
-        <h2 class="fw-bolder m-0" style="color: var(--brand-blue);">
-            <i class="fa-solid fa-book-open me-2"></i>Catálogo de Stock General
+        <h2 class="fw-bolder m-0 text-brand-black">
+            <i class="fa-solid fa-book-open text-brand-pink me-2"></i>Catálogo de Stock General
         </h2>
     </div>
 </div>
 
-<div class="card card-custom p-4 border mt-2 bg-white shadow-sm mb-4">
-    <!-- El Formulario usa Método GET Nativo para enviar 'q' por barra de direcciones URL -->
+<div class="card card-custom p-4 border mt-2 shadow-sm mb-4">
     <form method="GET" action="{{ url_for('sales_bp.catalogo') }}" class="row align-items-end g-3">
         <div class="col-md-9">
-            <label class="form-label fw-bold text-brand-black small"><i class="fa-solid fa-magnifying-glass me-1"></i> Búsqueda de Artículos</label>
-            <!-- Permite filtrado profundo en la BD por Substraer Coincidencias (ILIKE) -->
-            <input type="text" name="q" class="form-control bg-light border-0 py-2 shadow-sm" value="{{ q }}" placeholder="Busca escribiendo el SKU Oficial o el Nombre del accesorio..." autocomplete="off">
+            <label class="form-label fw-bold checkout-label small mb-2"><i class="fa-solid fa-magnifying-glass me-1"></i> Búsqueda de Artículos</label>
+            <div class="search-bar-silver">
+                <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" name="q" value="{{ q }}" placeholder="Busca escribiendo el SKU Oficial o el Nombre del accesorio..." autocomplete="off">
+            </div>
         </div>
         <div class="col-md-3">
-            <!-- Botón Dominante en Turquesa (Azul de Redcover.com '#A3D8DE') -->
-            <button type="submit" class="btn btn-blue w-100 py-2 rounded-3 shadow-sm fw-bold">
+            <button type="submit" class="btn-checkout-primary w-100 py-2 rounded-3 shadow-sm fw-bold">
                 Buscar Existencias
             </button>
         </div>
@@ -28,40 +27,99 @@
 </div>
 
 <style>
+/* Estilos específicos Catálogo - Silver Tech */
+.product-card {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+    border-radius: 14px;
+    overflow: hidden;
+}
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.15);
+    border-color: #94A3B8 !important;
+}
+[data-theme="dark"] .product-card {
+    background-color: #111827 !important;
+    border: 1px solid rgba(226, 232, 240, 0.15) !important;
+}
+[data-theme="dark"] .product-card:hover {
+    border-color: rgba(226, 232, 240, 0.4) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.product-img-box {
+    background: #F1F5F9;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.product-img-box .placeholder-icon {
+    color: #64748B;
+}
+[data-theme="dark"] .product-img-box {
+    background: linear-gradient(145deg, #1E293B, #0F172A) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+[data-theme="dark"] .product-img-box .placeholder-icon {
+    color: #94A3B8 !important;
+}
+.product-card .card-title {
+    font-weight: 600;
+    color: var(--text-primary) !important;
+}
+[data-theme="dark"] .product-card .card-title {
+    color: #FFFFFF !important;
+}
+.product-sku {
+    color: #64748B;
+    font-size: 0.85rem;
+}
+[data-theme="dark"] .product-sku {
+    color: #CBD5E1 !important;
+}
+.product-price {
+    font-size: 1.15rem !important;
+    font-weight: 700 !important;
+    color: #10B981 !important;
+}
 @media print {
-    /* Ocultar elementos de navegación y búsqueda al imprimir el catálogo */
     .btn, form, footer, header, nav, .sidebar, .sidebar-wrapper { display: none !important; }
     body, .container-fluid, .main-content { padding: 0 !important; margin: 0 !important; background: white !important; }
     .card { page-break-inside: avoid; border: 1px solid #e0e0e0 !important; box-shadow: none !important; }
     .print-friendly-row { gap: 1rem !important; }
-    .col-md-4, .col-xl-3 { flex: 0 0 auto !important; width: 33.333% !important; } 
-    /* Force 3 columns in print */
+    .col-md-4, .col-xl-3 { flex: 0 0 auto !important; width: 33.333% !important; }
 }
 </style>
 
 <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4 print-friendly-row">
     {% for p in productos %}
     <div class="col">
-        <div class="card h-100 border-0 shadow-sm {% if p.total_stock <= 0 %}opacity-50{% endif %}" style="border-radius: 12px; overflow: hidden;">
-            {% if p.imagen %}
-                <img src="{{ url_for('static', filename='uploads/' ~ p.imagen) }}" class="card-img-top bg-light" alt="{{ p.nombre }}" style="height: 220px; object-fit: contain; padding: 1.5rem;">
-            {% else %}
-                <div class="card-img-top bg-light d-flex align-items-center justify-content-center border-bottom border-light" style="height: 220px;">
-                    <i class="fa-solid fa-image fa-3x text-muted opacity-25"></i>
-                </div>
-            {% endif %}
+        <div class="card h-100 product-card shadow-sm {% if p.total_stock <= 0 %}opacity-50{% endif %}">
+            <div class="product-img-box position-relative" style="height: 220px;">
+                {% if p.imagen %}
+                    <img src="{{ url_for('static', filename='uploads/' ~ p.imagen) }}" alt="{{ p.nombre }}" style="height: 100%; width: 100%; object-fit: contain; padding: 1.25rem;">
+                {% else %}
+                    <span class="placeholder-icon d-flex flex-column align-items-center justify-content-center h-100">
+                        <i class="fa-solid fa-image fa-3x mb-2 opacity-50"></i>
+                        <small>Sin Imagen</small>
+                    </span>
+                {% endif %}
+            </div>
             
             <div class="card-body d-flex flex-column p-4">
-                <div class="d-flex justify-content-between align-items-start mb-1">
-                    <p class="text-muted small mb-0 fw-bold"><i class="fa-solid fa-barcode me-1"></i>{{ p.sku }}</p>
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <p class="product-sku small mb-0 fw-bold"><i class="fa-solid fa-barcode me-1"></i>{{ p.sku }}</p>
                     {% if p.total_stock <= 0 %}
                         <span class="badge bg-danger rounded-pill px-2"><i class="fa-solid fa-ban"></i> Agotado</span>
+                    {% else %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2">{{ p.total_stock }} disp.</span>
                     {% endif %}
                 </div>
-                <h5 class="card-title fw-bolder text-brand-black mb-3">{{ p.nombre }}</h5>
+                <h5 class="card-title fw-bolder mb-3 text-truncate" title="{{ p.nombre }}">{{ p.nombre }}</h5>
                 
                 {% if p.variantes %}
-                    <h6 class="fw-bold text-muted mb-2" style="font-size: 0.75rem; letter-spacing: 0.5px;">SUBCATEGORÍAS DISPONIBLES:</h6>
+                    <h6 class="fw-bold checkout-label mb-2" style="font-size: 0.75rem; letter-spacing: 0.5px;">SUBCATEGORÍAS DISPONIBLES:</h6>
                     <div class="table-responsive mb-auto">
                         <table class="table table-sm table-borderless align-middle mb-0">
                             <tbody style="font-size: 0.9rem;">
@@ -69,9 +127,9 @@
                                 {% for v in p.variantes %}
                                     {% if v.cantidad_stock > 0 %}
                                         {% set ns.active_variants = ns.active_variants + 1 %}
-                                        <tr class="border-bottom border-light">
-                                            <td class="ps-0 text-secondary"><i class="fa-solid fa-caret-right text-brand-pink me-1" style="font-size: 0.7rem;"></i> {{ v.nombre_variante }}</td>
-                                            <td class="text-end fw-bold text-brand-black pe-0">${{ (v.precio_sugerido or p.precio_sugerido)|cop }}</td>
+                                        <tr class="border-bottom" style="border-color: rgba(255, 255, 255, 0.08) !important;">
+                                            <td class="ps-0" style="color: var(--text-secondary);"><i class="fa-solid fa-caret-right text-brand-pink me-1" style="font-size: 0.7rem;"></i> {{ v.nombre_variante }}</td>
+                                            <td class="text-end fw-bold pe-0 product-price" style="font-size: 0.95rem !important;">${{ (v.precio_sugerido or p.precio_sugerido)|cop }}</td>
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
@@ -82,21 +140,21 @@
                         </table>
                     </div>
                 {% else %}
-                    <div class="mt-auto pt-3 border-top border-light d-flex justify-content-between align-items-end">
-                        <span class="text-muted fw-bold" style="font-size: 0.8rem; letter-spacing: 0.5px;">PRECIO GENERAL</span>
-                        <h4 class="fw-bolder m-0" style="color: var(--brand-pink);">${{ (p.precio_sugerido)|cop }}</h4>
+                    <div class="mt-auto pt-3 border-top d-flex justify-content-between align-items-end" style="border-color: rgba(255, 255, 255, 0.08) !important;">
+                        <span class="checkout-label fw-bold" style="font-size: 0.8rem; letter-spacing: 0.5px;">PRECIO GENERAL</span>
+                        <h4 class="product-price m-0">${{ (p.precio_sugerido)|cop }}</h4>
                     </div>
                 {% endif %}
             </div>
             
             <!-- Franja Rango de Precio -->
             {% if p.variantes and p.rango_precios %}
-            <div class="card-footer bg-white border-top border-light pt-2 pb-3 px-4 text-end">
-                <span class="text-muted fw-bold me-1" style="font-size: 0.75rem;">VALORES:</span>
+            <div class="card-footer border-top pt-2 pb-3 px-4 text-end" style="background: transparent; border-color: rgba(226, 232, 240, 0.1) !important;">
+                <span class="checkout-label fw-bold me-1" style="font-size: 0.75rem;">VALORES:</span>
                 {% if p.rango_precios is number %}
                     <span class="fw-bolder fs-5 text-brand-black">${{ (p.rango_precios)|cop }}</span>
                 {% else %}
-                    <span class="fw-bold" style="color: var(--brand-pink); font-size: 1.1rem;">Desde ${{ (p.rango_precios[0])|cop }}</span>
+                    <span class="fw-bold product-price" style="font-size: 1.1rem;">Desde ${{ (p.rango_precios[0])|cop }}</span>
                 {% endif %}
             </div>
             {% endif %}
@@ -104,10 +162,10 @@
         </div>
     </div>
     {% else %}
-    <div class="col-12 text-center py-5 bg-white border rounded shadow-sm">
-        <i class="fa-solid fa-box-open fs-1 mb-3 text-muted opacity-25"></i>
+    <div class="col-12 text-center py-5 cart-empty-box shadow-sm">
+        <i class="fa-solid fa-box-open fs-1 mb-3 opacity-50"></i>
         <h4 class="text-brand-black fw-bold">No se hallaron resultados</h4>
-        <p class="text-muted mb-0">No pudimos localizar artículos físicos con esos atributos de búsqueda.</p>
+        <p class="checkout-label mb-0">No pudimos localizar artículos físicos con esos atributos de búsqueda.</p>
     </div>
     {% endfor %}
 </div>
@@ -117,22 +175,22 @@
 <nav aria-label="Paginación catálogo" class="mt-4">
     <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
         <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
-            <a class="page-link rounded-pill px-3 shadow-sm"
+            <a class="page-link rounded-pill px-3 shadow-sm pos-input"
                href="{% if paginacion.has_prev %}{{ url_for('sales_bp.catalogo', page=paginacion.prev_num, q=q) }}{% else %}#{% endif %}"
                aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></a>
         </li>
         {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
             {% if p_num %}
                 <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
-                    <a class="page-link rounded-pill px-3 shadow-sm"
+                    <a class="page-link rounded-pill px-3 shadow-sm pos-input"
                        href="{{ url_for('sales_bp.catalogo', page=p_num, q=q) }}">{{ p_num }}</a>
                 </li>
             {% else %}
-                <li class="page-item disabled"><span class="page-link rounded-pill px-3">…</span></li>
+                <li class="page-item disabled"><span class="page-link rounded-pill px-3 pos-input">…</span></li>
             {% endif %}
         {% endfor %}
         <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
-            <a class="page-link rounded-pill px-3 shadow-sm"
+            <a class="page-link rounded-pill px-3 shadow-sm pos-input"
                href="{% if paginacion.has_next %}{{ url_for('sales_bp.catalogo', page=paginacion.next_num, q=q) }}{% else %}#{% endif %}"
                aria-label="Siguiente"><i class="fa-solid fa-chevron-right"></i></a>
         </li>

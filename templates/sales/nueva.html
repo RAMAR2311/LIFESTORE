@@ -2,8 +2,14 @@
 
 {% block content %}
 <!-- Título de Pantalla Renombrado (Requerimento) -->
-<div class="d-flex align-items-center mb-4">
+<div class="d-flex align-items-center justify-content-between mb-4">
     <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-cash-register me-2" style="color: var(--brand-pink);"></i>Caja Central</h2>
+    <div>
+        <span class="badge bg-light text-dark border shadow-sm px-3 py-2 rounded-pill fs-6">
+            <i class="fa-solid fa-shop text-primary me-1"></i> Sucursal: 
+            <strong>{{ active_branch.nombre if active_branch else (current_user.branch.nombre if current_user.branch else 'Principal') }}</strong>
+        </span>
+    </div>
 </div>
 
 <div class="row">
@@ -115,7 +121,8 @@
 
             <hr class="mb-4">
 
-            <!-- Selector de Asesor (Obligatorio) -->
+            <!-- Selector de Asesor (Obligatorio en tienda, exento en bodega) -->
+            {% if not sucursal_actual or sucursal_actual.tipo == 'tienda' %}
             <div class="mb-3">
                 <label class="form-label fw-bold text-brand-black small text-uppercase mb-2"><i class="fa-solid fa-user-tie me-1"></i> Asesor de Venta</label>
                 <select id="asesor-vendedor" class="form-select form-select-lg border-0 shadow-sm bg-light" required style="cursor: pointer;">
@@ -125,6 +132,13 @@
                     {% endfor %}
                 </select>
             </div>
+            {% else %}
+            <div class="mb-3">
+                <div class="p-2 px-3 rounded bg-light border text-muted small">
+                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de selección de asesores</strong>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Selector de Proveedor removido para evitar asociar ventas de inventario interno -->
 
@@ -141,14 +155,34 @@
 
             <!-- Modo 1: Pago Único (por defecto) -->
             <div id="pago_unico_section">
-                <select id="metodo-pago" class="form-select form-select-lg border-0 shadow-sm bg-light mb-3" style="cursor: pointer;">
+                <select id="metodo-pago" class="form-select form-select-lg border-0 shadow-sm bg-light mb-3" style="cursor: pointer;" onchange="toggleCamposAbonoTerceroUnico(this.value)">
                     <option value="efectivo">💵 Efectivo</option>
+                    <option value="nequi">🟣 Nequi</option>
                     <option value="bancolombia">🏦 Bancolombia</option>
                     <option value="daviplata">📲 Daviplata</option>
-                    <option value="tarjeta_credito">💳 T. Crédito</option>
+                    <option value="bolt">⚡ Bolt (Datáfono)</option>
                     <option value="addi">🛒 Addi</option>
-                    <option value="sitecredito">💳 Sitecredito</option>
+                    <option value="sistecredito">💳 Sistecrédito</option>
+                    <option value="abono_tercero">🤝 Abono a Terceros / Proveedor</option>
                 </select>
+
+                <!-- Campos específicos para Abono a Terceros / Proveedor (Pago Único) -->
+                <div id="campos_abono_tercero_unico" class="card border-0 bg-warning bg-opacity-10 p-3 mb-3 rounded-3" style="display: none;">
+                    <div class="fw-bold text-dark small mb-2"><i class="fa-solid fa-handshake me-1 text-warning"></i> Datos del Abono a Proveedor:</div>
+                    <div class="mb-2">
+                        <label class="form-label extra-small fw-bold text-muted mb-1">Proveedor Destinatario <span class="text-danger">*</span></label>
+                        <select id="abono_provider_id_unico" class="form-select form-select-sm border-0 shadow-sm bg-white">
+                            <option value="" disabled selected>-- Seleccionar Proveedor Destinatario --</option>
+                            {% for prov in providers %}
+                                <option value="{{ prov.id }}">{{ prov.nombre }} (Saldo: ${{ prov.saldo_pendiente|cop }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label extra-small fw-bold text-muted mb-1">Comprobante / Soporte Transacción <span class="text-danger">*</span></label>
+                        <input type="text" id="abono_comprobante_unico" class="form-control form-control-sm border-0 shadow-sm bg-white" placeholder="Ej: Transf. Nequi #849302 / Ref. Bancolombia">
+                    </div>
+                </div>
             </div>
 
             <!-- Modo 2: Pago Dividido/Mixto (oculto por defecto) -->
@@ -576,14 +610,29 @@
             label.className = 'badge bg-warning bg-opacity-25 text-dark border border-warning rounded-pill px-3 py-1';
         }
     }
+    const LISTA_PROVEEDORES = [
+        {% for prov in providers %}
+        { id: {{ prov.id }}, nombre: {{ prov.nombre|tojson }}, saldo: {{ prov.saldo_pendiente|int }} },
+        {% endfor %}
+    ];
+
     const METODOS_DISPONIBLES = [
         { value: 'efectivo',      label: '💵 Efectivo' },
+        { value: 'nequi',         label: '🟣 Nequi' },
         { value: 'bancolombia',   label: '🏦 Bancolombia' },
         { value: 'daviplata',     label: '📲 Daviplata' },
-        { value: 'tarjeta_credito', label: '💳 T. Crédito' },
+        { value: 'bolt',          label: '⚡ Bolt (Datáfono)' },
         { value: 'addi',          label: '🛒 Addi' },
-        { value: 'sitecredito',   label: '💳 Sitecredito' }
+        { value: 'sistecredito',  label: '💳 Sistecrédito' },
+        { value: 'abono_tercero', label: '🤝 Abono a Terceros / Proveedor' }
     ];
+
+    function toggleCamposAbonoTerceroUnico(valor) {
+        const divAbono = document.getElementById('campos_abono_tercero_unico');
+        if (divAbono) {
+            divAbono.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+        }
+    }
 
     // Capturar el ESCANER ("Enter" en el teclado sin enviar un formulario)
     document.getElementById('sku_input').addEventListener('keypress', function(e) {
@@ -626,7 +675,7 @@
     document.getElementById('btn_agregar_pago').addEventListener('click', agregarPagoParcial);
 
     function agregarPagoParcial() {
-        pagosMixtos.push({ metodo_pago: 'efectivo', monto: 0 });
+        pagosMixtos.push({ metodo_pago: 'efectivo', monto: 0, provider_id: null, comprobante: '' });
         renderizarPagosMixtos();
     }
 
@@ -642,9 +691,17 @@
     function actualizarPagoParcial(index, campo, valor) {
         if (campo === 'metodo_pago') {
             pagosMixtos[index].metodo_pago = valor;
+            renderizarPagosMixtos();
+            return;
         }
         if (campo === 'monto') {
             pagosMixtos[index].monto = parseFloat(valor) || 0;
+        }
+        if (campo === 'provider_id') {
+            pagosMixtos[index].provider_id = valor ? parseInt(valor) : null;
+        }
+        if (campo === 'comprobante') {
+            pagosMixtos[index].comprobante = valor.trim();
         }
         actualizarSaldoRestante();
     }
@@ -708,26 +765,55 @@
 
         pagosMixtos.forEach((pago, index) => {
             const div = document.createElement('div');
-            div.className = 'pago-item d-flex gap-2 align-items-center';
+            div.className = 'pago-item p-2 bg-white rounded-3 border shadow-sm mb-2';
             
             // Select del método
             let optionsHtml = METODOS_DISPONIBLES.map(m => 
                 `<option value="${m.value}" ${m.value === pago.metodo_pago ? 'selected' : ''}>${m.label}</option>`
             ).join('');
 
+            let abonoCamposHtml = '';
+            if (pago.metodo_pago === 'abono_tercero') {
+                let provOptions = LISTA_PROVEEDORES.map(pr => 
+                    `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
+                ).join('');
+
+                abonoCamposHtml = `
+                    <div class="p-2 mt-2 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25">
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <label class="extra-small fw-bold text-muted mb-1 d-block">Proveedor Destinatario *</label>
+                                <select class="form-select form-select-sm border-0 shadow-sm" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
+                                    <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
+                                    ${provOptions}
+                                </select>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="extra-small fw-bold text-muted mb-1 d-block">Soporte / Comprobante *</label>
+                                <input type="text" class="form-control form-control-sm border-0 shadow-sm" placeholder="Ej: Transf. Nequi #849302" 
+                                       value="${pago.comprobante || ''}" oninput="actualizarPagoParcial(${index}, 'comprobante', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
             div.innerHTML = `
-                <select class="form-select form-select-sm border-0 shadow-sm bg-light" style="cursor: pointer; flex: 1;" onchange="actualizarPagoParcial(${index}, 'metodo_pago', this.value)">
-                    ${optionsHtml}
-                </select>
-                <div class="input-group input-group-sm" style="flex: 1;">
-                    <span class="input-group-text bg-light border-0">$</span>
-                    <input type="number" class="form-control border-0 shadow-sm text-end" placeholder="Monto" value="${pago.monto > 0 ? Math.round(pago.monto) : ''}" 
-                           oninput="actualizarPagoParcial(${index}, 'monto', this.value)" 
-                           step="1" min="0">
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm border-0 shadow-sm bg-light" style="cursor: pointer; flex: 1;" onchange="actualizarPagoParcial(${index}, 'metodo_pago', this.value)">
+                        ${optionsHtml}
+                    </select>
+                    <div class="input-group input-group-sm" style="flex: 1;">
+                        <span class="input-group-text bg-light border-0">$</span>
+                        <input type="number" class="form-control border-0 shadow-sm text-end" placeholder="Monto" value="${pago.monto > 0 ? Math.round(pago.monto) : ''}" 
+                               oninput="actualizarPagoParcial(${index}, 'monto', this.value)" 
+                               step="1" min="0">
+                    </div>
+                    <button type="button" class="btn btn-sm text-danger px-2" onclick="eliminarPagoParcial(${index})" title="Quitar este pago">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
-                <button type="button" class="btn btn-sm text-danger px-2" onclick="eliminarPagoParcial(${index})" title="Quitar este pago">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
+                ${abonoCamposHtml}
             `;
             container.appendChild(div);
         });
@@ -1292,10 +1378,11 @@
     // Evento Transaccional JSON de Salida
     async function procesarPago(datosCliente = null) {
 
+        const esBodega = {% if sucursal_actual and sucursal_actual.tipo == 'bodega' %}true{% else %}false{% endif %};
         const asesorSelect = document.getElementById('asesor-vendedor');
-        const asesorId = asesorSelect ? asesorSelect.value : null;
+        const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
 
-        if (!asesorId) {
+        if (!esBodega && !asesorId) {
             return alert('⚠️ Por favor, selecciona el asesor que realizó la venta antes de continuar.');
         }
 
@@ -1314,10 +1401,20 @@
                 if (!p.monto || p.monto <= 0) {
                     return alert(`El pago #${i + 1} (${p.metodo_pago}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
                 }
+                if (p.metodo_pago === 'abono_tercero') {
+                    if (!p.provider_id) {
+                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere seleccionar el Proveedor destinatario.`);
+                    }
+                    if (!p.comprobante || !p.comprobante.trim()) {
+                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere el número de comprobante o soporte.`);
+                    }
+                }
                 sumaPagos += p.monto;
                 pagosPayload.push({
                     metodo_pago: p.metodo_pago,
-                    monto: Math.round(p.monto)
+                    monto: Math.round(p.monto),
+                    provider_id: p.metodo_pago === 'abono_tercero' ? p.provider_id : null,
+                    comprobante: p.metodo_pago === 'abono_tercero' ? p.comprobante : null
                 });
             }
 
@@ -1328,14 +1425,33 @@
             }
         } else {
             const metodoPago = document.getElementById('metodo-pago').value;
+            let providerIdUnico = null;
+            let comprobanteUnico = null;
+
+            if (metodoPago === 'abono_tercero') {
+                const provSelect = document.getElementById('abono_provider_id_unico');
+                const compInput = document.getElementById('abono_comprobante_unico');
+                providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
+                comprobanteUnico = compInput && compInput.value ? compInput.value.trim() : null;
+
+                if (!providerIdUnico) {
+                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
+                }
+                if (!comprobanteUnico) {
+                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes ingresar el comprobante o soporte de la transacción.');
+                }
+            }
+
             pagosPayload.push({
                 metodo_pago: metodoPago,
-                monto: Math.round(obtenerGranTotal())
+                monto: Math.round(obtenerGranTotal()),
+                provider_id: providerIdUnico,
+                comprobante: comprobanteUnico
             });
         }
 
         const payload = {
-            asesor_id: parseInt(asesorId),
+            asesor_id: asesorId ? parseInt(asesorId) : null,
             provider_id: null,
             items: carrito.map(item => {
                 const base = {

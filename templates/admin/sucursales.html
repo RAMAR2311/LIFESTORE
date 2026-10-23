@@ -1,0 +1,556 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Cabecera de la Página -->
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bolder m-0 text-brand-black">
+                <i class="fa-solid fa-code-branch me-2 text-primary"></i>Gestión de Sucursales &amp; Bodegas
+            </h2>
+            <p class="text-muted small mb-0">Configura locales físicos, bodegas centrales, consecutivos DIAN e identidad gráfica para facturación.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/admin/vendedores" class="btn btn-outline-secondary rounded-pill px-3 fw-bold shadow-sm">
+                <i class="fa-solid fa-users-gear me-1"></i> Asignar Vendedores
+            </a>
+            <a href="/admin/dashboard" class="btn btn-light rounded-pill px-4 fw-bold text-muted border shadow-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Panel Principal
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <!-- Columna Izquierda: Formulario de Alta con Estética de Alta Gama -->
+    <div class="col-lg-5 col-xl-4">
+        <div class="card card-custom p-4 border-0 shadow-sm position-relative overflow-hidden">
+            <!-- Barra decorativa superior -->
+            <div class="position-absolute top-0 start-0 w-100" style="height: 4px; background: linear-gradient(90deg, #2563eb, #38bdf8, #94a3b8);"></div>
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-brand-black m-0">
+                    <i class="fa-solid fa-square-plus me-2 text-primary"></i>Nueva Sede
+                </h5>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 small">
+                    Multisede Activo
+                </span>
+            </div>
+
+            <form method="POST" action="{{ url_for('admin_bp.sucursales') }}" enctype="multipart/form-data" id="formNuevaSucursal">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                <!-- 1. SELECTOR TÁCTICO DE TIPO DE SEDE (Interactivo) -->
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-bold small text-uppercase" style="letter-spacing: 0.5px;">
+                        1. Tipo de Sede <span class="text-danger">*</span>
+                    </label>
+                    <div class="row g-2" id="tipoSelectorGroup">
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="tipo" id="tipoTienda" value="tienda" checked onchange="onSelectTipoSede('tienda')">
+                            <label class="btn btn-outline-secondary w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoTienda" style="transition: all 0.2s ease;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <i class="fa-solid fa-store fs-5 text-primary"></i>
+                                    <i class="fa-solid fa-circle-check text-primary check-icon"></i>
+                                </div>
+                                <div>
+                                    <span class="fw-bold d-block text-dark small">Tienda POS</span>
+                                    <span class="text-muted" style="font-size: 0.7rem; line-height: 1.1; display: block;">Ventas &amp; Turnos</span>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="tipo" id="tipoBodega" value="bodega" onchange="onSelectTipoSede('bodega')">
+                            <label class="btn btn-outline-secondary w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoBodega" style="transition: all 0.2s ease;">
+                                <div class="d-flex align-items-center justify-content-between mb-1">
+                                    <i class="fa-solid fa-warehouse fs-5 text-purple" style="color: #9333ea;"></i>
+                                    <i class="fa-solid fa-circle-check text-purple check-icon" style="color: #9333ea;"></i>
+                                </div>
+                                <div>
+                                    <span class="fw-bold d-block text-dark small">Bodega Central</span>
+                                    <span class="text-muted" style="font-size: 0.7rem; line-height: 1.1; display: block;">Logística Mayor</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. DATOS BÁSICOS -->
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-bold small text-uppercase">Nombre de la Sede <span class="text-danger">*</span></label>
+                    <input type="text" name="nombre" class="form-control pos-input py-2" required placeholder="Ej: Local 2 Unicentro, Bodega Mayorista">
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label text-brand-black fw-bold small text-uppercase m-0">Código Identificador <span class="text-danger">*</span></label>
+                        <span id="badgeCodigoStatus" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;">
+                            <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Sugerido
+                        </span>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0 px-2 text-muted font-mono"><i class="fa-solid fa-hashtag text-primary"></i></span>
+                        <input type="text" id="codigoInput" name="codigo" class="form-control pos-input border-start-0 ps-1 text-uppercase fw-bold font-mono" required placeholder="EJ: LOC2" maxlength="20" value="{{ next_loc_code }}">
+                        <button type="button" class="btn btn-outline-secondary border px-3" onclick="recalcularCodigo()" title="Calcular el siguiente código correlativo libre">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                        </button>
+                    </div>
+                    <div class="form-text small" style="font-size: 0.72rem;">Se asigna automáticamente según las sedes existentes (Tienda: LOC / Bodega: BOD).</div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-brand-black fw-bold small text-uppercase">Teléfono</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light text-muted"><i class="fa-solid fa-phone"></i></span>
+                            <input type="text" name="telefono" class="form-control pos-input" placeholder="Ej: 310 123 4567">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-brand-black fw-bold small text-uppercase">Dirección</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light text-muted"><i class="fa-solid fa-location-dot"></i></span>
+                            <input type="text" name="direccion" class="form-control pos-input" placeholder="Cra 15 # 85-30">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. DATOS COMERCIALES & FACTURACIÓN -->
+                <div class="card p-3 mb-3 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(226, 232, 240, 0.25);">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fw-bold text-primary small text-uppercase">
+                            <i class="fa-solid fa-file-invoice me-1"></i> Facturación &amp; Logotipo
+                        </span>
+                        <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50 small">Membrete</span>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Nombre Comercial (Cabecera Factura)</label>
+                        <input type="text" name="nombre_comercial" class="form-control form-control-sm pos-input" placeholder="Ej: LifeStore - Celulares &amp; Tecnología">
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted mb-1">NIT / Cédula</label>
+                            <input type="text" name="nit" class="form-control form-control-sm pos-input" placeholder="901.234.567-8">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Prefijo Factura</label>
+                            <input type="text" name="prefijo_factura" class="form-control form-control-sm pos-input text-uppercase font-mono" placeholder="FAC" value="FAC" maxlength="10">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Último Consecutivo</label>
+                            <input type="number" name="ultimo_consecutivo" class="form-control form-control-sm pos-input font-mono" value="0" min="0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted mb-1">
+                                <i class="fa-solid fa-cloud-arrow-up text-primary me-1"></i> Adjuntar Logo
+                            </label>
+                            <input type="file" name="logo_file" id="createLogoFile" class="form-control form-control-sm pos-input" accept="image/*" onchange="previewLogoFile(this, 'createLogoPreviewBox', 'createLogoImgTag')">
+                        </div>
+                    </div>
+
+                    <!-- Previsualización Inteligente del Logo Subido -->
+                    <div id="createLogoPreviewBox" class="p-2 mt-2 bg-white rounded-3 border d-none text-center shadow-sm position-relative">
+                        <span class="badge bg-dark position-absolute top-0 end-0 m-1" style="font-size: 0.65rem;">Auto-adaptado</span>
+                        <div class="small text-muted mb-1 fw-bold" style="font-size: 0.68rem;">Vista previa de impresión en factura:</div>
+                        <img id="createLogoImgTag" src="" alt="Vista previa logo" style="max-height: 52px; max-width: 170px; width: auto; height: auto; object-fit: contain;">
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0 d-block mx-auto mt-1 small" onclick="limpiarLogoFileInput('createLogoFile', 'createLogoPreviewBox', 'createLogoImgTag')">
+                            <i class="fa-solid fa-trash me-1"></i> Quitar imagen
+                        </button>
+                    </div>
+
+                    <div class="mt-2">
+                        <label class="form-label small fw-bold text-muted mb-1">Resolución DIAN / Nota Legal</label>
+                        <textarea name="resolucion_dian" class="form-control form-control-sm pos-input" rows="2" placeholder="Ej: Responsable de IVA / Documento soporte emitido bajo resolución..."></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold rounded-pill shadow-sm">
+                    <i class="fa-solid fa-check me-1"></i> Guardar y Registrar Sede
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Columna Derecha: Listado de Sucursales Registradas -->
+    <div class="col-lg-7 col-xl-8">
+        <div class="card card-custom p-0 overflow-hidden border-0 shadow-sm">
+            <div class="bg-light p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h6 class="fw-bold text-brand-black m-0">
+                    <i class="fa-solid fa-network-wired text-primary me-2"></i>Sedes Registradas ({{ sucursales|length }})
+                </h6>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-50 rounded-pill px-3 py-1">
+                        {{ sucursales|selectattr('activa')|list|length }} Activas
+                    </span>
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-50 rounded-pill px-3 py-1">
+                        {{ sucursales|rejectattr('activa')|list|length }} Inactivas
+                    </span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-dark text-white text-uppercase" style="font-size: 0.78rem;">
+                        <tr>
+                            <th class="ps-4" width="100">Código</th>
+                            <th>Sede &amp; Marca Factura</th>
+                            <th width="120">Tipo</th>
+                            <th>Ubicación / Contacto</th>
+                            <th class="text-center" width="90">Estado</th>
+                            <th class="text-center pe-4" width="110">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in sucursales %}
+                        <tr>
+                            <td class="ps-4 fw-bold font-mono">
+                                <span class="badge bg-light text-dark border px-2 py-1 shadow-sm fs-6">
+                                    {{ s.codigo }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    {% if s.logo_url %}
+                                        <div class="rounded border p-1 bg-white shadow-sm d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                            <img src="{{ s.logo_url }}" alt="Logo {{ s.nombre }}" style="max-height: 38px; max-width: 38px; width: auto; height: auto; object-fit: contain;">
+                                        </div>
+                                    {% else %}
+                                        <div class="rounded border p-1 bg-light text-muted shadow-sm d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                                            <i class="fa-solid fa-store fs-5 opacity-50"></i>
+                                        </div>
+                                    {% endif %}
+                                    <div>
+                                        <div class="fw-bold text-dark fs-6">{{ s.nombre }}</div>
+                                        {% if s.nombre_comercial %}
+                                            <div class="small text-primary fw-semibold"><i class="fa-solid fa-tag me-1"></i>{{ s.nombre_comercial }}</div>
+                                        {% endif %}
+                                        <div class="small text-muted">Prefijo: <strong>{{ s.prefijo_factura or 'FAC' }}</strong> (Último consecutivo: #{{ s.ultimo_consecutivo }})</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if s.tipo == 'bodega' %}
+                                    <span class="badge rounded-pill px-3 py-1 shadow-sm" style="background: rgba(147, 51, 234, 0.15); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.35);">
+                                        <i class="fa-solid fa-warehouse me-1"></i> Bodega
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-primary bg-opacity-15 text-primary border border-primary border-opacity-50 rounded-pill px-3 py-1 shadow-sm">
+                                        <i class="fa-solid fa-store me-1"></i> Tienda
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="small">
+                                <div><i class="fa-solid fa-location-dot text-danger me-1"></i> {{ s.direccion or 'Sin dirección física' }}</div>
+                                {% if s.telefono %}
+                                <div><i class="fa-solid fa-phone text-success me-1"></i> {{ s.telefono }}</div>
+                                {% endif %}
+                                {% if s.nit %}
+                                <div class="text-muted"><i class="fa-solid fa-id-card me-1"></i> NIT: {{ s.nit }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if s.activa %}
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2 py-1">Activa</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border rounded-pill px-2 py-1">Inactiva</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center pe-4">
+                                <div class="d-flex justify-content-center gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" style="width: 34px; height: 34px;" title="Editar Sucursal" data-bs-toggle="modal" data-bs-target="#modalEditBranch{{ s.id }}">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('admin_bp.toggle_sucursal', id=s.id) }}" class="d-inline" onsubmit="return confirm('¿Cambiar estado operativo de esta sucursal?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="btn btn-sm btn-outline-{{ 'warning' if s.activa else 'success' }} rounded-circle shadow-sm" style="width: 34px; height: 34px;" title="{{ 'Desactivar' if s.activa else 'Activar' }}">
+                                            <i class="fa-solid fa-power-off"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Modal Editar Sucursal (Rediseñado) -->
+                        <div class="modal fade" id="modalEditBranch{{ s.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                                    <div class="modal-header bg-dark text-white border-0 py-3">
+                                        <h5 class="modal-title fw-bold">
+                                            <i class="fa-solid fa-pen-to-square me-2 text-primary"></i>Editar Sede: {{ s.nombre }}
+                                        </h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="POST" action="{{ url_for('admin_bp.editar_sucursal', id=s.id) }}" enctype="multipart/form-data">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <div class="modal-body p-4 text-start">
+                                            
+                                            <!-- Sección 1: Datos Operativos -->
+                                            <div class="row g-3 mb-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold small text-uppercase">Nombre de la Sede</label>
+                                                    <input type="text" name="nombre" class="form-control pos-input" value="{{ s.nombre }}" required>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label fw-bold small text-uppercase">Código Corto</label>
+                                                    <input type="text" name="codigo" class="form-control pos-input text-uppercase fw-bold font-mono" value="{{ s.codigo }}" required maxlength="20">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label fw-bold small text-uppercase">Tipo de Sede</label>
+                                                    <select name="tipo" class="form-select pos-input" required>
+                                                        <option value="tienda" {% if s.tipo == 'tienda' %}selected{% endif %}>🏪 Tienda (POS)</option>
+                                                        <option value="bodega" {% if s.tipo == 'bodega' %}selected{% endif %}>📦 Bodega Central</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold small text-uppercase">Dirección Física</label>
+                                                    <input type="text" name="direccion" class="form-control pos-input" value="{{ s.direccion or '' }}">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold small text-uppercase">Teléfono de Contacto</label>
+                                                    <input type="text" name="telefono" class="form-control pos-input" value="{{ s.telefono or '' }}">
+                                                </div>
+                                            </div>
+
+                                            <hr class="my-3 text-muted">
+
+                                            <!-- Sección 2: Facturación e Imagen del Logo -->
+                                            <div class="card p-3 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px dashed rgba(226, 232, 240, 0.25);">
+                                                <h6 class="fw-bold text-primary small text-uppercase mb-3">
+                                                    <i class="fa-solid fa-file-invoice me-1"></i> Facturación &amp; Imagen Corporativa
+                                                </h6>
+
+                                                <div class="row g-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label small fw-bold text-muted mb-1">Nombre Comercial / Marca</label>
+                                                        <input type="text" name="nombre_comercial" class="form-control form-control-sm pos-input" value="{{ s.nombre_comercial or '' }}" placeholder="Ej: LifeStore AS">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label small fw-bold text-muted mb-1">NIT / Cédula</label>
+                                                        <input type="text" name="nit" class="form-control form-control-sm pos-input" value="{{ s.nit or '' }}" placeholder="901.234.567-8">
+                                                    </div>
+                                                    <div class="col-md-3">
+                                                        <label class="form-label small fw-bold text-muted mb-1">Prefijo Factura</label>
+                                                        <input type="text" name="prefijo_factura" class="form-control form-control-sm pos-input text-uppercase font-mono" value="{{ s.prefijo_factura or 'FAC' }}" maxlength="10">
+                                                    </div>
+
+                                                    <div class="col-md-4">
+                                                        <label class="form-label small fw-bold text-muted mb-1">Último Consecutivo</label>
+                                                        <input type="number" name="ultimo_consecutivo" class="form-control form-control-sm pos-input font-mono" value="{{ s.ultimo_consecutivo or 0 }}" min="0">
+                                                    </div>
+
+                                                    <div class="col-md-8">
+                                                        <label class="form-label small fw-bold text-muted mb-1">
+                                                            <i class="fa-solid fa-image me-1 text-primary"></i> Subir / Actualizar Logo
+                                                        </label>
+                                                        
+                                                        {% if s.logo_url %}
+                                                        <div class="d-flex align-items-center gap-2 mb-2 p-2 bg-light rounded border">
+                                                            <img src="{{ s.logo_url }}" alt="Logo actual" style="max-height: 38px; max-width: 90px; width: auto; height: auto; object-fit: contain;" class="bg-white p-1 rounded border">
+                                                            <div class="form-check m-0">
+                                                                <input class="form-check-input" type="checkbox" name="eliminar_logo" id="delLogo{{ s.id }}" value="1">
+                                                                <label class="form-check-label small text-danger fw-bold" for="delLogo{{ s.id }}" style="font-size: 0.75rem;">
+                                                                    Quitar este logo
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        {% endif %}
+
+                                                        <input type="file" name="logo_file" id="editLogoInput{{ s.id }}" class="form-control form-control-sm pos-input" accept="image/*" onchange="previewLogoFile(this, 'editLogoBox{{ s.id }}', 'editLogoImg{{ s.id }}')">
+                                                        <div class="form-text small" style="font-size: 0.7rem;">Sube cualquier imagen; el sistema la auto-adapta y recorta proporcionalmente.</div>
+
+                                                        <div id="editLogoBox{{ s.id }}" class="p-2 mt-2 bg-white rounded-3 border d-none text-center shadow-sm">
+                                                            <div class="small text-muted mb-1 fw-bold" style="font-size: 0.68rem;">Nuevo logo previsualizado:</div>
+                                                            <img id="editLogoImg{{ s.id }}" src="" alt="Vista previa nuevo logo" style="max-height: 50px; max-width: 160px; width: auto; height: auto; object-fit: contain;">
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-12">
+                                                        <label class="form-label small fw-bold text-muted mb-1">Resolución DIAN / Texto Legal Factura</label>
+                                                        <textarea name="resolucion_dian" class="form-control form-control-sm pos-input" rows="2">{{ s.resolucion_dian or '' }}</textarea>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                        <div class="modal-footer border-0 bg-light">
+                                            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm">
+                                                <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Cambios
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-code-branch fs-1 mb-2 opacity-25"></i>
+                                <p class="mb-0 fw-semibold">No hay sucursales ni bodegas registradas en el sistema.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos interactivos para las tarjetas de Tipo de Sede */
+.sede-type-card {
+    cursor: pointer;
+    border: 2px solid rgba(148, 163, 184, 0.3) !important;
+    background: var(--bg-card, #ffffff);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sede-type-card:hover {
+    border-color: #38bdf8 !important;
+    transform: translateY(-2px);
+}
+.btn-check:checked + .sede-type-card {
+    border-color: #2563eb !important;
+    background: rgba(37, 99, 235, 0.08) !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+}
+.check-icon {
+    display: none;
+}
+.btn-check:checked + .sede-type-card .check-icon {
+    display: inline-block;
+}
+
+/* Normalización Dark Mode Obsidian & Silver Tech */
+[data-theme="dark"] .sede-type-card {
+    background: #0f172a !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+[data-theme="dark"] .sede-type-card .sede-title,
+[data-theme="dark"] .sede-type-card span.text-dark {
+    color: #f8fafc !important;
+}
+[data-theme="dark"] .btn-check:checked + .sede-type-card {
+    border-color: #38bdf8 !important;
+    background: rgba(56, 189, 248, 0.12) !important;
+    box-shadow: 0 4px 14px rgba(56, 189, 248, 0.22);
+}
+[data-theme="dark"] .table tbody td div.text-dark {
+    color: #f8fafc !important;
+}
+[data-theme="dark"] .modal-content {
+    background-color: #0b1120 !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #cbd5e1 !important;
+}
+[data-theme="dark"] .modal-header {
+    background-color: #070b14 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+[data-theme="dark"] .modal-body,
+[data-theme="dark"] .modal-footer {
+    background-color: #0b1120 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+[data-theme="dark"] .modal-body .card {
+    background: rgba(15, 23, 42, 0.6) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+</style>
+
+<script>
+    const nextCodesCache = {
+        'tienda': '{{ next_loc_code }}',
+        'bodega': '{{ next_bod_code }}'
+    };
+    let codigoModificadoManualmente = false;
+
+    // Al alternar entre Tienda y Bodega en las tarjetas de radio
+    async function onSelectTipoSede(tipo) {
+        const input = document.getElementById('codigoInput');
+        const badge = document.getElementById('badgeCodigoStatus');
+        if (!input) return;
+
+        // Si ya tenemos en caché o consultamos por API
+        if (nextCodesCache[tipo]) {
+            input.value = nextCodesCache[tipo];
+            if (badge) badge.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-1"></i>Sugerido: ' + tipo.toUpperCase();
+        } else {
+            try {
+                const res = await fetch(`/admin/api/siguiente-codigo-sede?tipo=${tipo}`);
+                const data = await res.json();
+                if (data.success && data.codigo) {
+                    nextCodesCache[tipo] = data.codigo;
+                    input.value = data.codigo;
+                    if (badge) badge.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-1"></i>Sugerido: ' + tipo.toUpperCase();
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        codigoModificadoManualmente = false;
+    }
+
+    // Botón para recalcular código correlativo
+    async function recalcularCodigo() {
+        const tipoSelected = document.querySelector('input[name="tipo"]:checked')?.value || 'tienda';
+        const input = document.getElementById('codigoInput');
+        const badge = document.getElementById('badgeCodigoStatus');
+        try {
+            const res = await fetch(`/admin/api/siguiente-codigo-sede?tipo=${tipoSelected}`);
+            const data = await res.json();
+            if (data.success && data.codigo) {
+                nextCodesCache[tipoSelected] = data.codigo;
+                if (input) input.value = data.codigo;
+                if (badge) badge.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles me-1"></i>Recalculado';
+                codigoModificadoManualmente = false;
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // Previsualización interactiva de archivo de imagen subido
+    function previewLogoFile(input, boxId, imgId) {
+        const box = document.getElementById(boxId);
+        const img = document.getElementById(imgId);
+        if (!input || !box || !img) return;
+
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                img.src = e.target.result;
+                box.classList.remove('d-none');
+            };
+            reader.readAsDataURL(input.files[0]);
+        } else {
+            box.classList.add('d-none');
+        }
+    }
+
+    function limpiarLogoFileInput(inputId, boxId, imgId) {
+        const input = document.getElementById(inputId);
+        const box = document.getElementById(boxId);
+        const img = document.getElementById(imgId);
+        if (input) input.value = '';
+        if (img) img.src = '';
+        if (box) box.classList.add('d-none');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const codigoInput = document.getElementById('codigoInput');
+        if (codigoInput) {
+            codigoInput.addEventListener('input', function() {
+                codigoModificadoManualmente = true;
+                const badge = document.getElementById('badgeCodigoStatus');
+                if (badge) badge.innerHTML = '<i class="fa-solid fa-pen me-1"></i>Manual';
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -27,7 +27,95 @@ def dashboard():
         facturas_recientes = FacturaBodega.query.order_by(FacturaBodega.fecha_subida.desc()).limit(10).all()
         abonos_recientes = AbonoBodega.query.order_by(AbonoBodega.fecha_abono.desc()).limit(10).all()
     
-    return render_template('bodega/dashboard.html', clientes_count=total_clientes, facturas=facturas_recientes, abonos=abonos_recientes)
+    from datetime import timedelta
+    from models import StockTransfer, Branch
+    hoy = obtener_hora_bogota()
+    inicio_hoy = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+    fin_hoy = inicio_hoy + timedelta(days=1)
+
+    bodega_branch_id = current_user.branch_id
+
+    # 1. En Tránsito (Pendientes)
+    q_traslados_pend = StockTransfer.query.filter_by(status='PENDIENTE')
+    if bodega_branch_id:
+        q_traslados_pend = q_traslados_pend.filter(
+            (StockTransfer.origin_branch_id == bodega_branch_id) | (StockTransfer.destination_branch_id == bodega_branch_id)
+        )
+    traslados_pendientes_count = q_traslados_pend.count()
+
+    # 2. Enviados Hoy hacia Tiendas (origen bodega -> destino tienda)
+    q_env_hoy = db.session.query(StockTransfer).join(
+        Branch, StockTransfer.destination_branch_id == Branch.id
+    ).filter(
+        StockTransfer.created_at >= inicio_hoy,
+        StockTransfer.created_at < fin_hoy,
+        Branch.tipo == 'tienda'
+    )
+    if bodega_branch_id:
+        q_env_hoy = q_env_hoy.filter(StockTransfer.origin_branch_id == bodega_branch_id)
+    enviados_hoy_tiendas = q_env_hoy.count()
+
+    # 3. Devoluciones / Retornos a Bodega Hoy
+    q_ret_hoy = db.session.query(StockTransfer).join(
+        Branch, StockTransfer.destination_branch_id == Branch.id
+    ).filter(
+        StockTransfer.created_at >= inicio_hoy,
+        StockTransfer.created_at < fin_hoy,
+        Branch.tipo == 'bodega'
+    )
+    if bodega_branch_id:
+        q_ret_hoy = q_ret_hoy.filter(StockTransfer.destination_branch_id == bodega_branch_id)
+    retornos_hoy_bodega = q_ret_hoy.count()
+
+    # 4. Completados y Rechazados Hoy
+    q_comp_hoy = StockTransfer.query.filter(
+        StockTransfer.resolved_at >= inicio_hoy,
+        StockTransfer.resolved_at < fin_hoy,
+        StockTransfer.status == 'ACEPTADO'
+    )
+    q_rech_hoy = StockTransfer.query.filter(
+        StockTransfer.resolved_at >= inicio_hoy,
+        StockTransfer.resolved_at < fin_hoy,
+        StockTransfer.status == 'RECHAZADO'
+    )
+    if bodega_branch_id:
+        q_comp_hoy = q_comp_hoy.filter(
+            (StockTransfer.origin_branch_id == bodega_branch_id) | (StockTransfer.destination_branch_id == bodega_branch_id)
+        )
+        q_rech_hoy = q_rech_hoy.filter(
+            (StockTransfer.origin_branch_id == bodega_branch_id) | (StockTransfer.destination_branch_id == bodega_branch_id)
+        )
+    completados_hoy = q_comp_hoy.count()
+    rechazados_hoy = q_rech_hoy.count()
+    total_resueltos_hoy = completados_hoy + rechazados_hoy
+    tasa_exito_recepcion = round((completados_hoy / total_resueltos_hoy * 100), 1) if total_resueltos_hoy > 0 else 100.0
+
+    # 5. Lista rápida de Traslados Activos y de la Jornada
+    q_jornada = StockTransfer.query.filter(
+        (StockTransfer.status == 'PENDIENTE') | (StockTransfer.created_at >= inicio_hoy)
+    )
+    if bodega_branch_id:
+        q_jornada = q_jornada.filter(
+            (StockTransfer.origin_branch_id == bodega_branch_id) | (StockTransfer.destination_branch_id == bodega_branch_id)
+        )
+    traslados_jornada = q_jornada.order_by(
+        StockTransfer.status.asc(),
+        StockTransfer.created_at.desc()
+    ).limit(15).all()
+
+    return render_template(
+        'bodega/dashboard.html',
+        clientes_count=total_clientes,
+        facturas=facturas_recientes,
+        abonos=abonos_recientes,
+        traslados_pendientes_count=traslados_pendientes_count,
+        enviados_hoy_tiendas=enviados_hoy_tiendas,
+        retornos_hoy_bodega=retornos_hoy_bodega,
+        completados_hoy=completados_hoy,
+        rechazados_hoy=rechazados_hoy,
+        tasa_exito_recepcion=tasa_exito_recepcion,
+        traslados_jornada=traslados_jornada
+    )
 
 @bodega_bp.route('/clientes/nuevo', methods=['GET', 'POST'])
 @login_required

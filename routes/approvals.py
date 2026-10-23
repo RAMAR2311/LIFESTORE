@@ -107,6 +107,15 @@ def aprobar_solicitud(id):
     solicitud.estado = 'aprobado'
     solicitud.admin_id = current_user.id
     solicitud.fecha_resolucion = obtener_hora_bogota()
+
+    from models import AuditLog
+    AuditLog.registrar(
+        action='APROBACION_PRECIO_MINIMO',
+        user_id=current_user.id,
+        motivo=f'Aprobación de precio especial ${float(precio_aprobado):,.2f} (Precio Mínimo: ${float(solicitud.precio_minimo):,.2f}) para "{solicitud.producto.nombre if solicitud.producto else "Producto"}". Solicitado por: {solicitud.vendedor.nombre if solicitud.vendedor else "Asesor"}',
+        target_id=solicitud.id,
+        target_type='DISCOUNT_APPROVAL'
+    )
     db.session.commit()
 
     return jsonify({'success': True, 'mensaje': 'Aprobada'})
@@ -128,6 +137,15 @@ def rechazar_solicitud(id):
     solicitud.motivo_rechazo = motivo
     solicitud.admin_id = current_user.id
     solicitud.fecha_resolucion = obtener_hora_bogota()
+
+    from models import AuditLog
+    AuditLog.registrar(
+        action='RECHAZO_PRECIO_MINIMO',
+        user_id=current_user.id,
+        motivo=f'Rechazo de descuento para "{solicitud.producto.nombre if solicitud.producto else "Producto"}". Motivo: {motivo}',
+        target_id=solicitud.id,
+        target_type='DISCOUNT_APPROVAL'
+    )
     db.session.commit()
 
     return jsonify({'success': True, 'mensaje': 'Rechazada'})

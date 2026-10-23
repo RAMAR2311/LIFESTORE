@@ -1,9 +1,15 @@
-const CACHE_NAME = 'tutienda-app-v3';
+const CACHE_NAME = 'lifestore-app-v4';
 const ASSETS_TO_CACHE = [
     '/manifest.json',
     '/static/manifest.json',
-    '/static/img/tutienda.png',
     '/static/favicon.ico',
+    '/static/favicon-32x32.png',
+    '/static/favicon-16x16.png',
+    '/static/img/icons/icon-192x192.png',
+    '/static/img/icons/icon-512x512.png',
+    '/static/img/icons/apple-touch-icon.png',
+    '/static/img/lifestore_branding_dark.png',
+    '/static/img/lifestore_branding_light.png',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css',
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js'

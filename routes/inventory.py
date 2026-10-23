@@ -2,51 +2,129 @@ import os
 from werkzeug.utils import secure_filename
 from flask import current_app, Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, jsonify
 from flask_login import login_required, current_user
-from models import db, Product, StockAdjustment, ProductVariant
+from models import db, Product, StockAdjustment, ProductVariant, Branch, BranchStock
+from services.stock_service import get_or_create_branch_stock, sync_global_product_stock, get_product_stock_distribution
 from decorators import admin_required, admin_or_bodega_required
+from flask import session
 import pandas as pd
 from io import BytesIO
 
 inventory_bp = Blueprint('inventory_bp', __name__)
 
+def _resolve_target_branch_id(form_branch_id=None):
+    """Helper para determinar la sucursal de destino en creación o ingreso de mercancía."""
+    if current_user.rol == 'bodega':
+        if current_user.branch_id:
+            return current_user.branch_id
+        bodega_b = Branch.query.filter_by(tipo='bodega', activa=True).first()
+        if bodega_b:
+            return bodega_b.id
+    elif current_user.rol == 'vendedor':
+        if current_user.branch_id:
+            return current_user.branch_id
+
+    # Rol admin o fallback
+    if form_branch_id:
+        return int(form_branch_id)
+    if session.get('active_branch_id'):
+        return int(session['active_branch_id'])
+    
+    # Sucursal por defecto
+    default_b = Branch.query.filter_by(activa=True).first()
+    return default_b.id if default_b else 1
+
 @inventory_bp.route('/', methods=['GET'])
 @login_required
-@admin_or_bodega_required
 def index():
-    tipo = 'bodega' if current_user.rol == 'bodega' else 'tienda'
+    tipo = 'bodega' if current_user.rol in ['bodega', 'vendedor_bodega'] else 'tienda'
     page = request.args.get('page', 1, type=int)
     per_page = 20
 
+    active_b_id = None
+    if current_user.rol == 'admin':
+        active_b_id = session.get('active_branch_id')
+    elif current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
+        active_b_id = current_user.branch_id
+
+    base_query = Product.query.filter_by(tipo_inventario=tipo)
+
+    # Si es vendedor, solo puede ver productos con stock > 0 en su sucursal asignada
+    if current_user.rol == 'vendedor':
+        if not active_b_id:
+            # Si el vendedor no tiene sucursal asignada, se le asigna la principal o no ve nada
+            default_b = Branch.query.filter_by(tipo='tienda', activa=True).first()
+            active_b_id = default_b.id if default_b else 1
+
+        # Filtrar productos que tengan BranchStock en su sucursal con cantidad > 0
+        base_query = base_query.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
+        ).filter(BranchStock.cantidad > 0)
+    elif current_user.rol == 'admin' and active_b_id is not None:
+        # Admin con sucursal seleccionada: muestra todos los productos de tienda,
+        # pero resalta el stock de esa sucursal
+        pass
+
     # Paginación del listado principal
-    paginacion = Product.query.filter_by(tipo_inventario=tipo).order_by(Product.nombre).paginate(
+    paginacion = base_query.order_by(Product.nombre).paginate(
         page=page, per_page=per_page, error_out=False
     )
     productos = paginacion.items
 
+    # Obtener desglose de stock por sucursal para cada producto en la página
+    # Para vendedor: solo su propia sucursal. Para admin/bodega: todas las sucursales
+    stock_por_producto = {}
+    todas_sucursales = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+
+    for p in productos:
+        if current_user.rol == 'vendedor':
+            # Solo stock local
+            bs = BranchStock.query.filter_by(branch_id=active_b_id, product_id=p.id, variant_id=None).first()
+            cant_local = bs.cantidad if bs else 0
+            # Si tiene variantes, sumamos las variantes de su sucursal
+            if p.variantes:
+                sum_var = db.session.query(db.func.coalesce(db.func.sum(BranchStock.cantidad), 0)).filter(
+                    BranchStock.branch_id == active_b_id,
+                    BranchStock.product_id == p.id,
+                    BranchStock.variant_id.isnot(None)
+                ).scalar() or 0
+                cant_local = int(sum_var)
+            stock_por_producto[p.id] = {
+                'local_stock': cant_local,
+                'distribucion': [{'branch_id': active_b_id, 'branch_name': current_user.branch.nombre if current_user.branch else 'Local', 'cantidad': cant_local}]
+            }
+        else:
+            # Admin o Bodega: Desglose completo
+            distribucion = get_product_stock_distribution(p.id)
+            stock_local = 0
+            if active_b_id:
+                for d in distribucion:
+                    if d['branch_id'] == active_b_id:
+                        stock_local = d['cantidad']
+                        break
+            else:
+                stock_local = p.total_stock
+
+            stock_por_producto[p.id] = {
+                'local_stock': stock_local,
+                'distribucion': distribucion
+            }
+
     # --- KPIs de Inventario ---
-    # Se calcula sobre TODO el inventario (no solo la página actual)
-    todos = Product.query.filter_by(tipo_inventario=tipo).all()
+    # Se calcula sobre los productos visibles según el rol
+    todos = base_query.all()
     total_productos = len(todos)
 
     valor_costo = 0.0
     valor_sugerido = 0.0
     total_unidades_fisicas = 0
     for p in todos:
-        if p.variantes:
-            for v in p.variantes:
-                costo = float(v.precio_costo or p.precio_costo or 0)
-                sugerido = float(v.precio_sugerido or p.precio_sugerido or 0)
-                stock = v.cantidad_stock or 0
-                valor_costo += costo * stock
-                valor_sugerido += sugerido * stock
-                total_unidades_fisicas += stock
-        else:
-            costo = float(p.precio_costo or 0)
-            sugerido = float(p.precio_sugerido or 0)
-            stock = p.cantidad_stock or 0
-            valor_costo += costo * stock
-            valor_sugerido += sugerido * stock
-            total_unidades_fisicas += stock
+        cant_p = stock_por_producto.get(p.id, {}).get('local_stock', p.total_stock) if current_user.rol == 'vendedor' else p.total_stock
+        costo = float(p.precio_costo or 0)
+        sugerido = float(p.precio_sugerido or 0)
+        valor_costo += costo * cant_p
+        valor_sugerido += sugerido * cant_p
+        total_unidades_fisicas += cant_p
 
     return render_template(
         'inventory/index.html',
@@ -55,7 +133,10 @@ def index():
         total_productos=total_productos,
         valor_costo=valor_costo,
         valor_sugerido=valor_sugerido,
-        total_unidades_fisicas=total_unidades_fisicas
+        total_unidades_fisicas=total_unidades_fisicas,
+        stock_por_producto=stock_por_producto,
+        active_b_id=active_b_id,
+        todas_sucursales=todas_sucursales
     )
 
 @inventory_bp.route('/nuevo', methods=['GET', 'POST'])
@@ -101,29 +182,43 @@ def nuevo():
             observacion=request.form.get('observacion')
         )
         
+        target_branch_id = _resolve_target_branch_id(request.form.get('branch_id'))
+
         try:
             db.session.add(nuevo_prod)
             db.session.flush() # Para obtener el ID del producto
             
             # Crear variantes si existen
-            for i in range(len(v_nombres)):
-                if not v_nombres[i]: continue
-                nueva_v = ProductVariant(
-                    product_id=nuevo_prod.id,
-                    nombre_variante=v_nombres[i],
-                    cantidad_stock=int(v_stocks[i] or 0),
-                    precio_costo=float(v_costos[i]) if v_costos[i] else nuevo_prod.precio_costo,
-                    precio_minimo=float(v_mins[i]) if v_mins[i] else nuevo_prod.precio_minimo,
-                    precio_sugerido=float(v_sugs[i]) if v_sugs[i] else nuevo_prod.precio_sugerido
-                )
-                db.session.add(nueva_v)
+            if v_nombres:
+                for i in range(len(v_nombres)):
+                    if not v_nombres[i]: continue
+                    cant_var = int(v_stocks[i] or 0)
+                    nueva_v = ProductVariant(
+                        product_id=nuevo_prod.id,
+                        nombre_variante=v_nombres[i],
+                        cantidad_stock=cant_var,
+                        precio_costo=float(v_costos[i]) if v_costos[i] else nuevo_prod.precio_costo,
+                        precio_minimo=float(v_mins[i]) if v_mins[i] else nuevo_prod.precio_minimo,
+                        precio_sugerido=float(v_sugs[i]) if v_sugs[i] else nuevo_prod.precio_sugerido
+                    )
+                    db.session.add(nueva_v)
+                    db.session.flush()
 
-            db.session.commit()
-            
+                    # Asignar stock a la sucursal de destino
+                    b_stock = get_or_create_branch_stock(target_branch_id, nuevo_prod.id, nueva_v.id)
+                    b_stock.cantidad = cant_var
+                    sync_global_product_stock(nuevo_prod.id, nueva_v.id)
+            else:
+                # Producto simple sin variantes
+                b_stock = get_or_create_branch_stock(target_branch_id, nuevo_prod.id, None)
+                b_stock.cantidad = stock_base
+                sync_global_product_stock(nuevo_prod.id, None)
+
             # Crear ajuste inicial automáticamente en el Kardex
             ajuste_inicial = StockAdjustment(
                 product_id=nuevo_prod.id,
                 admin_id=current_user.id,
+                branch_id=target_branch_id,
                 tipo_movimiento='Creación Inicial' + (' (con Variantes)' if v_nombres else ''),
                 stock_anterior=0,
                 stock_nuevo=nuevo_prod.total_stock
@@ -137,7 +232,9 @@ def nuevo():
             db.session.rollback()
             flash(f'Error al intentar guardar el producto: {str(e)}', 'danger')
             
-    return render_template('inventory/form.html')
+    sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    default_branch_id = _resolve_target_branch_id()
+    return render_template('inventory/form.html', sucursales=sucursales_activas, default_branch_id=default_branch_id)
 
 @inventory_bp.route('/editar/<int:id>', methods=['GET', 'POST'])
 @login_required
@@ -328,6 +425,7 @@ def agregar_variante(id):
     producto = Product.query.get_or_404(id)
     nombre_variante = request.form.get('nombre_variante')
     cantidad_stock = int(request.form.get('cantidad_stock', 0))
+    target_branch_id = _resolve_target_branch_id()
     
     precio_costo_req = request.form.get('precio_costo')
     precio_minimo_req = request.form.get('precio_minimo')
@@ -347,14 +445,18 @@ def agregar_variante(id):
     )
     try:
         db.session.add(nueva_variante)
-        
-        # Forzar el stock base a 0 para que el sistema calcule el valor usando solo las variantes
-        producto.cantidad_stock = 0
+        db.session.flush()
+
+        # Asignar a BranchStock
+        b_stock = get_or_create_branch_stock(target_branch_id, producto.id, nueva_variante.id)
+        b_stock.cantidad += cantidad_stock
+        sync_global_product_stock(producto.id, nueva_variante.id)
         
         if cantidad_stock > 0:
             ajuste = StockAdjustment(
                 product_id=producto.id,
                 admin_id=current_user.id,
+                branch_id=target_branch_id,
                 tipo_movimiento=f'Creación de Subcategoría: {nombre_variante}',
                 stock_anterior=0,
                 stock_nuevo=cantidad_stock
@@ -374,6 +476,7 @@ def agregar_variante(id):
 @admin_or_bodega_required
 def editar_variante(id):
     variante = ProductVariant.query.get_or_404(id)
+    target_branch_id = _resolve_target_branch_id()
     
     variante.nombre_variante = request.form.get('nombre_variante')
     stock_anterior = variante.cantidad_stock
@@ -381,10 +484,11 @@ def editar_variante(id):
     cantidad_stock_req = request.form.get('cantidad_stock')
     cantidad_sumar = request.form.get('cantidad_sumar')
     
+    delta = 0
     if cantidad_sumar and int(cantidad_sumar) != 0:
-        variante.cantidad_stock += int(cantidad_sumar)
+        delta = int(cantidad_sumar)
     elif cantidad_stock_req is not None:
-        variante.cantidad_stock = int(cantidad_stock_req)
+        delta = int(cantidad_stock_req) - variante.cantidad_stock
     
     precio_costo_req = request.form.get('precio_costo')
     precio_minimo_req = request.form.get('precio_minimo')
@@ -395,10 +499,15 @@ def editar_variante(id):
     if precio_sugerido_req: variante.precio_sugerido = float(precio_sugerido_req)
     
     try:
-        if stock_anterior != variante.cantidad_stock:
+        if delta != 0:
+            b_stock = get_or_create_branch_stock(target_branch_id, variante.product_id, variante.id)
+            b_stock.cantidad = max(0, b_stock.cantidad + delta)
+            sync_global_product_stock(variante.product_id, variante.id)
+
             ajuste = StockAdjustment(
                 product_id=variante.product_id,
                 admin_id=current_user.id,
+                branch_id=target_branch_id,
                 tipo_movimiento=f'Edición de stock Subcategoría: {variante.nombre_variante}',
                 stock_anterior=stock_anterior,
                 stock_nuevo=variante.cantidad_stock
@@ -423,6 +532,7 @@ def editar_variantes_masivo(producto_id):
     costos = request.form.getlist('precio_costo[]')
     minimos = request.form.getlist('precio_minimo[]')
     sugs = request.form.getlist('precio_sugerido[]')
+    target_branch_id = _resolve_target_branch_id()
     
     cambios_realizados = 0
 
@@ -441,10 +551,15 @@ def editar_variantes_masivo(producto_id):
             # Sumar stock
             stock_anterior = variante.cantidad_stock
             if sumas[i] and int(sumas[i]) != 0:
-                variante.cantidad_stock += int(sumas[i])
+                delta_sum = int(sumas[i])
+                b_stock = get_or_create_branch_stock(target_branch_id, producto_id, variante.id)
+                b_stock.cantidad = max(0, b_stock.cantidad + delta_sum)
+                sync_global_product_stock(producto_id, variante.id)
+
                 ajuste = StockAdjustment(
                     product_id=variante.product_id,
                     admin_id=current_user.id,
+                    branch_id=target_branch_id,
                     tipo_movimiento=f'Edición masiva de stock Subcategoría: {variante.nombre_variante}',
                     stock_anterior=stock_anterior,
                     stock_nuevo=variante.cantidad_stock

@@ -43,6 +43,177 @@
     </div>
 </div>
 
+<!-- ─── SECCIÓN: TRASLADOS DEL DÍA & FLUJO EN TIEMPO REAL (BODEGA) ─── -->
+<div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+    <div>
+        <h4 class="fw-bold mb-1" style="color: var(--text-primary); letter-spacing: -0.02em;">
+            <i class="fa-solid fa-truck-ramp-box text-primary me-2"></i>Traslados del Día & Logística
+        </h4>
+        <p class="text-muted small mb-0">Control diario en tiempo real de despachos, retornos a bodega y recepciones.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('transfers_bp.trazabilidad') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
+            <i class="fa-solid fa-timeline me-1"></i> Bitácora Trazabilidad
+        </a>
+        <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">
+            <i class="fa-solid fa-plus me-1"></i> Nuevo Traslado
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- KPI 1: En Tránsito (Pendientes) -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #F59E0B !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">En Tránsito (Pendientes)</span>
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill">PENDIENTE</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 {% if traslados_pendientes_count > 0 %}text-warning{% endif %}">
+                {{ traslados_pendientes_count }} <span class="fs-6 text-muted fw-normal">guías</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index', tab='pendientes') }}" class="text-decoration-none small fw-bold text-warning">
+                    Ver por recibir <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 2: Enviados Hoy hacia Tiendas -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #3B82F6 !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">Despachos a Tiendas Hoy</span>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill">SALIDAS</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 text-primary">
+                {{ enviados_hoy_tiendas }} <span class="fs-6 text-muted fw-normal">envíos</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index', tab='enviados') }}" class="text-decoration-none small fw-bold text-primary">
+                    Ver enviados <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 3: Devoluciones / Retornos a Bodega Hoy -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #8B5CF6 !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">Retornos a Bodega Hoy</span>
+                <span class="badge bg-purple bg-opacity-10 text-purple border rounded-pill">DEVOLUCIONES</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 text-purple">
+                {{ retornos_hoy_bodega }} <span class="fs-6 text-muted fw-normal">retornos</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index') }}" class="text-decoration-none small fw-bold text-purple">
+                    Supervisar recepciones <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 4: Completados y Tasa de Éxito Hoy -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #10B981 !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">Tasa de Aceptación Hoy</span>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill">EFECTIVIDAD</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 text-success">
+                {{ tasa_exito_recepcion }}% <span class="fs-6 text-muted fw-normal">({{ completados_hoy }} ok / {{ rechazados_hoy }} rech)</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index', tab='historial') }}" class="text-decoration-none small fw-bold text-success">
+                    Historial del día <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABLA RÁPIDA DE TRASLADOS DE LA JORNADA -->
+<div class="card card-custom border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+    <div class="p-3 px-4 d-flex justify-content-between align-items-center border-bottom bg-light">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-dark rounded-pill px-3 py-1 font-mono">HOY</span>
+            <h6 class="fw-bold m-0 text-dark">Traslados Activos y de la Jornada</h6>
+        </div>
+        <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+            Ver Todos <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="table-responsive p-0">
+        <table class="table table-hover align-middle m-0" style="font-size: 0.88rem;">
+            <thead class="bg-light text-muted" style="font-size: 0.75rem; text-transform: uppercase;">
+                <tr>
+                    <th class="ps-4">ID</th>
+                    <th>RUTA</th>
+                    <th>SOLICITANTE</th>
+                    <th class="text-center">ÍTEMS</th>
+                    <th class="text-center">ESTADO</th>
+                    <th>HORA</th>
+                    <th class="text-end pe-4">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in traslados_jornada %}
+                <tr>
+                    <td class="ps-4 fw-bold font-mono">#{{ t.id }}</td>
+                    <td>
+                        <span class="badge bg-light text-dark border px-2 py-1">{{ t.origin_branch.nombre }}</span>
+                        <i class="fa-solid fa-arrow-right text-muted small mx-1"></i>
+                        <span class="badge bg-light text-dark border px-2 py-1">{{ t.destination_branch.nombre }}</span>
+                    </td>
+                    <td><small class="fw-semibold text-muted">{{ t.created_by.nombre if t.created_by else 'Sistema' }}</small></td>
+                    <td class="text-center">
+                        <span class="badge bg-light text-dark border">{{ t.items|length }} prod.</span>
+                    </td>
+                    <td class="text-center">
+                        {% if t.status == 'PENDIENTE' %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2.5 py-1">
+                                <i class="fa-solid fa-clock me-1"></i> Pendiente
+                            </span>
+                        {% elif t.status == 'ACEPTADO' %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2.5 py-1">
+                                <i class="fa-solid fa-check me-1"></i> Aceptado
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2.5 py-1">
+                                <i class="fa-solid fa-xmark me-1"></i> Rechazado
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td><small class="text-muted font-mono">{{ t.created_at.strftime('%H:%M') }}</small></td>
+                    <td class="text-end pe-4">
+                        {% if t.status == 'PENDIENTE' and (current_user.rol == 'admin' or current_user.branch_id == t.destination_branch_id) %}
+                            <form method="POST" action="{{ url_for('transfers_bp.accept', id=t.id) }}" class="d-inline" onsubmit="return confirm('¿Aceptar traslado #{{ t.id }} e ingresar stock a bodega?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-2.5 py-0.5 fw-bold" title="Aceptar">
+                                    <i class="fa-solid fa-check"></i>
+                                </button>
+                            </form>
+                        {% endif %}
+                        <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-0.5" title="Ver Detalle">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        No hay traslados registrados hoy.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <div class="row g-4 mb-4">
     <div class="col-lg-6">
         <div class="card card-custom border-0 p-0 overflow-hidden h-100 shadow-sm">

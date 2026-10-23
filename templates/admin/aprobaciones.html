@@ -23,6 +23,7 @@
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-4">FECHA Y HORA</th>
+                            <th>SUCURSAL</th>
                             <th>VENDEDOR</th>
                             <th>PRODUCTO</th>
                             <th class="text-end">PRECIO MÍNIMO</th>
@@ -35,6 +36,11 @@
                         {% for a in aprobaciones.items %}
                         <tr>
                             <td class="text-muted ps-4">{{ a.fecha_solicitud.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td>
+                                <span class="badge bg-light text-dark border rounded-pill px-2 py-1">
+                                    <i class="fa-solid fa-shop me-1 text-primary"></i>{{ a.vendedor.branch.nombre if a.vendedor and a.vendedor.branch else (a.vendedor.sucursal if a.vendedor else 'Sede Central') }}
+                                </span>
+                            </td>
                             <td class="fw-bold text-brand-black">{{ a.vendedor.nombre if a.vendedor else 'Desconocido' }}</td>
                             <td>{{ a.product.nombre if a.product else 'N/A' }}</td>
                             <td class="text-end text-muted">${{ a.precio_original | cop }}</td>

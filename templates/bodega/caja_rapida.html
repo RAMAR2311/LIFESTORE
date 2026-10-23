@@ -10,9 +10,9 @@
 
         <!-- Buscador de productos -->
         <div class="mb-4">
-            <div class="input-group input-group-lg shadow-sm rounded-pill border">
-                <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                <input type="text" id="productSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Buscar producto por nombre o SKU..." style="border-radius: 0 50px 50px 0;">
+            <div class="search-bar-silver">
+                <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="productSearch" placeholder="Buscar producto por nombre o SKU..." autocomplete="off">
             </div>
         </div>
 
@@ -32,21 +32,21 @@
                      data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "precio_minimo": p.precio_minimo or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario}|tojson|safe }}'
                      data-variants='{{ vars_data|tojson|safe }}'
                      onclick="handleProductClick(this)">
-                    <div class="ratio ratio-1x1 bg-light rounded-top d-flex align-items-center justify-content-center overflow-hidden">
+                    <div class="ratio ratio-1x1 product-img-box rounded-top">
                         {% if p.imagen %}
                             <img src="{{ url_for('static', filename='uploads/' + p.imagen) }}" alt="{{ p.nombre }}" style="object-fit: cover; width: 100%; height: 100%;">
                         {% else %}
-                            <span class="text-muted small text-center pt-4"><i class="fa-solid fa-image fa-2x mb-2 text-black-50"></i><br>Sin Imagen</span>
+                            <span class="small text-center pt-2 placeholder-icon"><i class="fa-solid fa-image fa-2x mb-1 d-block opacity-50"></i>Sin Imagen</span>
                         {% endif %}
                     </div>
                     <div class="card-body p-3 text-center d-flex flex-column justify-content-between">
                         <div>
-                            <h6 class="card-title fw-bold text-dark text-truncate mb-1" title="{{ p.nombre }}">{{ p.nombre }}</h6>
-                            <small class="text-muted d-block mb-2">{{ p.sku }}</small>
+                            <h6 class="card-title text-truncate mb-1" title="{{ p.nombre }}">{{ p.nombre }}</h6>
+                            <small class="product-sku d-block mb-2">{{ p.sku }}</small>
                         </div>
                         <div>
-                            <h5 class="fw-bolder mb-1" style="color: var(--brand-pink);">${{ p.precio_sugerido|cop }}</h5>
-                            <small class="text-muted"><i class="fa-solid fa-box text-secondary"></i> {{ total_stock }} en stock</small>
+                            <h5 class="product-price mb-1">${{ p.precio_sugerido|cop }}</h5>
+                            <small class="product-stock"><i class="fa-solid fa-box me-1"></i> {{ total_stock }} en stock</small>
                         </div>
                     </div>
                 </div>

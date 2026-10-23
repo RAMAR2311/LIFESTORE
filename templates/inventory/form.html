@@ -13,6 +13,20 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 
                 <div class="row g-4">
+                    {% if not producto %}
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-brand-black"><i class="fa-solid fa-location-dot text-primary me-1"></i> Sucursal Destino de Ingreso</label>
+                        <select name="branch_id" class="form-select bg-light border-0 fw-semibold">
+                            {% for b in sucursales %}
+                                <option value="{{ b.id }}" {% if default_branch_id and default_branch_id == b.id %}selected{% endif %}>
+                                    {{ b.nombre }} ({{ b.codigo }}) - Tipo: {{ b.tipo|capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">El stock ingresado se asignará a esta sucursal o bodega.</small>
+                    </div>
+                    {% endif %}
+
                     <div class="col-md-4">
                         <label class="form-label fw-bold text-brand-black">SKU / Código Maestro</label>
                         <input type="text" class="form-control bg-light border-0" name="sku" required placeholder="Ej: FUNDA-XXX" value="{{ producto.sku if producto else '' }}">

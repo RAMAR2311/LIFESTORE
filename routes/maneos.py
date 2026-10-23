@@ -1,23 +1,42 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_required, current_user
-from models import db, Product, ProductVariant, Maneo, StockAdjustment, Sale, SaleDetail, SalePayment, SaleClient, obtener_hora_bogota
-from decorators import admin_required
+from models import db, Product, ProductVariant, Maneo, StockAdjustment, Sale, SaleDetail, SalePayment, SaleClient, Branch, obtener_hora_bogota
+from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 
 maneos_bp = Blueprint('maneos_bp', __name__)
 
 @maneos_bp.route('/')
 @login_required
-@admin_required
 def index():
-    # Listar todos los maneos activos (PENDIENTES) y un historial reciente de cerrados
-    activos = Maneo.query.filter_by(estado='PENDIENTE').order_by(Maneo.fecha_prestamo.desc()).all()
-    historial = Maneo.query.filter(Maneo.estado != 'PENDIENTE').order_by(Maneo.fecha_resolucion.desc()).limit(50).all()
+    if current_user.rol not in ['admin', 'vendedor', 'bodega']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('index'))
+
+    query_activos = Maneo.query.filter_by(estado='PENDIENTE')
+    query_historial = Maneo.query.filter(Maneo.estado != 'PENDIENTE')
+
+    # Filtrado por sucursal
+    if current_user.rol == 'vendedor':
+        if current_user.branch_id:
+            query_activos = query_activos.filter(Maneo.branch_id == current_user.branch_id)
+            query_historial = query_historial.filter(Maneo.branch_id == current_user.branch_id)
+    else:
+        active_b_id = session.get('active_branch_id')
+        if active_b_id:
+            query_activos = query_activos.filter(Maneo.branch_id == int(active_b_id))
+            query_historial = query_historial.filter(Maneo.branch_id == int(active_b_id))
+
+    activos = query_activos.order_by(Maneo.fecha_prestamo.desc()).all()
+    historial = query_historial.order_by(Maneo.fecha_resolucion.desc()).limit(50).all()
     return render_template('maneos/index.html', activos=activos, historial=historial)
 
 @maneos_bp.route('/prestar', methods=['POST'])
 @login_required
-@admin_required
 def prestar():
+    if current_user.rol not in ['admin', 'vendedor', 'bodega']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('maneos_bp.index'))
+
     sku_busqueda = request.form.get('sku_busqueda', '').strip()
     local_vecino = request.form.get('local_vecino', '').strip()
     cantidad = int(request.form.get('cantidad', 1))
@@ -25,6 +44,23 @@ def prestar():
     if not sku_busqueda or not local_vecino or cantidad < 1:
         flash("Todos los campos son obligatorios y la cantidad debe ser mayor a 0.", "danger")
         return redirect(url_for('maneos_bp.index'))
+
+    # Determinar la sucursal de donde sale el maneo
+    if current_user.rol in ['vendedor', 'bodega']:
+        maneo_branch_id = current_user.branch_id
+        if not maneo_branch_id:
+            b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            maneo_branch_id = b_def.id if b_def else 1
+    else:
+        active_b = session.get('active_branch_id')
+        if active_b:
+            maneo_branch_id = int(active_b)
+        else:
+            b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            maneo_branch_id = b_def.id if b_def else 1
+
+    branch_obj = Branch.query.get(maneo_branch_id)
+    branch_nom = branch_obj.nombre if branch_obj else 'Principal'
 
     # Buscar el producto o variante por SKU
     producto = Product.query.filter_by(sku=sku_busqueda).first()
@@ -44,43 +80,44 @@ def prestar():
         if not variante or variante.product_id != producto.id:
             flash("Variante inválida.", "danger")
             return redirect(url_for('maneos_bp.index'))
-            
-        if variante.cantidad_stock < cantidad:
-            flash(f"Stock insuficiente. Solo hay {variante.cantidad_stock} unidades disponibles de esta subcategoría.", "danger")
+
+        b_stock = get_or_create_branch_stock(maneo_branch_id, producto.id, variante.id, for_update=True)
+        if b_stock.cantidad < cantidad:
+            flash(f"Stock insuficiente en '{branch_nom}'. Solo hay {b_stock.cantidad} unidades disponibles de esta subcategoría.", "danger")
             return redirect(url_for('maneos_bp.index'))
             
-        # Descontar Inventario Variante
-        stock_anterior = variante.cantidad_stock
-        variante.cantidad_stock -= cantidad
-        producto.cantidad_stock -= cantidad # Reflejar en base
+        # Descontar Inventario Local y sincronizar
+        stock_anterior = b_stock.cantidad
+        b_stock.cantidad -= cantidad
+        sync_global_product_stock(producto.id, variante.id)
         
-        # Registrar Ajuste
-        from models import StockAdjustment
         ajuste = StockAdjustment(
             product_id=producto.id,
             admin_id=current_user.id,
-            tipo_movimiento=f"Préstamo (Maneo) a {local_vecino} (Subcat: {variante.nombre_variante})",
+            branch_id=maneo_branch_id,
+            tipo_movimiento=f"Préstamo (Maneo) a {local_vecino} (Subcat: {variante.nombre_variante}) en {branch_nom}",
             stock_anterior=stock_anterior,
-            stock_nuevo=variante.cantidad_stock
+            stock_nuevo=b_stock.cantidad
         )
         db.session.add(ajuste)
     else:
-        if producto.cantidad_stock < cantidad:
-            flash(f"Stock insuficiente. Solo hay {producto.cantidad_stock} unidades disponibles.", "danger")
+        b_stock = get_or_create_branch_stock(maneo_branch_id, producto.id, None, for_update=True)
+        if b_stock.cantidad < cantidad:
+            flash(f"Stock insuficiente en '{branch_nom}'. Solo hay {b_stock.cantidad} unidades disponibles.", "danger")
             return redirect(url_for('maneos_bp.index'))
             
-        # Descontar Inventario Base
-        stock_anterior = producto.cantidad_stock
-        producto.cantidad_stock -= cantidad
+        # Descontar Inventario Base Local y sincronizar
+        stock_anterior = b_stock.cantidad
+        b_stock.cantidad -= cantidad
+        sync_global_product_stock(producto.id, None)
         
-        # Registrar Ajuste
-        from models import StockAdjustment
         ajuste = StockAdjustment(
             product_id=producto.id,
             admin_id=current_user.id,
-            tipo_movimiento=f"Préstamo (Maneo) a {local_vecino}",
+            branch_id=maneo_branch_id,
+            tipo_movimiento=f"Préstamo (Maneo) a {local_vecino} en {branch_nom}",
             stock_anterior=stock_anterior,
-            stock_nuevo=producto.cantidad_stock
+            stock_nuevo=b_stock.cantidad
         )
         db.session.add(ajuste)
 
@@ -88,6 +125,7 @@ def prestar():
     nuevo_maneo = Maneo(
         product_id=producto.id,
         variant_id=variante.id if variante else None,
+        branch_id=maneo_branch_id,
         local_vecino=local_vecino,
         cantidad=cantidad,
         estado='PENDIENTE'
@@ -96,7 +134,7 @@ def prestar():
 
     try:
         db.session.commit()
-        flash(f"Préstamo registrado exitosamente para {local_vecino}.", "success")
+        flash(f"Préstamo registrado exitosamente para {local_vecino} desde {branch_nom}.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Error al registrar el préstamo: {e}", "danger")
@@ -105,8 +143,11 @@ def prestar():
 
 @maneos_bp.route('/facturar/<int:id>', methods=['POST'])
 @login_required
-@admin_required
 def facturar(id):
+    if current_user.rol not in ['admin', 'vendedor', 'bodega']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('maneos_bp.index'))
+
     maneo = Maneo.query.get_or_404(id)
     if maneo.estado != 'PENDIENTE':
         flash("Este maneo ya fue resuelto.", "warning")
@@ -128,10 +169,15 @@ def facturar(id):
         return redirect(url_for('maneos_bp.index'))
 
     total_venta = precio_unidad * maneo.cantidad
+    maneo_branch = maneo.branch_id or (current_user.branch_id or 1)
+    b_obj = Branch.query.get(maneo_branch)
+    branch_nom = b_obj.nombre if b_obj else 'Principal'
 
     # Crear la Venta
     nueva_venta = Sale(
         vendedor_id=current_user.id,
+        branch_id=maneo_branch,
+        sucursal=branch_nom,
         monto_total=total_venta,
         metodo_pago=metodo_pago,
         tipo_venta='celulares' if es_celular else 'general'
@@ -173,7 +219,7 @@ def facturar(id):
 
     try:
         db.session.commit()
-        flash(f"Maneo facturado correctamente. Venta #{nueva_venta.id} registrada por ${total_venta:,.0f}.", "success")
+        flash(f"Maneo facturado correctamente en {branch_nom}. Venta #{nueva_venta.id} registrada por ${total_venta:,.0f}.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Error al facturar el maneo: {e}", "danger")
@@ -182,8 +228,11 @@ def facturar(id):
 
 @maneos_bp.route('/devolver/<int:id>', methods=['POST'])
 @login_required
-@admin_required
 def devolver(id):
+    if current_user.rol not in ['admin', 'vendedor', 'bodega']:
+        flash('Acceso denegado.', 'danger')
+        return redirect(url_for('maneos_bp.index'))
+
     maneo = Maneo.query.get_or_404(id)
     if maneo.estado != 'PENDIENTE':
         flash("Este maneo ya fue resuelto.", "warning")
@@ -193,41 +242,47 @@ def devolver(id):
     maneo.estado = 'DEVUELTO'
     maneo.fecha_resolucion = obtener_hora_bogota()
 
-    # 2. Devolver stock
+    # 2. Devolver stock a la sucursal de origen
+    maneo_branch = maneo.branch_id or (current_user.branch_id or 1)
+    b_obj = Branch.query.get(maneo_branch)
+    branch_nom = b_obj.nombre if b_obj else 'Principal'
     producto = maneo.producto
-    from models import StockAdjustment
     
     if maneo.variant_id:
-        variante = ProductVariant.query.with_for_update().get(maneo.variant_id)
-        if variante:
-            stock_anterior = variante.cantidad_stock
-            variante.cantidad_stock += maneo.cantidad
-            producto.cantidad_stock += maneo.cantidad # Reflejar en base
-            
-            ajuste = StockAdjustment(
-                product_id=producto.id,
-                admin_id=current_user.id,
-                tipo_movimiento=f"Devolución de Maneo de {maneo.local_vecino} (Subcat: {variante.nombre_variante})",
-                stock_anterior=stock_anterior,
-                stock_nuevo=variante.cantidad_stock
-            )
-            db.session.add(ajuste)
-    else:
-        stock_anterior = producto.cantidad_stock
-        producto.cantidad_stock += maneo.cantidad
-    
+        b_stock = get_or_create_branch_stock(maneo_branch, producto.id, maneo.variant_id, for_update=True)
+        stock_anterior = b_stock.cantidad
+        b_stock.cantidad += maneo.cantidad
+        sync_global_product_stock(producto.id, maneo.variant_id)
+
+        var_nom = maneo.variante.nombre_variante if maneo.variante else ''
         ajuste = StockAdjustment(
             product_id=producto.id,
             admin_id=current_user.id,
-            tipo_movimiento=f"Devolución de Maneo de {maneo.local_vecino}",
+            branch_id=maneo_branch,
+            tipo_movimiento=f"Devolución de Maneo de {maneo.local_vecino} (Subcat: {var_nom}) en {branch_nom}",
             stock_anterior=stock_anterior,
-            stock_nuevo=producto.cantidad_stock
+            stock_nuevo=b_stock.cantidad
+        )
+        db.session.add(ajuste)
+    else:
+        b_stock = get_or_create_branch_stock(maneo_branch, producto.id, None, for_update=True)
+        stock_anterior = b_stock.cantidad
+        b_stock.cantidad += maneo.cantidad
+        sync_global_product_stock(producto.id, None)
+
+        ajuste = StockAdjustment(
+            product_id=producto.id,
+            admin_id=current_user.id,
+            branch_id=maneo_branch,
+            tipo_movimiento=f"Devolución de Maneo de {maneo.local_vecino} en {branch_nom}",
+            stock_anterior=stock_anterior,
+            stock_nuevo=b_stock.cantidad
         )
         db.session.add(ajuste)
 
     try:
         db.session.commit()
-        flash(f"Maneo devuelto. {maneo.cantidad} unidades regresaron al stock.", "success")
+        flash(f"Maneo devuelto. {maneo.cantidad} unidades regresaron al stock de {branch_nom}.", "success")
     except Exception as e:
         db.session.rollback()
         flash(f"Error al devolver el maneo: {e}", "danger")

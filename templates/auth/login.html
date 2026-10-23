@@ -2,10 +2,14 @@
 
 {% block content %}
 <style>
-    /* Estructura 100% White Canvas */
+    /* Estructura 100% Canvas Blanco Puro & Silver Tech LifeStore */
     body {
-        background-color: #FFFFFF !important;
-        background-image: none !important;
+        background-color: #F8FAFC !important;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(226, 232, 240, 0.6) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(241, 245, 249, 0.8) 0px, transparent 50%),
+            radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.9) 0px, transparent 100%) !important;
+        min-height: 100vh;
         overflow-x: hidden;
     }
 
@@ -18,38 +22,39 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 2.5rem 1rem;
-        background-color: #FFFFFF;
+        padding: 2.5rem 1.25rem;
     }
 
+    /* Tarjeta Principal Premium */
     .login-master-card {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
-        border-radius: 20px;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.02);
+        border-radius: 24px;
+        box-shadow: 
+            0 20px 45px -10px rgba(15, 23, 42, 0.08),
+            0 1px 3px rgba(15, 23, 42, 0.04);
         overflow: hidden;
         width: 100%;
-        max-width: 940px;
+        max-width: 860px;
         position: relative;
     }
 
-    /* Remate superior decorativo en degradado plata metálica */
+    /* Línea superior con degradado metálico plateado / cromo */
     .login-master-card::before {
         content: "";
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        height: 5px;
-        background: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);
+        height: 4px;
+        background: linear-gradient(90deg, #E2E8F0 0%, #0F172A 50%, #94A3B8 100%);
         z-index: 10;
     }
 
-    /* Panel Izquierdo: Branding & Identidad Silver Tech */
-    .brand-side {
-        background: #FFFFFF;
+    /* Panel Izquierdo: Blanco puro con branding elegante y minimalista */
+    .brand-side-white {
+        background: #FAFAFC;
         border-right: 1px solid #F1F5F9;
-        color: #0F172A;
         position: relative;
         display: flex;
         flex-direction: column;
@@ -57,160 +62,213 @@
         padding: 3.5rem 3rem;
     }
 
-    .brand-logo-badge {
-        background: #FFFFFF;
-        padding: 16px 22px;
-        border-radius: 16px;
+    /* Badge sutil de estatus */
+    .system-status-chip {
         display: inline-flex;
         align-items: center;
-        gap: 14px;
+        gap: 7px;
+        font-size: 0.73rem;
+        font-weight: 700;
+        color: #475569;
+        background: #FFFFFF;
+        padding: 6px 14px;
+        border-radius: 9999px;
         border: 1px solid #E2E8F0;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
-        margin-bottom: 2rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        letter-spacing: 0.04em;
     }
 
-    .feature-pill {
+    .pulse-indicator {
+        width: 7px;
+        height: 7px;
+        background-color: #10B981;
+        border-radius: 50%;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+
+    /* Contenedor del logo con contraste premium que resalta el nuevo isotipo */
+    .brand-logo-frame {
+        background: #0B0F19;
+        border: 1px solid #1E293B;
+        border-radius: 18px;
+        padding: 1.5rem 1.8rem;
         display: inline-flex;
         align-items: center;
-        gap: 0.65rem;
-        background: #F8FAFC;
+        justify-content: center;
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.25);
+        margin: 1.5rem 0 1.75rem 0;
+        width: 100%;
+        max-width: 320px;
+    }
+
+    .brand-logo-frame img {
+        width: 100%;
+        height: auto;
+        max-height: 70px;
+        object-fit: contain;
+    }
+
+    /* Features sobrias en escala limpia */
+    .feature-item {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.75rem 1rem;
+        background: #FFFFFF;
         border: 1px solid #E2E8F0;
-        padding: 0.6rem 1rem;
-        border-radius: 10px;
-        font-size: 0.8rem;
-        color: #475569;
-        margin-bottom: 0.65rem;
+        border-radius: 12px;
+        margin-bottom: 0.75rem;
+        font-size: 0.84rem;
+        font-weight: 500;
+        color: #334155;
         transition: all 0.2s ease;
     }
 
-    .feature-pill:hover {
-        background: #F1F5F9;
+    .feature-item:hover {
         border-color: #CBD5E1;
+        transform: translateX(3px);
+        background: #FFFFFF;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+
+    .feature-icon-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #F1F5F9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         color: #0F172A;
-        transform: translateX(4px);
+        font-size: 0.85rem;
     }
 
-    .feature-pill i {
-        color: #1A1A1A;
-        width: 16px;
-    }
-
-    /* Panel Derecho: Formulario */
-    .form-side {
-        padding: 3.5rem 3.5rem;
+    /* Panel Derecho: Formulario de Login */
+    .form-side-white {
+        padding: 3.5rem 3.25rem;
         background: #FFFFFF;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
 
-    .form-side .login-input-group {
-        position: relative;
-        transition: all 0.2s ease;
+    .form-title {
+        font-size: 1.65rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #0F172A;
+        margin-bottom: 0.35rem;
     }
 
-    .form-side .input-group-text {
-        background: #FFFFFF !important;
-        border: 1px solid #E2E8F0 !important;
-        border-right: none !important;
+    .form-subtitle {
+        font-size: 0.88rem;
+        color: #64748B;
+        margin-bottom: 2rem;
+    }
+
+    .input-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #334155;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+    }
+
+    .login-input-group {
+        border: 1.5px solid #E2E8F0;
+        border-radius: 14px;
+        background: #F8FAFC;
+        transition: all 0.2s ease;
+        overflow: hidden;
+    }
+
+    .login-input-group:focus-within {
+        background: #FFFFFF;
+        border-color: #0F172A;
+        box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.06);
+    }
+
+    .login-input-group .input-group-text {
+        background: transparent !important;
+        border: none !important;
         color: #64748B !important;
-        border-radius: 12px 0 0 12px !important;
         padding-left: 1.15rem;
-        padding-right: 1.15rem;
-        transition: all 0.2s ease;
-    }
-
-    .form-side .form-control {
-        background: #FFFFFF !important;
-        border: 1px solid #E2E8F0 !important;
-        border-left: none !important;
-        border-radius: 0 12px 12px 0 !important;
-        font-size: 0.95rem;
-        padding: 0.85rem 1rem 0.85rem 0.2rem;
-        color: #0F172A !important;
-        transition: all 0.2s ease;
+        padding-right: 0.85rem;
     }
 
     .login-input-group:focus-within .input-group-text {
-        border-color: #94A3B8 !important;
         color: #0F172A !important;
     }
 
-    .login-input-group:focus-within .form-control {
-        border-color: #94A3B8 !important;
-        box-shadow: none !important;
+    .login-input-group .form-control {
+        background: transparent !important;
+        border: none !important;
+        color: #0F172A !important;
+        font-size: 0.95rem;
+        font-weight: 500;
+        padding: 0.85rem 1rem 0.85rem 0.2rem;
     }
 
-    /* Botón CTA Iniciar Sesión (#1A1A1A con efecto hover metálico) */
-    .btn-login-premium {
-        background: #1A1A1A !important;
+    .login-input-group .form-control::placeholder {
+        color: #94A3B8;
+        font-weight: 400;
+    }
+
+    .btn-toggle-eye {
+        background: transparent !important;
+        border: none !important;
+        color: #64748B !important;
+        padding-right: 1.15rem;
+        transition: color 0.15s ease;
+    }
+
+    .btn-toggle-eye:hover {
+        color: #0F172A !important;
+    }
+
+    /* Botón Principal Negro Puro #0F172A */
+    .btn-login-main {
+        background: #0F172A !important;
         color: #FFFFFF !important;
         font-weight: 700;
         font-size: 0.92rem;
-        letter-spacing: 0.08em;
-        border: 1px solid #1A1A1A !important;
-        border-radius: 12px;
+        letter-spacing: 0.06em;
+        border: 1.5px solid #0F172A !important;
+        border-radius: 14px;
         padding: 0.90rem 1.5rem;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-        display: inline-flex;
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
         align-items: center;
         justify-content: center;
         gap: 0.6rem;
+        width: 100%;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+        margin-top: 1rem;
     }
 
-    .btn-login-premium:hover {
-        background: linear-gradient(135deg, #334155 0%, #1A1A1A 100%) !important;
-        border-color: #94A3B8 !important;
+    .btn-login-main:hover {
+        background: #1E293B !important;
+        border-color: #1E293B !important;
         transform: translateY(-2px);
-        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.20);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.18);
         color: #FFFFFF !important;
     }
 
-    .btn-login-premium:active {
+    .btn-login-main:active {
         transform: translateY(0);
     }
 
-    .brand-badge-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: #475569;
-        background: #F8FAFC;
-        padding: 4px 10px;
-        border-radius: 20px;
-        border: 1px solid #E2E8F0;
-        letter-spacing: 0.05em;
-    }
-
-    .status-dot {
-        width: 7px;
-        height: 7px;
-        background-color: #1A1A1A;
-        border-radius: 50%;
-        animation: pulseDot 2s infinite;
-    }
-
-    @keyframes pulseDot {
-        0%, 100% { opacity: 1; transform: scale(1); }
-        50% { opacity: 0.4; transform: scale(1.3); }
-    }
-
     @media (max-width: 991.98px) {
-        .brand-side {
+        .brand-side-white {
             padding: 2.5rem 2rem;
             border-right: none;
             border-bottom: 1px solid #F1F5F9;
             text-align: center;
             align-items: center;
         }
-        .form-side {
+        .form-side-white {
             padding: 2.5rem 2rem;
-        }
-        .brand-logo-badge {
-            margin-bottom: 1.5rem;
         }
     }
 </style>
@@ -218,94 +276,98 @@
 <div class="login-container-wrapper">
     <div class="login-master-card">
         <div class="row g-0">
-            <!-- Columna Izquierda: Logo & Identidad de Marca LifeStore -->
-            <div class="col-lg-5 brand-side">
+            <!-- Columna Izquierda: Identidad de Marca Blanca y Plata -->
+            <div class="col-lg-5 brand-side-white">
                 <div class="position-relative">
-                    <!-- Badge superior -->
-                    <div class="mb-4">
-                        <span class="brand-badge-status">
-                            <span class="status-dot"></span> SISTEMA ACTIVO &bull; POS &amp; GESTIÓN
+                    <div class="mb-2">
+                        <span class="system-status-chip">
+                            <span class="pulse-indicator"></span> SISTEMA ACTIVO &bull; POS
                         </span>
                     </div>
 
-                    <!-- Logo Maestro Oficial -->
-                    <div class="mb-4">
-                        <img src="{{ url_for('static', filename='img/lifestore_logo.png') }}" 
-                             alt="LifeStore - Celulares" 
-                             style="max-width: 250px; height: auto; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.06));">
+                    <!-- Logo Oficial LifeStore Proporcionado por el Cliente -->
+                    <div class="brand-logo-frame">
+                        <img src="{{ url_for('static', filename='img/lifestore_branding_dark.png') }}?v=16" alt="LifeStore - Celulares & Tecnología">
                     </div>
 
-                    <h2 class="fw-bold mb-2" style="font-size: 1.45rem; letter-spacing: -0.02em; color: #0F172A;">
+                    <h2 class="fw-bold mb-2" style="font-size: 1.35rem; letter-spacing: -0.02em; color: #0F172A;">
                         Gestión Comercial <br class="d-none d-lg-block">&amp; Control POS
                     </h2>
-                    <p class="text-secondary mb-4 small" style="line-height: 1.5;">
-                        Plataforma centralizada para inventario de celulares por IMEI, ventas y arqueo de caja.
+                    <p class="text-secondary mb-4 small" style="line-height: 1.55;">
+                        Control integral de inventarios con seriales IMEI, ventas y arqueos de caja en tiempo real.
                     </p>
 
-                    <!-- Beneficios / Características del Software -->
-                    <div class="d-none d-md-block mt-4 pt-1">
-                        <div class="feature-pill d-block">
-                            <i class="fa-solid fa-barcode"></i> Control Avanzado de Inventario &amp; IMEIs
+                    <!-- Features limpias -->
+                    <div class="d-none d-md-block">
+                        <div class="feature-item">
+                            <div class="feature-icon-badge">
+                                <i class="fa-solid fa-barcode"></i>
+                            </div>
+                            <span>Inventario por IMEIs y Seriales</span>
                         </div>
-                        <div class="feature-pill d-block">
-                            <i class="fa-solid fa-receipt"></i> Ventas, Facturación &amp; Arqueos Diarios
-                        </div>
-                        <div class="feature-pill d-block">
-                            <i class="fa-solid fa-shield-check"></i> Acceso Seguro &amp; Auditoría Integral
+                        <div class="feature-item">
+                            <div class="feature-icon-badge">
+                                <i class="fa-solid fa-receipt"></i>
+                            </div>
+                            <span>Punto de Venta y Facturación</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Footer inferior del lado izquierdo -->
-                <div class="position-relative mt-4 pt-3 border-top border-light-subtle">
-                    <div class="d-flex align-items-center justify-content-between text-muted small">
-                        <span style="font-size: 0.72rem; color: #64748B;">LifeStore v2.5 Enterprise</span>
-                        <span style="font-size: 0.72rem; color: #64748B;"><i class="fa-solid fa-lock text-dark me-1"></i> SSL 256-Bit</span>
-                    </div>
+                <!-- Footer inferior -->
+                <div class="mt-4 pt-3 border-top border-light-subtle d-flex align-items-center justify-content-between text-muted small">
+                    <span style="font-size: 0.72rem; color: #64748B;">LifeStore v2.5</span>
+                    <span style="font-size: 0.72rem; color: #64748B;"><i class="fa-solid fa-shield-halved me-1"></i> Conexión Segura</span>
                 </div>
             </div>
 
-            <!-- Columna Derecha: Formulario de Inicio de Sesión -->
-            <div class="col-lg-7 form-side">
-                <div class="mb-4">
+            <!-- Columna Derecha: Formulario de Autenticación -->
+            <div class="col-lg-7 form-side-white">
+                <div>
                     <span class="text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.12em; color: #64748B;">
                         Acceso Autorizado
                     </span>
-                    <h3 class="fw-bold mt-1 mb-2" style="font-family: 'Inter', sans-serif; font-size: 1.70rem; color: #0F172A;">
-                        Iniciar Sesión
-                    </h3>
-                    <p class="text-secondary small mb-0">
-                        Ingresa tus credenciales autorizadas para acceder a la plataforma.
-                    </p>
+                    <h1 class="form-title mt-1">Iniciar Sesión</h1>
+                    <p class="form-subtitle">Ingresa tus credenciales para acceder a la plataforma.</p>
                 </div>
 
-                <form method="POST" action="/auth/login" class="mt-2">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mb-3">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show border-0 rounded-3 py-2 px-3 small d-flex align-items-center gap-2 mb-2" role="alert">
+                                <i class="fa-solid {{ 'fa-circle-check text-success' if category == 'success' else 'fa-circle-exclamation text-danger' }}"></i>
+                                <span class="flex-grow-1">{{ message }}</span>
+                                <button type="button" class="btn-close shadow-none p-2" data-bs-dismiss="alert" aria-label="Close" style="font-size: 0.65rem;"></button>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="/auth/login">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
+                    <!-- Correo -->
                     <div class="mb-3">
-                        <label class="form-label fw-semibold text-dark small text-uppercase" style="letter-spacing: 0.05em; font-size: 0.76rem;">
-                            Correo Electrónico
-                        </label>
+                        <label class="form-label input-label">Correo Electrónico</label>
                         <div class="input-group login-input-group">
                             <span class="input-group-text">
-                                <i class="fa-solid fa-envelope"></i>
+                                <i class="fa-regular fa-envelope"></i>
                             </span>
                             <input type="email" 
                                    class="form-control" 
                                    name="email" 
                                    required 
-                                   autofocus
-                                   placeholder="usuario@lifestore.com"
+                                   autofocus 
+                                   placeholder="admin@lifestore.com"
                                    autocomplete="email">
                         </div>
                     </div>
 
+                    <!-- Contraseña -->
                     <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label fw-semibold text-dark small text-uppercase mb-0" style="letter-spacing: 0.05em; font-size: 0.76rem;">
-                                Contraseña
-                            </label>
-                        </div>
+                        <label class="form-label input-label">Contraseña</label>
                         <div class="input-group login-input-group">
                             <span class="input-group-text">
                                 <i class="fa-solid fa-lock"></i>
@@ -317,27 +379,25 @@
                                    required 
                                    placeholder="••••••••••••"
                                    autocomplete="current-password">
-                            <button class="btn btn-outline-secondary border-start-0 border" 
+                            <button class="btn btn-toggle-eye" 
                                     type="button" 
                                     id="togglePassword" 
-                                    style="background: #FFFFFF; border-color: #E2E8F0 !important; border-radius: 0 12px 12px 0; color: #64748B;"
                                     title="Mostrar u ocultar contraseña">
                                 <i class="fa-solid fa-eye" id="togglePasswordIcon"></i>
                             </button>
                         </div>
                     </div>
 
-                    <div class="d-grid mt-4 pt-2">
-                        <button type="submit" class="btn btn-login-premium">
-                            <span>INICIAR SESIÓN</span>
-                            <i class="fa-solid fa-arrow-right"></i>
-                        </button>
-                    </div>
+                    <!-- Botón de Envío -->
+                    <button type="submit" class="btn btn-login-main">
+                        <span>ENTRAR AL SISTEMA</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
                 </form>
 
                 <div class="mt-4 pt-3 border-top text-center" style="border-color: #F1F5F9 !important;">
-                    <p class="text-muted small mb-0" style="font-size: 0.78rem;">
-                        <i class="fa-solid fa-circle-info text-secondary me-1"></i> LifeStore POS &bull; Si tienes problemas de acceso, contacta al Administrador.
+                    <p class="text-muted small mb-0" style="font-size: 0.76rem;">
+                        <i class="fa-solid fa-circle-info text-secondary me-1"></i> LifeStore &bull; Plataforma administrativa protegida.
                     </p>
                 </div>
             </div>

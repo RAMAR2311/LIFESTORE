@@ -4,19 +4,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
     <title>LifeStore - Celulares</title>
-    <!-- Favicon y PWA -->
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/icons/icon-192x192.png') }}?v=8">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=8">
-    <link rel="manifest" href="/manifest.json?v=8">
+    <!-- Favicon y PWA con nuevo logo de alta definición -->
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}?v=16">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}?v=16">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}?v=16">
+    <link rel="manifest" href="/manifest.json?v=16">
+    
+    <!-- Script de inicialización de Tema para evitar flash blanco -->
+    <script>
+        (function() {
+            try {
+                const savedTheme = localStorage.getItem('lifestore-theme');
+                if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            } catch (e) {}
+        })();
+    </script>
     
     <!-- Meta tags para iOS, Android y PWA -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="LifeStore">
     <meta name="application-name" content="LifeStore">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icons/icon-192x192.png') }}?v=8">
-    <meta name="theme-color" content="#FFFFFF">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/icons/apple-touch-icon.png') }}?v=16">
+    <meta name="theme-color" content="#0f172a">
 
     <!-- Google Fonts: Inter, Montserrat, JetBrains Mono, Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,40 +42,78 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- LifeStore Theme Global (Silver Tech / Dark Metal Normalization) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}?v=1">
     <style>
-        /* DESIGN TOKENS (Silver Tech Light Theme - 100% White Canvas) */
+        /* DESIGN TOKENS (Silver Minimal Light / Dark Metal Obsidian) */
         :root {
-            --brand-bg: #FFFFFF;             /* Fondo 100% Blanco Puro */
+            --brand-bg: linear-gradient(180deg, #F8FAFC 0%, #E2E8F0 100%);
             --brand-card-bg: #FFFFFF;        /* Superficie Blanca Pura */
-            --brand-border: #E5E7EB;         /* Borde limpio Gris tenue / Plata suave */
+            --brand-border: #E2E8F0;         /* Borde limpio Plata suave */
             --brand-border-subtle: #F1F5F9;  /* Divisores muy sutiles */
             
-            --brand-primary: #1A1A1A;        /* Negro Profundo / Titanio (Botones CTA, selecciones) */
-            --brand-secondary: #94A3B8;      /* Plata Metálica / Gris Pizarra */
-            --brand-silver: #C0C0C0;         /* Plata Metálica de Acento */
-            --brand-titanium: #475569;       /* Gris Titanio Estructural */
-            --brand-dark: #1A1A1A;           /* Negro Profundo */
+            --brand-primary: #0F172A;        /* Negro Profundo / Titanio */
+            --brand-secondary: #475569;      /* Gris Pizarra */
+            --brand-silver: #CBD5E1;         /* Plata Metálica */
+            --brand-titanium: #475569;       /* Titanio */
+            --brand-dark: #0F172A;           /* Negro Profundo */
             
-            --text-primary: #0F172A;         /* Negro azulado / profundo lectura nítida */
-            --text-secondary: #64748B;       /* Gris medio secundario */
-            --divider: #F1F5F9;              /* Divisores sutiles */
+            --text-primary: #0F172A;         /* Títulos en negro azulado nítido */
+            --text-secondary: #475569;       /* Subtítulos legibles */
+            --divider: #E2E8F0;              /* Divisores */
             
-            /* Compatibilidad retroactiva con clases existentes */
-            --brand-red: #1A1A1A;
-            --brand-black: #1A1A1A;
-            --brand-white: #FFFFFF;
+            --brand-gradient: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            --brand-silver-gradient: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 50%, #CBD5E1 100%);
+            --card-shadow: 0 4px 15px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+            --card-shadow-hover: 0 12px 28px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
             
-            --brand-gradient: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);
-            --brand-silver-gradient: linear-gradient(135deg, #E2E8F0 0%, #C0C0C0 50%, #94A3B8 100%);
-            --card-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
-            --card-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.07);
+            --navbar-bg: rgba(255, 255, 255, 0.96);
+            --navbar-border: #E2E8F0;
+            --offcanvas-bg: #FFFFFF;
+            --table-hover-bg: rgba(15, 23, 42, 0.03);
+            --theme-toggle-bg: #F1F5F9;
+            --theme-toggle-color: #0F172A;
+            --theme-toggle-border: #CBD5E1;
+        }
+
+        /* MODO OSCURO (Dark Metal / Silver Tech Obsidian) */
+        [data-theme="dark"] {
+            --brand-bg: radial-gradient(circle at 50% 0%, #111827 0%, #090D16 100%);
+            --brand-card-bg: #111827;        /* Base oscura sólida con gradiente translúcido */
+            --brand-border: rgba(226, 232, 240, 0.15); /* Borde plateado sutil */
+            --brand-border-subtle: rgba(255, 255, 255, 0.08);
+            
+            --brand-primary: #F8FAFC;        /* Blanco brillante para acentos */
+            --brand-secondary: #CBD5E1;      /* Plata intermedia nítida */
+            --brand-silver: #94A3B8;         /* Acento plata templado */
+            --brand-titanium: #CBD5E1;       /* Titanio reflectante */
+            --brand-dark: #FFFFFF;
+            
+            --text-primary: #F8FAFC;         /* Blanco nítido para títulos */
+            --text-secondary: #CBD5E1;       /* Plata legible (nunca grises que se pierdan) */
+            --divider: rgba(255, 255, 255, 0.1);
+            
+            --brand-gradient: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+            --brand-silver-gradient: linear-gradient(135deg, #1E293B 0%, #334155 100%);
+            --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            --card-shadow-hover: 0 16px 32px -4px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+            
+            --navbar-bg: rgba(13, 17, 23, 0.94);
+            --navbar-border: rgba(226, 232, 240, 0.12);
+            --offcanvas-bg: #0D1117;
+            --table-hover-bg: rgba(255, 255, 255, 0.05);
+            --theme-toggle-bg: #1E293B;
+            --theme-toggle-color: #F8FAFC;
+            --theme-toggle-border: rgba(255, 255, 255, 0.18);
         }
 
         body {
-            background-color: var(--brand-bg) !important;
+            background: var(--brand-bg) !important;
+            min-height: 100vh;
             color: var(--text-primary);
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             -webkit-font-smoothing: antialiased;
+            transition: background 0.3s ease, color 0.25s ease;
         }
 
         /* Tipografías Especiales */
@@ -96,20 +149,38 @@
         .text-brand-pink { color: var(--brand-primary) !important; }
         .text-brand-blue { color: var(--brand-titanium) !important; }
         
-        .btn-brand-blue, .btn-pink {
-            background-color: var(--brand-primary) !important;
+        .btn-brand-blue, .btn-pink, .btn-primary {
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
             color: #FFFFFF !important;
             font-weight: 600;
-            border: 1px solid var(--brand-primary) !important;
-            border-radius: 10px;
-            transition: all 0.2s ease-in-out;
+            border: 1px solid rgba(15, 23, 42, 0.3) !important;
+            border-radius: 9999px;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .btn-brand-blue:hover, .btn-pink:hover {
-            background-color: #334155 !important;
-            border-color: #334155 !important;
+        .btn-brand-blue:hover, .btn-pink:hover, .btn-primary:hover {
+            background: linear-gradient(135deg, #1E293B 0%, #334155 100%) !important;
+            border-color: #64748B !important;
             color: #FFFFFF !important;
             transform: translateY(-2px);
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.22);
+        }
+
+        [data-theme="dark"] .btn-brand-blue, 
+        [data-theme="dark"] .btn-pink, 
+        [data-theme="dark"] .btn-primary {
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: #F8FAFC !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        [data-theme="dark"] .btn-brand-blue:hover, 
+        [data-theme="dark"] .btn-pink:hover, 
+        [data-theme="dark"] .btn-primary:hover {
+            background: linear-gradient(135deg, #334155 0%, #1E293B 100%) !important;
+            border-color: rgba(255, 255, 255, 0.35) !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
         }
 
         .btn-blue {
@@ -117,7 +188,7 @@
             color: #FFFFFF !important;
             font-weight: 600;
             border: 1px solid var(--brand-dark) !important;
-            border-radius: 10px;
+            border-radius: 9999px;
             transition: all 0.2s ease-in-out;
         }
         .btn-blue:hover {
@@ -128,37 +199,72 @@
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
         }
 
-        /* Navbar: 100% White Canvas con Borde Plata Suave y Soporte PWA Notch */
+        .badge {
+            font-weight: 600 !important;
+            letter-spacing: 0.02em;
+        }
+
+        /* Navbar: Glassmorphism y Soporte PWA Notch */
         .navbar-custom {
-            background-color: #FFFFFF !important;
-            border-bottom: 1px solid var(--brand-border);
-            padding: 0.85rem 0;
-            padding-top: calc(0.85rem + env(safe-area-inset-top, 0px));
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+            background-color: var(--navbar-bg) !important;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--navbar-border);
+            padding: 0.65rem 0;
+            padding-top: calc(0.65rem + env(safe-area-inset-top, 0px));
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
             z-index: 1030;
+            transition: background-color 0.25s ease, border-color 0.25s ease;
+        }
+
+        /* Botón de Modo Día / Noche (One-click Toggle) */
+        .btn-theme-toggle {
+            background: var(--theme-toggle-bg);
+            border: 1px solid var(--theme-toggle-border);
+            color: var(--theme-toggle-color);
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            font-size: 0.95rem;
+            position: relative;
+            z-index: 1045;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        }
+        .btn-theme-toggle:hover {
+            transform: scale(1.08);
+            border-color: var(--brand-secondary);
+        }
+        .btn-theme-toggle:active {
+            transform: scale(0.94);
         }
 
         /* Botón de las 3 Líneas (Hamburguesa) Optimizado para Móvil / PWA */
         .navbar-toggler-btn {
             position: relative;
             z-index: 1045;
-            background: transparent;
-            border: 1px solid var(--brand-border);
+            background: var(--theme-toggle-bg);
+            border: 1px solid var(--theme-toggle-border);
+            color: var(--theme-toggle-color);
             padding: 8px 12px;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            transition: background 0.15s ease, transform 0.1s ease;
+            transition: background 0.15s ease, transform 0.1s ease, border-color 0.2s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
         }
         .navbar-toggler-btn:hover {
-            background: rgba(0, 0, 0, 0.04);
+            background: var(--brand-border);
         }
         .navbar-toggler-btn:active {
-            background: rgba(0, 0, 0, 0.08);
             transform: scale(0.94);
         }
         
@@ -168,6 +274,35 @@
             font-size: 1.35rem;
             letter-spacing: -0.5px;
             pointer-events: auto;
+        }
+
+        .navbar-custom .brand-logo-img {
+            height: 52px;
+            max-width: 340px;
+            width: auto;
+            object-fit: contain;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .navbar-custom .brand-logo-dark {
+            display: none;
+        }
+        .navbar-custom .brand-logo-light {
+            display: block;
+        }
+
+        [data-theme="dark"] .navbar-custom .brand-logo-dark {
+            display: block;
+        }
+        [data-theme="dark"] .navbar-custom .brand-logo-light {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .navbar-custom .brand-logo-img {
+                height: 40px;
+                max-width: 220px;
+            }
         }
 
         .navbar-custom .nav-link {
@@ -181,42 +316,42 @@
             color: var(--brand-primary);
         }
 
-        /* Superficies Claras y Limpias (100% White Canvas) */
+        /* Superficies Claras y Limpias con Sombra Multicapa */
         .card, .card-custom {
-            background-color: #FFFFFF !important;
+            background-color: var(--brand-card-bg) !important;
             border: 1px solid var(--brand-border) !important;
-            border-radius: 16px;
+            border-radius: 18px;
             box-shadow: var(--card-shadow);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.25s ease, border-color 0.25s ease;
         }
         .card-custom:hover {
             box-shadow: var(--card-shadow-hover);
         }
 
-        /* Inputs y Formularios White Canvas */
+        /* Inputs y Formularios */
         .form-control, .form-select {
-            background-color: #FFFFFF !important;
+            background-color: var(--brand-card-bg) !important;
             border: 1px solid var(--brand-border) !important;
             color: var(--text-primary) !important;
             border-radius: 10px;
             transition: all 0.2s ease;
         }
         .form-control:focus, .form-select:focus {
-            background-color: #FFFFFF !important;
-            border-color: #94A3B8 !important;
+            background-color: var(--brand-card-bg) !important;
+            border-color: var(--brand-secondary) !important;
             box-shadow: 0 0 0 0.25rem rgba(148, 163, 184, 0.2) !important;
             color: var(--text-primary) !important;
         }
 
         /* Tablas */
         .table, .table-custom {
-            background-color: #FFFFFF !important;
+            background-color: var(--brand-card-bg) !important;
             color: var(--text-primary);
         }
         .table thead th, .table-custom thead th {
-            background-color: #FFFFFF !important;
+            background-color: var(--brand-card-bg) !important;
             color: var(--text-secondary) !important;
-            border-bottom: 2px solid #CBD5E1 !important;
+            border-bottom: 2px solid var(--brand-border) !important;
             text-transform: uppercase;
             font-size: 0.75rem;
             font-weight: 700;
@@ -224,318 +359,1218 @@
             padding: 1rem 0.85rem;
         }
         .table tbody td, .table-custom tbody td {
-            background-color: #FFFFFF !important;
+            background-color: var(--brand-card-bg) !important;
+            color: var(--text-primary) !important;
             padding: 1rem 0.85rem;
             vertical-align: middle;
-            border-bottom: 1px solid #F1F5F9;
+            border-bottom: 1px solid var(--brand-border-subtle);
         }
         .table-hover tbody tr:hover td {
-            background-color: rgba(0, 0, 0, 0.02) !important;
+            background-color: var(--table-hover-bg) !important;
         }
 
-        /* Sidebar Offcanvas Premium y Optimizado para Móvil / PWA */
+        /* ==========================================================================
+           SIDEBAR OFFCANVAS PREMIUM HIGH-TECH (SILVER TECH & OBSIDIAN DESIGN SYSTEM)
+           ========================================================================== */
         .offcanvas {
-            background-color: #FFFFFF !important;
+            background-color: var(--offcanvas-bg) !important;
             color: var(--text-primary) !important;
             border-right: 1px solid var(--brand-border) !important;
-            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.06) !important;
-            max-width: 85vw !important;
+            box-shadow: 6px 0 30px rgba(0, 0, 0, 0.15) !important;
+            max-width: 88vw !important;
             z-index: 1055 !important;
+            transition: background-color 0.25s ease, border-color 0.25s ease;
         }
         .offcanvas-header {
-            background: #FFFFFF !important;
+            background: var(--offcanvas-bg) !important;
             border-bottom: 1px solid var(--brand-border) !important;
-            padding: 1.25rem 1.25rem;
-            padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
+            padding: 1.15rem 1.15rem;
+            padding-top: calc(1.15rem + env(safe-area-inset-top, 0px));
         }
-        .offcanvas-header .offcanvas-title {
-            color: var(--text-primary) !important;
-            font-size: 1rem;
-            letter-spacing: 0.03em;
+        .sidebar-avatar-wrapper {
+            position: relative;
+            flex-shrink: 0;
         }
-        .offcanvas-header .btn-close {
-            filter: none;
-            opacity: 0.7;
+        .sidebar-avatar-circle {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(148, 163, 184, 0.18) 100%);
+            border: 1px solid var(--brand-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--brand-primary);
+            font-size: 1.1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s ease, border-color 0.2s ease;
         }
+        .sidebar-avatar-wrapper:hover .sidebar-avatar-circle {
+            transform: scale(1.05);
+            border-color: var(--brand-primary);
+        }
+        .sidebar-status-dot {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            background: #10b981;
+            border: 2px solid var(--offcanvas-bg);
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+        }
+        .sidebar-user-name {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+            line-height: 1.25;
+        }
+        .sidebar-role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.64rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            padding: 2px 8px;
+            border-radius: 20px;
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            color: #2563eb;
+            text-transform: uppercase;
+        }
+        .sidebar-role-badge .role-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #3b82f6;
+            box-shadow: 0 0 5px #3b82f6;
+        }
+        .sidebar-close-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            font-size: 0.95rem;
+            flex-shrink: 0;
+        }
+        .sidebar-close-btn:hover {
+            background: rgba(148, 163, 184, 0.15);
+            color: var(--text-primary);
+            border-color: var(--brand-border);
+        }
+
         .offcanvas-body {
             scrollbar-width: thin;
-            scrollbar-color: #D1D5DB transparent;
+            scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
         }
         .offcanvas-body::-webkit-scrollbar {
-            width: 5px;
+            width: 4px;
         }
         .offcanvas-body::-webkit-scrollbar-track {
             background: transparent;
         }
         .offcanvas-body::-webkit-scrollbar-thumb {
-            background-color: #E2E8F0;
+            background-color: rgba(148, 163, 184, 0.25);
             border-radius: 20px;
         }
         .offcanvas-body::-webkit-scrollbar-thumb:hover {
             background-color: var(--brand-secondary);
         }
 
-        /* Buscador rápido del Menú */
+        /* Buscador Rápido del Menú (Spotlight Style) */
         .sidebar-search-box {
             position: relative;
-            margin: 0.85rem 1rem 0.5rem 1rem;
+            margin: 0.85rem 1rem 0.4rem 1rem;
         }
         .sidebar-search-box input {
             font-size: 0.82rem;
-            padding: 0.5rem 0.75rem 0.5rem 2.1rem;
+            font-weight: 500;
+            padding: 0.55rem 2rem 0.55rem 2.25rem;
             border-radius: 10px;
-            border: 1px solid #E2E8F0;
-            background: #F8FAFC;
-            transition: all 0.2s ease;
+            border: 1px solid var(--brand-border);
+            background: rgba(241, 245, 249, 0.6);
+            color: var(--text-primary);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sidebar-search-box input::placeholder {
+            color: #94a3b8;
+            font-weight: 400;
         }
         .sidebar-search-box input:focus {
-            background: #FFFFFF;
-            border-color: #94A3B8;
-            box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15);
+            background: var(--brand-card-bg);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            outline: none;
         }
-        .sidebar-search-box i {
+        .sidebar-search-box .search-icon {
             position: absolute;
-            left: 0.75rem;
+            left: 0.8rem;
             top: 50%;
             transform: translateY(-50%);
-            color: #94A3B8;
+            color: #94a3b8;
             font-size: 0.82rem;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+        .sidebar-search-box input:focus ~ .search-icon {
+            color: #3b82f6;
+        }
+        .sidebar-search-box .search-shortcut-hint {
+            position: absolute;
+            right: 0.65rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.65rem;
+            color: #94a3b8;
+            background: rgba(148, 163, 184, 0.15);
+            padding: 1px 5px;
+            border-radius: 4px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            pointer-events: none;
         }
 
-        /* Categorías / Títulos de Sección */
+        /* Títulos de Categoría / Separadores Tecnológicos */
         .sidebar-section-label {
-            font-size: 0.68rem;
+            font-size: 0.65rem;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #94A3B8;
-            padding: 0.75rem 0.75rem 0.35rem 0.75rem;
-            margin-top: 0.5rem;
+            letter-spacing: 0.12em;
+            color: #64748b;
+            padding: 0.85rem 0.55rem 0.35rem 0.55rem;
+            margin-top: 0.35rem;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 7px;
+        }
+        .sidebar-section-label::before {
+            content: "";
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #94a3b8;
+            opacity: 0.7;
         }
         .sidebar-section-label::after {
             content: "";
             flex: 1;
             height: 1px;
-            background: #F1F5F9;
+            background: linear-gradient(90deg, rgba(148, 163, 184, 0.2) 0%, rgba(148, 163, 184, 0) 100%);
         }
 
-        /* Links de navegación */
+        /* Links de Navegación */
         .offcanvas-body .sidebar-link {
-            color: #334155 !important;
-            font-size: 0.88rem;
+            color: var(--text-primary) !important;
+            font-size: 0.86rem;
             font-weight: 600;
-            padding: 0.6rem 0.85rem;
+            padding: 0.52rem 0.75rem;
             border-radius: 10px;
             display: flex;
             align-items: center;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             text-decoration: none;
             border: 1px solid transparent;
+            margin-bottom: 2px;
         }
         .offcanvas-body .sidebar-link:hover {
-            background: rgba(0, 0, 0, 0.04) !important;
-            color: #0F172A !important;
-            border-color: #E2E8F0;
+            background: rgba(148, 163, 184, 0.12) !important;
+            color: var(--brand-primary) !important;
+            border-color: rgba(148, 163, 184, 0.2);
             transform: translateX(3px);
         }
         .offcanvas-body .sidebar-link.active {
-            background: rgba(0, 0, 0, 0.04) !important;
-            color: #0F172A !important;
-            border-left: 3px solid #1A1A1A;
+            background: rgba(59, 130, 246, 0.1) !important;
+            color: #2563eb !important;
+            border: 1px solid rgba(59, 130, 246, 0.25) !important;
             font-weight: 700;
         }
-        .sidebar-icon {
-            width: 22px;
-            text-align: center;
+
+        /* Iconos estilizados dentro de caja tecnológica */
+        .sidebar-icon-box {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             margin-right: 0.75rem;
-            font-size: 0.95rem;
+            font-size: 0.85rem;
+            background: rgba(148, 163, 184, 0.1);
+            color: var(--brand-titanium);
+            border: 1px solid rgba(148, 163, 184, 0.12);
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        .offcanvas-body .sidebar-link:hover .sidebar-icon-box,
+        .offcanvas-body .sidebar-accordion-btn:hover .sidebar-icon-box {
+            background: rgba(59, 130, 246, 0.15);
+            color: #2563eb;
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: scale(1.08);
+        }
+
+        /* Colores específicos de cajas de iconos por módulo */
+        .icon-box-general { background: rgba(148, 163, 184, 0.12); color: #475569; }
+        .icon-box-ventas  { background: rgba(16, 185, 129, 0.1); color: #059669; border-color: rgba(16, 185, 129, 0.2); }
+        .icon-box-compras { background: rgba(245, 158, 11, 0.1); color: #d97706; border-color: rgba(245, 158, 11, 0.2); }
+        .icon-box-admin   { background: rgba(99, 102, 241, 0.1); color: #6366f1; border-color: rgba(99, 102, 241, 0.2); }
+        .icon-box-finanzas{ background: rgba(14, 165, 233, 0.1); color: #0284c7; border-color: rgba(14, 165, 233, 0.2); }
+        .icon-box-ai      { background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.2)); color: #7c3aed; border-color: rgba(168, 85, 247, 0.3); }
+
+        /* Compatibilidad con clase clásica sidebar-icon */
+        .sidebar-icon {
+            width: 20px;
+            text-align: center;
+            margin-right: 0.65rem;
+            font-size: 0.92rem;
             color: var(--brand-titanium) !important;
             transition: transform 0.2s, color 0.2s;
         }
-        .offcanvas-body .sidebar-link:hover .sidebar-icon,
-        .offcanvas-body .sidebar-accordion-btn:hover .sidebar-icon {
-            color: var(--brand-primary) !important;
-            transform: scale(1.1);
-        }
 
-        /* Acordeones / Submódulos */
+        /* Acordeones Principales */
         .sidebar-accordion-btn {
             width: 100%;
             background: transparent;
             border: 1px solid transparent;
-            color: #334155;
-            font-size: 0.88rem;
+            color: var(--text-primary);
+            font-size: 0.86rem;
             font-weight: 600;
-            padding: 0.6rem 0.85rem;
+            padding: 0.52rem 0.75rem;
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             cursor: pointer;
             transition: all 0.2s ease;
+            margin-bottom: 2px;
         }
         .sidebar-accordion-btn:hover {
-            background: #F8FAFC;
-            color: #0F172A;
+            background: rgba(148, 163, 184, 0.12);
+            color: var(--brand-primary);
+            border-color: rgba(148, 163, 184, 0.18);
         }
         .sidebar-accordion-btn[aria-expanded="true"] {
-            background: rgba(0, 0, 0, 0.03);
-            color: #0F172A;
-            border-color: #E2E8F0;
-        }
-        .sidebar-accordion-btn[aria-expanded="true"] .sidebar-icon {
-            color: var(--brand-primary) !important;
+            background: rgba(59, 130, 246, 0.08);
+            color: #2563eb;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            font-weight: 700;
         }
         .sidebar-accordion-btn .chevron-arrow {
-            font-size: 0.75rem;
-            color: #94A3B8;
-            transition: transform 0.2s ease;
+            font-size: 0.72rem;
+            color: #94a3b8;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
         }
         .sidebar-accordion-btn[aria-expanded="true"] .chevron-arrow {
             transform: rotate(180deg);
-            color: var(--brand-primary);
+            color: #2563eb;
         }
 
+        /* Submenú Flotante / Tarjeta de Submódulos */
         .sidebar-submenu {
-            background: #F8FAFC;
-            border-radius: 10px;
-            padding: 0.35rem 0.45rem;
-            margin: 0.25rem 0 0.5rem 0.75rem;
-            border-left: 2px solid #CBD5E1;
+            background: rgba(241, 245, 249, 0.65);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-left: 2.5px solid #3b82f6;
+            border-radius: 11px;
+            padding: 0.4rem 0.4rem;
+            margin: 0.3rem 0 0.55rem 0.55rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+            position: relative;
         }
         .sidebar-submenu .sidebar-sublink {
-            color: #475569;
-            font-size: 0.82rem;
+            color: var(--text-secondary);
+            font-size: 0.81rem;
             font-weight: 500;
-            padding: 0.45rem 0.65rem;
-            border-radius: 6px;
+            padding: 0.42rem 0.65rem;
+            border-radius: 7px;
             display: flex;
             align-items: center;
             text-decoration: none;
             transition: all 0.15s ease;
+            margin-bottom: 1px;
         }
         .sidebar-submenu .sidebar-sublink i {
-            color: var(--brand-titanium) !important;
-            transition: transform 0.15s ease;
+            color: #94a3b8 !important;
+            transition: transform 0.15s ease, color 0.15s ease;
         }
         .sidebar-submenu .sidebar-sublink:hover {
-            background: #FFFFFF;
-            color: var(--brand-primary);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-            transform: translateX(2px);
+            background: var(--brand-card-bg);
+            color: var(--text-primary);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+            transform: translateX(3px);
         }
         .sidebar-submenu .sidebar-sublink:hover i {
+            color: #3b82f6 !important;
             transform: scale(1.15);
         }
-        .sidebar-badge-count {
-            font-size: 0.65rem;
-            padding: 2px 7px;
-            border-radius: 10px;
-            font-weight: 700;
-        }
 
-        /* Subdesplegable anidado / dropdown interno */
+        /* Submenú Anidado (Equipo & Asesores) */
         .sidebar-nested-accordion-btn {
             width: 100%;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0.45rem 0.65rem;
-            color: #334155;
-            font-size: 0.82rem;
+            padding: 0.42rem 0.65rem;
+            color: var(--text-secondary);
+            font-size: 0.81rem;
             font-weight: 600;
             background: transparent;
             border: 1px solid transparent;
-            border-radius: 6px;
+            border-radius: 7px;
             cursor: pointer;
             transition: all 0.15s ease;
             text-align: left;
+            margin-bottom: 1px;
         }
         .sidebar-nested-accordion-btn:hover {
-            background: #FFFFFF;
-            color: #0F172A;
-            border-color: #E2E8F0;
+            background: var(--brand-card-bg);
+            color: var(--text-primary);
+            border-color: var(--brand-border);
         }
         .sidebar-nested-accordion-btn[aria-expanded="true"] {
-            background: #FFFFFF;
-            color: #0F172A;
-            border-color: #CBD5E1;
+            background: var(--brand-card-bg);
+            color: #2563eb;
+            border-color: rgba(59, 130, 246, 0.3);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
         }
         .sidebar-nested-accordion-btn .nested-chevron {
-            font-size: 0.68rem;
-            color: #94A3B8;
+            font-size: 0.65rem;
+            color: #94a3b8;
             transition: transform 0.2s ease;
         }
         .sidebar-nested-accordion-btn[aria-expanded="true"] .nested-chevron {
             transform: rotate(180deg);
-            color: var(--brand-primary);
+            color: #2563eb;
         }
         .sidebar-nested-submenu {
-            background: #FFFFFF;
+            background: rgba(148, 163, 184, 0.08);
             border-radius: 8px;
-            padding: 0.25rem 0.35rem;
-            margin: 0.2rem 0 0.4rem 0.6rem;
-            border-left: 2px solid #94A3B8;
-            border: 1px solid #E2E8F0;
-            border-left-width: 2.5px;
-            border-left-color: #475569;
+            padding: 0.3rem 0.35rem;
+            margin: 0.2rem 0 0.35rem 0.5rem;
+            border-left: 2px solid #6366f1;
+        }
+
+        /* Tarjeta Especial IA (ZENIC Asistente) */
+        .sidebar-ai-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(168, 85, 247, 0.09) 100%) !important;
+            border: 1px solid rgba(168, 85, 247, 0.25) !important;
+            box-shadow: 0 2px 10px rgba(168, 85, 247, 0.05);
+            margin-top: 0.25rem;
+        }
+        .sidebar-ai-card:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.16) 100%) !important;
+            border-color: rgba(168, 85, 247, 0.45) !important;
+            box-shadow: 0 4px 14px rgba(168, 85, 247, 0.12) !important;
+            transform: translateX(3px) !important;
+        }
+        .sidebar-ai-pill {
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            color: #ffffff !important;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            padding: 2px 7px;
+            border-radius: 20px;
+            box-shadow: 0 2px 6px rgba(168, 85, 247, 0.35);
+        }
+
+        /* Footer y Botón Cerrar Sesión */
+        .sidebar-footer-box {
+            background: var(--brand-card-bg);
+            border-top: 1px solid var(--brand-border) !important;
+        }
+        .sidebar-logout-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 0.58rem 1rem;
+            font-size: 0.83rem;
+            font-weight: 700;
+            border-radius: 10px;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.06);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            text-decoration: none;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sidebar-logout-btn:hover {
+            background: #ef4444;
+            color: #ffffff;
+            border-color: #ef4444;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+            transform: translateY(-1px);
+        }
+        .sidebar-logout-btn:hover .logout-icon {
+            transform: translateX(3px);
+        }
+        .sidebar-logout-btn .logout-icon {
+            transition: transform 0.2s ease;
+        }
+
+        /* Modo Oscuro: Optimizaciones Específicas del Sidebar */
+        [data-theme="dark"] .sidebar-avatar-circle {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: #60a5fa;
+        }
+        [data-theme="dark"] .sidebar-role-badge {
+            background: rgba(59, 130, 246, 0.12);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+        [data-theme="dark"] .sidebar-search-box input {
+            background: #111827;
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+        }
+        [data-theme="dark"] .sidebar-search-box input:focus {
+            background: #0f172a;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+        }
+        [data-theme="dark"] .sidebar-section-label {
+            color: #94a3b8;
+        }
+        [data-theme="dark"] .sidebar-section-label::before {
+            background: #60a5fa;
+        }
+        [data-theme="dark"] .sidebar-accordion-btn[aria-expanded="true"] {
+            background: rgba(59, 130, 246, 0.14);
+            color: #93c5fd;
+            border-color: rgba(59, 130, 246, 0.35);
+        }
+        [data-theme="dark"] .sidebar-accordion-btn[aria-expanded="true"] .chevron-arrow {
+            color: #93c5fd;
+        }
+        [data-theme="dark"] .sidebar-submenu {
+            background: rgba(17, 24, 39, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-left: 2.5px solid #60a5fa;
+        }
+        [data-theme="dark"] .sidebar-submenu .sidebar-sublink {
+            color: #cbd5e1;
+        }
+        [data-theme="dark"] .sidebar-submenu .sidebar-sublink:hover {
+            background: #1e293b;
+            color: #f8fafc;
+        }
+        [data-theme="dark"] .sidebar-submenu .sidebar-sublink:hover i {
+            color: #60a5fa !important;
+        }
+        [data-theme="dark"] .sidebar-nested-accordion-btn {
+            background: transparent !important;
+            color: #cbd5e1 !important;
+            border-color: transparent !important;
+        }
+        [data-theme="dark"] .sidebar-nested-accordion-btn:hover {
+            background: #1e293b !important;
+            color: #f8fafc !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        [data-theme="dark"] .sidebar-nested-accordion-btn[aria-expanded="true"] {
+            background: #1e293b !important;
+            color: #93c5fd !important;
+            border-color: rgba(59, 130, 246, 0.35) !important;
+        }
+        [data-theme="dark"] .sidebar-nested-submenu {
+            background: #090d16 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-left: 2px solid #818cf8 !important;
+        }
+        [data-theme="dark"] .icon-box-general { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; }
+        [data-theme="dark"] .icon-box-ventas  { background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.3); }
+        [data-theme="dark"] .icon-box-compras { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border-color: rgba(245, 158, 11, 0.3); }
+        [data-theme="dark"] .icon-box-admin   { background: rgba(99, 102, 241, 0.15); color: #818cf8; border-color: rgba(99, 102, 241, 0.3); }
+        [data-theme="dark"] .icon-box-finanzas{ background: rgba(14, 165, 233, 0.15); color: #38bdf8; border-color: rgba(14, 165, 233, 0.3); }
+
+        /* ==========================================================================
+           NORMALIZACIÓN GLOBAL DEFINITIVA MODO OSCURO (SILVER TECH / OBSIDIAN)
+           Aplica transversalmente a TODO el sistema (100% de rutas y templates)
+           ========================================================================== */
+
+        /* 1. Tipografía Base y Jerarquía Universal */
+        [data-theme="dark"] body {
+            color: #cbd5e1 !important;
+            background: radial-gradient(circle at 50% 0%, #111827 0%, #090d16 100%) !important;
+            background-color: #090d16 !important;
+        }
+
+        [data-theme="dark"] h1, 
+        [data-theme="dark"] h2, 
+        [data-theme="dark"] h3, 
+        [data-theme="dark"] h4, 
+        [data-theme="dark"] h5, 
+        [data-theme="dark"] h6,
+        [data-theme="dark"] .h1, 
+        [data-theme="dark"] .h2, 
+        [data-theme="dark"] .h3, 
+        [data-theme="dark"] .h4, 
+        [data-theme="dark"] .h5, 
+        [data-theme="dark"] .h6 {
+            color: #f8fafc !important;
+        }
+
+        [data-theme="dark"] p, 
+        [data-theme="dark"] label:not(.btn):not(.badge),
+        [data-theme="dark"] .form-label {
+            color: #e2e8f0 !important;
+        }
+
+        /* Rescate universal de textos apagados o invisibles */
+        [data-theme="dark"] .text-muted,
+        [data-theme="dark"] small.text-muted,
+        [data-theme="dark"] .text-black-50,
+        [data-theme="dark"] .text-secondary {
+            color: #94a3b8 !important;
+        }
+
+        [data-theme="dark"] .text-dark,
+        [data-theme="dark"] .text-brand-black {
+            color: #ffffff !important;
+        }
+
+        /* 2. Tarjetas, Paneles y Contenedores (.card, .panel, .box, .bg-white) */
+        [data-theme="dark"] .card, 
+        [data-theme="dark"] .card-custom,
+        [data-theme="dark"] .bg-white,
+        [data-theme="dark"] .card-body,
+        [data-theme="dark"] .panel,
+        [data-theme="dark"] .box {
+            background-color: #111827 !important;
+            border-color: rgba(226, 232, 240, 0.12) !important;
+            color: #f8fafc !important;
+        }
+
+        [data-theme="dark"] .card,
+        [data-theme="dark"] .card-custom {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+        }
+
+        [data-theme="dark"] .card-header {
+            background-color: #0f172a !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+            color: #f8fafc !important;
+        }
+
+        [data-theme="dark"] .card-footer {
+            background-color: #0f172a !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+            color: #e2e8f0 !important;
+        }
+
+        /* Evitar bloques bg-light cegadores */
+        [data-theme="dark"] .bg-light {
+            background-color: #1e293b !important;
+            color: #cbd5e1 !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* 3. Tablas de Datos en Todo el Sistema (table, .table) */
+        [data-theme="dark"] table,
+        [data-theme="dark"] .table,
+        [data-theme="dark"] .table-custom {
+            color: #e2e8f0 !important;
+            background-color: transparent !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        [data-theme="dark"] table thead th,
+        [data-theme="dark"] .table thead th,
+        [data-theme="dark"] .table-custom thead th {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.15) !important;
+            border-top: none !important;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+        }
+
+        [data-theme="dark"] table tbody td,
+        [data-theme="dark"] .table tbody td,
+        [data-theme="dark"] .table-custom tbody td {
+            background-color: transparent !important;
+            color: #e2e8f0 !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            vertical-align: middle;
+        }
+
+        [data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > *,
+        [data-theme="dark"] table.table-striped tbody tr:nth-of-type(odd) {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .table-hover > tbody > tr:hover > *,
+        [data-theme="dark"] table.table-hover tbody tr:hover td {
+            background-color: rgba(255, 255, 255, 0.07) !important;
+            color: #ffffff !important;
+        }
+
+        /* 4. Formularios, Inputs y Selectores (.form-control, .form-select, .input-group) */
+        [data-theme="dark"] .form-control, 
+        [data-theme="dark"] .form-select, 
+        [data-theme="dark"] textarea.form-control,
+        [data-theme="dark"] select.form-select,
+        [data-theme="dark"] input[type="text"],
+        [data-theme="dark"] input[type="number"],
+        [data-theme="dark"] input[type="date"],
+        [data-theme="dark"] input[type="email"],
+        [data-theme="dark"] input[type="password"],
+        [data-theme="dark"] input[type="search"] {
+            background-color: #1e293b !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: #ffffff !important;
+            border-radius: 10px;
+        }
+
+        [data-theme="dark"] ::placeholder,
+        [data-theme="dark"] .form-control::placeholder,
+        [data-theme="dark"] input::placeholder,
+        [data-theme="dark"] textarea::placeholder {
+            color: #94a3b8 !important;
+            opacity: 1 !important;
+        }
+
+        [data-theme="dark"] .form-control:focus, 
+        [data-theme="dark"] .form-select:focus,
+        [data-theme="dark"] textarea:focus,
+        [data-theme="dark"] select:focus {
+            background-color: #1e293b !important;
+            border-color: #94a3b8 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 0 0.25rem rgba(148, 163, 184, 0.25) !important;
+        }
+
+        [data-theme="dark"] select option {
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .input-group-text {
+            background-color: #0f172a !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: #94a3b8 !important;
+        }
+
+        /* 5. Modales, Dropdowns y Menús Emergentes */
+        [data-theme="dark"] .modal-content, 
+        [data-theme="dark"] .dropdown-menu {
+            background-color: #0f172a !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            color: #ffffff !important;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+        }
+
+        [data-theme="dark"] .modal-header,
+        [data-theme="dark"] .modal-footer {
+            background-color: #0b0f19 !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f8fafc !important;
+        }
+
+        [data-theme="dark"] .modal-body {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+        }
+
+        [data-theme="dark"] .dropdown-item {
+            color: #cbd5e1 !important;
+            padding: 0.5rem 1rem;
+            transition: all 0.15s ease;
+        }
+
+        [data-theme="dark"] .dropdown-item:hover,
+        [data-theme="dark"] .dropdown-item:focus {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: #ffffff !important;
+        }
+
+        [data-theme="dark"] .dropdown-divider {
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        /* 6. Badges y Etiquetas de Estado (.badge) */
+        .badge {
+            font-weight: 600 !important;
+            padding: 0.4em 0.75em !important;
+            border-radius: 9999px !important;
+            letter-spacing: 0.02em;
+        }
+
+        [data-theme="dark"] .badge.bg-success,
+        [data-theme="dark"] .badge.text-success {
+            background-color: rgba(16, 185, 129, 0.15) !important;
+            color: #34d399 !important;
+            border: 1px solid rgba(52, 211, 153, 0.3) !important;
+        }
+
+        [data-theme="dark"] .badge.bg-danger,
+        [data-theme="dark"] .badge.text-danger {
+            background-color: rgba(239, 68, 68, 0.15) !important;
+            color: #f87171 !important;
+            border: 1px solid rgba(248, 113, 113, 0.3) !important;
+        }
+
+        [data-theme="dark"] .badge.bg-warning,
+        [data-theme="dark"] .badge.text-warning {
+            background-color: rgba(245, 158, 11, 0.15) !important;
+            color: #fbbf24 !important;
+            border: 1px solid rgba(251, 191, 36, 0.3) !important;
+        }
+
+        [data-theme="dark"] .badge.bg-info,
+        [data-theme="dark"] .badge.text-info {
+            background-color: rgba(14, 165, 233, 0.15) !important;
+            color: #38bdf8 !important;
+            border: 1px solid rgba(56, 189, 248, 0.3) !important;
+        }
+
+        [data-theme="dark"] .badge.bg-secondary,
+        [data-theme="dark"] .badge.bg-dark {
+            background-color: rgba(148, 163, 184, 0.15) !important;
+            color: #e2e8f0 !important;
+            border: 1px solid rgba(226, 232, 240, 0.2) !important;
+        }
+
+        [data-theme="dark"] .badge.bg-primary {
+            background-color: rgba(99, 102, 241, 0.18) !important;
+            color: #a5b4fc !important;
+            border: 1px solid rgba(165, 180, 252, 0.3) !important;
+        }
+
+        /* List groups y elementos comunes */
+        [data-theme="dark"] .list-group-item {
+            background-color: transparent !important;
+            color: #e2e8f0 !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        [data-theme="dark"] .border-light {
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        [data-theme="dark"] hr {
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            opacity: 1 !important;
+        }
+
+        /* 1. Tarjetas de Productos (.product-card, .card-pos, .product-card-container) */
+        .product-card, .card-pos {
+            background-color: var(--brand-card-bg) !important;
+            border: 1px solid var(--brand-border) !important;
+            border-radius: 14px;
+            overflow: hidden;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+        }
+        .product-card:hover, .card-pos:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.15);
+            border-color: #94A3B8 !important;
+        }
+
+        /* Contenedor de la Imagen */
+        .product-img-box, .product-card .ratio, .card-pos .ratio {
+            background: #F1F5F9;
+            border-bottom: 1px solid #E2E8F0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: background 0.25s ease;
+        }
+        .product-img-box .placeholder-icon, 
+        .product-card .ratio .placeholder-icon,
+        .card-pos .ratio .placeholder-icon {
+            color: #64748B;
+        }
+
+        /* Bloque de Información y Precios */
+        .product-card .card-title, .card-pos .card-title {
+            font-weight: 600;
+            color: var(--text-primary) !important;
+            font-size: 0.95rem;
+        }
+        .product-card .product-sku, .card-pos .product-sku,
+        .product-card .product-stock, .card-pos .product-stock {
+            color: #64748B;
+            font-size: 0.8rem;
+        }
+        .product-card .product-price, .card-pos .product-price {
+            font-size: 1.15rem !important;
+            font-weight: 700 !important;
+            color: #10B981 !important; /* Verde esmeralda luminoso */
+        }
+
+        /* Modo Oscuro: Tarjetas de Producto */
+        [data-theme="dark"] .product-card, 
+        [data-theme="dark"] .card-pos {
+            background-color: #111827 !important;
+            border: 1px solid rgba(226, 232, 240, 0.15) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+        [data-theme="dark"] .product-card:hover, 
+        [data-theme="dark"] .card-pos:hover {
+            border-color: rgba(226, 232, 240, 0.4) !important;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+        [data-theme="dark"] .product-img-box, 
+        [data-theme="dark"] .product-card .ratio, 
+        [data-theme="dark"] .card-pos .ratio {
+            background: linear-gradient(145deg, #1E293B, #0F172A) !important;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        }
+        [data-theme="dark"] .product-img-box .placeholder-icon, 
+        [data-theme="dark"] .product-card .ratio .placeholder-icon,
+        [data-theme="dark"] .card-pos .ratio .placeholder-icon,
+        [data-theme="dark"] .product-card .ratio .text-muted,
+        [data-theme="dark"] .card-pos .ratio .text-muted {
+            color: #94A3B8 !important;
+        }
+        [data-theme="dark"] .product-card .card-title, 
+        [data-theme="dark"] .card-pos .card-title {
+            color: #FFFFFF !important;
+            font-weight: 600;
+        }
+        [data-theme="dark"] .product-card .product-sku, 
+        [data-theme="dark"] .card-pos .product-sku,
+        [data-theme="dark"] .product-card .product-stock, 
+        [data-theme="dark"] .card-pos .product-stock {
+            color: #CBD5E1 !important;
+        }
+        [data-theme="dark"] .product-card .product-price, 
+        [data-theme="dark"] .card-pos .product-price {
+            color: #10B981 !important; /* Esmeralda luminoso */
+        }
+
+        /* 2. Panel Lateral de Venta / Carrito (.pos-cart, .checkout-panel) */
+        .pos-cart, .checkout-panel {
+            background-color: var(--brand-card-bg) !important;
+            border: 1px solid var(--brand-border) !important;
+            border-radius: 18px;
+        }
+        [data-theme="dark"] .pos-cart, 
+        [data-theme="dark"] .checkout-panel {
+            background-color: #111827 !important;
+            border: 1px solid rgba(226, 232, 240, 0.15) !important;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Carrito Vacío */
+        .cart-empty-box {
+            background: #F8FAFC;
+            border: 1px dashed #CBD5E1;
+            border-radius: 14px;
+            color: #64748B;
+            padding: 2.5rem 1rem;
+            text-align: center;
+        }
+        [data-theme="dark"] .cart-empty-box {
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: 1px dashed rgba(255, 255, 255, 0.15) !important;
+            color: #94A3B8 !important;
+        }
+        [data-theme="dark"] .cart-empty-box i {
+            color: #94A3B8 !important;
+        }
+
+        /* Subtotales, Etiquetas y Cifras */
+        .checkout-label {
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+        }
+        [data-theme="dark"] .checkout-label {
+            color: #CBD5E1 !important;
+        }
+        .checkout-total-label {
+            font-weight: 800;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+        [data-theme="dark"] .checkout-total-label {
+            color: #FFFFFF !important;
+        }
+        .checkout-total-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            color: #0F172A;
+        }
+        [data-theme="dark"] .checkout-total-val {
+            color: #FFFFFF !important;
+            text-shadow: 0 0 16px rgba(255, 255, 255, 0.2);
+        }
+
+        /* Selectores e Inputs en POS */
+        .pos-select, .pos-input {
+            background-color: #FFFFFF;
+            border: 1px solid #CBD5E1 !important;
+            color: #0F172A !important;
+            border-radius: 10px;
+        }
+        [data-theme="dark"] .pos-select, 
+        [data-theme="dark"] .pos-input,
+        [data-theme="dark"] .checkout-panel .form-select,
+        [data-theme="dark"] .checkout-panel .form-control {
+            background-color: #1F2937 !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            color: #FFFFFF !important;
+        }
+        [data-theme="dark"] .checkout-panel .form-select option {
+            background-color: #1F2937 !important;
+            color: #FFFFFF !important;
+        }
+
+        /* 3. Botones de Acción POS */
+        /* Botón Principal: Platino cepillado con texto negro */
+        .btn-checkout-primary {
+            background: linear-gradient(135deg, #F8FAFC 0%, #CBD5E1 100%) !important;
+            color: #0F172A !important;
+            font-weight: 800 !important;
+            font-size: 1.1rem !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            border: 1px solid #FFFFFF !important;
+            border-radius: 12px;
+            padding: 0.9rem 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        .btn-checkout-primary:hover {
+            background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 100%) !important;
+            color: #000000 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(255, 255, 255, 0.35), inset 0 1px 0 #FFFFFF;
+        }
+        .btn-checkout-primary:active {
+            transform: translateY(0);
+        }
+
+        /* Botón Secundario: Transparente con borde plateado y texto #e2e8f0 */
+        .btn-checkout-secondary {
+            background: transparent !important;
+            border: 1px solid rgba(226, 232, 240, 0.3) !important;
+            color: #475569 !important;
+            font-weight: 700 !important;
+            font-size: 0.9rem !important;
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        .btn-checkout-secondary:hover {
+            background: rgba(15, 23, 42, 0.05) !important;
+            color: #0F172A !important;
+        }
+        [data-theme="dark"] .btn-checkout-secondary {
+            background: transparent !important;
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: #E2E8F0 !important;
+        }
+        [data-theme="dark"] .btn-checkout-secondary:hover {
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.4) !important;
+            color: #FFFFFF !important;
+        }
+
+        /* 4. Barras de Búsqueda e Inputs de Cabecera */
+        .search-bar-silver {
+            position: relative;
+            display: flex;
+            align-items: center;
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 9999px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: all 0.2s ease;
+        }
+        .search-bar-silver:focus-within {
+            border-color: #94A3B8;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+        }
+        .search-bar-silver .search-icon {
+            padding-left: 1.25rem;
+            color: #64748B;
+            font-size: 1rem;
+        }
+        .search-bar-silver input {
+            border: none !important;
+            background: transparent !important;
+            color: #0F172A !important;
+            box-shadow: none !important;
+            padding: 0.75rem 1.25rem 0.75rem 0.75rem;
+            width: 100%;
+            font-size: 0.95rem;
+        }
+        .search-bar-silver input::placeholder {
+            color: #94A3B8 !important;
+            opacity: 1;
+        }
+
+        /* Modo Oscuro: Búsqueda */
+        [data-theme="dark"] .search-bar-silver {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        [data-theme="dark"] .search-bar-silver:focus-within {
+            border-color: rgba(255, 255, 255, 0.35) !important;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+        }
+        [data-theme="dark"] .search-bar-silver .search-icon {
+            color: #94A3B8 !important;
+        }
+        [data-theme="dark"] .search-bar-silver input {
+            color: #FFFFFF !important;
+        }
+        [data-theme="dark"] .search-bar-silver input::placeholder {
+            color: #94A3B8 !important;
+            opacity: 1;
         }
     </style>
 </head>
 <body>
     <!-- Navbar LifeStore -->
-    <nav class="navbar navbar-custom mb-5 position-relative">
+    <nav class="navbar navbar-custom mb-4 position-relative">
         <div class="container-fluid px-3 d-flex justify-content-between align-items-center">
             
-            {% if current_user.is_authenticated %}
-            <!-- Botón Hamburguesa (Izquierda) -->
-            <button class="navbar-toggler-btn" type="button" id="btnToggleSidebar" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar" aria-controls="offcanvasNavbar" aria-label="Abrir Menú">
-                <i class="fa-solid fa-bars fs-5" style="color: var(--brand-dark);"></i>
-            </button>
-            {% else %}
-            <!-- Spacer if not authenticated -->
-            <div style="width: 40px;"></div>
-            {% endif %}
+            <div class="d-flex align-items-center gap-2">
+                {% if current_user.is_authenticated %}
+                <!-- Botón Hamburguesa -->
+                <button class="navbar-toggler-btn" type="button" id="btnToggleSidebar" data-bs-toggle="offcanvas" data-bs-target="#offcanvasNavbar" aria-controls="offcanvasNavbar" aria-label="Abrir Menú">
+                    <i class="fa-solid fa-bars fs-5" style="color: var(--brand-dark);"></i>
+                </button>
+                {% else %}
+                <div style="width: 40px;"></div>
+                {% endif %}
+
+                <!-- SUCURSAL SELECTOR (ADMIN) / SUCURSAL BADGE (VENDEDOR/BODEGA) -->
+                {% if current_user.is_authenticated %}
+                    {% if current_user.rol == 'admin' %}
+                    <div class="dropdown d-none d-sm-block">
+                        <button class="btn btn-sm btn-light border rounded-pill dropdown-toggle px-3 py-1 shadow-sm d-flex align-items-center gap-2" type="button" id="adminBranchDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.8rem; font-weight: 600;">
+                            <i class="fa-solid fa-location-dot text-primary"></i>
+                            <span class="text-truncate" style="max-width: 170px;">
+                                {% if active_branch %}
+                                    {{ active_branch.nombre }} ({{ active_branch.codigo }})
+                                {% else %}
+                                    Todas las Sedes (Global)
+                                {% endif %}
+                            </span>
+                        </button>
+                        <ul class="dropdown-menu shadow-lg border-0 rounded-3 p-2" aria-labelledby="adminBranchDropdown" style="min-width: 240px; font-size: 0.85rem;">
+                            <li><h6 class="dropdown-header text-uppercase small fw-bold">Filtrar por Sucursal</h6></li>
+                            <li>
+                                <form method="POST" action="{{ url_for('admin_bp.switch_branch') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <input type="hidden" name="branch_id" value="all"/>
+                                    <button type="submit" class="dropdown-item rounded-2 py-2 d-flex justify-content-between align-items-center {% if not active_branch %}active fw-bold{% endif %}">
+                                        <span><i class="fa-solid fa-globe me-2 text-primary"></i> Todas las Sedes (Global)</span>
+                                        {% if not active_branch %}<i class="fa-solid fa-check small"></i>{% endif %}
+                                    </button>
+                                </form>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% for b in all_branches %}
+                            <li>
+                                <form method="POST" action="{{ url_for('admin_bp.switch_branch') }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <input type="hidden" name="branch_id" value="{{ b.id }}"/>
+                                    <button type="submit" class="dropdown-item rounded-2 py-2 d-flex justify-content-between align-items-center {% if active_branch and active_branch.id == b.id %}active fw-bold{% endif %}">
+                                        <span>
+                                            <i class="fa-solid {% if b.tipo == 'bodega' %}fa-boxes-stacked text-purple{% else %}fa-store text-success{% endif %} me-2"></i>
+                                            {{ b.nombre }} <span class="badge bg-light text-dark border ms-1">{{ b.codigo }}</span>
+                                        </span>
+                                        {% if active_branch and active_branch.id == b.id %}<i class="fa-solid fa-check small"></i>{% endif %}
+                                    </button>
+                                </form>
+                            </li>
+                            {% endfor %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item rounded-2 py-2 text-primary fw-semibold small" href="{{ url_for('admin_bp.sucursales') }}">
+                                    <i class="fa-solid fa-gear me-2"></i> Administrar Sucursales
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    {% else %}
+                    <!-- Badge fijo para Vendedor o Bodeguero -->
+                    <div class="d-none d-sm-flex align-items-center">
+                        <span class="badge bg-light text-dark border rounded-pill px-3 py-1 shadow-sm d-flex align-items-center gap-1" style="font-size: 0.78rem;">
+                            <i class="fa-solid fa-location-dot text-primary"></i>
+                            <span>{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
+                        </span>
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
 
             <!-- Brand Logo (Centro) -->
-            <a class="navbar-brand d-flex align-items-center fw-bold m-0 position-absolute start-50 translate-middle-x text-decoration-none" href="{{ url_for('index') }}" style="max-width: calc(100% - 100px); overflow: hidden;">
-                <img src="{{ url_for('static', filename='img/lifestore_logo.png') }}" alt="LifeStore - Celulares" style="height: 36px; width: auto; object-fit: contain;">
+            <a class="navbar-brand d-flex align-items-center justify-content-center m-0 position-absolute start-50 translate-middle-x text-decoration-none" href="{{ url_for('index') }}" style="max-width: calc(100% - 140px); overflow: visible;">
+                <img src="{{ url_for('static', filename='img/lifestore_branding_light.png') }}?v=16" alt="LifeStore - Celulares & Tecnología" class="brand-logo-img brand-logo-light">
+                <img src="{{ url_for('static', filename='img/lifestore_branding_dark.png') }}?v=16" alt="LifeStore - Celulares & Tecnología" class="brand-logo-img brand-logo-dark">
             </a>
 
-            <!-- Spacer derecho para equilibrar flex -->
-            <div style="width: 40px;"></div>
+            <!-- Botón Modo Día / Noche (Derecha) -->
+            <button class="btn-theme-toggle" type="button" id="btnToggleTheme" title="Alternar Modo Día / Noche" aria-label="Alternar Modo Día / Noche">
+                <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
+            </button>
         </div>
     </nav>
 
     {% if current_user.is_authenticated %}
     <!-- Offcanvas Menú Lateral (Sidebar Optimizado y Categorizado) -->
-    <div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="offcanvasNavbar" aria-labelledby="offcanvasNavbarLabel" style="width: 300px;">
+    <div class="offcanvas offcanvas-start border-0 shadow" tabindex="-1" id="offcanvasNavbar" aria-labelledby="offcanvasNavbarLabel" style="width: 315px;">
         <div class="offcanvas-header">
-            <div class="d-flex align-items-center gap-2">
-                <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; background: #F1F5F9; border: 1px solid #E2E8F0; color: #1A1A1A;">
-                    <i class="fa-solid fa-user-shield"></i>
+            <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+                <div class="sidebar-avatar-wrapper">
+                    <div class="sidebar-avatar-circle">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <span class="sidebar-status-dot" title="En línea"></span>
                 </div>
-                <div>
-                    <h6 class="offcanvas-title fw-bold mb-0" id="offcanvasNavbarLabel" style="color: #0F172A;">
+                <div class="d-flex flex-column min-w-0">
+                    <h6 class="offcanvas-title sidebar-user-name mb-0 text-truncate" id="offcanvasNavbarLabel">
                         {{ current_user.nombre or current_user.email.split('@')[0] | capitalize }}
                     </h6>
-                    <span class="badge" style="background: #F1F5F9; color: #475569; font-size: 0.65rem; border: 1px solid #E2E8F0;">
-                        ROL: {{ current_user.rol | upper }}
-                    </span>
+                    <div class="mt-1">
+                        <span class="sidebar-role-badge">
+                            <span class="role-dot"></span>
+                            ROL: {{ current_user.rol | upper }}
+                        </span>
+                    </div>
                 </div>
             </div>
-            <button type="button" class="btn-close shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <button type="button" class="sidebar-close-btn" data-bs-dismiss="offcanvas" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
 
         <div class="offcanvas-body d-flex flex-column p-0">
-            <!-- Buscador Rápido de Módulos -->
+            <!-- Buscador Rápido de Módulos (Spotlight Style) -->
             <div class="sidebar-search-box">
-                <i class="fa-solid fa-magnifying-glass"></i>
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
                 <input type="text" id="sidebarSearchInput" class="form-control" placeholder="Buscar módulo o acción..." autocomplete="off">
+                <span class="search-shortcut-hint">/</span>
             </div>
 
             <div class="flex-grow-1 px-3 py-2 overflow-y-auto" id="sidebarMenuContainer">
@@ -543,14 +1578,14 @@
                     <!-- SECCIÓN: VISTA GENERAL -->
                     <div class="sidebar-section-label">General</div>
                     <a class="sidebar-link" href="/admin/dashboard">
-                        <i class="fa-solid fa-chart-pie sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-general"><i class="fa-solid fa-chart-pie"></i></div>
                         <span>Dashboard Principal</span>
                     </a>
 
                     <!-- SECCIÓN: VENTAS -->
                     <div class="sidebar-section-label">Ventas</div>
                     <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupCaja" aria-expanded="true">
-                        <span><i class="fa-solid fa-cash-register sidebar-icon"></i> Ventas</span>
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-cash-register"></i></div> Ventas</span>
                         <i class="fa-solid fa-chevron-down chevron-arrow"></i>
                     </button>
                     <div class="collapse show" id="groupCaja">
@@ -561,8 +1596,14 @@
                             <a class="sidebar-sublink" href="/sales/catalogo">
                                 <i class="fa-solid fa-book-open me-2" style="width: 16px;"></i> Catálogo Tienda
                             </a>
+                            <a class="sidebar-sublink" href="{{ url_for('arqueo_bp.abrir_turno') }}">
+                                <i class="fa-solid fa-key me-2" style="width: 16px;"></i> Abrir Turno Caja
+                            </a>
                             <a class="sidebar-sublink" href="/arqueo/nuevo">
-                                <i class="fa-solid fa-calculator me-2" style="width: 16px;"></i> Arqueo de Caja
+                                <i class="fa-solid fa-calculator me-2" style="width: 16px;"></i> Arqueo &amp; Cierre
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('arqueo_bp.auditoria_turnos') }}">
+                                <i class="fa-solid fa-clipboard-check me-2" style="width: 16px;"></i> Auditoría Turnos
                             </a>
                             <a class="sidebar-sublink" href="{{ url_for('arqueo_bp.log_sobrantes') }}">
                                 <i class="fa-solid fa-scale-unbalanced-flip me-2" style="width: 16px;"></i> Log de Sobrantes
@@ -573,7 +1614,7 @@
                     <!-- SECCIÓN: COMPRAS -->
                     <div class="sidebar-section-label">Compras</div>
                     <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupOperaciones" aria-expanded="false">
-                        <span><i class="fa-solid fa-cart-flatbed sidebar-icon"></i> Compras</span>
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-cart-flatbed"></i></div> Compras</span>
                         <i class="fa-solid fa-chevron-down chevron-arrow"></i>
                     </button>
                     <div class="collapse" id="groupOperaciones">
@@ -599,7 +1640,7 @@
                     <!-- SECCIÓN: ADMINISTRATIVO (INVENTARIO + EQUIPO & FINANZAS) -->
                     <div class="sidebar-section-label">Administrativo</div>
                     <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupAdministrativo" aria-expanded="false">
-                        <span><i class="fa-solid fa-boxes-stacked sidebar-icon"></i> Administrativo</span>
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-boxes-stacked"></i></div> Administrativo</span>
                         <i class="fa-solid fa-chevron-down chevron-arrow"></i>
                     </button>
                     <div class="collapse" id="groupAdministrativo">
@@ -634,6 +1675,9 @@
                                     <a class="sidebar-sublink" href="/admin/vendedores">
                                         <i class="fa-solid fa-user-shield me-2" style="width: 16px;"></i> Perfiles &amp; Usuarios
                                     </a>
+                                    <a class="sidebar-sublink" href="{{ url_for('admin_bp.sucursales') }}">
+                                        <i class="fa-solid fa-code-branch me-2" style="width: 16px;"></i> Sucursales &amp; Bodegas
+                                    </a>
                                     <a class="sidebar-sublink" href="{{ url_for('admin_bp.asesores') }}">
                                         <i class="fa-solid fa-user-tie me-2" style="width: 16px;"></i> Asesores de Venta
                                     </a>
@@ -643,9 +1687,20 @@
                                 </div>
                             </div>
 
-                            <!-- Otras Operaciones Administrativas -->
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
+                                <span><i class="fa-solid fa-truck-moving me-2" style="width: 16px;"></i> Traslados de Stock</span>
+                                {% if pending_transfers_count > 0 %}
+                                    <span class="badge bg-danger rounded-pill">{{ pending_transfers_count }}</span>
+                                {% endif %}
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('transfers_bp.trazabilidad') }}">
+                                <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad / Kardex
+                            </a>
                             <a class="sidebar-sublink" href="{{ url_for('admin_bp.aprobaciones') }}">
                                 <i class="fa-solid fa-tags me-2" style="width: 16px;"></i> Aprobaciones Especiales
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('admin_bp.auditoria') }}">
+                                <i class="fa-solid fa-fingerprint me-2 text-primary" style="width: 16px;"></i> Bitácora de Auditoría
                             </a>
                             <a class="sidebar-sublink" href="/gastos">
                                 <i class="fa-solid fa-money-bill-transfer me-2" style="width: 16px;"></i> Control de Gastos
@@ -659,57 +1714,69 @@
                     <!-- SECCIÓN: BANCOS (INDEPENDIENTE) -->
                     <div class="sidebar-section-label">Finanzas</div>
                     <a class="sidebar-link" href="{{ url_for('bancos_bp.index') }}">
-                        <i class="fa-solid fa-building-columns sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-building-columns"></i></div>
                         <span>Bancos</span>
                     </a>
 
                     <!-- SECCIÓN: INTELIGENCIA ARTIFICIAL -->
                     <div class="sidebar-section-label">Inteligencia Artificial</div>
-                    <a class="sidebar-link" href="/zenic" style="background: #F8FAFC; border: 1px solid #E2E8F0; color: #0F172A !important;">
-                        <i class="fa-solid fa-robot sidebar-icon" style="color: #475569 !important;"></i>
-                        <span>ZENIC Asistente</span>
-                        <span class="ms-auto badge" style="background: #1A1A1A; color: #FFFFFF; font-size: 0.6rem; border-radius: 20px; padding: 2px 7px;">IA</span>
+                    <a class="sidebar-link sidebar-ai-card" href="/zenic">
+                        <div class="sidebar-icon-box icon-box-ai">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <span class="fw-bold">ZENIC Asistente</span>
+                        <span class="ms-auto sidebar-ai-pill">IA</span>
                     </a>
 
                 {% elif current_user.rol == 'vendedor' %}
                     <!-- SECCIÓN: CAJERO / VENDEDOR -->
                     <div class="sidebar-section-label">Punto de Venta</div>
                     <a class="sidebar-link" href="/sales/caja_visual">
-                        <i class="fa-solid fa-store sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-store"></i></div>
                         <span>Caja Rápida Visual</span>
                     </a>
                     <a class="sidebar-link" href="/sales/catalogo">
-                        <i class="fa-solid fa-book-open sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-book-open"></i></div>
                         <span>Catálogo Tienda</span>
                     </a>
                     <a class="sidebar-link" href="/sales/ventas_hoy">
-                        <i class="fa-solid fa-list-check sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-list-check"></i></div>
                         <span>Ventas del Día</span>
                     </a>
 
-                    <div class="sidebar-section-label">Gestión</div>
+                    <div class="sidebar-section-label">Gestión de Turno</div>
+                    <a class="sidebar-link" href="{{ url_for('arqueo_bp.abrir_turno') }}">
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-key"></i></div>
+                        <span>Abrir Turno Caja</span>
+                    </a>
                     <a class="sidebar-link" href="/arqueo/nuevo">
-                        <i class="fa-solid fa-calculator sidebar-icon"></i>
-                        <span>Arqueo de Caja</span>
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-calculator"></i></div>
+                        <span>Arqueo &amp; Cierre</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bancos_bp.index') }}">
-                        <i class="fa-solid fa-building-columns sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-building-columns"></i></div>
                         <span>Bancos &amp; Métodos Pago</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('arqueo_bp.log_sobrantes') }}">
-                        <i class="fa-solid fa-scale-unbalanced-flip sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-scale-unbalanced-flip"></i></div>
                         <span>Log de Sobrantes</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('warranties_bp.index') }}">
-                        <i class="fa-solid fa-shield-halved sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-shield-halved"></i></div>
                         <span>Garantías</span>
                     </a>
+                    <a class="sidebar-link d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-truck-moving"></i></div> Traslados</span>
+                        {% if pending_transfers_count > 0 %}
+                            <span class="badge bg-danger rounded-pill">{{ pending_transfers_count }}</span>
+                        {% endif %}
+                    </a>
                     <a class="sidebar-link" href="/gastos">
-                        <i class="fa-solid fa-money-bill-transfer sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-money-bill-transfer"></i></div>
                         <span>Gastos</span>
                     </a>
                     <a class="sidebar-link" href="/admin/maneos">
-                        <i class="fa-solid fa-handshake sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-handshake"></i></div>
                         <span>Maneos</span>
                     </a>
 
@@ -717,33 +1784,43 @@
                     <!-- SECCIÓN: BODEGA -->
                     <div class="sidebar-section-label">Control Bodega</div>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.dashboard') }}">
-                        <i class="fa-solid fa-boxes-stacked sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-boxes-stacked"></i></div>
                         <span>Panel Bodega</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('inventory_bp.index') }}">
-                        <i class="fa-solid fa-box sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-box"></i></div>
                         <span>Mi Inventario</span>
                     </a>
+                    <a class="sidebar-link d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-truck-moving"></i></div> Traslados</span>
+                        {% if pending_transfers_count > 0 %}
+                            <span class="badge bg-danger rounded-pill">{{ pending_transfers_count }}</span>
+                        {% endif %}
+                    </a>
+                    <a class="sidebar-link" href="{{ url_for('transfers_bp.trazabilidad') }}">
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-timeline"></i></div>
+                        <span>Bitácora Trazabilidad</span>
+                    </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.caja_rapida') }}">
-                        <i class="fa-solid fa-store sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-store"></i></div>
                         <span>Caja Rápida (POS)</span>
                     </a>
 
                     <div class="sidebar-section-label">Clientes &amp; Pagos</div>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.clientes') }}">
-                        <i class="fa-solid fa-address-book sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-address-book"></i></div>
                         <span>Directorio Clientes</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.nuevo_cliente') }}">
-                        <i class="fa-solid fa-user-plus sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-user-plus"></i></div>
                         <span>Registrar Cliente</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.nueva_factura') }}">
-                        <i class="fa-solid fa-file-invoice sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-file-invoice"></i></div>
                         <span>Factura Manual</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.modulo_abonos') }}">
-                        <i class="fa-solid fa-money-bill-transfer sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-money-bill-transfer"></i></div>
                         <span>Módulo de Abonos</span>
                     </a>
 
@@ -751,38 +1828,38 @@
                     <!-- SECCIÓN: VENDEDOR BODEGA -->
                     <div class="sidebar-section-label">Operación Bodega</div>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.dashboard') }}">
-                        <i class="fa-solid fa-house-chimney sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-house-chimney"></i></div>
                         <span>Mi Panel</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.caja_rapida') }}">
-                        <i class="fa-solid fa-store sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-store"></i></div>
                         <span>Caja Rápida (POS)</span>
                     </a>
 
                     <div class="sidebar-section-label">Clientes &amp; Facturación</div>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.clientes') }}">
-                        <i class="fa-solid fa-address-book sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-address-book"></i></div>
                         <span>Mis Clientes</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.nuevo_cliente') }}">
-                        <i class="fa-solid fa-user-plus sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-user-plus"></i></div>
                         <span>Crear Cliente</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.nueva_factura') }}">
-                        <i class="fa-solid fa-file-invoice sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-file-invoice"></i></div>
                         <span>Factura Manual</span>
                     </a>
                     <a class="sidebar-link" href="{{ url_for('bodega_bp.modulo_abonos') }}">
-                        <i class="fa-solid fa-money-bill-transfer sidebar-icon"></i>
+                        <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-money-bill-transfer"></i></div>
                         <span>Registrar Abono</span>
                     </a>
                 {% endif %}
             </div>
             
             <!-- Interfaz de Desconexión / Fin de Turno al final del sidebar -->
-            <div class="p-3 border-top mt-auto" style="background: #FAFAFA; border-color: #E2E8F0 !important;">
-                <a class="btn btn-outline-danger w-100 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 py-2" href="{{ url_for('auth_bp.logout') }}" style="font-size: 0.85rem;">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            <div class="sidebar-footer-box p-3 border-top mt-auto">
+                <a class="sidebar-logout-btn" href="{{ url_for('auth_bp.logout') }}">
+                    <i class="fa-solid fa-arrow-right-from-bracket logout-icon"></i>
                     <span>Cerrar Sesión</span>
                 </a>
             </div>
@@ -895,6 +1972,53 @@
 
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- CONTROLADOR DE MODO DÍA / NOCHE (One-Click) -->
+    <script>
+        (function() {
+            const btnToggleTheme = document.getElementById('btnToggleTheme');
+            const themeToggleIcon = document.getElementById('themeToggleIcon');
+
+            function updateThemeUI(theme) {
+                if (theme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    if (themeToggleIcon) {
+                        themeToggleIcon.classList.remove('fa-moon');
+                        themeToggleIcon.classList.add('fa-sun');
+                        themeToggleIcon.style.color = '#F59E0B'; // Sol dorado
+                    }
+                    if (btnToggleTheme) {
+                        btnToggleTheme.setAttribute('title', 'Cambiar a Modo Día');
+                    }
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    if (themeToggleIcon) {
+                        themeToggleIcon.classList.remove('fa-sun');
+                        themeToggleIcon.classList.add('fa-moon');
+                        themeToggleIcon.style.color = '';
+                    }
+                    if (btnToggleTheme) {
+                        btnToggleTheme.setAttribute('title', 'Cambiar a Modo Noche');
+                    }
+                }
+            }
+
+            // Sincronizar estado visual al cargar
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            updateThemeUI(currentTheme);
+
+            if (btnToggleTheme) {
+                btnToggleTheme.addEventListener('click', function() {
+                    const activeTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                    const nextTheme = activeTheme === 'dark' ? 'light' : 'dark';
+                    try {
+                        localStorage.setItem('lifestore-theme', nextTheme);
+                    } catch (e) {}
+                    updateThemeUI(nextTheme);
+                });
+            }
+        })();
+    </script>
 
     <script>
         function formatCOP(val) {
