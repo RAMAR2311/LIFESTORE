@@ -1732,7 +1732,10 @@ def auditoria():
         ('RECEPCION_TRASLADO', 'Recepción de Traslado'),
         ('RECHAZO_TRASLADO', 'Rechazo de Traslado'),
         ('ENTREGA_GARANTIA', 'Entrega de Garantía'),
-        ('REAPERTURA_TURNO', 'Reapertura de Turno')
+        ('REAPERTURA_TURNO', 'Reapertura de Turno'),
+        ('SOLICITUD_VALE', 'Solicitud de Vale'),
+        ('APROBACION_VALE', 'Aprobación de Vale'),
+        ('RECHAZO_VALE', 'Rechazo de Vale')
     ]
 
     return render_template(

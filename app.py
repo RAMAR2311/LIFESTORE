@@ -10,7 +10,7 @@ from flask_wtf.csrf import CSRFProtect
 # Importar la instancia de db y modelos desde models
 from models import (
     db, User, Branch, BranchStock, StockTransfer, StockTransferItem,
-    Product, ProductVariant, Sale, ArqueoCaja, StockAdjustment, Maneo, Expense, Warranty, Retoma
+    Product, ProductVariant, Sale, ArqueoCaja, StockAdjustment, Maneo, Expense, Warranty, Retoma, Vale
 )
 
 def create_app():
@@ -121,6 +121,10 @@ def create_app():
     from routes.transfers import transfers_bp
     app.register_blueprint(transfers_bp, url_prefix='/transfers')
 
+    # Registro de Blueprint Vales de Asesores
+    from routes.vales import vales_bp
+    app.register_blueprint(vales_bp, url_prefix='/vales')
+
 
     @app.template_filter('cop')
     def cop_filter(value):
@@ -150,8 +154,9 @@ def create_app():
         
         # Conteo de traslados pendientes por recibir para la sucursal activa o usuario
         pending_transfers_count = 0
+        pending_vales_count = 0
         if current_user.is_authenticated:
-            from models import StockTransfer
+            from models import StockTransfer, Vale
             q_pend = StockTransfer.query.filter_by(status='PENDIENTE')
             if current_user.rol != 'admin':
                 if current_user.branch_id:
@@ -160,12 +165,25 @@ def create_app():
                 q_pend = q_pend.filter(StockTransfer.destination_branch_id == active_id)
             pending_transfers_count = q_pend.count()
 
+            q_vales = Vale.query.filter_by(estado='PENDIENTE')
+            if current_user.rol != 'admin':
+                if current_user.branch_id:
+                    q_vales = q_vales.filter(
+                        (Vale.branch_id == current_user.branch_id) | (Vale.solicitado_por_id == current_user.id)
+                    )
+                else:
+                    q_vales = q_vales.filter(Vale.solicitado_por_id == current_user.id)
+            elif active_id:
+                q_vales = q_vales.filter(Vale.branch_id == active_id)
+            pending_vales_count = q_vales.count()
+
         return {
             'get_active_branch_id': get_active_branch_id,
             'active_branch_id': active_id,
             'active_branch': active_branch,
             'all_branches': Branch.query.filter_by(activa=True).all() if current_user.is_authenticated else [],
-            'pending_transfers_count': pending_transfers_count
+            'pending_transfers_count': pending_transfers_count,
+            'pending_vales_count': pending_vales_count
         }
 
     @app.route('/')
@@ -193,6 +211,10 @@ def create_app():
 
     # Auto-parcheador de esquema de base de datos para prevenir errores 500 en producción por columnas faltantes
     with app.app_context():
+        try:
+            db.create_all()
+        except Exception:
+            db.session.rollback()
         queries = [
             "ALTER TABLE provider_invoices ADD COLUMN sale_id INTEGER REFERENCES sales(id) ON DELETE SET NULL;",
             "ALTER TABLE sales ADD COLUMN provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;",

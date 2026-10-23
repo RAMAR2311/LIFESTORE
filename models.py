@@ -930,7 +930,7 @@ class AuditLog(db.Model):
     action = db.Column(db.String(100), nullable=False, index=True) # ej. 'APROBACION_PRECIO_MINIMO', 'CANCELACION_VENTA', 'REAPERTURA_TURNO', 'AUTORIZACION_CAMBIO'
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     target_id = db.Column(db.Integer, nullable=True) # ID del registro afectado (Venta, Turno, Garantía, etc.)
-    target_type = db.Column(db.String(50), nullable=True) # 'SALE', 'CASH_SHIFT', 'DISCOUNT_APPROVAL', 'WARRANTY', 'TRANSFER'
+    target_type = db.Column(db.String(50), nullable=True) # 'SALE', 'CASH_SHIFT', 'DISCOUNT_APPROVAL', 'WARRANTY', 'TRANSFER', 'VALE'
     timestamp = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False, index=True)
     motivo = db.Column(db.Text, nullable=False) # Justificación obligatoria
     detalles = db.Column(db.Text, nullable=True) # Contexto o datos adicionales en JSON / texto
@@ -954,6 +954,32 @@ class AuditLog(db.Model):
         )
         db.session.add(log)
         return log
+
+
+class Vale(db.Model):
+    """Modelo para gestionar solicitudes de vales de asesores y su trazabilidad de aprobación/rechazo."""
+    __tablename__ = 'vales'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=False, index=True)
+    solicitado_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+    monto = db.Column(db.Numeric(14, 2), nullable=False)
+    concepto = db.Column(db.Text, nullable=True)
+    estado = db.Column(db.String(20), nullable=False, default='PENDIENTE', index=True)  # 'PENDIENTE', 'APROBADO', 'RECHAZADO'
+    resuelto_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    observacion_resolucion = db.Column(db.Text, nullable=True)
+    fecha_solicitud = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False, index=True)
+    fecha_resolucion = db.Column(db.DateTime, nullable=True)
+
+    asesor = db.relationship('Asesor', backref=db.backref('vales', lazy=True, cascade='all, delete-orphan'))
+    solicitado_por = db.relationship('User', foreign_keys=[solicitado_por_id], backref=db.backref('vales_solicitados', lazy=True))
+    resuelto_por = db.relationship('User', foreign_keys=[resuelto_por_id], backref=db.backref('vales_resueltos', lazy=True))
+    branch = db.relationship('Branch', backref=db.backref('vales', lazy=True))
+
+    def __init__(self, **kwargs):
+        super(Vale, self).__init__(**kwargs)
+
 
 
 

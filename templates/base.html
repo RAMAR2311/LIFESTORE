@@ -1667,7 +1667,12 @@
 
                             <!-- Desplegable Interno: Gestión de Equipo & Asesores -->
                             <button class="sidebar-nested-accordion-btn my-1" type="button" data-bs-toggle="collapse" data-bs-target="#subgroupEquipoUsuarios" aria-expanded="false">
-                                <span><i class="fa-solid fa-users-gear me-2" style="width: 16px; color: var(--brand-titanium);"></i> Equipo &amp; Asesores</span>
+                                <span class="d-flex align-items-center">
+                                    <i class="fa-solid fa-users-gear me-2" style="width: 16px; color: var(--brand-titanium);"></i> Equipo &amp; Asesores
+                                    {% if pending_vales_count > 0 %}
+                                        <span class="badge bg-warning text-dark rounded-pill ms-2" style="font-size: 0.65rem;">{{ pending_vales_count }}</span>
+                                    {% endif %}
+                                </span>
                                 <i class="fa-solid fa-chevron-down nested-chevron"></i>
                             </button>
                             <div class="collapse" id="subgroupEquipoUsuarios">
@@ -1683,6 +1688,12 @@
                                     </a>
                                     <a class="sidebar-sublink" href="{{ url_for('admin_bp.ventas_vendedores') }}">
                                         <i class="fa-solid fa-chart-line me-2" style="width: 16px;"></i> Rendimiento Asesores
+                                    </a>
+                                    <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('vales_bp.index') }}">
+                                        <span><i class="fa-solid fa-hand-holding-dollar me-2" style="width: 16px;"></i> Vales</span>
+                                        {% if pending_vales_count > 0 %}
+                                            <span class="badge bg-warning text-dark rounded-pill">{{ pending_vales_count }}</span>
+                                        {% endif %}
                                     </a>
                                 </div>
                             </div>
@@ -1774,6 +1785,12 @@
                     <a class="sidebar-link" href="/gastos">
                         <div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-money-bill-transfer"></i></div>
                         <span>Gastos</span>
+                    </a>
+                    <a class="sidebar-link d-flex justify-content-between align-items-center" href="{{ url_for('vales_bp.index') }}">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-hand-holding-dollar"></i></div> Vales</span>
+                        {% if pending_vales_count > 0 %}
+                            <span class="badge bg-warning text-dark rounded-pill">{{ pending_vales_count }}</span>
+                        {% endif %}
                     </a>
                     <a class="sidebar-link" href="/admin/maneos">
                         <div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-handshake"></i></div>
