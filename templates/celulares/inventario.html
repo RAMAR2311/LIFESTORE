@@ -12,11 +12,6 @@
             <i class="fa-solid fa-tags me-1"></i> Precios Masivos
         </button>
         {% endif %}
-        {% if current_user.rol == 'admin' %}
-        <button type="button" class="btn btn-outline-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalPreciosMasivo" onclick="cargarModelosPrecios()">
-            <i class="fa-solid fa-tags me-1"></i> Precios Masivos
-        </button>
-        {% endif %}
         <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalImportarExcel">
             <i class="fa-solid fa-file-excel me-1"></i> Importar Excel
         </button>
