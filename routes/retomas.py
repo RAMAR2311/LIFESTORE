@@ -98,6 +98,9 @@ def aprobar_retoma(id):
     precio_min_dec = Decimal(precio_minimo)
     precio_sug_dec = Decimal(precio_sugerido)
 
+    imei1_val = (retoma.imei1 or '').strip()
+    imei2_val = (retoma.imei2 or '').strip() or None
+
     try:
         producto_final = None
         es_reingreso = False

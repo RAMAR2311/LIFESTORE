@@ -376,16 +376,39 @@
                 <!-- Fila 1: Marca, Referencia, Capacidad -->
                 <div class="row mb-3">
                     <div class="col-md-4 mb-2">
-                        <label class="form-label small fw-bold">Marca</label>
-                        <input type="text" id="retoma_marca" class="form-control bg-light" placeholder="Ej: Samsung">
+                        <label class="form-label small fw-bold">Marca *</label>
+                        <select id="retoma_marca" class="form-select bg-light fw-semibold" onchange="actualizarModelosRetoma(this.value)">
+                            <option value="">-- Seleccione Marca --</option>
+                            <option value="Apple">Apple</option>
+                            <option value="Samsung">Samsung</option>
+                            <option value="Ray-Ban Meta">Ray-Ban Meta</option>
+                            <option value="Xiaomi">Xiaomi</option>
+                            <option value="Motorola">Motorola</option>
+                            <option value="Huawei">Huawei</option>
+                            <option value="Honor">Honor</option>
+                            <option value="OPPO">OPPO</option>
+                            <option value="Infinix">Infinix</option>
+                            <option value="Tecno">Tecno</option>
+                            <option value="Otro">Otro / Otra Marca</option>
+                        </select>
                     </div>
                     <div class="col-md-4 mb-2">
                         <label class="form-label small fw-bold">Referencia / Modelo *</label>
-                        <input type="text" id="retoma_modelo" class="form-control bg-light" placeholder="Ej: Galaxy S23" required>
+                        <select id="retoma_modelo" class="form-select bg-light fw-semibold" required>
+                            <option value="">-- Primero elija Marca --</option>
+                        </select>
+                        <input type="text" id="retoma_modelo_custom" class="form-control bg-light mt-1" placeholder="Escriba el modelo si es 'Otro'" style="display:none;">
                     </div>
                     <div class="col-md-4 mb-2">
                         <label class="form-label small fw-bold">Capacidad (Memoria)</label>
-                        <input type="text" id="retoma_memoria" class="form-control bg-light" placeholder="Ej: 128GB">
+                        <select id="retoma_memoria" class="form-select bg-light">
+                            <option value="">-- Seleccionar --</option>
+                            <option value="64GB">64GB</option>
+                            <option value="128GB">128GB</option>
+                            <option value="256GB">256GB</option>
+                            <option value="512GB">512GB</option>
+                            <option value="1TB">1TB</option>
+                        </select>
                     </div>
                 </div>
                 <!-- Fila 2: Color, Batería -->
@@ -1218,6 +1241,158 @@
         procesarPagoGlobal(datosCliente);
     }
 
+    const CATALOGO_RETOMAS = {
+        'Apple': [
+            {
+                categoria: 'iPhones (11 al 18 Pro Max)',
+                modelos: [
+                    'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
+                    'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+                    'iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+                    'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+                    'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+                    'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
+                    'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+                    'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                ]
+            },
+            {
+                categoria: 'iPads (A16, Air, Pro)',
+                modelos: [
+                    'iPad 10ma Gen (A16 Bionic)', 'iPad 11na Gen', 'iPad Mini 6', 'iPad Mini 7',
+                    'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
+                    'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)', 'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
+                ]
+            },
+            {
+                categoria: 'MacBook (Air, Pro)',
+                modelos: [
+                    'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)', 'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
+                    'MacBook Pro 14" (M1/M2/M3)', 'MacBook Pro 16" (M1/M2/M3)', 'MacBook Pro 14" (M4)', 'MacBook Pro 16" (M4)'
+                ]
+            },
+            {
+                categoria: 'AirPods & Apple Watch',
+                modelos: [
+                    'AirPods 3ra Gen', 'AirPods 4ta Gen', 'AirPods 4ta Gen ANC', 'AirPods Pro 2 USB-C', 'AirPods Max',
+                    'Apple Watch SE', 'Apple Watch Series 8', 'Apple Watch Series 9', 'Apple Watch Series 10', 'Apple Watch Ultra 2'
+                ]
+            }
+        ],
+        'Samsung': [
+            {
+                categoria: 'Samsung Galaxy Serie S & Z',
+                modelos: [
+                    'Galaxy S21', 'Galaxy S21 Ultra', 'Galaxy S22', 'Galaxy S22 Ultra',
+                    'Galaxy S23', 'Galaxy S23 Plus', 'Galaxy S23 Ultra', 'Galaxy S23 FE',
+                    'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+                    'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+                    'Galaxy Z Fold 4', 'Galaxy Z Flip 4', 'Galaxy Z Fold 5', 'Galaxy Z Flip 5',
+                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6', 'Galaxy Z Fold 7', 'Galaxy Z Flip 7'
+                ]
+            },
+            {
+                categoria: 'Samsung Galaxy Serie A & Tablets',
+                modelos: [
+                    'Galaxy A15', 'Galaxy A25', 'Galaxy A35', 'Galaxy A55', 'Galaxy A54', 'Galaxy A34',
+                    'Galaxy Tab S9', 'Galaxy Tab S9 FE', 'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra'
+                ]
+            }
+        ],
+        'Ray-Ban Meta': [
+            {
+                categoria: 'Gafas Inteligentes Ray-Ban Meta',
+                modelos: [
+                    'Ray-Ban Meta Wayfarer (Standard)',
+                    'Ray-Ban Meta Wayfarer (Large)',
+                    'Ray-Ban Meta Headliner',
+                    'Ray-Ban Meta Skyler',
+                    'Ray-Ban Meta Transitions',
+                    'Ray-Ban Meta Polarized'
+                ]
+            }
+        ],
+        'Xiaomi': [
+            {
+                categoria: 'Xiaomi & Redmi',
+                modelos: [
+                    'Redmi Note 12', 'Redmi Note 12 Pro', 'Redmi Note 13', 'Redmi Note 13 Pro', 'Redmi Note 13 Pro+',
+                    'Redmi 13C', 'Redmi 14C', 'Xiaomi 13T', 'Xiaomi 13T Pro', 'Xiaomi 14', 'Xiaomi 14 Ultra', 'Poco X6 Pro', 'Poco F6'
+                ]
+            }
+        ],
+        'Motorola': [
+            {
+                categoria: 'Motorola Moto G & Edge',
+                modelos: [
+                    'Moto G54', 'Moto G84', 'Moto G24', 'Moto G04', 'Edge 40', 'Edge 40 Neo', 'Edge 50 Pro', 'Edge 50 Ultra', 'Razr 40 Ultra', 'Razr 50 Ultra'
+                ]
+            }
+        ]
+    };
+
+    function actualizarModelosRetoma(marca, modeloPreseleccionado = '') {
+        const sel = document.getElementById('retoma_modelo');
+        const customInput = document.getElementById('retoma_modelo_custom');
+        if (!sel) return;
+        sel.innerHTML = '';
+        if (customInput) customInput.style.display = 'none';
+
+        if (!marca) {
+            sel.innerHTML = '<option value="">-- Primero elija Marca --</option>';
+            return;
+        }
+
+        if (marca === 'Otro' || !CATALOGO_RETOMAS[marca]) {
+            sel.innerHTML = '<option value="__OTRO__">Otro Modelo (Escribir abajo)</option>';
+            if (customInput) {
+                customInput.style.display = 'block';
+                customInput.value = modeloPreseleccionado || '';
+            }
+            return;
+        }
+
+        sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
+        CATALOGO_RETOMAS[marca].forEach(grp => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = grp.categoria;
+            grp.modelos.forEach(mod => {
+                const opt = document.createElement('option');
+                opt.value = mod;
+                opt.textContent = mod;
+                if (mod === modeloPreseleccionado) {
+                    opt.selected = true;
+                }
+                optgroup.appendChild(opt);
+            });
+            sel.appendChild(optgroup);
+        });
+
+        const optOtro = document.createElement('option');
+        optOtro.value = '__OTRO__';
+        optOtro.textContent = '+ Otro Modelo no listado';
+        sel.appendChild(optOtro);
+
+        if (modeloPreseleccionado && !sel.value) {
+            sel.value = '__OTRO__';
+            if (customInput) {
+                customInput.style.display = 'block';
+                customInput.value = modeloPreseleccionado;
+            }
+        }
+
+        sel.onchange = function() {
+            if (this.value === '__OTRO__') {
+                if (customInput) {
+                    customInput.style.display = 'block';
+                    customInput.focus();
+                }
+            } else {
+                if (customInput) customInput.style.display = 'none';
+            }
+        };
+    }
+
     function abrirModalRetoma(index = -1) {
         editRetomaIndex = index;
         const btnEliminar = document.getElementById('btnEliminarRetoma');
@@ -1227,8 +1402,12 @@
             const r = retomasLista[index];
             const valNum = parseInt(r.valor_retoma, 10);
             document.getElementById('retoma_valor').value = !isNaN(valNum) ? valNum.toLocaleString('es-CO') : (r.valor_retoma || '');
-            document.getElementById('retoma_marca').value = r.marca || '';
-            document.getElementById('retoma_modelo').value = r.modelo || '';
+            
+            const marcaVal = r.marca || '';
+            const modeloVal = r.modelo || '';
+            document.getElementById('retoma_marca').value = marcaVal;
+            actualizarModelosRetoma(marcaVal, modeloVal);
+
             document.getElementById('retoma_imei1').value = r.imei1 || '';
             document.getElementById('retoma_imei2').value = r.imei2 || '';
             document.getElementById('retoma_color').value = r.color || '';
@@ -1254,7 +1433,12 @@
     function limpiarFormularioRetoma() {
         document.getElementById('retoma_valor').value = '';
         document.getElementById('retoma_marca').value = '';
-        document.getElementById('retoma_modelo').value = '';
+        actualizarModelosRetoma('');
+        const customInput = document.getElementById('retoma_modelo_custom');
+        if (customInput) {
+            customInput.value = '';
+            customInput.style.display = 'none';
+        }
         document.getElementById('retoma_imei1').value = '';
         document.getElementById('retoma_imei2').value = '';
         document.getElementById('retoma_color').value = '';
@@ -1266,31 +1450,49 @@
     function confirmarRetoma() {
         const rawValor = (document.getElementById('retoma_valor').value || '').toString().replace(/\D/g, '');
         const valor = parseFloat(rawValor);
-        const modelo = document.getElementById('retoma_modelo').value.trim();
+        
+        const marcaSelect = document.getElementById('retoma_marca');
+        const marca = marcaSelect ? marcaSelect.value.trim() : '';
+
+        const modeloSelect = document.getElementById('retoma_modelo');
+        const customInput = document.getElementById('retoma_modelo_custom');
+        let modelo = modeloSelect ? modeloSelect.value.trim() : '';
+        if (modelo === '__OTRO__' && customInput) {
+            modelo = customInput.value.trim();
+        }
+
         const imei1 = document.getElementById('retoma_imei1').value.trim();
 
         if (isNaN(valor) || valor <= 0) {
             return alert('Debes ingresar un valor de descuento válido para la retoma.');
         }
 
-        if (!modelo || !imei1) {
-            return alert('El modelo y el IMEI 1 son obligatorios para la retoma.');
+        if (!marca) {
+            return alert('Debes seleccionar la marca del equipo.');
+        }
+
+        if (!modelo || modelo === '__OTRO__') {
+            return alert('Debes seleccionar o escribir la referencia/modelo del equipo.');
+        }
+
+        if (!imei1) {
+            return alert('El IMEI 1 es obligatorio para registrar la retoma.');
         }
 
         const imeiDuplicado = retomasLista.some((r, idx) => idx !== editRetomaIndex && r.imei1 === imei1);
         if (imeiDuplicado) {
-            return alert(`⚠️ El IMEI 1 (${imei1}) ya fue ingresado en otra retoma de esta venta.`);
+            return alert('Ya has agregado un equipo con este mismo IMEI 1 en las retomas de esta venta.');
         }
 
         const retomaObj = {
-            valor_retoma: valor,
-            marca: document.getElementById('retoma_marca').value.trim(),
+            marca: marca,
             modelo: modelo,
-            imei1: imei1,
-            imei2: document.getElementById('retoma_imei2').value.trim(),
+            memoria: document.getElementById('retoma_memoria').value.trim(),
             color: document.getElementById('retoma_color').value.trim(),
             bateria: document.getElementById('retoma_bateria').value.trim(),
-            memoria: document.getElementById('retoma_memoria').value.trim(),
+            imei1: imei1,
+            imei2: document.getElementById('retoma_imei2').value.trim(),
+            valor_retoma: valor,
             observaciones: document.getElementById('retoma_observaciones').value.trim()
         };
 
@@ -1299,8 +1501,6 @@
         } else {
             retomasLista.push(retomaObj);
         }
-
-        limpiarFormularioRetoma();
 
         const modalEl = document.getElementById('modalRetoma');
         const modalInstance = bootstrap.Modal.getInstance(modalEl);
@@ -1315,8 +1515,7 @@
             renderCart();
         }
     }
-
-    function eliminarRetomaActual() {
+function eliminarRetomaActual() {
         if (editRetomaIndex >= 0 && editRetomaIndex < retomasLista.length) {
             retomasLista.splice(editRetomaIndex, 1);
         }
