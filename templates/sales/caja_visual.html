@@ -58,6 +58,59 @@
         font-weight: 700 !important;
         color: #10B981 !important; /* Esmeralda luminoso */
     }
+    /* Estilos temáticos para Retomas y Botones de Caja (Modo Día y Modo Noche) */
+    .pos-retoma-btn {
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
+        border: 1px solid #CBD5E1 !important;
+        transition: all 0.2s ease;
+    }
+    .pos-retoma-btn:hover {
+        background-color: #F1F5F9 !important;
+        border-color: #94A3B8 !important;
+        color: #000000 !important;
+    }
+    [data-theme="dark"] .pos-retoma-btn {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #F1F5F9 !important;
+        border-color: rgba(226, 232, 240, 0.2) !important;
+    }
+    [data-theme="dark"] .pos-retoma-btn:hover {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(226, 232, 240, 0.4) !important;
+    }
+
+    .retoma-container-box {
+        background: rgba(239, 68, 68, 0.08) !important;
+        border-left: 3px solid #EF4444 !important;
+    }
+    [data-theme="dark"] .retoma-container-box {
+        background: rgba(239, 68, 68, 0.15) !important;
+    }
+    
+    .retoma-item-row {
+        color: #1E293B !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    [data-theme="dark"] .retoma-item-row {
+        color: #F8FAFC !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .pos-btn-secondary-action {
+        background-color: #F8FAFC !important;
+        color: #334155 !important;
+        border: 1px solid #CBD5E1 !important;
+    }
+    .pos-btn-secondary-action:hover {
+        background-color: #F1F5F9 !important;
+        color: #0F172A !important;
+    }
+    [data-theme="dark"] .pos-btn-secondary-action {
+        background-color: transparent !important;
+        color: #CBD5E1 !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }
 </style>
 <div class="row h-100 g-4">
     <!-- Panel Izquierdo: Catálogo de Productos -->
@@ -173,7 +226,7 @@
                     <span class="fw-bold align-self-center"><i class="fa-solid fa-recycle me-1"></i> Retomas (<span id="retomas_count">0</span>):</span>
                     <span class="fw-bold fs-5" id="retoma_amount">-$0</span>
                 </div>
-                <div id="retomas_list_container" class="ps-2 border-start border-2 border-danger ms-1 mb-2 rounded p-2" style="font-size: 0.85rem; background: rgba(239, 68, 68, 0.08);">
+                <div id="retomas_list_container" class="ps-2 ms-1 mb-2 rounded p-2 retoma-container-box" style="font-size: 0.85rem;">
                     <!-- Lista dinámica de retomas -->
                 </div>
             </div>
@@ -183,8 +236,8 @@
                 <span class="fw-bolder fs-1 checkout-total-val price-display font-mono" id="total_amount">$0</span>
             </div>
 
-            <button type="button" class="btn btn-outline-light btn-sm rounded-pill fw-bold w-100 mb-4" onclick="abrirModalRetoma()" style="border-color: rgba(226, 232, 240, 0.25);">
-                <i class="fa-solid fa-recycle me-1 text-warning"></i> Añadir Equipo en Retoma
+            <button type="button" class="btn pos-retoma-btn btn-sm rounded-pill fw-bold w-100 mb-4 shadow-sm" onclick="abrirModalRetoma()">
+                <i class="fa-solid fa-recycle me-1 text-danger"></i> Añadir Equipo en Retoma
             </button>
 
             {% if current_user.rol == 'admin' %}
@@ -276,7 +329,7 @@
                     <!-- Se inyecta dinámicamente -->
                 </div>
 
-                <button type="button" class="btn btn-outline-light btn-sm rounded-pill fw-bold w-100" id="btn_agregar_pago" style="border-color: rgba(255, 255, 255, 0.2); color: #cbd5e1;">
+                <button type="button" class="btn pos-btn-secondary-action btn-sm rounded-pill fw-bold w-100" id="btn_agregar_pago">
                     <i class="fa-solid fa-plus me-1"></i> Agregar otro método de pago
                 </button>
             </div>
@@ -877,7 +930,7 @@
 
             if (retomasContainer) {
                 retomasContainer.innerHTML = retomasLista.map((r, i) => `
-                    <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light text-dark small">
+                    <div class="d-flex justify-content-between align-items-center py-1 retoma-item-row small">
                         <div class="text-truncate me-2" style="max-width: 65%;">
                             <strong class="text-danger"><i class="fa-solid fa-mobile-screen me-1"></i>${r.marca ? r.marca + ' ' : ''}${r.modelo}</strong>
                             <small class="text-muted d-block text-truncate" style="font-size: 0.75rem;">IMEI: ${r.imei1} ${r.color ? '| ' + r.color : ''}</small>
