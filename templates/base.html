@@ -1727,6 +1727,12 @@
                             <a class="sidebar-sublink" href="/gastos">
                                 <i class="fa-solid fa-money-bill-transfer me-2" style="width: 16px;"></i> Control de Gastos
                             </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('exchanges_bp.index') }}">
+                                <span><i class="fa-solid fa-arrow-right-arrow-left me-2" style="width: 16px;"></i> Cambios Celulares</span>
+                                {% if pending_exchanges_count > 0 %}
+                                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_exchanges_count }}</span>
+                                {% endif %}
+                            </a>
                             <a class="sidebar-sublink" href="/admin/maneos">
                                 <i class="fa-solid fa-handshake me-2" style="width: 16px;"></i> Maneos
                             </a>
@@ -1807,6 +1813,12 @@
                         <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-finanzas"><i class="fa-solid fa-hand-holding-dollar"></i></div> Vales</span>
                         {% if pending_vales_count > 0 %}
                             <span class="badge bg-warning text-dark rounded-pill">{{ pending_vales_count }}</span>
+                        {% endif %}
+                    </a>
+                    <a class="sidebar-link d-flex justify-content-between align-items-center" href="{{ url_for('exchanges_bp.index') }}">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-arrow-right-arrow-left"></i></div> Cambios Celulares</span>
+                        {% if pending_exchanges_count > 0 %}
+                            <span class="badge bg-warning text-dark rounded-pill">{{ pending_exchanges_count }}</span>
                         {% endif %}
                     </a>
                     <a class="sidebar-link" href="/admin/maneos">

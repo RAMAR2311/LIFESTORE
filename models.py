@@ -291,6 +291,24 @@ class Product(db.Model):
                 return s
         return None
 
+    @property
+    def cambio_activo(self):
+        if not self.cambios_salida:
+            return None
+        for c in self.cambios_salida:
+            if c.estado == 'PENDIENTE':
+                return c
+        return None
+
+    @property
+    def cambio_activo(self):
+        if not self.cambios_salida:
+            return None
+        for c in self.cambios_salida:
+            if c.estado == 'PENDIENTE':
+                return c
+        return None
+
 class ProductVariant(db.Model):
     __tablename__ = 'product_variants'
 
@@ -1046,3 +1064,68 @@ class TechnicalService(db.Model):
 
     def __init__(self, **kwargs):
         super(TechnicalService, self).__init__(**kwargs)
+
+
+class ExchangePartner(db.Model):
+    """Aliados comerciales, empresas o personas con las que se realizan intercambios/cambios de mercancía."""
+    __tablename__ = 'exchange_partners'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(150), nullable=False)
+    contacto = db.Column(db.String(50), nullable=True) # Teléfono / WhatsApp
+    documento_o_nit = db.Column(db.String(50), nullable=True)
+    direccion = db.Column(db.String(200), nullable=True)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=obtener_hora_bogota)
+
+    cambios = db.relationship('DeviceExchange', backref='partner', lazy=True)
+
+    def __init__(self, **kwargs):
+        super(ExchangePartner, self).__init__(**kwargs)
+
+
+class DeviceExchange(db.Model):
+    """Registro de intercambios de celulares con terceros (salida de un equipo a cambio de otro)."""
+    __tablename__ = 'device_exchanges'
+
+    id = db.Column(db.Integer, primary_key=True)
+    partner_id = db.Column(db.Integer, db.ForeignKey('exchange_partners.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+
+    # Equipo que sale del inventario
+    product_salida_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    imei_salida = db.Column(db.String(50), nullable=True, index=True)
+    modelo_salida = db.Column(db.String(150), nullable=True)
+    costo_salida = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
+
+    # Equipo que se recibe a cambio (cuando se completa)
+    product_entrada_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True, index=True)
+    marca_entrada = db.Column(db.String(100), nullable=True)
+    modelo_entrada = db.Column(db.String(150), nullable=True)
+    color_entrada = db.Column(db.String(50), nullable=True)
+    memoria_entrada = db.Column(db.String(50), nullable=True)
+    imei1_entrada = db.Column(db.String(50), nullable=True, index=True)
+    imei2_entrada = db.Column(db.String(50), nullable=True)
+    costo_entrada = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
+    precio_minimo_entrada = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
+    precio_sugerido_entrada = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
+
+    # Estado y Trazabilidad: 'PENDIENTE', 'COMPLETADO', 'DEVUELTO'
+    estado = db.Column(db.String(20), nullable=False, default='PENDIENTE', index=True)
+    motivo_salida = db.Column(db.Text, nullable=True)
+    observacion_resolucion = db.Column(db.Text, nullable=True)
+    fecha_salida = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False, index=True)
+    fecha_resolucion = db.Column(db.DateTime, nullable=True)
+
+    # Relaciones
+    producto_salida = db.relationship('Product', foreign_keys=[product_salida_id], backref=db.backref('cambios_salida', lazy=True))
+    producto_entrada = db.relationship('Product', foreign_keys=[product_entrada_id], backref=db.backref('cambios_entrada', lazy=True))
+    usuario = db.relationship('User', foreign_keys=[user_id], backref=db.backref('cambios_registrados', lazy=True))
+    resolved_by = db.relationship('User', foreign_keys=[resolved_by_id], backref=db.backref('cambios_resueltos', lazy=True))
+    branch = db.relationship('Branch', backref=db.backref('cambios_mercancia', lazy=True))
+
+    def __init__(self, **kwargs):
+        super(DeviceExchange, self).__init__(**kwargs)
+

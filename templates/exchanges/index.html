@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-0 px-md-3">
+    <!-- Encabezado y Acciones Principales -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-brand-black m-0 d-flex align-items-center gap-2">
+                <span class="badge bg-info bg-opacity-15 text-dark p-2 rounded-3 border border-info border-opacity-25">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                </span>
+                Módulo de Cambios de Celulares
+            </h2>
+            <p class="text-muted small mb-0 mt-1">Control y trazabilidad de celulares entregados a cambio con terceros o aliados comerciales.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <!-- Botón Crear Aliado -->
+            <button type="button" class="btn btn-outline-dark rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCrearAliado">
+                <i class="fa-solid fa-handshake me-1 text-primary"></i> + Registrar Aliado
+            </button>
+            <!-- Botón Directorio de Aliados -->
+            <button type="button" class="btn btn-light border rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDirectorioAliados" title="Directorio de Aliados">
+                <i class="fa-solid fa-address-book text-muted"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Métricas Rápidas -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Pendientes por Recibir</div>
+                        <div class="fs-4 fw-bolder text-warning">{{ pendientes_count }}</div>
+                    </div>
+                    <div class="p-3 bg-warning bg-opacity-10 rounded-circle text-warning fs-5">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Cambios Completados</div>
+                        <div class="fs-4 fw-bolder text-success">{{ completados_count }}</div>
+                    </div>
+                    <div class="p-3 bg-success bg-opacity-10 rounded-circle text-success fs-5">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Devueltos / Cancelados</div>
+                        <div class="fs-4 fw-bolder text-secondary">{{ devueltos_count }}</div>
+                    </div>
+                    <div class="p-3 bg-secondary bg-opacity-10 rounded-circle text-secondary fs-5">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card card-custom border-0 shadow-sm p-3 mb-4">
+        <form method="GET" action="{{ url_for('exchanges_bp.index') }}" class="row g-2 align-items-center">
+            <div class="col-12 col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input type="text" name="q" class="form-control bg-light border-start-0" placeholder="Buscar por IMEI, Modelo o Aliado..." value="{{ q }}">
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="estado" class="form-select bg-light">
+                    <option value="">Todos los Estados</option>
+                    <option value="PENDIENTE" {% if filtro_estado == 'PENDIENTE' %}selected{% endif %}>⏳ Pendientes</option>
+                    <option value="COMPLETADO" {% if filtro_estado == 'COMPLETADO' %}selected{% endif %}>✅ Completados</option>
+                    <option value="DEVUELTO" {% if filtro_estado == 'DEVUELTO' %}selected{% endif %}>↩️ Devueltos al Stock</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="partner_id" class="form-select bg-light">
+                    <option value="">Todos los Aliados</option>
+                    {% for p in partners %}
+                    <option value="{{ p.id }}" {% if filtro_partner == p.id %}selected{% endif %}>{{ p.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary w-100 rounded-3" title="Filtrar">
+                    <i class="fa-solid fa-filter"></i>
+                </button>
+                {% if q or filtro_estado or filtro_partner %}
+                <a href="{{ url_for('exchanges_bp.index') }}" class="btn btn-outline-secondary rounded-3" title="Limpiar Filtros">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla Principal de Registros de Cambio -->
+    <div class="card card-custom border-0 shadow-sm p-0">
+        <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold m-0 text-brand-black">
+                <i class="fa-solid fa-list-check text-info me-2"></i> Registro de Intercambios Realizados ({{ cambios|length }})
+            </h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                <thead class="bg-light text-nowrap">
+                    <tr>
+                        <th class="ps-4">FECHA / SEDE</th>
+                        <th>ALIADO / PERSONA</th>
+                        <th>EQUIPO ENTREGADO (SALIDA)</th>
+                        <th>EQUIPO RECIBIDO (ENTRADA)</th>
+                        <th>ESTADO</th>
+                        <th class="text-end pe-4">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cambios %}
+                    <tr>
+                        <!-- Fecha / Sede -->
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">{{ c.fecha_salida.strftime('%d/%m/%Y') }}</div>
+                            <small class="text-muted d-block">{{ c.fecha_salida.strftime('%I:%M %p') }}</small>
+                            <span class="badge bg-light text-secondary border px-2 py-0 mt-1" style="font-size: 0.7rem;">
+                                <i class="fa-solid fa-shop me-1"></i>{{ c.branch.nombre if c.branch else 'Principal' }}
+                            </span>
+                        </td>
+
+                        <!-- Aliado / Persona -->
+                        <td>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-1">
+                                <i class="fa-solid fa-user-tag text-info"></i>
+                                <span>{{ c.partner.nombre if c.partner else 'Tercero' }}</span>
+                            </div>
+                            {% if c.partner and c.partner.contacto %}
+                                <small class="text-muted font-mono"><i class="fa-brands fa-whatsapp text-success me-1"></i>{{ c.partner.contacto }}</small>
+                            {% endif %}
+                        </td>
+
+                        <!-- Equipo Entregado (Salida) -->
+                        <td>
+                            <div class="fw-bold text-brand-black">{{ c.modelo_salida }}</div>
+                            {% if c.imei_salida %}
+                                <span class="badge bg-dark text-white font-mono px-2 py-0" style="font-size: 0.72rem;">IMEI: {{ c.imei_salida }}</span>
+                            {% endif %}
+                            <div class="text-muted small mt-1">Costo ref: ${{ c.costo_salida|cop }}</div>
+                            {% if c.motivo_salida %}
+                                <div class="text-truncate text-muted small" style="max-width: 200px;" title="{{ c.motivo_salida }}">
+                                    <em>Nota: {{ c.motivo_salida }}</em>
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Equipo Recibido (Entrada) -->
+                        <td>
+                            {% if c.estado == 'COMPLETADO' and c.modelo_entrada %}
+                                <div class="fw-bold text-success">{{ c.marca_entrada or '' }} {{ c.modelo_entrada }}</div>
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono px-2 py-0" style="font-size: 0.72rem;">
+                                    IMEI: {{ c.imei1_entrada }}
+                                </span>
+                                <div class="text-muted small mt-1">
+                                    Nuevo Costo: <strong>${{ c.costo_entrada|cop }}</strong> | Sug: ${{ c.precio_sugerido_entrada|cop }}
+                                </div>
+                            {% elif c.estado == 'DEVUELTO' %}
+                                <span class="text-muted small fst-italic">
+                                    <i class="fa-solid fa-rotate-left me-1"></i> Cancelado. Se devolvió el celular original al inventario.
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark px-2 py-1 rounded-pill">
+                                    <i class="fa-solid fa-hourglass-half me-1"></i> Esperando nuevo celular
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Estado -->
+                        <td>
+                            {% if c.estado == 'PENDIENTE' %}
+                                <span class="badge bg-warning text-dark px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-clock me-1"></i> Pendiente
+                                </span>
+                            {% elif c.estado == 'COMPLETADO' %}
+                                <span class="badge bg-success px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-circle-check me-1"></i> Completado
+                                </span>
+                            {% elif c.estado == 'DEVUELTO' %}
+                                <span class="badge bg-secondary px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-rotate-left me-1"></i> Devuelto
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="text-end pe-4">
+                            {% if c.estado == 'PENDIENTE' %}
+                                <div class="d-flex justify-content-end gap-1">
+                                    <!-- Botón Recibir Celular -->
+                                    <button type="button" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalRecibirCambio{{ c.id }}">
+                                        <i class="fa-solid fa-plus-circle me-1"></i> Recibir Celular
+                                    </button>
+                                    <!-- Botón Devolver Celular al Stock -->
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDevolverCambio{{ c.id }}" title="Cancelar y devolver celular original al inventario">
+                                        <i class="fa-solid fa-rotate-left me-1"></i> Devolver
+                                    </button>
+                                </div>
+                            {% else %}
+                                <span class="badge bg-light text-muted border px-2 py-1 small">Resuelto</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- MODAL RECIBIR NUEVO CELULAR POR CAMBIO -->
+                    {% if c.estado == 'PENDIENTE' %}
+                    <div class="modal fade text-start" id="modalRecibirCambio{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-header border-bottom py-3">
+                                    <h6 class="modal-title fw-bold text-brand-black">
+                                        <i class="fa-solid fa-circle-plus text-success me-2"></i>
+                                        Recibir Celular a Cambio (Canje #{% if c.id %}{{ c.id }}{% endif %})
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('exchanges_bp.recibir_celular_cambio', exchange_id=c.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-body py-3">
+                                        <!-- Resumen de Salida -->
+                                        <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <strong>Equipo Entregado:</strong> {{ c.modelo_salida }}
+                                                <span class="badge bg-dark text-white font-mono">IMEI: {{ c.imei_salida }}</span>
+                                            </div>
+                                            <div class="text-muted">Aliado: <strong>{{ c.partner.nombre if c.partner else 'Tercero' }}</strong> | Costo de Referencia Original: ${{ c.costo_salida|cop }}</div>
+                                        </div>
+
+                                        <h6 class="fw-bold small text-muted text-uppercase mb-2">Datos del Nuevo Celular que se Recibe:</h6>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Marca *</label>
+                                                <select name="marca_entrada" class="form-select form-select-sm" required>
+                                                    <option value="Apple" selected>Apple</option>
+                                                    <option value="Samsung">Samsung</option>
+                                                    <option value="Ray-Ban Meta">Ray-Ban Meta</option>
+                                                    <option value="Xiaomi">Xiaomi</option>
+                                                    <option value="Motorola">Motorola</option>
+                                                    <option value="Otra">Otra</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <label class="form-label small fw-bold text-muted">Modelo / Referencia *</label>
+                                                <input type="text" name="modelo_entrada" class="form-control form-control-sm" placeholder="Ej: iPhone 16 Pro Dorado" required>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-bold text-muted">Color</label>
+                                                <input type="text" name="color_entrada" class="form-control form-control-sm" placeholder="Ej: Dorado, Negro">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Capacidad / Memoria</label>
+                                                <input type="text" name="memoria_entrada" class="form-control form-control-sm" placeholder="Ej: 128GB, 256GB">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Batería (%)</label>
+                                                <input type="text" name="bateria_entrada" class="form-control form-control-sm" placeholder="Ej: 100% o N/A">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Inventario</label>
+                                                <input type="text" name="inventario_entrada" class="form-control form-control-sm" value="Usado" placeholder="Ej: Nuevo, Usado, Vitrina">
+                                            </div>
+                                        </div>
+
+                                        <h6 class="fw-bold small text-muted text-uppercase mb-2">Identificadores IMEI:</h6>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted">IMEI 1 (Principal) *</label>
+                                                <input type="text" name="imei1_entrada" class="form-control form-control-sm font-mono" placeholder="Ingresa el IMEI de 15 dígitos" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted">IMEI 2 (Opcional)</label>
+                                                <input type="text" name="imei2_entrada" class="form-control form-control-sm font-mono" placeholder="Segundo IMEI si aplica">
+                                            </div>
+                                        </div>
+
+                                        <h6 class="fw-bold small text-muted text-uppercase mb-2">Precios y Ubicación:</h6>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Precio de Costo ($ COP) *</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" step="1000" name="costo_entrada" class="form-control" value="{{ "%.0f"|format(c.costo_salida|float) if c.costo_salida else '0' }}" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Precio Mínimo ($ COP) *</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" step="1000" name="precio_minimo_entrada" class="form-control" placeholder="0" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Precio Sugerido ($ COP) *</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" step="1000" name="precio_sugerido_entrada" class="form-control" placeholder="0" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-12 mt-2">
+                                                <label class="form-label small fw-bold text-muted">Sucursal / Bodega donde se alojará este equipo *</label>
+                                                <select name="branch_id" class="form-select form-select-sm">
+                                                    {% for b in sucursales %}
+                                                    <option value="{{ b.id }}" {% if c.branch_id == b.id %}selected{% endif %}>
+                                                        {% if b.tipo == 'bodega' %}📦 BODEGA: {% else %}🏪 TIENDA: {% endif %}{{ b.nombre }} ({{ b.codigo }})
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label class="form-label small fw-bold text-muted">Observaciones de la Recepción</label>
+                                            <input type="text" name="observacion_resolucion" class="form-control form-control-sm" placeholder="Ej: Equipo recibido en perfecto estado con caja...">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-top py-2">
+                                        <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                            <i class="fa-solid fa-check me-1"></i> Guardar e Ingresar al Inventario
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL DEVOLVER CELULAR AL INVENTARIO (CANCELAR CAMBIO) -->
+                    <div class="modal fade text-start" id="modalDevolverCambio{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-sm">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-header border-bottom py-3">
+                                    <h6 class="modal-title fw-bold text-brand-black">
+                                        <i class="fa-solid fa-rotate-left text-danger me-2"></i>Devolver al Inventario
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('exchanges_bp.devolver_al_inventario', exchange_id=c.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-body py-3">
+                                        <p class="small text-muted mb-2">
+                                            ¿El aliado comercial te devolvió el mismo celular o se canceló el canje?
+                                        </p>
+                                        <div class="p-2 bg-light rounded border mb-3 small">
+                                            <strong>{{ c.modelo_salida }}</strong><br>
+                                            <span class="font-mono text-muted">IMEI: {{ c.imei_salida }}</span>
+                                        </div>
+                                        <p class="small text-dark mb-2">
+                                            Al confirmar, este celular <strong>volverá a sumar 1 unidad a su stock activo</strong> en la sucursal de origen.
+                                        </p>
+                                        <label class="form-label small fw-bold text-muted">Motivo / Justificación</label>
+                                        <textarea name="observacion_devolucion" class="form-control form-control-sm" rows="2" placeholder="Ej: No se concretó el negocio, equipo devuelto..."></textarea>
+                                    </div>
+                                    <div class="modal-footer border-top py-2">
+                                        <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                            <i class="fa-solid fa-rotate-left me-1"></i> Confirmar Devolución
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-arrow-right-arrow-left fa-3x text-secondary opacity-25 mb-3 d-block"></i>
+                            <h6 class="fw-bold">No hay registros de cambios de celulares</h6>
+                            <p class="small mb-0">Puedes entregar celulares a cambio directamente desde el Inventario de Celulares usando el botón de canje.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CREAR ALIADO / EMPRESA -->
+<div class="modal fade text-start" id="modalCrearAliado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-handshake text-primary me-2"></i>Registrar Aliado / Empresa
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('exchanges_bp.crear_aliado') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body py-3">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Nombre de la Empresa o Persona *</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Ej: TecnoStore / Pedro Gómez" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Teléfono / WhatsApp</label>
+                        <input type="text" name="contacto" class="form-control" placeholder="Ej: 3101234567">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Documento o NIT</label>
+                        <input type="text" name="documento_o_nit" class="form-control" placeholder="Ej: 901234567-1">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-muted">Dirección o Local</label>
+                        <input type="text" name="direccion" class="form-control" placeholder="Ej: Local 203 Pasaje Central">
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2">
+                    <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-check me-1"></i> Guardar Aliado
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DIRECTORIO DE ALIADOS -->
+<div class="modal fade text-start" id="modalDirectorioAliados" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-address-book text-primary me-2"></i> Directorio de Aliados Comerciales ({{ partners|length }})
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for p in partners %}
+                    <div class="list-group-item p-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-dark">{{ p.nombre }}</div>
+                            <div class="small text-muted">
+                                {% if p.documento_o_nit %}<span class="badge bg-light text-dark border me-1">NIT/Doc: {{ p.documento_o_nit }}</span>{% endif %}
+                                {% if p.direccion %}<i class="fa-solid fa-location-dot me-1 text-danger"></i>{{ p.direccion }}{% endif %}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            {% if p.contacto %}
+                                <a href="https://wa.me/57{{ p.contacto|replace(' ', '') }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm">
+                                    <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        No hay aliados registrados. Usa el botón "+ Registrar Aliado".
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

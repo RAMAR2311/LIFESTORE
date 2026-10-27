@@ -171,6 +171,12 @@
         <a href="{{ url_for('celulares_bp.inventario', estado='soporte', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-danger {% if estado == 'soporte' %}active fw-bold bg-danger text-white border-danger{% endif %}">
             <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Soporte ({{ celulares_en_soporte }})
         </a>
+        <a href="{{ url_for('celulares_bp.inventario', estado='cambio', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-info text-dark {% if estado == 'cambio' %}active fw-bold bg-info text-dark border-info{% endif %}">
+            <i class="fa-solid fa-arrow-right-arrow-left me-1"></i> En Cambio ({{ celulares_en_cambio }})
+        </a>
+        <a href="{{ url_for('celulares_bp.inventario', estado='cambio', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-info text-dark {% if estado == 'cambio' %}active fw-bold bg-info text-dark border-info{% endif %}">
+            <i class="fa-solid fa-arrow-right-arrow-left me-1"></i> En Cambio ({{ celulares_en_cambio }})
+        </a>
         <a href="{{ url_for('celulares_bp.inventario', estado='vendidos', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-dark {% if estado == 'vendidos' %}active fw-bold{% endif %}">
             <i class="fa-solid fa-check me-1"></i> Vendidos
         </a>
@@ -250,7 +256,16 @@
                     <td class="text-brand-black fw-bolder">${{ c.precio_sugerido|cop }}</td>
                     
                     <td class="pe-3 text-center">
-                        {% if c.soporte_activo %}
+                        {% if c.cambio_activo %}
+                            <div class="d-flex flex-column align-items-center gap-1">
+                                <span class="badge bg-info text-dark fw-bold shadow-sm rounded-pill px-2 py-1" style="font-size: 0.72rem;" title="En cambio con {{ c.cambio_activo.partner.nombre if c.cambio_activo.partner else 'Tercero' }}">
+                                    <i class="fa-solid fa-arrow-right-arrow-left me-1"></i>En Cambio: {{ c.cambio_activo.partner.nombre if c.cambio_activo.partner else 'Tercero' }}
+                                </span>
+                                <a href="{{ url_for('exchanges_bp.index', q=c.imei) }}" class="btn btn-xs btn-outline-info text-dark rounded-pill py-0 px-2 shadow-sm" style="font-size: 0.7rem;" title="Gestionar Cambio">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Gestionar
+                                </a>
+                            </div>
+                        {% elif c.soporte_activo %}
                             <div class="d-flex flex-column align-items-center gap-1">
                                 <span class="badge bg-danger text-white fw-bold shadow-sm rounded-pill px-2 py-1" style="font-size: 0.72rem;" title="En taller técnico: {{ c.soporte_activo.tipo_arreglo }}">
                                     <i class="fa-solid fa-screwdriver-wrench me-1"></i>En Soporte: {{ c.soporte_activo.technician.nombre if c.soporte_activo.technician else 'En Revisión' }}
@@ -280,6 +295,14 @@
                                 <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Prestar a Local Vecino (Maneo)" data-bs-toggle="modal" data-bs-target="#modalPrestarCelular{{ c.id }}">
                                     <i class="fa-solid fa-handshake text-dark" style="font-size: 0.75rem;"></i>
                                 </button>
+                                <!-- Botón Rápido: Cambio de Celular con Tercero -->
+                                <button type="button" class="btn btn-sm btn-outline-info text-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Cambio de Celular con Aliado/Tercero" data-bs-toggle="modal" data-bs-target="#modalCambioCelular{{ c.id }}">
+                                    <i class="fa-solid fa-arrow-right-arrow-left" style="font-size: 0.75rem;"></i>
+                                </button>
+                                <!-- Botón Rápido: Cambio de Celular con Tercero -->
+                                <button type="button" class="btn btn-sm btn-outline-info text-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Cambio de Celular con Aliado/Tercero" data-bs-toggle="modal" data-bs-target="#modalCambioCelular{{ c.id }}">
+                                    <i class="fa-solid fa-arrow-right-arrow-left" style="font-size: 0.75rem;"></i>
+                                </button>
                                 <!-- Botón Rápido: Enviar a Soporte Técnico / Taller -->
                                 <button type="button" class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Enviar a Soporte Técnico / Reparación" data-bs-toggle="modal" data-bs-target="#modalSoporteTecnico{{ c.id }}">
                                     <i class="fa-solid fa-screwdriver-wrench" style="font-size: 0.75rem;"></i>
@@ -293,6 +316,132 @@
                                         <i class="fa-solid fa-trash-can" style="font-size: 0.75rem;"></i>
                                     </button>
                                 </form>
+                            </div>
+
+
+                            <!-- Modal Salida a Cambio de Celular -->
+                            <div class="modal fade text-start" id="modalCambioCelular{{ c.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow-lg rounded-4">
+                                        <div class="modal-header border-bottom py-3">
+                                            <h6 class="fw-bold text-brand-black mb-0">
+                                                <i class="fa-solid fa-arrow-right-arrow-left text-info me-2"></i>Cambio de Celular con Tercero
+                                            </h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('exchanges_bp.registrar_salida_cambio', product_id=c.id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <div class="modal-body py-3">
+                                                <p class="small text-muted mb-2">
+                                                    Vas a entregar este celular a un aliado comercial o persona a cambio de otro equipo que llegará luego. Su stock pasará a 0 y se trasladará a <strong>Cambios de Celulares</strong>.
+                                                </p>
+                                                <div class="p-3 rounded-3 bg-light border mb-3 small">
+                                                    <div class="fw-bold fs-6 text-dark">{{ c.marca }} {{ c.modelo_celular or c.nombre }}</div>
+                                                    <div class="font-monospace text-muted mt-1">IMEI: {{ c.imei }}</div>
+                                                    <div class="text-muted">Color: {{ c.color or 'N/A' }} | Costo Ref: ${{ c.precio_costo|cop }}</div>
+                                                </div>
+
+                                                <!-- Selector de Aliado Existente -->
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold small text-muted">Persona / Empresa que recibe el celular *</label>
+                                                    <select name="partner_id" id="partner_select_{{ c.id }}" class="form-select form-select-sm" onchange="toggleNuevoAliado({{ c.id }}, this.value)">
+                                                        <option value="">-- Seleccionar Aliado Registrado --</option>
+                                                        {% for part in partners_disponibles %}
+                                                        <option value="{{ part.id }}">{{ part.nombre }} {% if part.contacto %}({{ part.contacto }}){% endif %}</option>
+                                                        {% endfor %}
+                                                        <option value="__NUEVO__">+ Registrar Nueva Persona / Aliado</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Formulario en línea para nuevo aliado si elige __NUEVO__ -->
+                                                <div id="nuevo_aliado_fields_{{ c.id }}" class="p-2 mb-3 bg-light rounded border" style="display: none;">
+                                                    <div class="mb-2">
+                                                        <label class="form-label extra-small fw-bold text-muted">Nombre de la Persona / Empresa *</label>
+                                                        <input type="text" name="nuevo_partner_nombre" class="form-control form-control-sm" placeholder="Ej: Celulares Express / Pedro">
+                                                    </div>
+                                                    <div>
+                                                        <label class="form-label extra-small fw-bold text-muted">Teléfono / WhatsApp</label>
+                                                        <input type="text" name="nuevo_partner_contacto" class="form-control form-control-sm" placeholder="Ej: 3101234567">
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-2">
+                                                    <label class="form-label fw-bold small text-muted">Motivo / Equipo esperado a cambio</label>
+                                                    <textarea name="motivo_salida" class="form-control form-control-sm" rows="2" placeholder="Ej: Se entrega negro a cambio de uno dorado que llega mañana..."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-top py-2">
+                                                <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-info text-dark rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                                    <i class="fa-solid fa-paper-plane me-1"></i> Entregar a Cambio
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <!-- Modal Salida a Cambio de Celular -->
+                            <div class="modal fade text-start" id="modalCambioCelular{{ c.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow-lg rounded-4">
+                                        <div class="modal-header border-bottom py-3">
+                                            <h6 class="fw-bold text-brand-black mb-0">
+                                                <i class="fa-solid fa-arrow-right-arrow-left text-info me-2"></i>Cambio de Celular con Tercero
+                                            </h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('exchanges_bp.registrar_salida_cambio', product_id=c.id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <div class="modal-body py-3">
+                                                <p class="small text-muted mb-2">
+                                                    Vas a entregar este celular a un aliado comercial o persona a cambio de otro equipo que llegará luego. Su stock pasará a 0 y se trasladará a <strong>Cambios de Celulares</strong>.
+                                                </p>
+                                                <div class="p-3 rounded-3 bg-light border mb-3 small">
+                                                    <div class="fw-bold fs-6 text-dark">{{ c.marca }} {{ c.modelo_celular or c.nombre }}</div>
+                                                    <div class="font-monospace text-muted mt-1">IMEI: {{ c.imei }}</div>
+                                                    <div class="text-muted">Color: {{ c.color or 'N/A' }} | Costo Ref: ${{ c.precio_costo|cop }}</div>
+                                                </div>
+
+                                                <!-- Selector de Aliado Existente -->
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold small text-muted">Persona / Empresa que recibe el celular *</label>
+                                                    <select name="partner_id" id="partner_select_{{ c.id }}" class="form-select form-select-sm" onchange="toggleNuevoAliado({{ c.id }}, this.value)">
+                                                        <option value="">-- Seleccionar Aliado Registrado --</option>
+                                                        {% for part in partners_disponibles %}
+                                                        <option value="{{ part.id }}">{{ part.nombre }} {% if part.contacto %}({{ part.contacto }}){% endif %}</option>
+                                                        {% endfor %}
+                                                        <option value="__NUEVO__">+ Registrar Nueva Persona / Aliado</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Formulario en línea para nuevo aliado si elige __NUEVO__ -->
+                                                <div id="nuevo_aliado_fields_{{ c.id }}" class="p-2 mb-3 bg-light rounded border" style="display: none;">
+                                                    <div class="mb-2">
+                                                        <label class="form-label extra-small fw-bold text-muted">Nombre de la Persona / Empresa *</label>
+                                                        <input type="text" name="nuevo_partner_nombre" class="form-control form-control-sm" placeholder="Ej: Celulares Express / Pedro">
+                                                    </div>
+                                                    <div>
+                                                        <label class="form-label extra-small fw-bold text-muted">Teléfono / WhatsApp</label>
+                                                        <input type="text" name="nuevo_partner_contacto" class="form-control form-control-sm" placeholder="Ej: 3101234567">
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-2">
+                                                    <label class="form-label fw-bold small text-muted">Motivo / Equipo esperado a cambio</label>
+                                                    <textarea name="motivo_salida" class="form-control form-control-sm" rows="2" placeholder="Ej: Se entrega negro a cambio de uno dorado que llega mañana..."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-top py-2">
+                                                <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-info text-dark rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                                    <i class="fa-solid fa-paper-plane me-1"></i> Entregar a Cambio
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Modal Enviar a Soporte Técnico -->
@@ -599,6 +748,15 @@ function toggleInputPrecio(inputId, enabled) {
     if (!el) return;
     el.disabled = !enabled;
     el.required = enabled;
+}
+</script>
+
+
+<script>
+function toggleNuevoAliado(id, val) {
+    const fields = document.getElementById('nuevo_aliado_fields_' + id);
+    if (!fields) return;
+    fields.style.display = (val === '__NUEVO__') ? 'block' : 'none';
 }
 </script>
 

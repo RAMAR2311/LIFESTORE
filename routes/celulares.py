@@ -74,16 +74,15 @@ def inventario():
         Product.maneos.any(Maneo.estado == 'PENDIENTE')
     ).count()
 
-    from models import TechnicalService
+    from models import TechnicalService, DeviceExchange, ExchangePartner
     celulares_en_soporte = Product.query.filter(
         Product.tipo_inventario == 'celulares',
         Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
     ).count()
 
-    from models import TechnicalService
-    celulares_en_soporte = Product.query.filter(
+    celulares_en_cambio = Product.query.filter(
         Product.tipo_inventario == 'celulares',
-        Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
+        Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE')
     ).count()
 
     active_b_id = None
@@ -99,6 +98,7 @@ def inventario():
         selectinload(Product.detalles_venta).joinedload(SaleDetail.venta),
         selectinload(Product.maneos),
         selectinload(Product.servicios_tecnicos).joinedload(TechnicalService.technician),
+        selectinload(Product.cambios_salida).joinedload(DeviceExchange.partner),
         selectinload(Product.branch_stocks).joinedload(BranchStock.branch)
     ).filter_by(tipo_inventario='celulares')
 
@@ -125,12 +125,15 @@ def inventario():
         base_query = base_query.filter(Product.maneos.any(Maneo.estado == 'PENDIENTE'))
     elif estado == 'soporte':
         base_query = base_query.filter(Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])))
+    elif estado == 'cambio':
+        base_query = base_query.filter(Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE'))
     elif estado == 'vendidos':
-        # Vendidos reales: sin stock y que no estén en préstamo de maneo ni en soporte
+        # Vendidos reales: sin stock y que no estén en préstamo de maneo, soporte ni cambio
         base_query = base_query.filter(
             Product.cantidad_stock == 0,
             ~Product.maneos.any(Maneo.estado == 'PENDIENTE'),
-            ~Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
+            ~Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])),
+            ~Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE')
         )
 
     if referencias_seleccionadas:
@@ -170,8 +173,11 @@ def inventario():
     tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
     sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
 
+    partners_disponibles = ExchangePartner.query.filter_by(activo=True).order_by(ExchangePartner.nombre.asc()).all()
     return render_template('celulares/inventario.html',
-                           tecnicos_disponibles=tecnicos_disponibles, 
+                           tecnicos_disponibles=tecnicos_disponibles,
+                           partners_disponibles=partners_disponibles,
+                           celulares_en_cambio=celulares_en_cambio,
                            celulares=paginacion.items,
                            paginacion=paginacion,
                            q=q,

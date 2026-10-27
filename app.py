@@ -129,6 +129,10 @@ def create_app():
     from routes.support import support_bp
     app.register_blueprint(support_bp, url_prefix='/soporte')
 
+    # Registro de Blueprint Cambios de Celulares
+    from routes.exchanges import exchanges_bp
+    app.register_blueprint(exchanges_bp, url_prefix='/cambios-celulares')
+
 
     @app.template_filter('cop')
     def cop_filter(value):
@@ -161,7 +165,7 @@ def create_app():
         pending_vales_count = 0
         pending_support_count = 0
         if current_user.is_authenticated:
-            from models import StockTransfer, Vale, TechnicalService
+            from models import StockTransfer, Vale, TechnicalService, DeviceExchange
             q_pend = StockTransfer.query.filter_by(status='PENDIENTE')
             if current_user.rol != 'admin':
                 if current_user.branch_id:
@@ -190,6 +194,14 @@ def create_app():
                 q_sup = q_sup.filter(TechnicalService.branch_id == active_id)
             pending_support_count = q_sup.count()
 
+            q_ex = DeviceExchange.query.filter_by(estado='PENDIENTE')
+            if current_user.rol != 'admin':
+                if current_user.branch_id:
+                    q_ex = q_ex.filter(DeviceExchange.branch_id == current_user.branch_id)
+            elif active_id:
+                q_ex = q_ex.filter(DeviceExchange.branch_id == active_id)
+            pending_exchanges_count = q_ex.count()
+
         return {
             'get_active_branch_id': get_active_branch_id,
             'active_branch_id': active_id,
@@ -197,7 +209,8 @@ def create_app():
             'all_branches': Branch.query.filter_by(activa=True).all() if current_user.is_authenticated else [],
             'pending_transfers_count': pending_transfers_count,
             'pending_vales_count': pending_vales_count,
-            'pending_support_count': pending_support_count
+            'pending_support_count': pending_support_count,
+            'pending_exchanges_count': pending_exchanges_count
         }
 
     @app.route('/')
