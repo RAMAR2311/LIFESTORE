@@ -282,6 +282,15 @@ class Product(db.Model):
                 return m
         return None
 
+    @property
+    def soporte_activo(self):
+        if not self.servicios_tecnicos:
+            return None
+        for s in self.servicios_tecnicos:
+            if s.estado in ['EN_REVISION', 'EN_REPARACION']:
+                return s
+        return None
+
 class ProductVariant(db.Model):
     __tablename__ = 'product_variants'
 
@@ -980,6 +989,60 @@ class Vale(db.Model):
     def __init__(self, **kwargs):
         super(Vale, self).__init__(**kwargs)
 
+class Technician(db.Model):
+    """Modelo de Tecnicos / Talleres encargados de reparaciones y soporte tecnico."""
+    __tablename__ = 'technicians'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(120), nullable=False)
+    telefono = db.Column(db.String(50), nullable=True)
+    especialidad = db.Column(db.String(150), nullable=True)
+    direccion_taller = db.Column(db.String(200), nullable=True)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=obtener_hora_bogota)
+
+    servicios = db.relationship('TechnicalService', backref='technician', lazy=True)
+
+    def __init__(self, **kwargs):
+        super(Technician, self).__init__(**kwargs)
 
 
+class TechnicalService(db.Model):
+    """Ordenes de soporte tecnico / reparacion para celulares de Inventario o Garantias."""
+    __tablename__ = 'technical_services'
 
+    id = db.Column(db.Integer, primary_key=True)
+    origen = db.Column(db.String(20), nullable=False, default='INVENTARIO', index=True) # 'INVENTARIO' o 'GARANTIA'
+    
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True, index=True)
+    warranty_id = db.Column(db.Integer, db.ForeignKey('warranties.id'), nullable=True, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+    technician_id = db.Column(db.Integer, db.ForeignKey('technicians.id'), nullable=True, index=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    marca = db.Column(db.String(100), nullable=True)
+    modelo = db.Column(db.String(150), nullable=True)
+    imei = db.Column(db.String(50), nullable=True, index=True)
+    color = db.Column(db.String(50), nullable=True)
+
+    motivo_falla = db.Column(db.Text, nullable=False)
+    tipo_arreglo = db.Column(db.String(100), nullable=False, default='General', index=True)
+    estado = db.Column(db.String(30), nullable=False, default='EN_REVISION', index=True) # EN_REVISION, EN_REPARACION, REPARADO, NO_REPARABLE, ENTREGADO
+    
+    costo_reparacion = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
+    diagnostico_tecnico = db.Column(db.Text, nullable=True)
+    solucion_aplicada = db.Column(db.Text, nullable=True)
+
+    fecha_ingreso = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False, index=True)
+    fecha_estimada = db.Column(db.Date, nullable=True)
+    fecha_salida = db.Column(db.DateTime, nullable=True)
+
+    producto = db.relationship('Product', backref=db.backref('servicios_tecnicos', lazy=True))
+    garantia = db.relationship('Warranty', backref=db.backref('servicios_tecnicos', lazy=True))
+    branch = db.relationship('Branch', backref=db.backref('servicios_tecnicos', lazy=True))
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref=db.backref('servicios_creados', lazy=True))
+    resolved_by = db.relationship('User', foreign_keys=[resolved_by_id], backref=db.backref('servicios_resueltos', lazy=True))
+
+    def __init__(self, **kwargs):
+        super(TechnicalService, self).__init__(**kwargs)

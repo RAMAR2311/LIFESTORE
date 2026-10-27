@@ -125,6 +125,10 @@ def create_app():
     from routes.vales import vales_bp
     app.register_blueprint(vales_bp, url_prefix='/vales')
 
+    # Registro de Blueprint Soporte Técnico
+    from routes.support import support_bp
+    app.register_blueprint(support_bp, url_prefix='/soporte')
+
 
     @app.template_filter('cop')
     def cop_filter(value):
@@ -155,8 +159,9 @@ def create_app():
         # Conteo de traslados pendientes por recibir para la sucursal activa o usuario
         pending_transfers_count = 0
         pending_vales_count = 0
+        pending_support_count = 0
         if current_user.is_authenticated:
-            from models import StockTransfer, Vale
+            from models import StockTransfer, Vale, TechnicalService
             q_pend = StockTransfer.query.filter_by(status='PENDIENTE')
             if current_user.rol != 'admin':
                 if current_user.branch_id:
@@ -177,13 +182,22 @@ def create_app():
                 q_vales = q_vales.filter(Vale.branch_id == active_id)
             pending_vales_count = q_vales.count()
 
+            q_sup = TechnicalService.query.filter(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
+            if current_user.rol != 'admin':
+                if current_user.branch_id:
+                    q_sup = q_sup.filter(TechnicalService.branch_id == current_user.branch_id)
+            elif active_id:
+                q_sup = q_sup.filter(TechnicalService.branch_id == active_id)
+            pending_support_count = q_sup.count()
+
         return {
             'get_active_branch_id': get_active_branch_id,
             'active_branch_id': active_id,
             'active_branch': active_branch,
             'all_branches': Branch.query.filter_by(activa=True).all() if current_user.is_authenticated else [],
             'pending_transfers_count': pending_transfers_count,
-            'pending_vales_count': pending_vales_count
+            'pending_vales_count': pending_vales_count,
+            'pending_support_count': pending_support_count
         }
 
     @app.route('/')

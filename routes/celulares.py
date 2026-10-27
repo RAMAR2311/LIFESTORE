@@ -74,6 +74,18 @@ def inventario():
         Product.maneos.any(Maneo.estado == 'PENDIENTE')
     ).count()
 
+    from models import TechnicalService
+    celulares_en_soporte = Product.query.filter(
+        Product.tipo_inventario == 'celulares',
+        Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
+    ).count()
+
+    from models import TechnicalService
+    celulares_en_soporte = Product.query.filter(
+        Product.tipo_inventario == 'celulares',
+        Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
+    ).count()
+
     active_b_id = None
     if current_user.rol == 'admin':
         active_b_id = session.get('active_branch_id')
@@ -86,6 +98,7 @@ def inventario():
     base_query = Product.query.options(
         selectinload(Product.detalles_venta).joinedload(SaleDetail.venta),
         selectinload(Product.maneos),
+        selectinload(Product.servicios_tecnicos).joinedload(TechnicalService.technician),
         selectinload(Product.branch_stocks).joinedload(BranchStock.branch)
     ).filter_by(tipo_inventario='celulares')
 
@@ -110,11 +123,14 @@ def inventario():
         base_query = base_query.filter(Product.cantidad_stock > 0)
     elif estado == 'maneo':
         base_query = base_query.filter(Product.maneos.any(Maneo.estado == 'PENDIENTE'))
+    elif estado == 'soporte':
+        base_query = base_query.filter(Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])))
     elif estado == 'vendidos':
-        # Vendidos reales: sin stock y que no estén en préstamo de maneo
+        # Vendidos reales: sin stock y que no estén en préstamo de maneo ni en soporte
         base_query = base_query.filter(
             Product.cantidad_stock == 0,
-            ~Product.maneos.any(Maneo.estado == 'PENDIENTE')
+            ~Product.maneos.any(Maneo.estado == 'PENDIENTE'),
+            ~Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
         )
 
     if referencias_seleccionadas:
@@ -150,9 +166,12 @@ def inventario():
                 break
         celular_ubicaciones[c.id] = ubicacion
 
+    from models import Technician
+    tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
     sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
 
-    return render_template('celulares/inventario.html', 
+    return render_template('celulares/inventario.html',
+                           tecnicos_disponibles=tecnicos_disponibles, 
                            celulares=paginacion.items,
                            paginacion=paginacion,
                            q=q,
@@ -408,6 +427,98 @@ def eliminar_celular(id):
         
     return redirect(url_for('celulares_bp.inventario'))
 
+@celulares_bp.route('/api/referencias-modelos', methods=['GET'])
+@login_required
+def api_referencias_modelos():
+    """Devuelve las referencias de celulares con conteo de equipos activos y precios promedio."""
+    modelos = db.session.query(
+        Product.modelo_celular,
+        db.func.count(Product.id).label('total'),
+        db.func.min(Product.precio_minimo).label('min_p_minimo'),
+        db.func.max(Product.precio_minimo).label('max_p_minimo'),
+        db.func.min(Product.precio_sugerido).label('min_p_sugerido'),
+        db.func.max(Product.precio_sugerido).label('max_p_sugerido'),
+        db.func.min(Product.precio_costo).label('min_p_costo'),
+        db.func.max(Product.precio_costo).label('max_p_costo')
+    ).filter(
+        Product.tipo_inventario == 'celulares',
+        Product.modelo_celular != None,
+        Product.modelo_celular != '',
+        Product.cantidad_stock > 0
+    ).group_by(Product.modelo_celular).order_by(Product.modelo_celular.asc()).all()
+
+    data = []
+    for m in modelos:
+        data.append({
+            'modelo': m.modelo_celular,
+            'cantidad': m.total,
+            'precio_minimo': float(m.max_p_minimo or 0),
+            'precio_sugerido': float(m.max_p_sugerido or 0),
+            'precio_costo': float(m.max_p_costo or 0)
+        })
+    return jsonify({'success': True, 'modelos': data})
+
+@celulares_bp.route('/editar_precios_masivo', methods=['POST'])
+@login_required
+@admin_required
+def editar_precios_masivo():
+    """Actualiza masivamente los precios (costo, mínimo y sugerido) de una referencia seleccionada."""
+    modelo_celular = request.form.get('modelo_celular', '').strip()
+    aplicar_costo = request.form.get('aplicar_costo') == 'on'
+    aplicar_minimo = request.form.get('aplicar_minimo') == 'on'
+    aplicar_sugerido = request.form.get('aplicar_sugerido') == 'on'
+
+    costo_str = request.form.get('nuevo_precio_costo', '').replace('$', '').replace('.', '').replace(',', '').strip()
+    minimo_str = request.form.get('nuevo_precio_minimo', '').replace('$', '').replace('.', '').replace(',', '').strip()
+    sugerido_str = request.form.get('nuevo_precio_sugerido', '').replace('$', '').replace('.', '').replace(',', '').strip()
+
+    if not modelo_celular:
+        flash('Debe seleccionar una referencia o modelo.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    if not (aplicar_costo or aplicar_minimo or aplicar_sugerido):
+        flash('Debe marcar al menos un precio para actualizar (Costo, Mínimo o Sugerido).', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    # Buscar celulares con ese modelo
+    celulares = Product.query.filter(
+        Product.tipo_inventario == 'celulares',
+        Product.modelo_celular == modelo_celular,
+        Product.cantidad_stock > 0
+    ).all()
+
+    if not celulares:
+        flash(f'No se encontraron celulares activos de la referencia "{modelo_celular}".', 'info')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    count = 0
+    for cel in celulares:
+        if aplicar_costo and costo_str:
+            cel.precio_costo = float(costo_str)
+        if aplicar_minimo and minimo_str:
+            cel.precio_minimo = float(minimo_str)
+        if aplicar_sugerido and sugerido_str:
+            cel.precio_sugerido = float(sugerido_str)
+        count += 1
+
+    db.session.commit()
+
+    from models import AuditLog
+    detalles_cambio = f"Ref: {modelo_celular} | Total: {count} equipos | "
+    if aplicar_sugerido and sugerido_str: detalles_cambio += f"Sugerido: ${sugerido_str} "
+    if aplicar_minimo and minimo_str: detalles_cambio += f"Minimo: ${minimo_str} "
+    if aplicar_costo and costo_str: detalles_cambio += f"Costo: ${costo_str}"
+
+    AuditLog.registrar(
+        action='ACTUALIZACION_MASIVA_PRECIOS',
+        user_id=current_user.id,
+        motivo=f'Edición masiva de precios para la referencia {modelo_celular} ({count} equipos)',
+        detalles=detalles_cambio
+    )
+
+    flash(f'¡Precios actualizados con éxito en {count} celular(es) de la referencia "{modelo_celular}"!', 'success')
+    return redirect(url_for('celulares_bp.inventario', referencia=modelo_celular))
+
 @celulares_bp.route('/clientes')
 @login_required
 @admin_required
@@ -630,15 +741,121 @@ import io
 @login_required
 @admin_required
 def descargar_plantilla():
-    # Definir las cabeceras exactas incluyendo TIPO DISPOSITIVO
-    columnas = ['TIPO DISPOSITIVO', 'MARCA', 'REFERENCIA', 'CAPACIDAD', 'BATERIA', 'COLOR', 'IMEI 1', 'IMEI 2', 'PROVEEDOR', 'INVENTARIO', 'COSTO', 'P. MINIMO', 'P. SUGERIDO']
-    df = pd.DataFrame(columns=columnas)
-    
-    # Crear un buffer en memoria
+    import openpyxl
+    from openpyxl.worksheet.datavalidation import DataValidation
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    wb = openpyxl.Workbook()
+    ws_main = wb.active
+    ws_main.title = 'Plantilla Celulares'
+
+    # Catálogo enfocado: Apple, Samsung y Ray-Ban Meta
+    catalogo_tipos = [
+        'Celular',
+        'Computador',
+        'Tablet',
+        'Gafas Inteligentes',
+        'Smartwatch',
+        'Otro'
+    ]
+
+    catalogo_marcas = [
+        'Apple',
+        'Samsung',
+        'Ray-Ban Meta'
+    ]
+
+    catalogo_modelos = [
+        # Apple - iPhones
+        'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
+        'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+        'iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+        'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+        'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+        'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
+        'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+        'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max',
+        # Apple - iPads, MacBooks & AirPods
+        'iPad 10ma Gen (A16 Bionic)', 'iPad 11na Gen', 'iPad Mini 6', 'iPad Mini 7',
+        'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
+        'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)', 'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)',
+        'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
+        'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
+        'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
+        'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)',
+        'AirPods 3ra Generación', 'AirPods 4ta Generación', 'AirPods 4ta Generación con ANC',
+        'AirPods Pro 2da Generación (USB-C)', 'AirPods Max (Lightning)', 'AirPods Max (USB-C)',
+        # Samsung - Serie S, Z Fold/Flip, Tabs y Buds
+        'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+        'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+        'Galaxy Z Fold 6', 'Galaxy Z Flip 6', 'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
+        'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE',
+        'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
+        'Galaxy Buds 3', 'Galaxy Buds 3 Pro',
+        # Ray-Ban Meta
+        'Ray-Ban Meta Wayfarer',
+        'Ray-Ban Meta Headliner',
+        'Ray-Ban Meta Skyler'
+    ]
+
+    # Hoja oculta con las listas del catálogo
+    ws_cat = wb.create_sheet(title='_Catalogos')
+    ws_cat.sheet_state = 'hidden'
+
+    for idx, item in enumerate(catalogo_tipos, start=1):
+        ws_cat.cell(row=idx, column=1, value=item)
+    for idx, item in enumerate(catalogo_marcas, start=1):
+        ws_cat.cell(row=idx, column=2, value=item)
+    for idx, item in enumerate(catalogo_modelos, start=1):
+        ws_cat.cell(row=idx, column=3, value=item)
+
+    # Cabeceras
+    columnas = [
+        'TIPO DISPOSITIVO', 'MARCA', 'REFERENCIA', 'CAPACIDAD', 
+        'BATERIA', 'COLOR', 'IMEI 1', 'IMEI 2', 'PROVEEDOR', 
+        'INVENTARIO', 'COSTO', 'P. MINIMO', 'P. SUGERIDO'
+    ]
+
+    header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
+    header_fill = PatternFill(start_color='1E293B', end_color='1E293B', fill_type='solid')
+    align_center = Alignment(horizontal='center', vertical='center')
+
+    for col_idx, col_name in enumerate(columnas, start=1):
+        cell = ws_main.cell(row=1, column=col_idx, value=col_name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = align_center
+
+    # Validaciones de Datos (Listas desplegables en Excel)
+    dv_tipo = DataValidation(type='list', formula1=f"='_Catalogos'!$A$1:$A${len(catalogo_tipos)}", allow_blank=True)
+    dv_tipo.error = 'Seleccione un tipo de dispositivo válido'
+    dv_tipo.errorTitle = 'Tipo Inválido'
+    ws_main.add_data_validation(dv_tipo)
+    dv_tipo.add('A2:A1000')
+
+    dv_marca = DataValidation(type='list', formula1=f"='_Catalogos'!$B$1:$B${len(catalogo_marcas)}", allow_blank=True)
+    dv_marca.error = 'Seleccione una marca válida (Apple, Samsung o Ray-Ban Meta)'
+    dv_marca.errorTitle = 'Marca Inválida'
+    ws_main.add_data_validation(dv_marca)
+    dv_marca.add('B2:B1000')
+
+    dv_modelo = DataValidation(type='list', formula1=f"='_Catalogos'!$C$1:$C${len(catalogo_modelos)}", allow_blank=True)
+    dv_modelo.error = 'Seleccione una referencia/modelo del catálogo'
+    dv_modelo.errorTitle = 'Referencia Inválida'
+    ws_main.add_data_validation(dv_modelo)
+    dv_modelo.add('C2:C1000')
+
+    # Anchos de columna cómodos para visualización
+    column_widths = {
+        'A': 22, 'B': 18, 'C': 34, 'D': 16,
+        'E': 14, 'F': 16, 'G': 20, 'H': 20,
+        'I': 20, 'J': 18, 'K': 16, 'L': 16, 'M': 16
+    }
+    for col, width in column_widths.items():
+        ws_main.column_dimensions[col].width = width
+
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Plantilla Celulares')
-    
+    wb.save(output)
     output.seek(0)
     return send_file(output, download_name='plantilla_celulares.xlsx', as_attachment=True, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 

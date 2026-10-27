@@ -24,8 +24,10 @@ def index():
         if active_b_id:
             query = query.filter(Warranty.branch_id == int(active_b_id))
 
+    from models import Technician
+    tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
     warranties = query.order_by(Warranty.created_at.desc()).all()
-    return render_template('warranties/index.html', warranties=warranties)
+    return render_template('warranties/index.html', warranties=warranties, tecnicos_disponibles=tecnicos_disponibles)
 
 @warranties_bp.route('/api/search', methods=['GET'])
 @login_required

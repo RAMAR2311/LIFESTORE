@@ -83,6 +83,26 @@ def procesar_venta():
                 producto_check = Product.query.get(prod_id)
                 if not producto_check:
                     return jsonify({'error': f"El producto con ID {prod_id} no existe."}), 400
+
+                if producto_check.soporte_activo:
+                    return jsonify({
+                        'error': f"Operación cancelada: El equipo '{producto_check.modelo_celular or producto_check.nombre}' (IMEI: {producto_check.imei}) está en SOPORTE TÉCNICO. No puede ser vendido."
+                    }), 400
+
+                if producto_check.maneo_activo:
+                    return jsonify({
+                        'error': f"Operación cancelada: El equipo '{producto_check.modelo_celular or producto_check.nombre}' (IMEI: {producto_check.imei}) está en MANEO ({producto_check.maneo_activo.local_vecino}). No puede ser vendido."
+                    }), 400
+
+                if producto_check.soporte_activo:
+                    return jsonify({
+                        'error': f"Operación cancelada: El equipo '{producto_check.modelo_celular or producto_check.nombre}' (IMEI: {producto_check.imei}) está en SOPORTE TÉCNICO. No puede ser vendido."
+                    }), 400
+
+                if producto_check.maneo_activo:
+                    return jsonify({
+                        'error': f"Operación cancelada: El equipo '{producto_check.modelo_celular or producto_check.nombre}' (IMEI: {producto_check.imei}) está en MANEO ({producto_check.maneo_activo.local_vecino}). No puede ser vendido."
+                    }), 400
                 
                 # Validar precio mínimo y consultar aprobaciones remotas si es menor
                 if current_user.rol != 'admin' and precio_venta_final < producto_check.precio_minimo:
@@ -483,6 +503,30 @@ def api_buscar_producto(sku):
             auto_select_variant = variante.id
         else:
             return jsonify({'error': 'Código SKU o IMEI no encontrado en el sistema'}), 404
+
+    # Validación Estricta: Celulares en Soporte Técnico o Maneo no se pueden facturar en caja
+    if producto.soporte_activo:
+        tec_nom = producto.soporte_activo.technician.nombre if producto.soporte_activo.technician else 'en revisión'
+        return jsonify({
+            'error': f"El celular '{producto.modelo_celular or producto.nombre}' (IMEI: {producto.imei}) se encuentra actualmente en SOPORTE TÉCNICO ({producto.soporte_activo.tipo_arreglo} con {tec_nom}). No está disponible para facturar."
+        }), 400
+
+    if producto.maneo_activo:
+        return jsonify({
+            'error': f"El celular '{producto.modelo_celular or producto.nombre}' (IMEI: {producto.imei}) se encuentra prestado a '{producto.maneo_activo.local_vecino}' (Maneo). No está disponible para facturar."
+        }), 400
+
+    # Validación Estricta: Celulares en Soporte Técnico o Maneo no se pueden facturar en caja
+    if producto.soporte_activo:
+        tec_nom = producto.soporte_activo.technician.nombre if producto.soporte_activo.technician else 'en revisión'
+        return jsonify({
+            'error': f"El celular '{producto.modelo_celular or producto.nombre}' (IMEI: {producto.imei}) se encuentra actualmente en SOPORTE TÉCNICO ({producto.soporte_activo.tipo_arreglo} con {tec_nom}). No está disponible para facturar."
+        }), 400
+
+    if producto.maneo_activo:
+        return jsonify({
+            'error': f"El celular '{producto.modelo_celular or producto.nombre}' (IMEI: {producto.imei}) se encuentra prestado a '{producto.maneo_activo.local_vecino}' (Maneo). No está disponible para facturar."
+        }), 400
         
     # Determinar sucursal para consulta de stock
     active_b_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else session.get('active_branch_id')

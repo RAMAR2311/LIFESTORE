@@ -80,6 +80,10 @@
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-1">
                             {% if w.resolution != 'Entregada' %}
+                                <!-- Botón Enviar a Soporte Técnico -->
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDerivarSoporte{{ w.id }}" title="Enviar a Soporte Técnico / Taller">
+                                    <i class="fa-solid fa-screwdriver-wrench me-1"></i> Soporte
+                                </button>
                                 <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalEntregar{{ w.id }}" title="Entregar al Cliente">
                                     <i class="fa-solid fa-hand-holding-hand me-1"></i> Entregar
                                 </button>
@@ -87,6 +91,72 @@
                             <a href="{{ url_for('warranties_bp.ticket', id=w.id) }}" target="_blank" class="btn btn-sm btn-outline-dark rounded-pill px-3" title="Imprimir Ticket">
                                 <i class="fa-solid fa-print"></i>
                             </a>
+                        </div>
+
+                        <!-- Modal Derivar a Soporte Técnico -->
+                        <div class="modal fade" id="modalDerivarSoporte{{ w.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered text-start">
+                                <div class="modal-content border-0 shadow-lg rounded-4">
+                                    <div class="modal-header border-bottom py-3">
+                                        <h6 class="modal-title fw-bold text-brand-black">
+                                            <i class="fa-solid fa-screwdriver-wrench text-danger me-2"></i>Derivar Garantía #{{ w.id }} a Soporte Técnico
+                                        </h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="POST" action="{{ url_for('support_bp.enviar_desde_garantia', warranty_id=w.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <div class="modal-body py-3">
+                                            <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                                <div class="fw-bold fs-6 text-dark">{{ w.product.nombre if w.product else (w.nombre_manual or 'Equipo en Garantía') }}</div>
+                                                {% if w.product and w.product.imei %}
+                                                    <div class="font-mono text-muted mt-1">IMEI: {{ w.product.imei }}</div>
+                                                {% endif %}
+                                                <div class="text-muted mt-1"><strong>Falla del cliente:</strong> {{ w.motivo_reportado or w.reason }}</div>
+                                            </div>
+
+                                            <div class="row g-2 mb-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold small text-muted">Técnico Encargado *</label>
+                                                    <select name="technician_id" class="form-select form-select-sm" required>
+                                                        <option value="">-- Seleccionar Técnico --</option>
+                                                        {% for tec in tecnicos_disponibles %}
+                                                        <option value="{{ tec.id }}">{{ tec.nombre }} {% if tec.especialidad %}({{ tec.especialidad }}){% endif %}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-bold small text-muted">Tipo de Arreglo *</label>
+                                                    <select name="tipo_arreglo" class="form-select form-select-sm" required>
+                                                        <option value="Cambio de Pantalla / Display">Cambio de Pantalla / Display</option>
+                                                        <option value="Cambio de Batería">Cambio de Batería</option>
+                                                        <option value="Pin de Carga / Puerto USB">Pin de Carga / Puerto USB</option>
+                                                        <option value="Cámara Frontal / Trasera">Cámara Frontal / Trasera</option>
+                                                        <option value="Reparación de Placa / Corto / IC">Reparación de Placa / Corto / IC</option>
+                                                        <option value="Software / Flasheo / Reinstalación">Software / Flasheo / Reinstalación</option>
+                                                        <option value="Diagnóstico General / Revisión" selected>Diagnóstico General / Revisión</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold small text-muted">Instrucciones o Falla Técnica *</label>
+                                                <textarea name="motivo_falla" class="form-control" rows="3" required placeholder="Detalla la orden de trabajo para el técnico...">{{ w.motivo_reportado or w.reason }}</textarea>
+                                            </div>
+
+                                            <div class="mb-2">
+                                                <label class="form-label fw-bold small text-muted">Fecha Estimada de Retorno (Opcional)</label>
+                                                <input type="date" name="fecha_estimada" class="form-control form-control-sm">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer border-top py-2">
+                                            <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                                <i class="fa-solid fa-paper-plane me-1"></i> Derivar a Taller
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Modal Entregar Garantía -->

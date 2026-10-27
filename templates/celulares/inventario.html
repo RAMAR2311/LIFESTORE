@@ -7,6 +7,16 @@
         <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm">
             <i class="fa-solid fa-truck-moving me-1"></i> Trasladar Celulares
         </a>
+        {% if current_user.rol == 'admin' %}
+        <button type="button" class="btn btn-outline-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalPreciosMasivo" onclick="cargarModelosPrecios()">
+            <i class="fa-solid fa-tags me-1"></i> Precios Masivos
+        </button>
+        {% endif %}
+        {% if current_user.rol == 'admin' %}
+        <button type="button" class="btn btn-outline-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalPreciosMasivo" onclick="cargarModelosPrecios()">
+            <i class="fa-solid fa-tags me-1"></i> Precios Masivos
+        </button>
+        {% endif %}
         <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalImportarExcel">
             <i class="fa-solid fa-file-excel me-1"></i> Importar Excel
         </button>
@@ -163,6 +173,9 @@
         <a href="{{ url_for('celulares_bp.inventario', estado='maneo', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-warning text-dark {% if estado == 'maneo' %}active fw-bold bg-warning text-dark border-warning{% endif %}">
             <i class="fa-solid fa-handshake me-1"></i> En Maneo ({{ celulares_en_maneo }})
         </a>
+        <a href="{{ url_for('celulares_bp.inventario', estado='soporte', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-danger {% if estado == 'soporte' %}active fw-bold bg-danger text-white border-danger{% endif %}">
+            <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Soporte ({{ celulares_en_soporte }})
+        </a>
         <a href="{{ url_for('celulares_bp.inventario', estado='vendidos', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-dark {% if estado == 'vendidos' %}active fw-bold{% endif %}">
             <i class="fa-solid fa-check me-1"></i> Vendidos
         </a>
@@ -242,7 +255,16 @@
                     <td class="text-brand-black fw-bolder">${{ c.precio_sugerido|cop }}</td>
                     
                     <td class="pe-3 text-center">
-                        {% if c.maneo_activo %}
+                        {% if c.soporte_activo %}
+                            <div class="d-flex flex-column align-items-center gap-1">
+                                <span class="badge bg-danger text-white fw-bold shadow-sm rounded-pill px-2 py-1" style="font-size: 0.72rem;" title="En taller técnico: {{ c.soporte_activo.tipo_arreglo }}">
+                                    <i class="fa-solid fa-screwdriver-wrench me-1"></i>En Soporte: {{ c.soporte_activo.technician.nombre if c.soporte_activo.technician else 'En Revisión' }}
+                                </span>
+                                <a href="{{ url_for('support_bp.index', q=c.imei) }}" class="btn btn-xs btn-outline-danger rounded-pill py-0 px-2 shadow-sm" style="font-size: 0.7rem;" title="Gestionar Soporte Técnico">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Gestionar
+                                </a>
+                            </div>
+                        {% elif c.maneo_activo %}
                             <div class="d-flex flex-column align-items-center gap-1">
                                 <span class="badge bg-warning text-dark fw-bold shadow-sm rounded-pill px-2 py-1" style="font-size: 0.72rem;" title="Prestado a {{ c.maneo_activo.local_vecino }}">
                                     <i class="fa-solid fa-handshake me-1"></i>En Maneo: {{ c.maneo_activo.local_vecino }}
@@ -263,6 +285,10 @@
                                 <button type="button" class="btn btn-sm btn-outline-warning text-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Prestar a Local Vecino (Maneo)" data-bs-toggle="modal" data-bs-target="#modalPrestarCelular{{ c.id }}">
                                     <i class="fa-solid fa-handshake text-dark" style="font-size: 0.75rem;"></i>
                                 </button>
+                                <!-- Botón Rápido: Enviar a Soporte Técnico / Taller -->
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Enviar a Soporte Técnico / Reparación" data-bs-toggle="modal" data-bs-target="#modalSoporteTecnico{{ c.id }}">
+                                    <i class="fa-solid fa-screwdriver-wrench" style="font-size: 0.75rem;"></i>
+                                </button>
                                 <a href="{{ url_for('celulares_bp.editar_celular', id=c.id) }}" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Editar">
                                     <i class="fa-solid fa-pen" style="font-size: 0.75rem;"></i>
                                 </a>
@@ -272,6 +298,72 @@
                                         <i class="fa-solid fa-trash-can" style="font-size: 0.75rem;"></i>
                                     </button>
                                 </form>
+                            </div>
+
+                            <!-- Modal Enviar a Soporte Técnico -->
+                            <div class="modal fade text-start" id="modalSoporteTecnico{{ c.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow-lg rounded-4">
+                                        <div class="modal-header border-bottom py-3">
+                                            <h6 class="fw-bold text-brand-black mb-0">
+                                                <i class="fa-solid fa-screwdriver-wrench text-danger me-2"></i>Enviar Celular a Soporte Técnico
+                                            </h6>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('support_bp.enviar_desde_inventario', product_id=c.id) }}">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <div class="modal-body py-3">
+                                                <div class="p-3 rounded-3 bg-light border mb-3 small">
+                                                    <div class="fw-bold fs-6 text-dark">{{ c.marca }} {{ c.modelo_celular or c.nombre }}</div>
+                                                    <div class="font-monospace text-muted mt-1">IMEI: {{ c.imei }}</div>
+                                                    <div class="text-muted">Color: {{ c.color or 'N/A' }} | Batería: {{ c.bateria or 'N/A' }}</div>
+                                                </div>
+
+                                                <div class="row g-2 mb-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small text-muted">Técnico Encargado *</label>
+                                                        <select name="technician_id" class="form-select form-select-sm" required>
+                                                            <option value="">-- Seleccionar Técnico --</option>
+                                                            {% for tec in tecnicos_disponibles %}
+                                                            <option value="{{ tec.id }}">{{ tec.nombre }} {% if tec.especialidad %}({{ tec.especialidad }}){% endif %}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small text-muted">Tipo de Arreglo *</label>
+                                                        <select name="tipo_arreglo" class="form-select form-select-sm" required>
+                                                            <option value="Cambio de Pantalla / Display">Cambio de Pantalla / Display</option>
+                                                            <option value="Cambio de Batería">Cambio de Batería</option>
+                                                            <option value="Pin de Carga / Puerto USB">Pin de Carga / Puerto USB</option>
+                                                            <option value="Cámara Frontal / Trasera">Cámara Frontal / Trasera</option>
+                                                            <option value="Reparación de Placa / Corto / IC">Reparación de Placa / Corto / IC</option>
+                                                            <option value="Software / Flasheo / Reinstalación">Software / Flasheo / Reinstalación</option>
+                                                            <option value="Micrófono / Altavoz / Auricular">Micrófono / Altavoz / Auricular</option>
+                                                            <option value="Tapa Trasera / Carcasa / Chasis">Tapa Trasera / Carcasa / Chasis</option>
+                                                            <option value="Diagnóstico General / Revisión" selected>Diagnóstico General / Revisión</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label fw-bold small text-muted">Motivo o Falla Detectada *</label>
+                                                    <textarea name="motivo_falla" class="form-control" rows="3" placeholder="Describe detalladamente qué falla técnica presenta el celular..." required></textarea>
+                                                </div>
+
+                                                <div class="mb-2">
+                                                    <label class="form-label fw-bold small text-muted">Fecha Estimada de Entrega (Opcional)</label>
+                                                    <input type="date" name="fecha_estimada" class="form-control form-control-sm">
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-top py-2">
+                                                <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                                    <i class="fa-solid fa-paper-plane me-1"></i> Enviar a Taller
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Modal Prestar Celular Directo -->
@@ -389,4 +481,130 @@
         });
     }
 </script>
+
+<!-- MODAL EDICIÓN MASIVA DE PRECIOS POR REFERENCIA -->
+<div class="modal fade" id="modalPreciosMasivo" tabindex="-1" aria-labelledby="modalPreciosMasivoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-bold text-brand-black" id="modalPreciosMasivoLabel">
+                    <i class="fa-solid fa-tags text-primary me-2"></i>Actualización Masiva de Precios
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('celulares_bp.editar_precios_masivo') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body py-3">
+                    <p class="small text-muted mb-3">
+                        Selecciona un modelo o referencia para actualizar los precios (Costo, Mínimo y/o Sugerido) de todos los celulares activos en stock con esa referencia.
+                    </p>
+
+                    <!-- Selector de Referencia -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">Referencia / Modelo *</label>
+                        <select name="modelo_celular" id="select_modelo_masivo" class="form-select bg-light border fw-semibold" required onchange="onSelectModeloMasivo(this)">
+                            <option value="">-- Cargando referencias... --</option>
+                        </select>
+                        <div id="info_modelo_badge" class="mt-2 small text-primary fw-semibold" style="display: none;"></div>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <span class="small fw-bold text-dark d-block mb-2">Marca los precios que deseas actualizar:</span>
+
+                        <!-- Precio Sugerido (P. Venta) -->
+                        <div class="mb-2">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" name="aplicar_sugerido" id="check_sugerido" checked onchange="toggleInputPrecio('nuevo_precio_sugerido', this.checked)">
+                                <label class="form-check-label small fw-bold text-dark" for="check_sugerido">Actualizar Precio Sugerido (Venta)</label>
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" step="1000" name="nuevo_precio_sugerido" id="nuevo_precio_sugerido" class="form-control fw-bold" placeholder="0" required>
+                            </div>
+                        </div>
+
+                        <!-- Precio Mínimo -->
+                        <div class="mb-2">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" name="aplicar_minimo" id="check_minimo" checked onchange="toggleInputPrecio('nuevo_precio_minimo', this.checked)">
+                                <label class="form-check-label small fw-bold text-dark" for="check_minimo">Actualizar Precio Mínimo</label>
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" step="1000" name="nuevo_precio_minimo" id="nuevo_precio_minimo" class="form-control" placeholder="0" required>
+                            </div>
+                        </div>
+
+                        <!-- Precio Costo -->
+                        <div class="mb-1">
+                            <div class="form-check form-switch mb-1">
+                                <input class="form-check-input" type="checkbox" name="aplicar_costo" id="check_costo" onchange="toggleInputPrecio('nuevo_precio_costo', this.checked)">
+                                <label class="form-check-label small fw-bold text-dark" for="check_costo">Actualizar Precio Costo (Opcional)</label>
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="number" step="1000" name="nuevo_precio_costo" id="nuevo_precio_costo" class="form-control" placeholder="0" disabled>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2">
+                    <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Aplicar a Todos
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let catalogoModelosData = [];
+
+async function cargarModelosPrecios() {
+    const sel = document.getElementById('select_modelo_masivo');
+    if (!sel) return;
+    try {
+        const resp = await fetch('{{ url_for("celulares_bp.api_referencias_modelos") }}');
+        const data = await resp.json();
+        if (data.success && data.modelos) {
+            catalogoModelosData = data.modelos;
+            sel.innerHTML = '<option value="">-- Selecciona una Referencia --</option>';
+            data.modelos.forEach(m => {
+                sel.innerHTML += `<option value="${m.modelo}">${m.modelo} (${m.cantidad} en stock)</option>`;
+            });
+        }
+    } catch(err) {
+        console.error('Error cargando modelos:', err);
+    }
+}
+
+function onSelectModeloMasivo(sel) {
+    const val = sel.value;
+    const badge = document.getElementById('info_modelo_badge');
+    const inputSug = document.getElementById('nuevo_precio_sugerido');
+    const inputMin = document.getElementById('nuevo_precio_minimo');
+    const inputCos = document.getElementById('nuevo_precio_costo');
+
+    const item = catalogoModelosData.find(m => m.modelo === val);
+    if (item) {
+        badge.style.display = 'block';
+        badge.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i> Equipos en stock: <strong>${item.cantidad}</strong>. Precios actuales aprox: Sugerido $${Math.round(item.precio_sugerido).toLocaleString()} | Mínimo $${Math.round(item.precio_minimo).toLocaleString()}`;
+        if (inputSug) inputSug.value = Math.round(item.precio_sugerido);
+        if (inputMin) inputMin.value = Math.round(item.precio_minimo);
+        if (inputCos) inputCos.value = Math.round(item.precio_costo);
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function toggleInputPrecio(inputId, enabled) {
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    el.disabled = !enabled;
+    el.required = enabled;
+}
+</script>
+
 {% endblock %}

@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-0 px-md-3">
+    <!-- Encabezado y Acciones Principales -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-brand-black m-0 d-flex align-items-center gap-2">
+                <span class="badge bg-primary bg-opacity-10 text-primary p-2 rounded-3">
+                    <i class="fa-solid fa-screwdriver-wrench"></i>
+                </span>
+                Módulo de Soporte Técnico & Reparaciones
+            </h2>
+            <p class="text-muted small mb-0 mt-1">Control integral de celulares en taller: fallas de inventario y garantías de clientes.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <!-- Botón Crear Técnico -->
+            <button type="button" class="btn btn-outline-dark rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCrearTecnico">
+                <i class="fa-solid fa-user-gear me-1 text-primary"></i> + Registrar Técnico
+            </button>
+            <!-- Botón Ver Directorio de Técnicos -->
+            <button type="button" class="btn btn-light border rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDirectorioTecnicos" title="Directorio de Técnicos">
+                <i class="fa-solid fa-address-book text-muted"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Métricas / Badges Rápidos -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">En Taller / Revisión</div>
+                        <div class="fs-4 fw-bolder text-warning">{{ en_taller_count }}</div>
+                    </div>
+                    <div class="p-3 bg-warning bg-opacity-10 rounded-circle text-warning fs-5">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Reparados / Listos</div>
+                        <div class="fs-4 fw-bolder text-success">{{ reparados_count }}</div>
+                    </div>
+                    <div class="p-3 bg-success bg-opacity-10 rounded-circle text-success fs-5">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Origen: Inventario</div>
+                        <div class="fs-4 fw-bolder text-info">{{ inventario_count }}</div>
+                    </div>
+                    <div class="p-3 bg-info bg-opacity-10 rounded-circle text-info fs-5">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Origen: Garantías</div>
+                        <div class="fs-4 fw-bolder text-primary">{{ garantia_count }}</div>
+                    </div>
+                    <div class="p-3 bg-primary bg-opacity-10 rounded-circle text-primary fs-5">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Filtros Multifunción -->
+    <div class="card card-custom border-0 shadow-sm p-3 mb-4">
+        <form method="GET" action="{{ url_for('support_bp.index') }}" class="row g-2 align-items-center">
+            <!-- Buscador IMEI / Modelo -->
+            <div class="col-12 col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input type="text" name="q" class="form-control bg-light border-start-0" placeholder="Buscar por IMEI, Modelo o Falla..." value="{{ q }}">
+                </div>
+            </div>
+
+            <!-- Filtro Origen -->
+            <div class="col-6 col-md-2">
+                <select name="origen" class="form-select bg-light">
+                    <option value="">Todos los Orígenes</option>
+                    <option value="INVENTARIO" {% if filtro_origen == 'INVENTARIO' %}selected{% endif %}>📦 Desde Inventario</option>
+                    <option value="GARANTIA" {% if filtro_origen == 'GARANTIA' %}selected{% endif %}>🛡️ Desde Garantía Cliente</option>
+                </select>
+            </div>
+
+            <!-- Filtro Técnico -->
+            <div class="col-6 col-md-2">
+                <select name="tecnico_id" class="form-select bg-light">
+                    <option value="">Todos los Técnicos</option>
+                    {% for t in tecnicos %}
+                    <option value="{{ t.id }}" {% if filtro_tecnico == t.id %}selected{% endif %}>{{ t.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtro Tipo de Arreglo -->
+            <div class="col-6 col-md-2">
+                <select name="tipo_arreglo" class="form-select bg-light">
+                    <option value="">Tipo de Arreglo (Todos)</option>
+                    {% for tipo in tipos_arreglo %}
+                    <option value="{{ tipo }}" {% if filtro_tipo == tipo %}selected{% endif %}>{{ tipo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Filtro Estado -->
+            <div class="col-6 col-md-2">
+                <select name="estado" class="form-select bg-light">
+                    <option value="">Todos los Estados</option>
+                    <option value="EN_REVISION" {% if filtro_estado == 'EN_REVISION' %}selected{% endif %}>En Revisión</option>
+                    <option value="EN_REPARACION" {% if filtro_estado == 'EN_REPARACION' %}selected{% endif %}>En Reparación</option>
+                    <option value="REPARADO" {% if filtro_estado == 'REPARADO' %}selected{% endif %}>Reparado</option>
+                    <option value="ENTREGADO" {% if filtro_estado == 'ENTREGADO' %}selected{% endif %}>Entregado</option>
+                    <option value="NO_REPARABLE" {% if filtro_estado == 'NO_REPARABLE' %}selected{% endif %}>No Reparable</option>
+                </select>
+            </div>
+
+            <div class="col-12 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary w-100 rounded-3" title="Filtrar">
+                    <i class="fa-solid fa-filter"></i>
+                </button>
+                {% if q or filtro_origen or filtro_tecnico or filtro_tipo or filtro_estado %}
+                <a href="{{ url_for('support_bp.index') }}" class="btn btn-outline-secondary rounded-3" title="Limpiar Filtros">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla Principal de Registros de Soporte Técnico -->
+    <div class="card card-custom border-0 shadow-sm p-0">
+        <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold m-0 text-brand-black">
+                <i class="fa-solid fa-list-check text-primary me-2"></i> Equipos Registrados en Soporte Técnico ({{ servicios|length }})
+            </h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                <thead class="bg-light text-nowrap">
+                    <tr>
+                        <th class="ps-4">INGRESO / SEDE</th>
+                        <th>ORIGEN</th>
+                        <th>EQUIPO &amp; IMEI</th>
+                        <th>TIPO DE ARREGLO &amp; FALLA</th>
+                        <th>TÉCNICO ASIGNADO</th>
+                        <th>ESTADO</th>
+                        <th>COSTO</th>
+                        <th class="text-end pe-4">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in servicios %}
+                    <tr>
+                        <!-- Ingreso & Sede -->
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">{{ s.fecha_ingreso.strftime('%d/%m/%Y') }}</div>
+                            <small class="text-muted d-block">{{ s.fecha_ingreso.strftime('%I:%M %p') }}</small>
+                            <span class="badge bg-light text-secondary border px-2 py-0 mt-1" style="font-size: 0.7rem;">
+                                <i class="fa-solid fa-shop me-1"></i>{{ s.branch.nombre if s.branch else 'Principal' }}
+                            </span>
+                        </td>
+
+                        <!-- Origen Diferenciado -->
+                        <td>
+                            {% if s.origen == 'INVENTARIO' %}
+                                <span class="badge bg-info bg-opacity-15 text-info-emphasis border border-info border-opacity-25 px-2 py-1 rounded-pill fw-bold">
+                                    <i class="fa-solid fa-boxes-stacked me-1"></i> Inventario
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning bg-opacity-20 text-warning-emphasis border border-warning border-opacity-50 px-2 py-1 rounded-pill fw-bold">
+                                    <i class="fa-solid fa-shield-halved me-1"></i> Garantía #{{ s.warranty_id }}
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Equipo & IMEI -->
+                        <td>
+                            <div class="fw-bold text-brand-black">{{ s.marca or '' }} {{ s.modelo or 'Dispositivo' }}</div>
+                            {% if s.imei %}
+                                <span class="badge bg-dark text-white font-mono px-2 py-0" style="font-size: 0.72rem;">IMEI: {{ s.imei }}</span>
+                            {% endif %}
+                            {% if s.color %}
+                                <small class="text-muted d-block" style="font-size: 0.72rem;">Color: {{ s.color }}</small>
+                            {% endif %}
+                        </td>
+
+                        <!-- Tipo de Arreglo & Falla -->
+                        <td style="max-width: 260px;">
+                            <span class="badge bg-secondary bg-opacity-10 text-dark border px-2 py-1 fw-bold rounded-2">
+                                <i class="fa-solid fa-wrench text-primary me-1"></i>{{ s.tipo_arreglo }}
+                            </span>
+                            <div class="text-truncate text-muted small mt-1" title="{{ s.motivo_falla }}">
+                                <strong>Falla:</strong> {{ s.motivo_falla }}
+                            </div>
+                            {% if s.solucion_aplicada %}
+                            <div class="text-truncate text-success small" title="{{ s.solucion_aplicada }}">
+                                <i class="fa-solid fa-check-double me-1"></i><strong>Solución:</strong> {{ s.solucion_aplicada }}
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Técnico Asignado -->
+                        <td>
+                            {% if s.technician %}
+                                <div class="fw-bold text-dark d-flex align-items-center gap-1">
+                                    <i class="fa-solid fa-user-check text-success"></i>
+                                    <span>{{ s.technician.nombre }}</span>
+                                </div>
+                                {% if s.technician.telefono %}
+                                    <small class="text-muted font-mono"><i class="fa-brands fa-whatsapp text-success me-1"></i>{{ s.technician.telefono }}</small>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-light text-danger border border-danger border-opacity-50 rounded-pill">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i>Sin Asignar
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Estado -->
+                        <td>
+                            {% if s.estado == 'EN_REVISION' %}
+                                <span class="badge bg-warning text-dark px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-magnifying-glass me-1"></i> En Revisión
+                                </span>
+                            {% elif s.estado == 'EN_REPARACION' %}
+                                <span class="badge bg-primary px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-gear fa-spin me-1"></i> En Taller
+                                </span>
+                            {% elif s.estado == 'REPARADO' %}
+                                <span class="badge bg-success px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-circle-check me-1"></i> Reparado
+                                </span>
+                            {% elif s.estado == 'ENTREGADO' %}
+                                <span class="badge bg-dark px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-handshake me-1"></i> Entregado
+                                </span>
+                            {% elif s.estado == 'NO_REPARABLE' %}
+                                <span class="badge bg-danger px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-xmark me-1"></i> No Reparable
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary px-3 py-1 rounded-pill fw-bold">{{ s.estado }}</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Costo Arreglo -->
+                        <td class="fw-bold text-brand-black">
+                            {% if s.costo_reparacion and s.costo_reparacion > 0 %}
+                                ${{ s.costo_reparacion|cop }}
+                            {% else %}
+                                <span class="text-muted small">$0</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="text-end pe-4">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalGestionarServicio{{ s.id }}">
+                                <i class="fa-solid fa-pen-to-square me-1"></i> Gestionar
+                            </button>
+                        </td>
+                    </tr>
+
+                    <!-- MODAL DE GESTIÓN Y ACTUALIZACIÓN DEL SERVICIO TÉCNICO -->
+                    <div class="modal fade" id="modalGestionarServicio{{ s.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-header border-bottom py-3">
+                                    <h6 class="modal-title fw-bold text-brand-black">
+                                        <i class="fa-solid fa-screwdriver-wrench text-primary me-2"></i>
+                                        Gestionar Servicio Técnico #{{ s.id }}
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('support_bp.actualizar_estado', id=s.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-body py-3">
+                                        <!-- Resumen del Equipo -->
+                                        <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <strong>{{ s.marca or '' }} {{ s.modelo }}</strong>
+                                                <span class="badge {% if s.origen == 'INVENTARIO' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">
+                                                    {{ s.origen }}
+                                                </span>
+                                            </div>
+                                            <div class="text-muted font-mono">IMEI: {{ s.imei or 'N/A' }}</div>
+                                            <div class="text-muted mt-1"><strong>Falla reportada:</strong> {{ s.motivo_falla }}</div>
+                                        </div>
+
+                                        <div class="row g-2 mb-3">
+                                            <!-- Estado -->
+                                            <div class="col-6">
+                                                <label class="form-label small fw-bold text-muted">Estado del Arreglo *</label>
+                                                <select name="estado" class="form-select form-select-sm" required>
+                                                    <option value="EN_REVISION" {% if s.estado == 'EN_REVISION' %}selected{% endif %}>En Revisión</option>
+                                                    <option value="EN_REPARACION" {% if s.estado == 'EN_REPARACION' %}selected{% endif %}>En Taller / Reparación</option>
+                                                    <option value="REPARADO" {% if s.estado == 'REPARADO' %}selected{% endif %}>Reparado (Listo)</option>
+                                                    <option value="ENTREGADO" {% if s.estado == 'ENTREGADO' %}selected{% endif %}>Entregado al Stock / Cliente</option>
+                                                    <option value="NO_REPARABLE" {% if s.estado == 'NO_REPARABLE' %}selected{% endif %}>No Reparable / Baja</option>
+                                                </select>
+                                            </div>
+                                            <!-- Técnico Asignado -->
+                                            <div class="col-6">
+                                                <label class="form-label small fw-bold text-muted">Técnico Responsable</label>
+                                                <select name="technician_id" class="form-select form-select-sm">
+                                                    <option value="">-- Sin Asignar --</option>
+                                                    {% for t in tecnicos %}
+                                                    <option value="{{ t.id }}" {% if s.technician_id == t.id %}selected{% endif %}>{{ t.nombre }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <!-- Costo de Reparación -->
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-muted">Costo del Arreglo ($ COP)</label>
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">$</span>
+                                                <input type="number" step="1000" name="costo_reparacion" class="form-control" value="{{ s.costo_reparacion or 0 }}" placeholder="0">
+                                            </div>
+                                        </div>
+
+                                        <!-- Diagnóstico Técnico -->
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-muted">Diagnóstico / Revisión del Técnico</label>
+                                            <textarea name="diagnostico_tecnico" class="form-control form-control-sm" rows="2" placeholder="Ej: Pantalla con flex dañado, tarjeta madre sin corto...">{{ s.diagnostico_tecnico or '' }}</textarea>
+                                        </div>
+
+                                        <!-- Solución Aplicada -->
+                                        <div class="mb-2">
+                                            <label class="form-label small fw-bold text-muted">Solución / Repuestos Utilizados</label>
+                                            <textarea name="solucion_aplicada" class="form-control form-control-sm" rows="2" placeholder="Ej: Se instaló nuevo módulo OLED original y batería...">{{ s.solucion_aplicada or '' }}</textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-top py-2">
+                                        <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cerrar</button>
+                                        <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                            <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Cambios
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-screwdriver-wrench fa-3x text-secondary opacity-25 mb-3 d-block"></i>
+                            <h6 class="fw-bold">No hay celulares registrados con los filtros seleccionados</h6>
+                            <p class="small mb-0">Puedes enviar celulares con falla técnica directo desde el inventario de celulares o desde el módulo de garantías.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CREAR TÉCNICO -->
+<div class="modal fade" id="modalCrearTecnico" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-user-plus text-primary me-2"></i>Registrar Nuevo Técnico
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('support_bp.crear_tecnico') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body py-3">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Nombre del Técnico o Taller *</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Ej: Carlos Pérez / Taller Fix" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Teléfono / WhatsApp</label>
+                        <input type="text" name="telefono" class="form-control" placeholder="Ej: 3101234567">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Especialidad</label>
+                        <input type="text" name="especialidad" class="form-control" placeholder="Ej: Pantallas, Microsoldadura, Placa">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-muted">Dirección o Local del Taller</label>
+                        <input type="text" name="direccion_taller" class="form-control" placeholder="Ej: CC Pasaje Comercial Loc 204">
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2">
+                    <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-check me-1"></i> Guardar Técnico
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DIRECTORIO DE TÉCNICOS -->
+<div class="modal fade" id="modalDirectorioTecnicos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-address-book text-primary me-2"></i> Directorio de Técnicos Registrados ({{ tecnicos|length }})
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for t in tecnicos %}
+                    <div class="list-group-item p-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-dark">{{ t.nombre }}</div>
+                            <div class="small text-muted">
+                                {% if t.especialidad %}<span class="badge bg-light text-dark border me-1">{{ t.especialidad }}</span>{% endif %}
+                                {% if t.direccion_taller %}<i class="fa-solid fa-location-dot me-1 text-danger"></i>{{ t.direccion_taller }}{% endif %}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            {% if t.telefono %}
+                                <a href="https://wa.me/57{{ t.telefono|replace(' ', '') }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm">
+                                    <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        No hay técnicos registrados. Usa el botón "+ Registrar Técnico".
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
