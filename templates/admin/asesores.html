@@ -6,9 +6,14 @@
         <h2 class="fw-bolder m-0" style="color: var(--brand-blue);">
             <i class="fa-solid fa-users-gear me-2"></i>Gestión de Asesores
         </h2>
-        <a href="/admin/dashboard" class="btn btn-light rounded-pill px-4 fw-bold text-muted border shadow-sm">
-            <i class="fa-solid fa-arrow-left me-1"></i> Panel Principal
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin_bp.nomina') }}" class="btn btn-outline-success rounded-pill px-4 fw-bold shadow-sm">
+                <i class="fa-solid fa-money-check-dollar me-1"></i> Ver Nómina
+            </a>
+            <a href="/admin/dashboard" class="btn btn-light rounded-pill px-4 fw-bold text-muted border shadow-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Panel Principal
+            </a>
+        </div>
     </div>
 </div>
 
@@ -20,9 +25,18 @@
             <form method="POST" action="{{ url_for('admin_bp.asesores') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 
-                <div class="mb-4">
-                    <label class="form-label text-brand-black fw-semibold small">Nombre Completo</label>
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Nombre Completo <span class="text-danger">*</span></label>
                     <input type="text" name="nombre" class="form-control bg-light border-0 py-2" required placeholder="Ej. Carlos Mendoza">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-brand-black fw-semibold small">Salario Base Mensual</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0 fw-bold">$</span>
+                        <input type="number" name="salario_base" class="form-control bg-light border-0 py-2 fw-bold text-success" step="1000" min="0" value="0" placeholder="0">
+                    </div>
+                    <small class="text-muted">Sueldo fijo mensual antes de comisiones y vales.</small>
                 </div>
                 
                 <div class="d-grid mt-auto">
@@ -37,14 +51,16 @@
     <!-- Columna Derecha: Tabla -->
     <div class="col-md-8">
         <div class="card card-custom p-0 overflow-hidden h-100 table-custom">
-            <div class="bg-light p-4 border-bottom">
-                 <h5 class="fw-bold text-brand-black m-0 mt-2">Listado de Asesores Globales</h5>
+            <div class="bg-light p-4 border-bottom d-flex justify-content-between align-items-center">
+                 <h5 class="fw-bold text-brand-black m-0">Listado de Asesores Globales</h5>
+                 <span class="badge bg-secondary rounded-pill px-3 py-2">{{ asesores|length }} registrados</span>
             </div>
             <div class="table-responsive p-0">
                 <table class="table table-hover align-middle m-0">
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-4">NOMBRE DEL ASESOR</th>
+                            <th class="text-end">SALARIO BASE</th>
                             <th>FECHA REGISTRO</th>
                             <th class="text-center">ESTADO</th>
                             <th class="text-center pe-4">ACCIONES</th>
@@ -53,7 +69,12 @@
                     <tbody>
                         {% for asesor in asesores %}
                         <tr>
-                            <td class="fw-bold text-brand-black ps-4">{{ asesor.nombre }}</td>
+                            <td class="fw-bold text-brand-black ps-4">
+                                <i class="fa-solid fa-user-tie text-muted me-2"></i>{{ asesor.nombre }}
+                            </td>
+                            <td class="text-end fw-bold text-success">
+                                ${{ (asesor.salario_base or 0)|cop }}
+                            </td>
                             <td class="text-muted small">{{ asesor.created_at.strftime('%d/%m/%Y %I:%M %p') if asesor.created_at else 'N/A' }}</td>
                             <td class="text-center">
                                 {% if asesor.activo %}
@@ -99,6 +120,11 @@
                                                         <label class="form-label fw-bold">Nombre Completo</label>
                                                         <input type="text" name="nombre" class="form-control bg-light" value="{{ asesor.nombre }}" required>
                                                     </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Salario Base Mensual ($)</label>
+                                                        <input type="number" name="salario_base" class="form-control bg-light fw-bold text-success" step="1000" min="0" value="{{ (asesor.salario_base or 0)|int }}" required>
+                                                        <small class="text-muted">Valor fijo mensual para liquidación de nómina.</small>
+                                                    </div>
                                                 </div>
                                                 <div class="modal-footer border-0 bg-light">
                                                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
@@ -112,7 +138,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="text-center py-5 text-muted">
+                            <td colspan="5" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-folder-open fs-2 mb-2 d-block opacity-50"></i>
                                 No hay asesores registrados en el sistema.
                             </td>

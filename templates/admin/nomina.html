@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Nómina y Liquidación de Asesores - LifeStore{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Encabezado -->
+    <div class="row mb-4 align-items-center">
+        <div class="col-md-7">
+            <h2 class="fw-bold mb-0 text-brand-black">
+                <i class="fa-solid fa-money-check-dollar text-success me-2"></i>Nómina y Liquidación de Asesores
+            </h2>
+            <p class="text-muted">Consolidado mensual: Salario Base + Comisiones (Inventario & Retomas) − Deducción de Vales y Anticipos.</p>
+        </div>
+        <div class="col-md-5 text-md-end">
+            <a href="{{ url_for('admin_bp.asesores') }}" class="btn btn-outline-dark rounded-pill px-3 py-2 fw-bold shadow-sm me-2">
+                <i class="fa-solid fa-user-tie me-1"></i> Asignar Salarios
+            </a>
+            <a href="{{ url_for('admin_bp.ventas_vendedores') }}" class="btn btn-primary rounded-pill px-3 py-2 fw-bold shadow-sm">
+                <i class="fa-solid fa-chart-line me-1"></i> Ver Comisiones
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros de Consulta -->
+    <div class="card card-custom border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+            <form method="GET" action="{{ url_for('admin_bp.nomina') }}" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Periodo / Mes de Nómina <span class="text-danger">*</span></label>
+                    <input type="month" name="mes" class="form-control bg-light" value="{{ mes_seleccionado }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">Comisión Fija por Equipo de Inventario</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light fw-bold">$</span>
+                        <input type="number" name="comision_fija" class="form-control bg-light fw-bold text-primary" 
+                               value="{{ comision_fija or 20000 }}" step="1000" min="0">
+                        <span class="input-group-text bg-light text-muted small">/equipo</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-dark w-100 rounded-pill fw-bold py-2 shadow-sm">
+                        <i class="fa-solid fa-calculator me-1 text-success"></i> Calcular Nómina del Mes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tarjetas de Resumen General -->
+    <div class="row g-3 mb-4">
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-secondary h-100">
+                <div class="text-uppercase fw-bold text-muted extra-small mb-1">Salarios Base Total</div>
+                <h4 class="fw-bold text-dark mb-0">${{ total_salarios_base|cop }}</h4>
+                <span class="text-muted extra-small mt-1 d-block">{{ resumen_nomina|length }} asesores activos</span>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-info h-100">
+                <div class="text-uppercase fw-bold text-info extra-small mb-1">Total Comisiones</div>
+                <h4 class="fw-bold text-info mb-0">${{ total_comisiones_global|cop }}</h4>
+                <span class="text-muted extra-small mt-1 d-block">Inventario + Bolsa 15%</span>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-danger h-100">
+                <div class="text-uppercase fw-bold text-danger extra-small mb-1">Vales Aprobados Deducibles</div>
+                <h4 class="fw-bold text-danger mb-0">-${{ total_vales_global|cop }}</h4>
+                <span class="text-muted extra-small mt-1 d-block">Anticipos: -${{ total_anticipos_global|cop }}</span>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-success h-100">
+                <div class="text-uppercase fw-bold text-success extra-small mb-1">Total Neto Nómina a Pagar</div>
+                <h3 class="fw-bold text-success mb-0">${{ total_neto_nomina|cop }}</h3>
+                <span class="text-muted extra-small mt-1 d-block">Saldo neto a desembolsar</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla Detallada de Nómina de Asesores -->
+    <div class="card card-custom border-0 shadow-sm">
+        <div class="card-header bg-white border-0 py-3 ps-4 pe-4 d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="fw-bold m-0 text-brand-black">
+                    <i class="fa-solid fa-users me-2 text-primary"></i>Liquidación Individual de Asesores (Mes: {{ mes_seleccionado }})
+                </h5>
+                <small class="text-muted">Fórmula: [Salario Base + Comisiones] − [Vales Aprobados + Anticipos] = <strong>Neto a Pagar</strong></small>
+            </div>
+            <span class="badge bg-light text-dark border px-3 py-2 fw-semibold">
+                Comisión Fija Aplicada: ${{ comision_fija|cop }}
+            </span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                    <thead class="table-light text-uppercase" style="font-size: 0.78rem;">
+                        <tr>
+                            <th class="ps-4" width="20%">Asesor Comercial</th>
+                            <th class="text-end" width="12%">Salario Base</th>
+                            <th class="text-end" width="14%">Comisiones</th>
+                            <th class="text-end" width="13%">Total Devengado</th>
+                            <th class="text-end text-danger" width="12%">Vales Deducidos</th>
+                            <th class="text-end text-warning" width="11%">Anticipos</th>
+                            <th class="text-end" width="14%">Neto a Pagar</th>
+                            <th class="text-center pe-4" width="14%">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in resumen_nomina %}
+                        <tr>
+                            <td class="ps-4">
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-sm bg-light rounded-circle text-primary fw-bold d-flex align-items-center justify-content-center me-2" style="width: 36px; height: 36px;">
+                                        <i class="fa-solid fa-user-tie"></i>
+                                    </div>
+                                    <div>
+                                        <strong class="text-dark d-block">{{ item.asesor.nombre }}</strong>
+                                        <span class="badge bg-secondary bg-opacity-25 text-dark extra-small">Activo</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-end fw-semibold text-secondary">
+                                ${{ item.salario_base|cop }}
+                            </td>
+                            <td class="text-end">
+                                <div class="fw-bold text-info">+${{ item.total_comisiones|cop }}</div>
+                                <div class="extra-small text-muted">
+                                    {{ item.items_inventario_count }} eq. fij. / {{ item.retomas_count }} ret.
+                                </div>
+                            </td>
+                            <td class="text-end fw-bold text-dark">
+                                ${{ item.total_devengado|cop }}
+                            </td>
+                            <td class="text-end fw-bold text-danger">
+                                {% if item.total_vales > 0 %}
+                                    -${{ item.total_vales|cop }}
+                                    <div class="extra-small text-muted">{{ item.vales_count }} vale(s)</div>
+                                {% else %}
+                                    <span class="text-muted">$0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end fw-bold text-warning">
+                                {% if item.total_anticipos > 0 %}
+                                    -${{ item.total_anticipos|cop }}
+                                {% else %}
+                                    <span class="text-muted">$0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <span class="fs-6 fw-bolder {% if item.neto_a_pagar > 0 %}text-success{% else %}text-muted{% endif %}">
+                                    ${{ item.neto_a_pagar|cop }}
+                                </span>
+                            </td>
+                            <td class="text-center pe-4">
+                                <div class="d-inline-flex gap-1">
+                                    <!-- Botón Comprobante / Colilla -->
+                                    <a href="{{ url_for('admin_bp.colilla_nomina', asesor_id=item.asesor.id, mes=mes_seleccionado, comision_fija=comision_fija) }}"
+                                       target="_blank"
+                                       class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm"
+                                       title="Imprimir Colilla de Nómina">
+                                        <i class="fa-solid fa-receipt me-1"></i> Colilla
+                                    </a>
+                                    <!-- Botón Ver Detalle de Comisiones -->
+                                    <a href="{{ url_for('admin_bp.ventas_vendedores', asesor_id=item.asesor.id, mes=mes_seleccionado, comision_fija=comision_fija) }}"
+                                       class="btn btn-sm btn-outline-dark rounded-pill px-2"
+                                       title="Ver auditoría de comisiones">
+                                        <i class="fa-solid fa-chart-line"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-users-slash fs-2 mb-2 d-block opacity-50"></i>
+                                No hay asesores registrados para liquidar en este periodo.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

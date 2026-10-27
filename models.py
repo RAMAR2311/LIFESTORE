@@ -839,6 +839,7 @@ class Asesor(db.Model):
     __tablename__ = 'asesores'
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
+    salario_base = db.Column(db.Numeric(14, 2), default=0.0, nullable=False)
     activo = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=obtener_hora_bogota)
 

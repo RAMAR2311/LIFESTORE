@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colilla de Pago de Nómina - {{ asesor.nombre }} ({{ mes_seleccionado }}) - LifeStore</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f6f9;
+            color: #212529;
+            padding: 30px 15px;
+        }
+        .receipt-card {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e9ecef;
+            padding: 40px;
+        }
+        .brand-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            color: #111827;
+        }
+        .table-custom-receipt th {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            border-bottom: 2px solid #e5e7eb;
+            padding: 10px 12px;
+        }
+        .table-custom-receipt td {
+            font-size: 0.88rem;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .total-box {
+            background-color: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+        }
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .receipt-card {
+                box-shadow: none;
+                border: none;
+                padding: 15px;
+                max-width: 100%;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="receipt-card">
+    <!-- Botones de Acción Superiores -->
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <button onclick="window.history.back()" class="btn btn-outline-secondary rounded-pill px-3 py-2 btn-sm fw-semibold">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver a Nómina
+        </button>
+        <button onclick="window.print()" class="btn btn-success rounded-pill px-4 py-2 fw-bold shadow-sm">
+            <i class="fa-solid fa-print me-2"></i> Imprimir Colilla
+        </button>
+    </div>
+
+    <!-- Encabezado de la Empresa -->
+    <div class="row align-items-center border-bottom pb-4 mb-4">
+        <div class="col-8">
+            <h3 class="brand-title mb-1 text-uppercase">
+                <i class="fa-solid fa-store text-primary me-2"></i>{{ sucursal.nombre_comercial or sucursal.nombre or 'LifeStore' }}
+            </h3>
+            <p class="text-muted small mb-0">
+                NIT: {{ sucursal.nit or '900.000.000-1' }}<br>
+                Dirección: {{ sucursal.direccion or 'Sede Principal' }} | Tel: {{ sucursal.telefono or 'N/A' }}
+            </p>
+        </div>
+        <div class="col-4 text-end">
+            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2 rounded-pill fw-bold text-uppercase">
+                Colilla de Nómina
+            </span>
+            <div class="fw-bold text-dark mt-2" style="font-size: 1.1rem;">Periodo: {{ mes_seleccionado }}</div>
+        </div>
+    </div>
+
+    <!-- Datos del Asesor -->
+    <div class="row g-3 mb-4 p-3 bg-light rounded-3">
+        <div class="col-md-6">
+            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Empleado / Asesor Comercial</small>
+            <div class="fw-bold text-dark fs-5">{{ asesor.nombre }}</div>
+            <div class="small text-muted">ID Asesor: #{{ '%04d' % asesor.id }} | Cargo: Comercial de Ventas</div>
+        </div>
+        <div class="col-md-6 text-md-end">
+            <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Fecha de Emisión</small>
+            <div class="fw-bold text-secondary">{{ data.asesor.created_at.strftime('%d/%m/%Y') if data.asesor.created_at else '' }}</div>
+            <div class="small text-muted">LifeStore Nómina v2.0</div>
+        </div>
+    </div>
+
+    <!-- Desglose de Liquidación -->
+    <div class="row g-4 mb-4">
+        <!-- Columna 1: Ingresos / Devengado -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success bg-opacity-10 text-success border-0 py-2 px-3 fw-bold">
+                    <i class="fa-solid fa-circle-plus me-1"></i> INGRESOS (DEVENGADO)
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-custom-receipt mb-0">
+                        <tbody>
+                            <tr>
+                                <td>Salario Base Mensual</td>
+                                <td class="text-end fw-bold text-dark">${{ data.salario_base|cop }}</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    Comisiones Inventario
+                                    <div class="extra-small text-muted">{{ data.items_inventario_count }} equipos x ${{ comision_fija|cop }}</div>
+                                </td>
+                                <td class="text-end fw-bold text-info">+${{ data.comision_inventario|cop }}</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    Comisiones Retomas (15%)
+                                    <div class="extra-small text-muted">{{ data.retomas_count }} retoma(s) participadas</div>
+                                </td>
+                                <td class="text-end fw-bold text-primary">+${{ data.comision_retomas|cop }}</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td class="fw-bold text-dark">TOTAL DEVENGADO</td>
+                                <td class="text-end fw-bold text-success fs-6">${{ data.total_devengado|cop }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna 2: Deducciones / Descuentos -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-danger bg-opacity-10 text-danger border-0 py-2 px-3 fw-bold">
+                    <i class="fa-solid fa-circle-minus me-1"></i> DEDUCCIONES & DESCUENTOS
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-custom-receipt mb-0">
+                        <tbody>
+                            <tr>
+                                <td>
+                                    Vales Aprobados en el Mes
+                                    <div class="extra-small text-muted">{{ vales_detalle|length }} vale(s) descontados</div>
+                                </td>
+                                <td class="text-end fw-bold text-danger">-${{ data.total_vales|cop }}</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    Anticipos de Comisión Pagados
+                                    <div class="extra-small text-muted">{{ anticipos_detalle|length }} anticipo(s) previos</div>
+                                </td>
+                                <td class="text-end fw-bold text-warning">-${{ data.total_anticipos|cop }}</td>
+                            </tr>
+                            <tr>
+                                <td>Liquidaciones Previas</td>
+                                <td class="text-end text-muted">-${{ data.total_liquidado_previo|cop }}</td>
+                            </tr>
+                            <tr class="table-light">
+                                <td class="fw-bold text-dark">TOTAL DEDUCCIONES</td>
+                                <td class="text-end fw-bold text-danger fs-6">-${{ (data.total_vales + data.total_anticipos + data.total_liquidado_previo)|cop }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Si tiene vales, mostrar detalle rápido -->
+    {% if vales_detalle %}
+    <div class="mb-4">
+        <h6 class="fw-bold text-muted text-uppercase mb-2" style="font-size: 0.75rem;">Detalle de Vales Descontados</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered" style="font-size: 0.8rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Vale #</th>
+                        <th>Fecha</th>
+                        <th>Concepto / Motivo</th>
+                        <th class="text-end">Monto Deducido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vales_detalle %}
+                    <tr>
+                        <td>VAL-{{ '%05d' % v.id }}</td>
+                        <td>{{ v.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ v.concepto or 'Sin concepto' }}</td>
+                        <td class="text-end fw-bold text-danger">${{ v.monto|cop }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Total Neto a Pagar -->
+    <div class="total-box mb-5">
+        <div class="row align-items-center">
+            <div class="col-sm-7">
+                <div class="text-uppercase fw-bold text-muted small">NETO TOTAL A PAGAR:</div>
+                <div class="fw-bold text-dark text-capitalize small mt-1">Son: {{ monto_en_letras }} pesos M/CTE</div>
+            </div>
+            <div class="col-sm-5 text-sm-end mt-2 mt-sm-0">
+                <span class="fs-2 fw-bolder text-success">${{ data.neto_a_pagar|cop }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firmas -->
+    <div class="row mt-5 pt-4 text-center">
+        <div class="col-6">
+            <div style="border-top: 1px dashed #9ca3af; width: 80%; margin: 0 auto; padding-top: 8px;">
+                <div class="fw-bold text-dark small">{{ asesor.nombre }}</div>
+                <div class="text-muted extra-small">C.C. ___________________<br>Firma del Asesor (Recibí Conforme)</div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div style="border-top: 1px dashed #9ca3af; width: 80%; margin: 0 auto; padding-top: 8px;">
+                <div class="fw-bold text-dark small">Administración / Pagaduría</div>
+                <div class="text-muted extra-small">{{ sucursal.nombre_comercial or sucursal.nombre or 'LifeStore' }}<br>Firma y Sello Autorizado</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -1247,7 +1247,7 @@ def ventas_vendedores():
                 ).order_by(Sale.fecha_venta.desc()).all()
 
                 for v_mes in todas_ventas_mes:
-                    shift_obj = v_mes.shift
+                    shift_obj = getattr(v_mes, "turno", None)
                     if not shift_obj and v_mes.branch_id:
                         shift_obj = CashShift.query.filter(
                             CashShift.branch_id == v_mes.branch_id,
@@ -1263,8 +1263,8 @@ def ventas_vendedores():
                         retomas_origen = []
                         if det.producto and det.producto.retoma_origen:
                             retomas_origen = det.producto.retoma_origen
-                        elif det.producto_id:
-                            retomas_origen = Retoma.query.filter_by(producto_generado_id=det.producto_id).all()
+                        elif det.product_id:
+                            retomas_origen = Retoma.query.filter_by(producto_generado_id=det.product_id).all()
 
                         for ret_item in retomas_origen:
                             # Asesor que lo retomó
@@ -1545,21 +1545,25 @@ def asesores():
     from models import Asesor
     if request.method == 'POST':
         nombre = request.form.get('nombre')
+        salario_base_raw = request.form.get('salario_base', '0')
         if not nombre or not nombre.strip():
             flash('Acción Denegada: El nombre del asesor no puede estar vacío.', 'danger')
         else:
             try:
-                nuevo_asesor = Asesor(nombre=nombre.strip(), activo=True)
+                sal_clean = str(salario_base_raw).replace('$', '').replace('.', '').replace(',', '').strip()
+                sal_num = Decimal(sal_clean) if sal_clean else Decimal('0.0')
+                nuevo_asesor = Asesor(nombre=nombre.strip(), salario_base=sal_num, activo=True)
                 db.session.add(nuevo_asesor)
                 db.session.commit()
-                flash(f"¡Asesor '{nombre.strip()}' registrado exitosamente!", "success")
+                flash(f"¡Asesor '{nombre.strip()}' registrado exitosamente con salario base de ${sal_num:,.0f}!", "success")
             except Exception as e:
                 db.session.rollback()
-                flash('Ocurrió un error al registrar el asesor.', 'danger')
+                flash(f'Ocurrió un error al registrar el asesor: {str(e)}', 'danger')
         return redirect(url_for('admin_bp.asesores'))
         
     lista_asesores = Asesor.query.order_by(Asesor.nombre).all()
     return render_template('admin/asesores.html', asesores=lista_asesores)
+
 
 @admin_bp.route('/asesores/<int:id>/editar', methods=['POST'])
 @login_required
@@ -1568,17 +1572,282 @@ def editar_asesor(id):
     from models import Asesor
     asesor = Asesor.query.get_or_404(id)
     nombre = request.form.get('nombre')
+    salario_base_raw = request.form.get('salario_base', '0')
     if not nombre or not nombre.strip():
         flash('El nombre del asesor no puede estar vacío.', 'danger')
     else:
         try:
+            sal_clean = str(salario_base_raw).replace('$', '').replace('.', '').replace(',', '').strip()
+            sal_num = Decimal(sal_clean) if sal_clean else Decimal('0.0')
             asesor.nombre = nombre.strip()
+            asesor.salario_base = sal_num
             db.session.commit()
-            flash('Asesor actualizado correctamente.', 'success')
+            flash('Asesor y salario base actualizados correctamente.', 'success')
         except Exception as e:
             db.session.rollback()
-            flash('Error al actualizar el asesor.', 'danger')
+            flash(f'Error al actualizar el asesor: {str(e)}', 'danger')
     return redirect(url_for('admin_bp.asesores'))
+
+
+
+def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_num=Decimal('20000')):
+    """
+    Función utilitaria centralizada para liquidar a un asesor en un rango de fechas:
+    Devengado = Salario Base + Comisión Inventario (Fija) + Bolsa 15% Retomas
+    Deducciones = Vales Aprobados + Anticipos
+    Neto = Devengado - Deducciones
+    """
+    from models import Asesor, Sale, Retoma, CashShift, CommissionPayment, Vale
+    
+    asesor = Asesor.query.get(asesor_id)
+    if not asesor:
+        return None
+
+    salario_base = Decimal(str(asesor.salario_base or 0))
+
+    # 1. Comisiones de Inventario Directas
+    ventas = Sale.query.filter(
+        Sale.asesor_id == asesor_id,
+        Sale.fecha_venta >= start_date,
+        Sale.fecha_venta <= end_date
+    ).all()
+
+    total_monto_ventas = sum(v.monto_total for v in ventas) if ventas else Decimal('0.0')
+    comision_inventario = Decimal('0.0')
+    items_inventario_count = 0
+
+    for v in ventas:
+        for d in v.detalles:
+            cant = d.cantidad_vendida or 1
+            es_retoma = bool(d.producto and d.producto.retoma_origen)
+            if not es_retoma:
+                comision_inventario += comision_fija_num * Decimal(str(cant))
+                items_inventario_count += cant
+
+    # 2. Comisiones por Retomas (15% utilidad neta)
+    todas_ventas_mes = Sale.query.filter(
+        Sale.fecha_venta >= start_date,
+        Sale.fecha_venta <= end_date
+    ).all()
+
+    comision_retomas = Decimal('0.0')
+    retomas_count = 0
+
+    for v_mes in todas_ventas_mes:
+        shift_obj = getattr(v_mes, "turno", None)
+        if not shift_obj and v_mes.branch_id:
+            shift_obj = CashShift.query.filter(
+                CashShift.branch_id == v_mes.branch_id,
+                CashShift.fecha_apertura <= v_mes.fecha_venta,
+                or_(CashShift.fecha_cierre >= v_mes.fecha_venta, CashShift.fecha_cierre == None)
+            ).first()
+
+        asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
+        if not asesores_turno_ids and v_mes.asesor_id:
+            asesores_turno_ids = [v_mes.asesor_id]
+
+        for det in v_mes.detalles:
+            retomas_origen = []
+            if det.producto and det.producto.retoma_origen:
+                retomas_origen = det.producto.retoma_origen
+            elif det.product_id:
+                retomas_origen = Retoma.query.filter_by(producto_generado_id=det.product_id).all()
+
+            for ret_item in retomas_origen:
+                id_asesor_retomador = ret_item.asesor_retoma_id
+                if not id_asesor_retomador and ret_item.venta and ret_item.venta.asesor_id:
+                    id_asesor_retomador = ret_item.venta.asesor_id
+
+                involucrados_ids = []
+                if id_asesor_retomador:
+                    involucrados_ids.append(id_asesor_retomador)
+                for a_id in asesores_turno_ids:
+                    if a_id not in involucrados_ids:
+                        involucrados_ids.append(a_id)
+
+                if asesor_id in involucrados_ids:
+                    precio_vta = Decimal(str(det.precio_venta_final or 0))
+                    costo_ret = Decimal(str(ret_item.valor_retoma or 0))
+                    arreglos_val = Decimal(str(ret_item.arreglos or 0))
+                    utilidad_neta = precio_vta - costo_ret - arreglos_val
+
+                    if utilidad_neta > 0:
+                        bolsa_15 = utilidad_neta * Decimal('0.15')
+                        num_involucrados = max(1, len(involucrados_ids))
+                        cuota_asesor = bolsa_15 / Decimal(str(num_involucrados))
+                        comision_retomas += cuota_asesor
+                        retomas_count += 1
+
+    total_comisiones = comision_inventario + comision_retomas
+    total_devengado = salario_base + total_comisiones
+
+    # 3. Deducciones por Vales Aprobados en el Mes
+    vales_mes = Vale.query.filter(
+        Vale.asesor_id == asesor_id,
+        Vale.estado == 'APROBADO',
+        Vale.fecha_solicitud >= start_date,
+        Vale.fecha_solicitud <= end_date
+    ).all()
+    total_vales = sum(Decimal(str(v.monto or 0)) for v in vales_mes) if vales_mes else Decimal('0.0')
+
+    # 4. Anticipos de Comisiones Pagados en el Mes
+    pagos_comisiones = CommissionPayment.query.filter(
+        CommissionPayment.asesor_id == asesor_id,
+        CommissionPayment.fecha_pago >= start_date,
+        CommissionPayment.fecha_pago <= end_date
+    ).all()
+
+    total_anticipos = Decimal('0.0')
+    total_liquidado_previo = Decimal('0.0')
+    for p in pagos_comisiones:
+        monto_p = Decimal(str(p.monto or 0))
+        if p.tipo_pago == 'ANTICIPO':
+            total_anticipos += monto_p
+        else:
+            total_liquidado_previo += monto_p
+
+    total_deducciones = total_vales + total_anticipos
+    neto_a_pagar = max(Decimal('0.0'), total_devengado - total_deducciones - total_liquidado_previo)
+
+    return {
+        'asesor': asesor,
+        'salario_base': salario_base,
+        'items_inventario_count': items_inventario_count,
+        'comision_inventario': comision_inventario,
+        'retomas_count': retomas_count,
+        'comision_retomas': comision_retomas,
+        'total_comisiones': total_comisiones,
+        'total_devengado': total_devengado,
+        'vales_count': len(vales_mes),
+        'total_vales': total_vales,
+        'total_anticipos': total_anticipos,
+        'total_liquidado_previo': total_liquidado_previo,
+        'total_deducciones': total_deducciones,
+        'neto_a_pagar': neto_a_pagar,
+        'total_monto_ventas': total_monto_ventas
+    }
+
+
+@admin_bp.route('/nomina', methods=['GET'])
+@login_required
+@admin_required
+def nomina():
+    """
+    Vista Ejecutiva de Nómina de Asesores:
+    Consolida para cada asesor: Salario Base + Comisiones (Fijo Inventario + Bolsa 15% Retomas) - Vales Aprobados - Anticipos.
+    """
+    import calendar
+    from datetime import datetime
+    from models import Asesor, Branch
+
+    mes_seleccionado = request.args.get('mes', '').strip()
+    if not mes_seleccionado:
+        mes_seleccionado = obtener_hora_bogota().strftime('%Y-%m')
+
+    comision_fija_str = request.args.get('comision_fija', '20000').strip()
+    try:
+        comision_fija_num = Decimal(str(comision_fija_str).replace('$', '').replace('.', '').replace(',', '').strip())
+    except Exception:
+        comision_fija_num = Decimal('20000')
+
+    year, month = map(int, mes_seleccionado.split('-'))
+    last_day = calendar.monthrange(year, month)[1]
+    start_date = datetime(year, month, 1, 0, 0, 0)
+    end_date = datetime(year, month, last_day, 23, 59, 59)
+
+    asesores = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre).all()
+    resumen_nomina = []
+
+    total_salarios_base = Decimal('0.0')
+    total_comisiones_global = Decimal('0.0')
+    total_vales_global = Decimal('0.0')
+    total_anticipos_global = Decimal('0.0')
+    total_neto_nomina = Decimal('0.0')
+
+    for a in asesores:
+        data = calcular_liquidacion_asesor(a.id, start_date, end_date, comision_fija_num)
+        if data:
+            resumen_nomina.append(data)
+            total_salarios_base += data['salario_base']
+            total_comisiones_global += data['total_comisiones']
+            total_vales_global += data['total_vales']
+            total_anticipos_global += data['total_anticipos']
+            total_neto_nomina += data['neto_a_pagar']
+
+    return render_template(
+        'admin/nomina.html',
+        mes_seleccionado=mes_seleccionado,
+        comision_fija=int(comision_fija_num),
+        resumen_nomina=resumen_nomina,
+        total_salarios_base=total_salarios_base,
+        total_comisiones_global=total_comisiones_global,
+        total_vales_global=total_vales_global,
+        total_anticipos_global=total_anticipos_global,
+        total_neto_nomina=total_neto_nomina
+    )
+
+
+@admin_bp.route('/nomina/colilla/<int:asesor_id>', methods=['GET'])
+@login_required
+@admin_required
+def colilla_nomina(asesor_id):
+    """Genera la colilla/comprobante de pago de nómina de un asesor específico."""
+    import calendar
+    from datetime import datetime
+    from models import Asesor, Branch, Vale, CommissionPayment
+
+    asesor = Asesor.query.get_or_404(asesor_id)
+    mes_seleccionado = request.args.get('mes', '').strip()
+    if not mes_seleccionado:
+        mes_seleccionado = obtener_hora_bogota().strftime('%Y-%m')
+
+    comision_fija_str = request.args.get('comision_fija', '20000').strip()
+    try:
+        comision_fija_num = Decimal(str(comision_fija_str).replace('$', '').replace('.', '').replace(',', '').strip())
+    except Exception:
+        comision_fija_num = Decimal('20000')
+
+    year, month = map(int, mes_seleccionado.split('-'))
+    last_day = calendar.monthrange(year, month)[1]
+    start_date = datetime(year, month, 1, 0, 0, 0)
+    end_date = datetime(year, month, last_day, 23, 59, 59)
+
+    data = calcular_liquidacion_asesor(asesor.id, start_date, end_date, comision_fija_num)
+
+    # Detalle de vales del asesor en el mes
+    vales_detalle = Vale.query.filter(
+        Vale.asesor_id == asesor.id,
+        Vale.estado == 'APROBADO',
+        Vale.fecha_solicitud >= start_date,
+        Vale.fecha_solicitud <= end_date
+    ).order_by(Vale.fecha_solicitud.asc()).all()
+
+    # Detalle de anticipos
+    anticipos_detalle = CommissionPayment.query.filter(
+        CommissionPayment.asesor_id == asesor.id,
+        CommissionPayment.fecha_pago >= start_date,
+        CommissionPayment.fecha_pago <= end_date
+    ).order_by(CommissionPayment.fecha_pago.asc()).all()
+
+    active_b_id = session.get('active_branch_id') or (current_user.branch_id if current_user.branch_id else 1)
+    sucursal = Branch.query.get(active_b_id)
+    if not sucursal:
+        sucursal = Branch.query.first()
+
+    monto_en_letras = numero_a_letras(data['neto_a_pagar'])
+
+    return render_template(
+        'admin/comprobante_nomina.html',
+        asesor=asesor,
+        data=data,
+        mes_seleccionado=mes_seleccionado,
+        comision_fija=int(comision_fija_num),
+        vales_detalle=vales_detalle,
+        anticipos_detalle=anticipos_detalle,
+        sucursal=sucursal,
+        monto_en_letras=monto_en_letras
+    )
+
 
 @admin_bp.route('/asesores/<int:id>/toggle', methods=['POST'])
 @login_required
