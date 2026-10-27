@@ -840,6 +840,10 @@ def descargar_plantilla():
         'Ray-Ban Meta Skyler'
     ]
 
+    from models import Branch
+    sucursales_db = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).all()
+    catalogo_sucursales = [b.nombre for b in sucursales_db] if sucursales_db else ['BODEGA CENTRAL', 'TIENDA 1']
+
     # Hoja oculta con las listas del catálogo
     ws_cat = wb.create_sheet(title='_Catalogos')
     ws_cat.sheet_state = 'hidden'
@@ -850,12 +854,14 @@ def descargar_plantilla():
         ws_cat.cell(row=idx, column=2, value=item)
     for idx, item in enumerate(catalogo_modelos, start=1):
         ws_cat.cell(row=idx, column=3, value=item)
+    for idx, item in enumerate(catalogo_sucursales, start=1):
+        ws_cat.cell(row=idx, column=4, value=item)
 
     # Cabeceras
     columnas = [
         'TIPO DISPOSITIVO', 'MARCA', 'REFERENCIA', 'CAPACIDAD', 
         'BATERIA', 'COLOR', 'IMEI 1', 'IMEI 2', 'PROVEEDOR', 
-        'INVENTARIO', 'COSTO', 'P. MINIMO', 'P. SUGERIDO'
+        'SUCURSAL', 'INVENTARIO', 'COSTO', 'P. MINIMO', 'P. SUGERIDO'
     ]
 
     header_font = Font(name='Calibri', size=11, bold=True, color='FFFFFF')
@@ -887,11 +893,17 @@ def descargar_plantilla():
     ws_main.add_data_validation(dv_modelo)
     dv_modelo.add('C2:C1000')
 
+    dv_sucursal = DataValidation(type='list', formula1=f"='_Catalogos'!$D$1:$D${len(catalogo_sucursales)}", allow_blank=True)
+    dv_sucursal.error = 'Seleccione una sucursal o bodega válida'
+    dv_sucursal.errorTitle = 'Sucursal Inválida'
+    ws_main.add_data_validation(dv_sucursal)
+    dv_sucursal.add('J2:J1000')
+
     # Anchos de columna cómodos para visualización
     column_widths = {
         'A': 22, 'B': 18, 'C': 34, 'D': 16,
         'E': 14, 'F': 16, 'G': 20, 'H': 20,
-        'I': 20, 'J': 18, 'K': 16, 'L': 16, 'M': 16
+        'I': 20, 'J': 24, 'K': 18, 'L': 16, 'M': 16, 'N': 16
     }
     for col, width in column_widths.items():
         ws_main.column_dimensions[col].width = width
@@ -1024,8 +1036,20 @@ def importar_excel():
             db.session.add(nuevo)
             db.session.flush()
 
-            # Multisucursal: Asignar a sucursal de destino y registrar en Kardex
-            target_branch_id = _resolve_celular_branch_id(request.form.get('branch_id'))
+            # Multisucursal: Determinar si la fila especificó SUCURSAL en el Excel
+            sucursal_fila = str(row.get('SUCURSAL', '')).strip()
+            fila_branch_id = None
+            if sucursal_fila:
+                from models import Branch
+                # Buscar por nombre exacto o nombre insensible a mayúsculas/minúsculas o código
+                b_match = Branch.query.filter(
+                    (db.func.lower(Branch.nombre) == sucursal_fila.lower()) |
+                    (db.func.lower(Branch.codigo) == sucursal_fila.lower())
+                ).first()
+                if b_match:
+                    fila_branch_id = b_match.id
+
+            target_branch_id = fila_branch_id or _resolve_celular_branch_id(request.form.get('branch_id'))
             b_stock = get_or_create_branch_stock(target_branch_id, nuevo.id, None)
             b_stock.cantidad = 1
             sync_global_product_stock(nuevo.id, None)
