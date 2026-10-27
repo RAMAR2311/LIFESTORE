@@ -369,3 +369,4 @@ def devolver_al_inventario(exchange_id):
         db.session.rollback()
         flash(f'Error al devolver el equipo al inventario: {str(e)}', 'danger')
         return redirect(url_for('exchanges_bp.index'))
+

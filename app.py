@@ -164,6 +164,7 @@ def create_app():
         pending_transfers_count = 0
         pending_vales_count = 0
         pending_support_count = 0
+        pending_exchanges_count = 0
         if current_user.is_authenticated:
             from models import StockTransfer, Vale, TechnicalService, DeviceExchange
             q_pend = StockTransfer.query.filter_by(status='PENDIENTE')
