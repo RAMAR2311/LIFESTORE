@@ -455,10 +455,12 @@ class Retoma(db.Model):
     producto_generado_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
     fecha_registro = db.Column(db.DateTime, default=obtener_hora_bogota)
     vendedor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    asesor_retoma_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=True, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
 
     venta = db.relationship('Sale', backref='retomas_asociadas', lazy=True)
     vendedor = db.relationship('User', backref='retomas_registradas', lazy=True)
+    asesor_retoma = db.relationship('Asesor', foreign_keys=[asesor_retoma_id], backref='retomas_realizadas', lazy=True)
     producto_generado = db.relationship('Product', backref='retoma_origen', lazy=True)
 
     def __init__(self, **kwargs):

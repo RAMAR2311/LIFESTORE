@@ -438,7 +438,8 @@ def procesar_venta():
                 bateria=r_item.get('bateria', '').strip(),
                 memoria=r_item.get('memoria', '').strip(),
                 observaciones=r_item.get('observaciones', '').strip(),
-                vendedor_id=current_user.id
+                vendedor_id=current_user.id,
+                asesor_retoma_id=asesor_id
             )
             db.session.add(retoma_registro)
 

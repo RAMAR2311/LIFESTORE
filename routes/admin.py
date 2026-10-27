@@ -1151,12 +1151,12 @@ def ventas_vendedores():
     
     asesor_id = request.args.get('asesor_id', type=int)
     mes_seleccionado = request.args.get('mes', '').strip()
-    porcentaje_comision_str = request.args.get('porcentaje_comision', '2.0').strip()
+    comision_fija_str = request.args.get('comision_fija', '20000').strip()
     
     try:
-        porcentaje_num = Decimal(str(porcentaje_comision_str).replace('%', '').replace(',', '.').strip())
+        comision_fija_num = Decimal(str(comision_fija_str).replace('$', '').replace('.', '').replace(',', '').strip())
     except Exception:
-        porcentaje_num = Decimal('2.0')
+        comision_fija_num = Decimal('20000')
 
     # Si no hay mes seleccionado, por defecto usar el mes actual
     if not mes_seleccionado:
@@ -1169,8 +1169,8 @@ def ventas_vendedores():
     asesor_filtro = None
     
     total_ventas_mes = Decimal('0.0')
-    total_monto_vitrina = Decimal('0.0')
-    total_comision_vitrina = Decimal('0.0')
+    total_monto_inventario = Decimal('0.0')
+    total_comision_inventario = Decimal('0.0')
     total_comision_retomas = Decimal('0.0')
     total_comision_mes = Decimal('0.0')
     total_anticipos = Decimal('0.0')
@@ -1186,7 +1186,7 @@ def ventas_vendedores():
                 start_date = datetime(year, month, 1, 0, 0, 0)
                 end_date = datetime(year, month, last_day, 23, 59, 59)
                 
-                # 1. Ventas de Vitrina asociadas al asesor
+                # 1. Ventas directas del Asesor en el mes
                 ventas = Sale.query.filter(
                     Sale.asesor_id == asesor_id,
                     Sale.fecha_venta >= start_date,
@@ -1196,36 +1196,51 @@ def ventas_vendedores():
                 total_ventas_mes = sum(v.monto_total for v in ventas)
 
                 for v in ventas:
-                    monto_vitrina_venta = Decimal('0.0')
+                    monto_inventario_venta = Decimal('0.0')
                     items_list = []
+                    comision_venta_fija = Decimal('0.0')
 
                     for d in v.detalles:
                         cant = d.cantidad_vendida or 1
                         precio_u = Decimal(str(d.precio_venta_final or 0))
                         subtot = precio_u * Decimal(str(cant))
-                        monto_vitrina_venta += subtot
+                        monto_inventario_venta += subtot
                         nom_item = d.producto.nombre if d.producto else (d.nombre_manual or 'Producto')
                         imei_item = d.producto.imei if (d.producto and d.producto.imei) else 'N/A'
+                        
+                        # Es producto de retoma si el producto tiene retoma_origen
+                        es_retoma = bool(d.producto and d.producto.retoma_origen)
+                        
+                        # Si es producto de inventario normal (no retoma), aplica comision fija por unidad
+                        comision_item = Decimal('0.0')
+                        if not es_retoma:
+                            comision_item = comision_fija_num * Decimal(str(cant))
+                            comision_venta_fija += comision_item
+
                         items_list.append({
                             'nombre': nom_item,
                             'imei': imei_item,
                             'cantidad': cant,
                             'precio': precio_u,
-                            'subtotal': subtot
+                            'subtotal': subtot,
+                            'es_retoma': es_retoma,
+                            'comision_fija': comision_item
                         })
 
-                    comision_venta = monto_vitrina_venta * (porcentaje_num / Decimal('100.0'))
-                    total_monto_vitrina += monto_vitrina_venta
-                    total_comision_vitrina += comision_venta
+                    total_monto_inventario += monto_inventario_venta
+                    total_comision_inventario += comision_venta_fija
 
                     ventas_procesadas.append({
                         'sale': v,
-                        'monto_vitrina': monto_vitrina_venta,
+                        'monto_inventario': monto_inventario_venta,
                         'items_list': items_list,
-                        'comision_venta': comision_venta
+                        'comision_venta': comision_venta_fija
                     })
 
-                # 2. Retomas: Bolsa del 15% sobre utilidad neta repartida entre asesores de turno
+                # 2. Retomas: Bolsa del 15% sobre utilidad neta
+                # Repartida equitativamente entre:
+                # - El asesor que retomó el equipo (origen de retoma)
+                # - Los asesores que estaban de turno cuando se vendió dicha retoma
                 todas_ventas_mes = Sale.query.filter(
                     Sale.fecha_venta >= start_date,
                     Sale.fecha_venta <= end_date
@@ -1241,20 +1256,33 @@ def ventas_vendedores():
                         ).first()
 
                     asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
-                    if not asesores_turno_ids:
-                        asesores_turno_ids = [v_mes.asesor_id] if v_mes.asesor_id else []
+                    if not asesores_turno_ids and v_mes.asesor_id:
+                        asesores_turno_ids = [v_mes.asesor_id]
 
-                    # Si el asesor consultado integró el turno de esa venta
-                    if asesor_id in asesores_turno_ids:
-                        num_asesores_turno = max(1, len(asesores_turno_ids))
-                        for det in v_mes.detalles:
-                            retomas_origen = []
-                            if det.producto and det.producto.retoma_origen:
-                                retomas_origen = det.producto.retoma_origen
-                            elif det.producto_id:
-                                retomas_origen = Retoma.query.filter_by(producto_generado_id=det.producto_id).all()
+                    for det in v_mes.detalles:
+                        retomas_origen = []
+                        if det.producto and det.producto.retoma_origen:
+                            retomas_origen = det.producto.retoma_origen
+                        elif det.producto_id:
+                            retomas_origen = Retoma.query.filter_by(producto_generado_id=det.producto_id).all()
 
-                            for ret_item in retomas_origen:
+                        for ret_item in retomas_origen:
+                            # Asesor que lo retomó
+                            id_asesor_retomador = ret_item.asesor_retoma_id
+                            if not id_asesor_retomador and ret_item.venta and ret_item.venta.asesor_id:
+                                id_asesor_retomador = ret_item.venta.asesor_id
+
+                            # Conjunto/lista de asesores involucrados en esta retoma:
+                            # [Retomador] + [Asesores del turno de venta] (manteniendo lista única de IDs)
+                            involucrados_ids = []
+                            if id_asesor_retomador:
+                                involucrados_ids.append(id_asesor_retomador)
+                            for a_id in asesores_turno_ids:
+                                if a_id not in involucrados_ids:
+                                    involucrados_ids.append(a_id)
+
+                            # Si el asesor consultado es uno de los involucrados:
+                            if asesor_id in involucrados_ids:
                                 precio_vta = Decimal(str(det.precio_venta_final or 0))
                                 costo_ret = Decimal(str(ret_item.valor_retoma or 0))
                                 arreglos_val = Decimal(str(ret_item.arreglos or 0))
@@ -1262,8 +1290,26 @@ def ventas_vendedores():
 
                                 if utilidad_neta > 0:
                                     bolsa_15 = utilidad_neta * Decimal('0.15')
-                                    cuota_asesor = bolsa_15 / Decimal(str(num_asesores_turno))
+                                    num_involucrados = max(1, len(involucrados_ids))
+                                    cuota_asesor = bolsa_15 / Decimal(str(num_involucrados))
                                     total_comision_retomas += cuota_asesor
+
+                                    # Identificar roles del asesor consultado
+                                    roles = []
+                                    if asesor_id == id_asesor_retomador:
+                                        roles.append('Retomó el equipo')
+                                    if asesor_id in asesores_turno_ids:
+                                        roles.append('Turno de venta')
+                                    rol_str = ' + '.join(roles) if roles else 'Comercial'
+
+                                    # Obtener nombres de todos los involucrados
+                                    nombres_inv = []
+                                    for inv_id in involucrados_ids:
+                                        a_obj = Asesor.query.get(inv_id)
+                                        if a_obj:
+                                            tag = '(Retomó)' if inv_id == id_asesor_retomador else '(Turno)'
+                                            nombres_inv.append(f"{a_obj.nombre} {tag}")
+
                                     retomas_procesadas.append({
                                         'venta': v_mes,
                                         'retoma': ret_item,
@@ -1273,12 +1319,14 @@ def ventas_vendedores():
                                         'arreglos': arreglos_val,
                                         'utilidad_neta': utilidad_neta,
                                         'bolsa_total': bolsa_15,
-                                        'num_asesores': num_asesores_turno,
-                                        'cuota_asesor': cuota_asesor
+                                        'num_involucrados': num_involucrados,
+                                        'involucrados_str': ', '.join(nombres_inv),
+                                        'cuota_asesor': cuota_asesor,
+                                        'rol_asesor': rol_str
                                     })
 
                 # 3. Consolidado Acumulado del Mes
-                total_comision_mes = total_comision_vitrina + total_comision_retomas
+                total_comision_mes = total_comision_inventario + total_comision_retomas
 
                 # 4. Historial de Anticipos y Pagos del Asesor en el Mes
                 pagos_comisiones = CommissionPayment.query.filter(
@@ -1306,14 +1354,14 @@ def ventas_vendedores():
         asesor_id=asesor_id,
         asesor_filtro=asesor_filtro,
         mes_seleccionado=mes_seleccionado,
-        porcentaje_comision=float(porcentaje_num),
+        comision_fija=int(comision_fija_num),
         ventas=ventas,
         ventas_procesadas=ventas_procesadas,
         retomas_procesadas=retomas_procesadas,
         pagos_comisiones=pagos_comisiones,
         total_ventas_mes=total_ventas_mes,
-        total_monto_vitrina=total_monto_vitrina,
-        total_comision_vitrina=total_comision_vitrina,
+        total_monto_inventario=total_monto_inventario,
+        total_comision_inventario=total_comision_inventario,
         total_comision_retomas=total_comision_retomas,
         total_comision_mes=total_comision_mes,
         total_anticipos=total_anticipos,
@@ -1331,7 +1379,7 @@ def registrar_anticipo_comision():
     metodo_pago = request.form.get('metodo_pago', 'efectivo')
     notas = request.form.get('notas', '').strip()
     mes_origen = request.form.get('mes', obtener_hora_bogota().strftime('%Y-%m'))
-    porcentaje = request.form.get('porcentaje_comision', '2.0')
+    comision_fija = request.form.get('comision_fija', '20000')
 
     asesor = Asesor.query.get_or_404(asesor_id)
     try:
@@ -1341,7 +1389,7 @@ def registrar_anticipo_comision():
             raise ValueError("El monto debe ser mayor a 0.")
     except Exception as e:
         flash(f"Monto inválido para el anticipo: {str(e)}", "danger")
-        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, porcentaje_comision=porcentaje))
+        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
 
     try:
         nuevo_pago = CommissionPayment(
@@ -1356,11 +1404,11 @@ def registrar_anticipo_comision():
         db.session.add(nuevo_pago)
         db.session.commit()
         flash(f"Anticipo por ${monto:,.0f} registrado con éxito para {asesor.nombre}.", "success")
-        return redirect(url_for('admin_bp.recibo_comision', payment_id=nuevo_pago.id))
+        return redirect(url_for('admin_bp.recibo_comision', payment_id=nuevo_pago.id, comision_fija=comision_fija))
     except Exception as e:
         db.session.rollback()
         flash(f"Error al registrar anticipo: {str(e)}", "danger")
-        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, porcentaje_comision=porcentaje))
+        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
 
 
 @admin_bp.route('/comisiones/liquidar', methods=['POST'])
@@ -1372,7 +1420,7 @@ def liquidar_saldo_comision():
     metodo_pago = request.form.get('metodo_pago', 'efectivo')
     notas = request.form.get('notas', '').strip()
     mes_origen = request.form.get('mes', obtener_hora_bogota().strftime('%Y-%m'))
-    porcentaje = request.form.get('porcentaje_comision', '2.0')
+    comision_fija = request.form.get('comision_fija', '20000')
 
     asesor = Asesor.query.get_or_404(asesor_id)
     try:
@@ -1382,7 +1430,7 @@ def liquidar_saldo_comision():
             raise ValueError("El monto a liquidar debe ser mayor a 0.")
     except Exception as e:
         flash(f"Monto de liquidación inválido: {str(e)}", "danger")
-        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, porcentaje_comision=porcentaje))
+        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
 
     try:
         nuevo_pago = CommissionPayment(
@@ -1397,11 +1445,11 @@ def liquidar_saldo_comision():
         db.session.add(nuevo_pago)
         db.session.commit()
         flash(f"Liquidación por ${monto:,.0f} registrada con éxito para {asesor.nombre}.", "success")
-        return redirect(url_for('admin_bp.recibo_comision', payment_id=nuevo_pago.id))
+        return redirect(url_for('admin_bp.recibo_comision', payment_id=nuevo_pago.id, comision_fija=comision_fija))
     except Exception as e:
         db.session.rollback()
         flash(f"Error al liquidar saldo: {str(e)}", "danger")
-        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, porcentaje_comision=porcentaje))
+        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
 
 
 @admin_bp.route('/comisiones/recibo/<int:payment_id>', methods=['GET'])
@@ -1411,6 +1459,11 @@ def recibo_comision(payment_id):
     pago = CommissionPayment.query.get_or_404(payment_id)
     asesor = pago.asesor
     monto_en_letras = numero_a_letras(pago.monto)
+    comision_fija_str = request.args.get('comision_fija', '20000').strip()
+    try:
+        comision_fija_num = Decimal(str(comision_fija_str).replace('$', '').replace('.', '').replace(',', '').strip())
+    except Exception:
+        comision_fija_num = Decimal('20000')
     
     # Sucursal para encabezado
     active_b_id = session.get('active_branch_id') or (current_user.branch_id if current_user.branch_id else 1)
@@ -1426,26 +1479,43 @@ def recibo_comision(payment_id):
     start_date = datetime(year, month, 1, 0, 0, 0)
     end_date = datetime(year, month, last_day, 23, 59, 59)
 
-    # Ventas de vitrina
+    # 1. Ventas de inventario normal (comisión fija)
     ventas = Sale.query.filter(Sale.asesor_id == asesor.id, Sale.fecha_venta >= start_date, Sale.fecha_venta <= end_date).all()
-    comision_vitrina = sum(sum((d.precio_venta_final or 0) * (d.cantidad_vendida or 1) for d in v.detalles) for v in ventas) * Decimal('0.02')
+    comision_inventario = Decimal('0.0')
+    for v in ventas:
+        for d in v.detalles:
+            cant = d.cantidad_vendida or 1
+            es_retoma = bool(d.producto and d.producto.retoma_origen)
+            if not es_retoma:
+                comision_inventario += comision_fija_num * Decimal(str(cant))
 
-    # Retomas
+    # 2. Retomas (15% repartido entre retomador y turno de venta)
     comision_retomas = Decimal('0.0')
     todas_v = Sale.query.filter(Sale.fecha_venta >= start_date, Sale.fecha_venta <= end_date).all()
     for v_m in todas_v:
         s_obj = v_m.shift
         a_ids = s_obj.lista_asesores_ids if s_obj else ([v_m.asesor_id] if v_m.asesor_id else [])
-        if asesor.id in a_ids:
-            n_ases = max(1, len(a_ids))
-            for d in v_m.detalles:
-                rets = d.producto.retoma_origen if (d.producto and d.producto.retoma_origen) else []
-                for r in rets:
+        for d in v_m.detalles:
+            rets = d.producto.retoma_origen if (d.producto and d.producto.retoma_origen) else []
+            for r in rets:
+                id_retomador = r.asesor_retoma_id
+                if not id_retomador and r.venta and r.venta.asesor_id:
+                    id_retomador = r.venta.asesor_id
+
+                involucrados = []
+                if id_retomador:
+                    involucrados.append(id_retomador)
+                for a_id in a_ids:
+                    if a_id not in involucrados:
+                        involucrados.append(a_id)
+
+                if asesor.id in involucrados:
                     uneta = Decimal(str(d.precio_venta_final or 0)) - Decimal(str(r.valor_retoma or 0)) - Decimal(str(r.arreglos or 0))
                     if uneta > 0:
-                        comision_retomas += (uneta * Decimal('0.15')) / Decimal(str(n_ases))
+                        bolsa = uneta * Decimal('0.15')
+                        comision_retomas += bolsa / Decimal(str(max(1, len(involucrados))))
 
-    total_generado = comision_vitrina + comision_retomas
+    total_generado = comision_inventario + comision_retomas
     # Pagos hasta este pago inclusive
     pagos_anteriores = CommissionPayment.query.filter(
         CommissionPayment.asesor_id == asesor.id,
@@ -1461,8 +1531,12 @@ def recibo_comision(payment_id):
         asesor=asesor,
         sucursal=sucursal,
         monto_en_letras=monto_en_letras,
-        saldo_restante=saldo_restante
+        saldo_restante=saldo_restante,
+        comision_inventario=comision_inventario,
+        comision_retomas=comision_retomas,
+        total_generado=total_generado
     )
+
 
 @admin_bp.route('/asesores', methods=['GET', 'POST'])
 @login_required
