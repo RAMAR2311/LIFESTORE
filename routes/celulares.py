@@ -332,7 +332,7 @@ def nuevo_celular():
             db.session.rollback()
             flash(f'Error al registrar el dispositivo: {str(e)}', 'danger')
 
-    sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    sucursales_activas = Branch.query.order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
     default_branch_id = _resolve_celular_branch_id()
     return render_template('celulares/form_celular.html', celular=None, sucursales=sucursales_activas, default_branch_id=default_branch_id)
 
@@ -353,7 +353,15 @@ def editar_celular(id):
             existente = Product.query.filter(Product.imei == imei_val, Product.id != id).first()
             if existente:
                 flash(f'El IMEI "{imei_val}" ya pertenece a otro celular registrado ({existente.nombre}).', 'danger')
-                return render_template('celulares/form_celular.html', celular=celular)
+                sucursales_activas = Branch.query.order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+                current_b_id = None
+                for bs in celular.branch_stocks:
+                    if bs.cantidad > 0:
+                        current_b_id = bs.branch_id
+                        break
+                if not current_b_id and sucursales_activas:
+                    current_b_id = sucursales_activas[0].id
+                return render_template('celulares/form_celular.html', celular=celular, sucursales=sucursales_activas, default_branch_id=current_b_id)
 
         celular.marca = request.form.get('marca', '').strip()
         celular.modelo_celular = request.form.get('modelo_celular', '').strip()
@@ -390,6 +398,24 @@ def editar_celular(id):
                 file.save(os.path.join(upload_folder, filename))
                 celular.imagen = filename
             
+        # Reubicación / Asignación de Sucursal o Bodega
+        nueva_branch_id = request.form.get('branch_id')
+        if nueva_branch_id:
+            try:
+                target_b_id = int(nueva_branch_id)
+                # Reasignar stock: poner en 0 en otras sedes y 1 en la sede destino
+                for bs in celular.branch_stocks:
+                    if bs.branch_id == target_b_id:
+                        bs.cantidad = 1
+                    else:
+                        bs.cantidad = 0
+                # Si no existía el registro de branch_stock para esa sede, crearlo
+                b_stock = get_or_create_branch_stock(target_b_id, celular.id, None)
+                b_stock.cantidad = 1
+                sync_global_product_stock(celular.id, None)
+            except Exception as e_stock:
+                current_app.logger.warning(f"Error reasignando sucursal a celular {celular.id}: {e_stock}")
+
         try:
             db.session.commit()
             flash('Celular actualizado exitosamente.', 'success')
@@ -401,7 +427,17 @@ def editar_celular(id):
             db.session.rollback()
             flash(f'Error al actualizar: {str(e)}', 'danger')
             
-    return render_template('celulares/form_celular.html', celular=celular)
+    sucursales_activas = Branch.query.order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    # Identificar la sucursal actual del equipo
+    current_b_id = None
+    for bs in celular.branch_stocks:
+        if bs.cantidad > 0:
+            current_b_id = bs.branch_id
+            break
+    if not current_b_id and sucursales_activas:
+        current_b_id = sucursales_activas[0].id
+
+    return render_template('celulares/form_celular.html', celular=celular, sucursales=sucursales_activas, default_branch_id=current_b_id)
 
 @celulares_bp.route('/eliminar/<int:id>', methods=['POST'])
 @login_required
