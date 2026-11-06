@@ -121,21 +121,26 @@
 
             <hr class="mb-4">
 
-            <!-- Selector de Asesor (Obligatorio en tienda, exento en bodega) -->
-            {% if not sucursal_actual or sucursal_actual.tipo == 'tienda' %}
+            <!-- Información de Turno de Asesores (Ventas compartidas por apertura de caja) -->
+            {% if turno_activo and turno_activo.asesores_obj %}
             <div class="mb-3">
-                <label class="form-label fw-bold text-brand-black small text-uppercase mb-2"><i class="fa-solid fa-user-tie me-1"></i> Asesor de Venta</label>
-                <select id="asesor-vendedor" class="form-select form-select-lg border-0 shadow-sm bg-light" required style="cursor: pointer;">
-                    <option value="" disabled selected>-- Seleccionar Asesor --</option>
-                    {% for a in asesores %}
-                        <option value="{{ a.id }}">{{ a.nombre }}</option>
-                    {% endfor %}
-                </select>
+                <div class="p-3 rounded-3 bg-light border border-primary border-opacity-25 shadow-sm">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold text-primary small text-uppercase"><i class="fa-solid fa-users me-1"></i> Asesores de Turno</span>
+                        <span class="badge bg-primary rounded-pill">{{ turno_activo.asesores_obj|length }} activo(s)</span>
+                    </div>
+                    <div class="text-truncate text-dark fw-semibold small" title="{{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}">
+                        {{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}
+                    </div>
+                    <div class="extra-small text-muted mt-1">
+                        * Las comisiones de este turno se dividen equitativamente entre los asesores registrados al abrir caja.
+                    </div>
+                </div>
             </div>
-            {% else %}
+            {% elif sucursal_actual and sucursal_actual.tipo == 'bodega' %}
             <div class="mb-3">
                 <div class="p-2 px-3 rounded bg-light border text-muted small">
-                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de selección de asesores</strong>
+                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de turnos y comisiones</strong>
                 </div>
             </div>
             {% endif %}
@@ -1381,10 +1386,6 @@
         const esBodega = {% if sucursal_actual and sucursal_actual.tipo == 'bodega' %}true{% else %}false{% endif %};
         const asesorSelect = document.getElementById('asesor-vendedor');
         const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
-
-        if (!esBodega && !asesorId) {
-            return alert('⚠️ Por favor, selecciona el asesor que realizó la venta antes de continuar.');
-        }
 
         const esMixto = document.getElementById('toggle_pago_mixto').checked;
 

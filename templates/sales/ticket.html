@@ -199,7 +199,11 @@
             <div style="margin-bottom: 2px;">
                 <strong>Cajero:</strong> {{ venta.vendedor.nombre }}
             </div>
-            {% if venta.asesor %}
+            {% if venta.turno and venta.turno.asesores_obj %}
+            <div style="margin-bottom: 2px;">
+                <strong>Asesores Turno:</strong> {{ venta.turno.asesores_obj|map(attribute='nombre')|join(', ') }}
+            </div>
+            {% elif venta.asesor %}
             <div style="margin-bottom: 2px;">
                 <strong>Asesor de Venta:</strong> {{ venta.asesor.nombre }}
             </div>

@@ -463,6 +463,15 @@ class Retoma(db.Model):
     asesor_retoma = db.relationship('Asesor', foreign_keys=[asesor_retoma_id], backref='retomas_realizadas', lazy=True)
     producto_generado = db.relationship('Product', backref='retoma_origen', lazy=True)
 
+    @property
+    def soporte_activo(self):
+        if not self.servicios_tecnicos:
+            return None
+        for s in self.servicios_tecnicos:
+            if s.estado in ['EN_REVISION', 'EN_REPARACION']:
+                return s
+        return None
+
     def __init__(self, **kwargs):
         super(Retoma, self).__init__(**kwargs)
 
@@ -769,6 +778,7 @@ class Warranty(db.Model):
 
     # Trazabilidad y Custodia: Recepción
     recibido_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=True, index=True)
     estado_estetico = db.Column(db.String(100), nullable=True) # ej: 'Excelente', 'Buen Estado', 'Rayones Leves', 'Golpes Visibles'
     detalles_esteticos = db.Column(db.Text, nullable=True)
     porcentaje_bateria = db.Column(db.String(20), nullable=True)
@@ -784,6 +794,7 @@ class Warranty(db.Model):
     product = db.relationship('Product', backref=db.backref('warranties', lazy=True))
     recibido_por = db.relationship('User', foreign_keys=[recibido_por_id], backref=db.backref('garantias_recibidas', lazy=True))
     entregado_por = db.relationship('User', foreign_keys=[entregado_por_id], backref=db.backref('garantias_entregadas', lazy=True))
+    asesor = db.relationship('Asesor', foreign_keys=[asesor_id], backref=db.backref('garantias_atendidas', lazy=True))
 
     @property
     def tiempo_transcurrido(self):
@@ -1037,8 +1048,10 @@ class TechnicalService(db.Model):
     
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True, index=True)
     warranty_id = db.Column(db.Integer, db.ForeignKey('warranties.id'), nullable=True, index=True)
+    retoma_id = db.Column(db.Integer, db.ForeignKey('retomas.id'), nullable=True, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     technician_id = db.Column(db.Integer, db.ForeignKey('technicians.id'), nullable=True, index=True)
+    asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=True, index=True)
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
@@ -1061,7 +1074,9 @@ class TechnicalService(db.Model):
 
     producto = db.relationship('Product', backref=db.backref('servicios_tecnicos', lazy=True))
     garantia = db.relationship('Warranty', backref=db.backref('servicios_tecnicos', lazy=True))
+    retoma = db.relationship('Retoma', backref=db.backref('servicios_tecnicos', lazy=True))
     branch = db.relationship('Branch', backref=db.backref('servicios_tecnicos', lazy=True))
+    asesor = db.relationship('Asesor', foreign_keys=[asesor_id], backref=db.backref('servicios_tecnicos_atendidos', lazy=True))
     created_by = db.relationship('User', foreign_keys=[created_by_id], backref=db.backref('servicios_creados', lazy=True))
     resolved_by = db.relationship('User', foreign_keys=[resolved_by_id], backref=db.backref('servicios_resueltos', lazy=True))
 
@@ -1094,6 +1109,7 @@ class DeviceExchange(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     partner_id = db.Column(db.Integer, db.ForeignKey('exchange_partners.id'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=True, index=True)
     resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
 
@@ -1126,6 +1142,7 @@ class DeviceExchange(db.Model):
     producto_salida = db.relationship('Product', foreign_keys=[product_salida_id], backref=db.backref('cambios_salida', lazy=True))
     producto_entrada = db.relationship('Product', foreign_keys=[product_entrada_id], backref=db.backref('cambios_entrada', lazy=True))
     usuario = db.relationship('User', foreign_keys=[user_id], backref=db.backref('cambios_registrados', lazy=True))
+    asesor = db.relationship('Asesor', foreign_keys=[asesor_id], backref=db.backref('cambios_atendidos', lazy=True))
     resolved_by = db.relationship('User', foreign_keys=[resolved_by_id], backref=db.backref('cambios_resueltos', lazy=True))
     branch = db.relationship('Branch', backref=db.backref('cambios_mercancia', lazy=True))
 

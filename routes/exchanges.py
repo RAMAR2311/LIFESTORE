@@ -49,6 +49,8 @@ def index():
     cambios = query.order_by(DeviceExchange.fecha_salida.desc()).all()
     partners = ExchangePartner.query.filter_by(activo=True).order_by(ExchangePartner.nombre.asc()).all()
     sucursales = Branch.query.order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    from models import Asesor
+    asesores = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
 
     # Conteos para métricas
     base_counts = DeviceExchange.query
@@ -66,6 +68,7 @@ def index():
         cambios=cambios,
         partners=partners,
         sucursales=sucursales,
+        asesores=asesores,
         filtro_estado=filtro_estado,
         filtro_partner=filtro_partner,
         q=q,
@@ -123,6 +126,7 @@ def registrar_salida_cambio(product_id):
         return redirect(url_for('celulares_bp.inventario'))
 
     partner_id = request.form.get('partner_id', type=int)
+    asesor_id = request.form.get('asesor_id', type=int)
     nuevo_partner_nombre = request.form.get('nuevo_partner_nombre', '').strip()
     motivo_salida = request.form.get('motivo_salida', '').strip()
 
@@ -158,6 +162,7 @@ def registrar_salida_cambio(product_id):
         cambio = DeviceExchange(
             partner_id=partner_id,
             user_id=current_user.id,
+            asesor_id=asesor_id,
             branch_id=branch_id,
             product_salida_id=celular.id,
             imei_salida=celular.imei,
@@ -210,8 +215,14 @@ def recibir_celular_cambio(exchange_id):
     # Datos del nuevo equipo
     marca = request.form.get('marca_entrada', '').strip()
     modelo = request.form.get('modelo_entrada', '').strip()
+    if modelo == '__OTRO__':
+        modelo = request.form.get('modelo_entrada_custom', '').strip()
     color = request.form.get('color_entrada', '').strip()
+    if color == '__OTRO__':
+        color = request.form.get('color_entrada_custom', '').strip()
     memoria = request.form.get('memoria_entrada', '').strip()
+    if memoria == '__OTRO__':
+        memoria = request.form.get('memoria_entrada_custom', '').strip()
     bateria = request.form.get('bateria_entrada', '').strip()
     imei1 = request.form.get('imei1_entrada', '').strip()
     imei2 = request.form.get('imei2_entrada', '').strip() or None
@@ -220,6 +231,7 @@ def recibir_celular_cambio(exchange_id):
     costo_str = request.form.get('costo_entrada', '0').replace('$', '').replace('.', '').replace(',', '').strip()
     minimo_str = request.form.get('precio_minimo_entrada', '0').replace('$', '').replace('.', '').replace(',', '').strip()
     sugerido_str = request.form.get('precio_sugerido_entrada', '0').replace('$', '').replace('.', '').replace(',', '').strip()
+    asesor_id = request.form.get('asesor_id', type=int)
     dest_branch_id = request.form.get('branch_id', type=int) or cambio.branch_id
     obs_resolucion = request.form.get('observacion_resolucion', '').strip()
 
@@ -287,6 +299,8 @@ def recibir_celular_cambio(exchange_id):
 
         # Actualizar datos del cambio
         cambio.estado = 'COMPLETADO'
+        if asesor_id:
+            cambio.asesor_id = asesor_id
         cambio.product_entrada_id = nuevo_cel.id
         cambio.marca_entrada = marca
         cambio.modelo_entrada = modelo

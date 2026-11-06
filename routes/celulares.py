@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file, session
 from flask_login import login_required, current_user
 from sqlalchemy import or_
-from models import db, Product, Sale, SaleDetail, SalePayment, ProductVariant, ArqueoCaja, Maneo, StockAdjustment, Branch, BranchStock
+from models import db, Product, Sale, SaleDetail, SalePayment, ProductVariant, ArqueoCaja, Maneo, StockAdjustment, Branch, BranchStock, AuditLog
 from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 from decorators import admin_required
 from datetime import datetime
@@ -169,13 +169,15 @@ def inventario():
                 break
         celular_ubicaciones[c.id] = ubicacion
 
-    from models import Technician
+    from models import Technician, Asesor
     tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
+    asesores_disponibles = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
     sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
 
     partners_disponibles = ExchangePartner.query.filter_by(activo=True).order_by(ExchangePartner.nombre.asc()).all()
     return render_template('celulares/inventario.html',
                            tecnicos_disponibles=tecnicos_disponibles,
+                           asesores_disponibles=asesores_disponibles,
                            partners_disponibles=partners_disponibles,
                            celulares_en_cambio=celulares_en_cambio,
                            celulares=paginacion.items,
@@ -449,6 +451,14 @@ def editar_celular(id):
 @login_required
 @admin_required
 def eliminar_celular(id):
+    # Validación estricta de Token Secreto de Administrador
+    token_esperado = os.environ.get('DELETE_TOKEN', '1234').strip()
+    token_recibido = request.form.get('token_secreto', '').strip()
+
+    if not token_recibido or token_recibido != token_esperado:
+        flash('⚠️ Token secreto incorrecto o no suministrado. Acción de eliminación rechazada por seguridad.', 'danger')
+        return redirect(url_for('celulares_bp.inventario'))
+
     celular = Product.query.get_or_404(id)
     if celular.tipo_inventario != 'celulares':
         flash('No es un celular', 'danger')
@@ -457,16 +467,176 @@ def eliminar_celular(id):
     if celular.detalles_venta:
         flash('No se puede eliminar porque ya tiene ventas asociadas.', 'danger')
         return redirect(url_for('celulares_bp.inventario'))
-        
     
     try:
+        imei_eliminado = celular.imei
+        nombre_eliminado = celular.nombre
+        
+        # Eliminar registros de branch_stocks y ajustes relacionados
+        BranchStock.query.filter_by(product_id=celular.id).delete()
+        StockAdjustment.query.filter_by(product_id=celular.id).delete()
+
         db.session.delete(celular)
         db.session.commit()
-        flash('Modelo de celular eliminado exitosamente.', 'success')
+
+        AuditLog.registrar(
+            action='ELIMINACION_CELULAR',
+            user_id=current_user.id,
+            motivo=f'Eliminación autorizada con token de celular {nombre_eliminado} (IMEI: {imei_eliminado})',
+            target_id=id,
+            target_type='PRODUCT'
+        )
+
+        flash(f'Dispositivo {nombre_eliminado} (IMEI: {imei_eliminado}) eliminado exitosamente.', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error al eliminar el modelo: {str(e)}', 'danger')
         
+    return redirect(url_for('celulares_bp.inventario'))
+
+@celulares_bp.route('/eliminar-lote', methods=['POST'])
+@login_required
+@admin_required
+def eliminar_celulares_lote():
+    # Validación estricta de Token Secreto de Administrador
+    token_esperado = os.environ.get('DELETE_TOKEN', '1234').strip()
+    token_recibido = request.form.get('token_secreto', '').strip()
+
+    if not token_recibido or token_recibido != token_esperado:
+        flash('⚠️ Token secreto incorrecto o no suministrado. Eliminación masiva rechazada por seguridad.', 'danger')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    ids_str = request.form.get('selected_ids', '')
+    if not ids_str:
+        flash('No seleccionaste ningún equipo para eliminar.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    ids = [int(x) for x in ids_str.split(',') if x.strip().isdigit()]
+    if not ids:
+        flash('Lista de celulares inválida.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    eliminados = 0
+    omitidos = 0
+    try:
+        celulares = Product.query.filter(Product.id.in_(ids), Product.tipo_inventario == 'celulares').all()
+        for c in celulares:
+            if c.detalles_venta:
+                omitidos += 1
+                continue
+            
+            BranchStock.query.filter_by(product_id=c.id).delete()
+            StockAdjustment.query.filter_by(product_id=c.id).delete()
+            db.session.delete(c)
+            eliminados += 1
+
+        db.session.commit()
+
+        AuditLog.registrar(
+            action='ELIMINACION_CELULARES_LOTE',
+            user_id=current_user.id,
+            motivo=f'Eliminación masiva con token de {eliminados} celulares ({omitidos} omitidos por ventas previas)',
+            target_id=None,
+            target_type='PRODUCT_BATCH'
+        )
+
+        msg = f'Se eliminaron {eliminados} celulares exitosamente.'
+        if omitidos > 0:
+            msg += f' ({omitidos} equipo(s) no se eliminaron porque ya registran ventas).'
+        flash(msg, 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al procesar la eliminación en lote: {str(e)}', 'danger')
+
+    return redirect(url_for('celulares_bp.inventario'))
+
+@celulares_bp.route('/enviar-soporte-lote', methods=['POST'])
+@login_required
+def enviar_soporte_lote():
+    ids_str = request.form.get('selected_ids', '')
+    if not ids_str:
+        flash('No seleccionaste ningún celular para enviar a soporte.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    ids = [int(x) for x in ids_str.split(',') if x.strip().isdigit()]
+    if not ids:
+        flash('Lista de equipos inválida.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    technician_id = request.form.get('technician_id', type=int)
+    asesor_id = request.form.get('asesor_id', type=int)
+    tipo_arreglo = request.form.get('tipo_arreglo', '').strip()
+    if tipo_arreglo == 'Otro':
+        otro_tipo = request.form.get('tipo_arreglo_otro', '').strip()
+        if otro_tipo:
+            tipo_arreglo = f"Otro: {otro_tipo}"
+    if not tipo_arreglo:
+        tipo_arreglo = 'Diagnóstico General / Revisión'
+    motivo_falla = request.form.get('motivo_falla', '').strip() or 'Envío en lote a revisión técnica'
+    fecha_estimada_str = request.form.get('fecha_estimada', '').strip()
+
+    fecha_estimada = None
+    if fecha_estimada_str:
+        try:
+            fecha_estimada = datetime.strptime(fecha_estimada_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+
+    user_branch_default = current_user.branch_id or (session.get('active_branch_id') or None)
+    if not user_branch_default:
+        default_b = Branch.query.filter_by(activa=True).first()
+        user_branch_default = default_b.id if default_b else 1
+
+    from models import TechnicalService
+    celulares = Product.query.filter(Product.id.in_(ids), Product.tipo_inventario == 'celulares').all()
+
+    enviados = 0
+    try:
+        for p in celulares:
+            # Identificar la sede específica de este celular
+            p_branch_id = None
+            for bs in p.branch_stocks:
+                if bs.cantidad > 0:
+                    p_branch_id = bs.branch_id
+                    break
+            if not p_branch_id:
+                p_branch_id = user_branch_default
+
+            servicio = TechnicalService(
+                origen='INVENTARIO',
+                product_id=p.id,
+                branch_id=p_branch_id,
+                technician_id=technician_id,
+                asesor_id=asesor_id,
+                created_by_id=current_user.id,
+                marca=p.marca,
+                modelo=p.modelo_celular or p.nombre,
+                imei=p.imei,
+                color=p.color,
+                motivo_falla=motivo_falla,
+                tipo_arreglo=tipo_arreglo,
+                estado='EN_REVISION',
+                fecha_estimada=fecha_estimada
+            )
+            db.session.add(servicio)
+            p.observacion = f"[EN TALLER / SOPORTE TÉCNICO]: {motivo_falla} | Falla: {tipo_arreglo}"
+            enviados += 1
+
+        db.session.commit()
+
+        AuditLog.registrar(
+            action='ENVIO_SOPORTE_LOTE',
+            user_id=current_user.id,
+            motivo=f'Envío en lote de {enviados} celulares a soporte técnico ({tipo_arreglo})',
+            target_id=None,
+            target_type='TECHNICAL_SERVICE_BATCH'
+        )
+
+        flash(f'¡{enviados} celulares fueron enviados a Soporte Técnico exitosamente!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al enviar celulares a soporte: {str(e)}', 'danger')
+
     return redirect(url_for('celulares_bp.inventario'))
 
 @celulares_bp.route('/api/referencias-modelos', methods=['GET'])
@@ -804,7 +974,8 @@ def descargar_plantilla():
     catalogo_marcas = [
         'Apple',
         'Samsung',
-        'Ray-Ban Meta'
+        'Meta',
+        'Android'
     ]
 
     catalogo_modelos = [
@@ -815,29 +986,25 @@ def descargar_plantilla():
         'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
         'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
         'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
-        'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
-        'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max',
-        # Apple - iPads, MacBooks & AirPods
-        'iPad 10ma Gen (A16 Bionic)', 'iPad 11na Gen', 'iPad Mini 6', 'iPad Mini 7',
-        'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
-        'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)', 'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)',
-        'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
-        'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
-        'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
-        'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)',
-        'AirPods 3ra Generación', 'AirPods 4ta Generación', 'AirPods 4ta Generación con ANC',
-        'AirPods Pro 2da Generación (USB-C)', 'AirPods Max (Lightning)', 'AirPods Max (USB-C)',
-        # Samsung - Serie S, Z Fold/Flip, Tabs y Buds
-        'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+        'iPhone 17', 'iPhone 17 Air', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+        'iPhone 18', 'iPhone 18 Duo', 'iPhone 18 Pro', 'iPhone 18 Pro Max',
+        # Apple - iPads, MacBooks, Apple Watch & AirPods
+        'MacBook Neo', 'MacBook Air M5', 'MacBook Pro M5', 'MacBook Pro M5 Pro', 'MacBook Pro M5 Max',
+        'AirPods Serie 4 (AirPods 4)', 'AirPods Serie 5 (AirPods 5)', 'AirPods Pro 3',
+        'Apple Watch Serie 11 (42mm)', 'Apple Watch Serie 11 (46mm)', 'Apple Watch Ultra 3 (49mm)',
+        # Samsung - Serie S24, S25, S26, Z Fold/Flip
+        'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra',
         'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+        'Galaxy S26', 'Galaxy S26 Plus', 'Galaxy S26 Ultra',
         'Galaxy Z Fold 6', 'Galaxy Z Flip 6', 'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
-        'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE',
-        'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
-        'Galaxy Buds 3', 'Galaxy Buds 3 Pro',
-        # Ray-Ban Meta
-        'Ray-Ban Meta Wayfarer',
-        'Ray-Ban Meta Headliner',
-        'Ray-Ban Meta Skyler'
+        # Meta (Ray-Ban & Oakley)
+        'Ray-Ban Meta Wayfarer (Standard)', 'Ray-Ban Meta Wayfarer (Large)',
+        'Ray-Ban Meta Headliner', 'Ray-Ban Meta Skyler',
+        'Oakley Meta Performance Edition', 'Oakley Meta Radar EV Edition', 'Oakley Meta Holbrook Smart',
+        # Android (Xiaomi / POCO / Redmi)
+        'Xiaomi 15 Ultra', 'Xiaomi 15 Pro', 'Xiaomi 15', 'Xiaomi 14 Ultra', 'Xiaomi 14T Pro', 'Xiaomi 14T', 'Xiaomi MIX Flip',
+        'POCO F7 Pro', 'POCO F7', 'POCO F6 Pro', 'POCO F6', 'POCO X7 Pro', 'POCO X6 Pro',
+        'Redmi Note 14 Pro+ 5G', 'Redmi Note 14 Pro 5G', 'Redmi Note 14 5G', 'Redmi Note 13 Pro+ 5G', 'Redmi 14C'
     ]
 
     from models import Branch

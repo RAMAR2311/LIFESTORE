@@ -1186,19 +1186,32 @@ def ventas_vendedores():
                 start_date = datetime(year, month, 1, 0, 0, 0)
                 end_date = datetime(year, month, last_day, 23, 59, 59)
                 
-                # 1. Ventas directas del Asesor en el mes
-                ventas = Sale.query.filter(
-                    Sale.asesor_id == asesor_id,
+                # 1. Ventas de inventario en las que el asesor participó por apertura de caja/turno
+                todas_ventas_mes = Sale.query.filter(
                     Sale.fecha_venta >= start_date,
                     Sale.fecha_venta <= end_date
                 ).order_by(Sale.fecha_venta.desc()).all()
-                
-                total_ventas_mes = sum(v.monto_total for v in ventas)
 
-                for v in ventas:
+                for v in todas_ventas_mes:
+                    shift_obj = getattr(v, "turno", None)
+                    if not shift_obj and v.branch_id:
+                        shift_obj = CashShift.query.filter(
+                            CashShift.branch_id == v.branch_id,
+                            CashShift.fecha_apertura <= v.fecha_venta,
+                            or_(CashShift.fecha_cierre >= v.fecha_venta, CashShift.fecha_cierre == None)
+                        ).first()
+
+                    asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
+                    if not asesores_turno_ids and v.asesor_id:
+                        asesores_turno_ids = [v.asesor_id]
+
+                    num_asesores_turno = max(1, len(asesores_turno_ids))
+                    participa_turno = (asesor_id in asesores_turno_ids)
+
                     monto_inventario_venta = Decimal('0.0')
                     items_list = []
                     comision_venta_fija = Decimal('0.0')
+                    tiene_items_inventario = False
 
                     for d in v.detalles:
                         cant = d.cantidad_vendida or 1
@@ -1208,14 +1221,17 @@ def ventas_vendedores():
                         nom_item = d.producto.nombre if d.producto else (d.nombre_manual or 'Producto')
                         imei_item = d.producto.imei if (d.producto and d.producto.imei) else 'N/A'
                         
-                        # Es producto de retoma si el producto tiene retoma_origen
                         es_retoma = bool(d.producto and d.producto.retoma_origen)
                         
-                        # Si es producto de inventario normal (no retoma), aplica comision fija por unidad
+                        # Comisión fija dividida equitativamente entre los asesores que abrieron caja
                         comision_item = Decimal('0.0')
+                        comision_item_cuota = Decimal('0.0')
                         if not es_retoma:
+                            tiene_items_inventario = True
                             comision_item = comision_fija_num * Decimal(str(cant))
-                            comision_venta_fija += comision_item
+                            comision_item_cuota = comision_item / Decimal(str(num_asesores_turno))
+                            if participa_turno:
+                                comision_venta_fija += comision_item_cuota
 
                         items_list.append({
                             'nombre': nom_item,
@@ -1224,40 +1240,42 @@ def ventas_vendedores():
                             'precio': precio_u,
                             'subtotal': subtot,
                             'es_retoma': es_retoma,
-                            'comision_fija': comision_item
+                            'comision_fija': comision_item_cuota if participa_turno else comision_item,
+                            'comision_total_item': comision_item,
+                            'num_asesores': num_asesores_turno
                         })
 
-                    total_monto_inventario += monto_inventario_venta
-                    total_comision_inventario += comision_venta_fija
+                    if participa_turno and tiene_items_inventario:
+                        total_ventas_mes += v.monto_total
+                        total_monto_inventario += monto_inventario_venta
+                        total_comision_inventario += comision_venta_fija
 
-                    ventas_procesadas.append({
-                        'sale': v,
-                        'monto_inventario': monto_inventario_venta,
-                        'items_list': items_list,
-                        'comision_venta': comision_venta_fija
-                    })
+                        ventas_procesadas.append({
+                            'sale': v,
+                            'monto_inventario': monto_inventario_venta,
+                            'items_list': items_list,
+                            'comision_venta': comision_venta_fija,
+                            'num_asesores': num_asesores_turno,
+                            'asesores_nombres': [a.nombre for a in shift_obj.asesores_obj] if (shift_obj and shift_obj.asesores_obj) else []
+                        })
 
                 # 2. Retomas: Bolsa del 15% sobre utilidad neta
+                # Se computa ÚNICAMENTE si el equipo fue efectivamente VENDIDO.
                 # Repartida equitativamente entre:
-                # - El asesor que retomó el equipo (origen de retoma)
-                # - Los asesores que estaban de turno cuando se vendió dicha retoma
-                todas_ventas_mes = Sale.query.filter(
-                    Sale.fecha_venta >= start_date,
-                    Sale.fecha_venta <= end_date
-                ).order_by(Sale.fecha_venta.desc()).all()
-
+                # - Los asesores presentes en el turno cuando se recibió/abrió la retoma
+                # - Los asesores presentes en el turno cuando se vendió la retoma
                 for v_mes in todas_ventas_mes:
-                    shift_obj = getattr(v_mes, "turno", None)
-                    if not shift_obj and v_mes.branch_id:
-                        shift_obj = CashShift.query.filter(
+                    shift_venta = getattr(v_mes, "turno", None)
+                    if not shift_venta and v_mes.branch_id:
+                        shift_venta = CashShift.query.filter(
                             CashShift.branch_id == v_mes.branch_id,
                             CashShift.fecha_apertura <= v_mes.fecha_venta,
                             or_(CashShift.fecha_cierre >= v_mes.fecha_venta, CashShift.fecha_cierre == None)
                         ).first()
 
-                    asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
-                    if not asesores_turno_ids and v_mes.asesor_id:
-                        asesores_turno_ids = [v_mes.asesor_id]
+                    asesores_venta_ids = shift_venta.lista_asesores_ids if shift_venta else []
+                    if not asesores_venta_ids and v_mes.asesor_id:
+                        asesores_venta_ids = [v_mes.asesor_id]
 
                     for det in v_mes.detalles:
                         retomas_origen = []
@@ -1267,21 +1285,34 @@ def ventas_vendedores():
                             retomas_origen = Retoma.query.filter_by(producto_generado_id=det.product_id).all()
 
                         for ret_item in retomas_origen:
-                            # Asesor que lo retomó
-                            id_asesor_retomador = ret_item.asesor_retoma_id
-                            if not id_asesor_retomador and ret_item.venta and ret_item.venta.asesor_id:
-                                id_asesor_retomador = ret_item.venta.asesor_id
+                            # 1) Obtener turno de recepción de la retoma
+                            asesores_recepcion_ids = []
+                            venta_origen = ret_item.venta
+                            shift_recepcion = getattr(venta_origen, "turno", None) if venta_origen else None
+                            if not shift_recepcion and venta_origen and venta_origen.branch_id:
+                                shift_recepcion = CashShift.query.filter(
+                                    CashShift.branch_id == venta_origen.branch_id,
+                                    CashShift.fecha_apertura <= (venta_origen.fecha_venta or ret_item.fecha_registro),
+                                    or_(CashShift.fecha_cierre >= (venta_origen.fecha_venta or ret_item.fecha_registro), CashShift.fecha_cierre == None)
+                                ).first()
 
-                            # Conjunto/lista de asesores involucrados en esta retoma:
-                            # [Retomador] + [Asesores del turno de venta] (manteniendo lista única de IDs)
+                            if shift_recepcion:
+                                asesores_recepcion_ids = shift_recepcion.lista_asesores_ids
+                            elif ret_item.asesor_retoma_id:
+                                asesores_recepcion_ids = [ret_item.asesor_retoma_id]
+                            elif venta_origen and venta_origen.asesor_id:
+                                asesores_recepcion_ids = [venta_origen.asesor_id]
+
+                            # 2) Lista única de asesores involucrados: Turno Recepción + Turno Venta
                             involucrados_ids = []
-                            if id_asesor_retomador:
-                                involucrados_ids.append(id_asesor_retomador)
-                            for a_id in asesores_turno_ids:
+                            for a_id in asesores_recepcion_ids:
+                                if a_id not in involucrados_ids:
+                                    involucrados_ids.append(a_id)
+                            for a_id in asesores_venta_ids:
                                 if a_id not in involucrados_ids:
                                     involucrados_ids.append(a_id)
 
-                            # Si el asesor consultado es uno de los involucrados:
+                            # 3) Si el asesor consultado participó en alguno de los turnos
                             if asesor_id in involucrados_ids:
                                 precio_vta = Decimal(str(det.precio_venta_final or 0))
                                 costo_ret = Decimal(str(ret_item.valor_retoma or 0))
@@ -1294,20 +1325,25 @@ def ventas_vendedores():
                                     cuota_asesor = bolsa_15 / Decimal(str(num_involucrados))
                                     total_comision_retomas += cuota_asesor
 
-                                    # Identificar roles del asesor consultado
+                                    # Identificar roles específicos
                                     roles = []
-                                    if asesor_id == id_asesor_retomador:
-                                        roles.append('Retomó el equipo')
-                                    if asesor_id in asesores_turno_ids:
-                                        roles.append('Turno de venta')
-                                    rol_str = ' + '.join(roles) if roles else 'Comercial'
+                                    if asesor_id in asesores_recepcion_ids:
+                                        roles.append('Turno Recepción')
+                                    if asesor_id in asesores_venta_ids:
+                                        roles.append('Turno Venta')
+                                    rol_str = ' + '.join(roles) if roles else 'Turno Caja'
 
-                                    # Obtener nombres de todos los involucrados
+                                    # Formatear nombres de involucrados con su etiqueta
                                     nombres_inv = []
                                     for inv_id in involucrados_ids:
                                         a_obj = Asesor.query.get(inv_id)
                                         if a_obj:
-                                            tag = '(Retomó)' if inv_id == id_asesor_retomador else '(Turno)'
+                                            etiquetas = []
+                                            if inv_id in asesores_recepcion_ids:
+                                                etiquetas.append('Recepción')
+                                            if inv_id in asesores_venta_ids:
+                                                etiquetas.append('Venta')
+                                            tag = f"({'+'.join(etiquetas)})"
                                             nombres_inv.append(f"{a_obj.nombre} {tag}")
 
                                     retomas_procesadas.append({
@@ -1479,38 +1515,78 @@ def recibo_comision(payment_id):
     start_date = datetime(year, month, 1, 0, 0, 0)
     end_date = datetime(year, month, last_day, 23, 59, 59)
 
-    # 1. Ventas de inventario normal (comisión fija)
-    ventas = Sale.query.filter(Sale.asesor_id == asesor.id, Sale.fecha_venta >= start_date, Sale.fecha_venta <= end_date).all()
-    comision_inventario = Decimal('0.0')
-    for v in ventas:
-        for d in v.detalles:
-            cant = d.cantidad_vendida or 1
-            es_retoma = bool(d.producto and d.producto.retoma_origen)
-            if not es_retoma:
-                comision_inventario += comision_fija_num * Decimal(str(cant))
-
-    # 2. Retomas (15% repartido entre retomador y turno de venta)
-    comision_retomas = Decimal('0.0')
+    # 1. Ventas de inventario normal (comisión fija dividida entre asesores que abrieron caja)
     todas_v = Sale.query.filter(Sale.fecha_venta >= start_date, Sale.fecha_venta <= end_date).all()
+    comision_inventario = Decimal('0.0')
+    for v in todas_v:
+        s_obj = getattr(v, "turno", None)
+        if not s_obj and v.branch_id:
+            s_obj = CashShift.query.filter(
+                CashShift.branch_id == v.branch_id,
+                CashShift.fecha_apertura <= v.fecha_venta,
+                or_(CashShift.fecha_cierre >= v.fecha_venta, CashShift.fecha_cierre == None)
+            ).first()
+
+        a_ids = s_obj.lista_asesores_ids if s_obj else ([v.asesor_id] if v.asesor_id else [])
+        if asesor.id in a_ids:
+            num_asesores = max(1, len(a_ids))
+            for d in v.detalles:
+                cant = d.cantidad_vendida or 1
+                es_retoma = bool(d.producto and d.producto.retoma_origen)
+                if not es_retoma:
+                    comision_item = comision_fija_num * Decimal(str(cant))
+                    comision_inventario += comision_item / Decimal(str(num_asesores))
+
+    # 2. Retomas vendidas (15% repartido entre asesores del turno de recepción y turno de venta)
+    comision_retomas = Decimal('0.0')
     for v_m in todas_v:
-        s_obj = v_m.shift
-        a_ids = s_obj.lista_asesores_ids if s_obj else ([v_m.asesor_id] if v_m.asesor_id else [])
+        shift_venta = getattr(v_m, "turno", None)
+        if not shift_venta and v_m.branch_id:
+            shift_venta = CashShift.query.filter(
+                CashShift.branch_id == v_m.branch_id,
+                CashShift.fecha_apertura <= v_m.fecha_venta,
+                or_(CashShift.fecha_cierre >= v_m.fecha_venta, CashShift.fecha_cierre == None)
+            ).first()
+
+        asesores_venta_ids = shift_venta.lista_asesores_ids if shift_venta else ([v_m.asesor_id] if v_m.asesor_id else [])
+
         for d in v_m.detalles:
             rets = d.producto.retoma_origen if (d.producto and d.producto.retoma_origen) else []
+            if not rets and d.product_id:
+                rets = Retoma.query.filter_by(producto_generado_id=d.product_id).all()
+
             for r in rets:
-                id_retomador = r.asesor_retoma_id
-                if not id_retomador and r.venta and r.venta.asesor_id:
-                    id_retomador = r.venta.asesor_id
+                # Turno de recepción
+                asesores_recepcion_ids = []
+                v_orig = r.venta
+                s_rec = getattr(v_orig, "turno", None) if v_orig else None
+                if not s_rec and v_orig and v_orig.branch_id:
+                    s_rec = CashShift.query.filter(
+                        CashShift.branch_id == v_orig.branch_id,
+                        CashShift.fecha_apertura <= (v_orig.fecha_venta or r.fecha_registro),
+                        or_(CashShift.fecha_cierre >= (v_orig.fecha_venta or r.fecha_registro), CashShift.fecha_cierre == None)
+                    ).first()
+
+                if s_rec:
+                    asesores_recepcion_ids = s_rec.lista_asesores_ids
+                elif r.asesor_retoma_id:
+                    asesores_recepcion_ids = [r.asesor_retoma_id]
+                elif v_orig and v_orig.asesor_id:
+                    asesores_recepcion_ids = [v_orig.asesor_id]
 
                 involucrados = []
-                if id_retomador:
-                    involucrados.append(id_retomador)
-                for a_id in a_ids:
-                    if a_id not in involucrados:
-                        involucrados.append(a_id)
+                for aid in asesores_recepcion_ids:
+                    if aid not in involucrados:
+                        involucrados.append(aid)
+                for aid in asesores_venta_ids:
+                    if aid not in involucrados:
+                        involucrados.append(aid)
 
                 if asesor.id in involucrados:
-                    uneta = Decimal(str(d.precio_venta_final or 0)) - Decimal(str(r.valor_retoma or 0)) - Decimal(str(r.arreglos or 0))
+                    precio_vta = Decimal(str(d.precio_venta_final or 0))
+                    costo_ret = Decimal(str(r.valor_retoma or 0))
+                    arreglos_val = Decimal(str(r.arreglos or 0))
+                    uneta = precio_vta - costo_ret - arreglos_val
                     if uneta > 0:
                         bolsa = uneta * Decimal('0.15')
                         comision_retomas += bolsa / Decimal(str(max(1, len(involucrados))))
@@ -1605,46 +1681,59 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
 
     salario_base = Decimal(str(asesor.salario_base or 0))
 
-    # 1. Comisiones de Inventario Directas
-    ventas = Sale.query.filter(
-        Sale.asesor_id == asesor_id,
-        Sale.fecha_venta >= start_date,
-        Sale.fecha_venta <= end_date
-    ).all()
-
-    total_monto_ventas = sum(v.monto_total for v in ventas) if ventas else Decimal('0.0')
-    comision_inventario = Decimal('0.0')
-    items_inventario_count = 0
-
-    for v in ventas:
-        for d in v.detalles:
-            cant = d.cantidad_vendida or 1
-            es_retoma = bool(d.producto and d.producto.retoma_origen)
-            if not es_retoma:
-                comision_inventario += comision_fija_num * Decimal(str(cant))
-                items_inventario_count += cant
-
-    # 2. Comisiones por Retomas (15% utilidad neta)
+    # 1. Comisiones de Inventario Compartidas por Turno
     todas_ventas_mes = Sale.query.filter(
         Sale.fecha_venta >= start_date,
         Sale.fecha_venta <= end_date
     ).all()
 
+    total_monto_ventas = Decimal('0.0')
+    comision_inventario = Decimal('0.0')
+    items_inventario_count = 0
+
+    for v in todas_ventas_mes:
+        shift_obj = getattr(v, "turno", None)
+        if not shift_obj and v.branch_id:
+            shift_obj = CashShift.query.filter(
+                CashShift.branch_id == v.branch_id,
+                CashShift.fecha_apertura <= v.fecha_venta,
+                or_(CashShift.fecha_cierre >= v.fecha_venta, CashShift.fecha_cierre == None)
+            ).first()
+
+        asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
+        if not asesores_turno_ids and v.asesor_id:
+            asesores_turno_ids = [v.asesor_id]
+
+        if asesor_id in asesores_turno_ids:
+            num_asesores = max(1, len(asesores_turno_ids))
+            total_monto_ventas += v.monto_total
+
+            for d in v.detalles:
+                cant = d.cantidad_vendida or 1
+                es_retoma = bool(d.producto and d.producto.retoma_origen)
+                if not es_retoma:
+                    comision_item = comision_fija_num * Decimal(str(cant))
+                    comision_inventario += comision_item / Decimal(str(num_asesores))
+                    items_inventario_count += cant
+
+    # 2. Comisiones por Retomas (15% utilidad neta)
+    # Se computa ÚNICAMENTE si el equipo fue efectivamente VENDIDO.
+    # Repartida entre turno de recepción + turno de venta.
     comision_retomas = Decimal('0.0')
     retomas_count = 0
 
     for v_mes in todas_ventas_mes:
-        shift_obj = getattr(v_mes, "turno", None)
-        if not shift_obj and v_mes.branch_id:
-            shift_obj = CashShift.query.filter(
+        shift_venta = getattr(v_mes, "turno", None)
+        if not shift_venta and v_mes.branch_id:
+            shift_venta = CashShift.query.filter(
                 CashShift.branch_id == v_mes.branch_id,
                 CashShift.fecha_apertura <= v_mes.fecha_venta,
                 or_(CashShift.fecha_cierre >= v_mes.fecha_venta, CashShift.fecha_cierre == None)
             ).first()
 
-        asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
-        if not asesores_turno_ids and v_mes.asesor_id:
-            asesores_turno_ids = [v_mes.asesor_id]
+        asesores_venta_ids = shift_venta.lista_asesores_ids if shift_venta else []
+        if not asesores_venta_ids and v_mes.asesor_id:
+            asesores_venta_ids = [v_mes.asesor_id]
 
         for det in v_mes.detalles:
             retomas_origen = []
@@ -1654,14 +1743,29 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
                 retomas_origen = Retoma.query.filter_by(producto_generado_id=det.product_id).all()
 
             for ret_item in retomas_origen:
-                id_asesor_retomador = ret_item.asesor_retoma_id
-                if not id_asesor_retomador and ret_item.venta and ret_item.venta.asesor_id:
-                    id_asesor_retomador = ret_item.venta.asesor_id
+                # Turno de recepción
+                asesores_recepcion_ids = []
+                venta_orig = ret_item.venta
+                shift_rec = getattr(venta_orig, "turno", None) if venta_orig else None
+                if not shift_rec and venta_orig and venta_orig.branch_id:
+                    shift_rec = CashShift.query.filter(
+                        CashShift.branch_id == venta_orig.branch_id,
+                        CashShift.fecha_apertura <= (venta_orig.fecha_venta or ret_item.fecha_registro),
+                        or_(CashShift.fecha_cierre >= (venta_orig.fecha_venta or ret_item.fecha_registro), CashShift.fecha_cierre == None)
+                    ).first()
+
+                if shift_rec:
+                    asesores_recepcion_ids = shift_rec.lista_asesores_ids
+                elif ret_item.asesor_retoma_id:
+                    asesores_recepcion_ids = [ret_item.asesor_retoma_id]
+                elif venta_orig and venta_orig.asesor_id:
+                    asesores_recepcion_ids = [venta_orig.asesor_id]
 
                 involucrados_ids = []
-                if id_asesor_retomador:
-                    involucrados_ids.append(id_asesor_retomador)
-                for a_id in asesores_turno_ids:
+                for a_id in asesores_recepcion_ids:
+                    if a_id not in involucrados_ids:
+                        involucrados_ids.append(a_id)
+                for a_id in asesores_venta_ids:
                     if a_id not in involucrados_ids:
                         involucrados_ids.append(a_id)
 
@@ -2067,7 +2171,7 @@ def auditoria():
 
     logs_paginados = query.order_by(AuditLog.timestamp.desc()).paginate(page=page, per_page=25, error_out=False)
 
-    usuarios = User.query.filter_by(activo=True).order_by(User.nombre.asc()).all()
+    usuarios = User.query.filter(User.rol != 'eliminado').order_by(User.nombre.asc()).all()
     acciones_disponibles = [
         ('APROBACION_PRECIO_MINIMO', 'Aprobación de Precio Mínimo'),
         ('RECHAZO_PRECIO_MINIMO', 'Rechazo de Precio Mínimo'),
@@ -2078,7 +2182,13 @@ def auditoria():
         ('REAPERTURA_TURNO', 'Reapertura de Turno'),
         ('SOLICITUD_VALE', 'Solicitud de Vale'),
         ('APROBACION_VALE', 'Aprobación de Vale'),
-        ('RECHAZO_VALE', 'Rechazo de Vale')
+        ('RECHAZO_VALE', 'Rechazo de Vale'),
+        ('ELIMINACION_CELULAR', 'Eliminación de Celular'),
+        ('ELIMINACION_CELULARES_LOTE', 'Eliminación de Celulares en Lote'),
+        ('ENVIO_SOPORTE_LOTE', 'Envío a Soporte en Lote'),
+        ('ELIMINACION_RETOMA', 'Eliminación de Retoma'),
+        ('ELIMINACION_RETOMAS_LOTE', 'Eliminación de Retomas en Lote'),
+        ('ENVIO_SOPORTE_RETOMAS_LOTE', 'Envío de Retomas a Soporte')
     ]
 
     return render_template(

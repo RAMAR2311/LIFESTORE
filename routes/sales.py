@@ -6,6 +6,8 @@ from decimal import Decimal
 from datetime import datetime, timedelta
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
+from werkzeug.utils import secure_filename
+import os
 
 sales_bp = Blueprint('sales_bp', __name__)
 
@@ -566,6 +568,39 @@ def api_buscar_producto(sku):
         'auto_select_variant': auto_select_variant
     })
 
+@sales_bp.route('/upload_comprobante_abono', methods=['POST'])
+@login_required
+def upload_comprobante_abono():
+    """Sube la imagen del comprobante de un pago por abono a terceros."""
+    if 'comprobante_file' not in request.files:
+        return jsonify({'success': False, 'error': 'No se seleccionó ningún archivo de imagen.'}), 400
+    file = request.files['comprobante_file']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'error': 'Archivo no válido.'}), 400
+
+    allowed_exts = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in allowed_exts:
+        return jsonify({'success': False, 'error': 'Formato no permitido. Solo imágenes (.jpg, .jpeg, .png, .webp) o PDF.'}), 400
+
+    upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'comprobantes_abonos')
+    os.makedirs(upload_folder, exist_ok=True)
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    clean_name = secure_filename(file.filename)
+    filename = f"abono_{timestamp}_{clean_name}"
+    file_path = os.path.join(upload_folder, filename)
+    file.save(file_path)
+
+    # Retornar identificador o ruta relativa accesible
+    relative_path = f"uploads/comprobantes_abonos/{filename}"
+    return jsonify({
+        'success': True,
+        'filename': filename,
+        'relative_path': relative_path,
+        'url': f"/static/{relative_path}"
+    })
+
 # Ruta para la Impresión del formato de Factura/Recibo POS y Garantía Multisede
 @sales_bp.route('/recibo/<int:sale_id>', methods=['GET'])
 @login_required # Proteger confidencialidad del cajero
@@ -957,38 +992,167 @@ def eliminar_venta(sale_id):
         
     return redirect(url_for('sales_bp.historial'))
 
-# Endpoint Catálogo Estricto de solo vista para Operarios
+# Endpoint Catálogo Masivo de Celulares Multi-Sede
 @sales_bp.route('/catalogo', methods=['GET'])
 @login_required 
 def catalogo():
+    from models import Maneo, TechnicalService, DeviceExchange
+    from sqlalchemy.orm import selectinload, joinedload
+
     query_str = request.args.get('q', '').strip()
+    referencia_filtro = request.args.get('referencia', '').strip()
+    branch_filtro = request.args.get('branch_id', type=int)
+    estado_filtro = request.args.get('estado', 'todos').strip() # 'todos', 'disponible', 'maneo', 'soporte', 'cambio'
     page = request.args.get('page', 1, type=int)
+    per_page = 24
     
-    base_query = Product.query.filter(
-        Product.tipo_inventario.in_(['tienda', 'celulares']),
-        Product.cantidad_stock > 0
+    # 1. Base query: Celulares que NO estén vendidos
+    base_query = Product.query.options(
+        selectinload(Product.branch_stocks).joinedload(BranchStock.branch),
+        selectinload(Product.maneos),
+        selectinload(Product.servicios_tecnicos).joinedload(TechnicalService.technician),
+        selectinload(Product.cambios_salida).joinedload(DeviceExchange.partner)
+    ).filter(
+        Product.tipo_inventario == 'celulares',
+        ~Product.detalles_venta.any()
     )
 
-    if current_user.rol == 'vendedor':
-        user_branch_id = current_user.branch_id or 1
+    # 2. Filtro por Estado Operativo
+    if estado_filtro == 'disponible':
+        base_query = base_query.filter(
+            Product.cantidad_stock > 0,
+            ~Product.maneos.any(Maneo.estado == 'PENDIENTE'),
+            ~Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])),
+            ~Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE')
+        )
+    elif estado_filtro == 'maneo':
+        base_query = base_query.filter(Product.maneos.any(Maneo.estado == 'PENDIENTE'))
+    elif estado_filtro == 'soporte':
+        base_query = base_query.filter(Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])))
+    elif estado_filtro == 'cambio':
+        base_query = base_query.filter(Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE'))
+    else:
+        # 'todos': Disponibles para venta O en procesos operativos temporales (Maneo, Soporte o Cambio)
+        base_query = base_query.filter(
+            or_(
+                Product.cantidad_stock > 0,
+                Product.maneos.any(Maneo.estado == 'PENDIENTE'),
+                Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])),
+                Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE')
+            )
+        )
+
+    # 3. Filtro por Referencia / Modelo exacto o seleccionado
+    if referencia_filtro:
+        base_query = base_query.filter(Product.modelo_celular == referencia_filtro)
+
+    # 4. Filtro por Sucursal / Bodega
+    if branch_filtro:
         base_query = base_query.join(
             BranchStock,
-            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == user_branch_id)
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == branch_filtro)
         ).filter(BranchStock.cantidad > 0)
-    
+
+    # 5. Búsqueda por texto (Marca, Modelo, IMEI, Color, Capacidad)
     if query_str:
-        # Motor de similitud Case-Insensitive (Like)
         search_term = f"%{query_str}%"
         base_query = base_query.filter(
             or_(
-                Product.sku.ilike(search_term), 
-                Product.nombre.ilike(search_term)
+                Product.nombre.ilike(search_term),
+                Product.modelo_celular.ilike(search_term),
+                Product.marca.ilike(search_term),
+                Product.imei.ilike(search_term),
+                Product.imei2.ilike(search_term),
+                Product.color.ilike(search_term),
+                Product.memoria.ilike(search_term)
             )
         )
+
+    # 6. Lista de todas las referencias de celulares disponibles para el dropdown
+    referencias_disponibles_raw = db.session.query(Product.modelo_celular).filter(
+        Product.tipo_inventario == 'celulares',
+        Product.modelo_celular != None,
+        Product.modelo_celular != '',
+        ~Product.detalles_venta.any(),
+        or_(
+            Product.cantidad_stock > 0,
+            Product.maneos.any(Maneo.estado == 'PENDIENTE'),
+            Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])),
+            Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE')
+        )
+    ).distinct().order_by(Product.modelo_celular.asc()).all()
+    referencias_disponibles = [r[0] for r in referencias_disponibles_raw if r[0]]
+
+    # 7. Lista de sucursales activas (Bodegas y Tiendas)
+    sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+
+    # Paginación
+    paginacion = base_query.order_by(Product.modelo_celular.asc(), Product.id.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    # Mapeo de ubicación física detallada para cada equipo
+    celulares_con_info = []
+    for c in paginacion.items:
+        ubicacion = None
+        for bs in c.branch_stocks:
+            if bs.cantidad > 0 and bs.branch:
+                ubicacion = {
+                    'id': bs.branch.id,
+                    'nombre': bs.branch.nombre,
+                    'codigo': bs.branch.codigo,
+                    'tipo': bs.branch.tipo
+                }
+                break
         
-    paginacion = base_query.order_by(Product.nombre).paginate(page=page, per_page=20, error_out=False)
+        # Estado operativo prioritario
+        estado_op = 'DISPONIBLE'
+        estado_label = 'Disponible para Venta'
+        estado_badge = 'success'
+        estado_detalle = ''
         
-    return render_template('sales/catalogo.html', productos=paginacion.items, paginacion=paginacion, q=query_str)
+        if c.soporte_activo:
+            estado_op = 'SOPORTE'
+            estado_label = 'En Soporte Técnico'
+            estado_badge = 'danger'
+            tecnico_nom = c.soporte_activo.technician.nombre if c.soporte_activo.technician else 'Taller'
+            estado_detalle = f"{tecnico_nom} ({c.soporte_activo.tipo_arreglo or 'Revisión'})"
+        elif c.maneo_activo:
+            estado_op = 'MANEO'
+            estado_label = 'En Maneo / Préstamo'
+            estado_badge = 'warning'
+            estado_detalle = f"Prestado a: {c.maneo_activo.local_receptor or 'Local'}"
+        elif c.cambio_activo:
+            estado_op = 'CAMBIO'
+            estado_label = 'En Trámite de Cambio'
+            estado_badge = 'info'
+            partner_nom = c.cambio_activo.partner.nombre if c.cambio_activo.partner else 'Aliado'
+            estado_detalle = f"Aliado: {partner_nom}"
+
+        celulares_con_info.append({
+            'producto': c,
+            'ubicacion': ubicacion,
+            'estado_op': estado_op,
+            'estado_label': estado_label,
+            'estado_badge': estado_badge,
+            'estado_detalle': estado_detalle
+        })
+
+    # Conteo rápido de KPIs del catálogo
+    total_catalogo = base_query.count()
+
+    return render_template(
+        'sales/catalogo.html',
+        celulares_con_info=celulares_con_info,
+        paginacion=paginacion,
+        q=query_str,
+        referencia_filtro=referencia_filtro,
+        referencias_disponibles=referencias_disponibles,
+        branch_filtro=branch_filtro,
+        sucursales_activas=sucursales_activas,
+        estado_filtro=estado_filtro,
+        total_catalogo=total_catalogo
+    )
 
 @sales_bp.route('/caja_visual', methods=['GET'])
 @login_required

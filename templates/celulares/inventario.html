@@ -181,11 +181,38 @@
 </div>
 
 <div class="card card-custom p-0 shadow-sm border-0">
+    <!-- Barra Flotante de Acciones en Lote -->
+    <div id="barraAccionesLote" class="card-header bg-dark text-white d-flex align-items-center justify-content-between py-2 px-3 border-0 shadow-sm d-none" style="position: sticky; top: 70px; z-index: 1020;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary rounded-pill px-3 py-1 fs-6">
+                <span id="cantSeleccionados">0</span> seleccionados
+            </span>
+            <span class="small text-muted d-none d-md-inline">Acciones disponibles para los equipos marcados:</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <!-- Botón Mandar a Soporte Técnico en Lote -->
+            <button type="button" class="btn btn-sm btn-outline-danger text-white rounded-pill px-3 fw-bold shadow-sm" onclick="abrirModalSoporteLote()">
+                <i class="fa-solid fa-screwdriver-wrench me-1 text-danger"></i> Enviar a Soporte
+            </button>
+            <!-- Botón Eliminar en Lote (Token Secreto) -->
+            <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 fw-bold shadow-sm" onclick="abrirModalEliminarLote()">
+                <i class="fa-solid fa-trash-can me-1"></i> Eliminar Seleccionados
+            </button>
+            <!-- Deseleccionar -->
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white rounded-pill px-2" onclick="deseleccionarTodos()" title="Deseleccionar todo">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-hover table-sm mb-0 align-middle text-center w-100" style="font-size: 0.85rem;">
             <thead class="bg-dark text-white text-nowrap" style="font-size: 0.8rem;">
                 <tr>
-                    <th class="ps-3 py-2 text-start fw-bold">MARCA</th>
+                    <th class="ps-3 py-2 text-center" style="width: 40px;">
+                        <input type="checkbox" id="checkAllCelulares" class="form-check-input cursor-pointer" onchange="toggleSelectAll(this)" title="Seleccionar todos">
+                    </th>
+                    <th class="py-2 text-start fw-bold">MARCA</th>
                     <th class="py-2 text-start fw-bold">REFERENCIA</th>
                     <th class="py-2 fw-bold">CAP.</th>
                     <th class="py-2 fw-bold">BAT.</th>
@@ -210,7 +237,18 @@
             <tbody class="text-nowrap">
                 {% for c in celulares %}
                 <tr>
-                    <td class="ps-3 fw-bold text-dark text-start">{{ c.marca or '-' }}</td>
+                    <td class="ps-3 text-center">
+                        {% set puede_seleccionar = not c.detalles_venta and c.total_stock > 0 and not c.soporte_activo and not c.cambio_activo and not c.maneo_activo %}
+                        <input type="checkbox" class="form-check-input check-celular cursor-pointer" 
+                               value="{{ c.id }}" 
+                               data-nombre="{{ c.marca }} {{ c.modelo_celular or c.nombre }}"
+                               data-imei="{{ c.imei }}"
+                               data-puede-eliminar="{{ 1 if not c.detalles_venta else 0 }}"
+                               onchange="actualizarSeleccionados()"
+                               {% if not puede_seleccionar and estado != 'todos' and not c.detalles_venta %}
+                               {% endif %}>
+                    </td>
+                    <td class="fw-bold text-dark text-start">{{ c.marca or '-' }}</td>
                     <td class="fw-semibold text-start">{{ c.modelo_celular or '-' }}</td>
                     <td>{{ c.memoria or '-' }}</td>
                     <td>{{ c.bateria or '-' }}</td>
@@ -303,12 +341,10 @@
                                 <a href="{{ url_for('celulares_bp.editar_celular', id=c.id) }}" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Editar">
                                     <i class="fa-solid fa-pen" style="font-size: 0.75rem;"></i>
                                 </a>
-                                <form method="POST" action="{{ url_for('celulares_bp.eliminar_celular', id=c.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar permanente?');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <button type="submit" class="btn btn-sm text-white bg-brand-pink border-0 rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Eliminar">
-                                        <i class="fa-solid fa-trash-can" style="font-size: 0.75rem;"></i>
-                                    </button>
-                                </form>
+                                <!-- Botón Eliminar con Modal de Token Secreto -->
+                                <button type="button" class="btn btn-sm text-white bg-brand-pink border-0 rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Eliminar Producto (Requiere Token)" onclick="abrirModalEliminarIndividual('{{ c.id }}', '{{ c.marca }} {{ c.modelo_celular or c.nombre }}', '{{ c.imei }}')">
+                                    <i class="fa-solid fa-trash-can" style="font-size: 0.75rem;"></i>
+                                </button>
                             </div>
 
 
@@ -334,16 +370,29 @@
                                                     <div class="text-muted">Color: {{ c.color or 'N/A' }} | Costo Ref: ${{ c.precio_costo|cop }}</div>
                                                 </div>
 
-                                                <!-- Selector de Aliado Existente -->
-                                                <div class="mb-3">
-                                                    <label class="form-label fw-bold small text-muted">Persona / Empresa que recibe el celular *</label>
-                                                    <select name="partner_id" id="partner_select_{{ c.id }}" class="form-select form-select-sm" onchange="toggleNuevoAliado({{ c.id }}, this.value)">
-                                                        <option value="">-- Seleccionar Aliado Registrado --</option>
-                                                        {% for part in partners_disponibles %}
-                                                        <option value="{{ part.id }}">{{ part.nombre }} {% if part.contacto %}({{ part.contacto }}){% endif %}</option>
-                                                        {% endfor %}
-                                                        <option value="__NUEVO__">+ Registrar Nueva Persona / Aliado</option>
-                                                    </select>
+                                                <!-- Selector de Aliado Existente y Asesor -->
+                                                <div class="row g-2 mb-3">
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small text-muted">Asesor Responsable *</label>
+                                                        <select name="asesor_id" class="form-select form-select-sm" required>
+                                                            <option value="">-- Seleccionar Asesor --</option>
+                                                            {% if asesores_disponibles %}
+                                                                {% for asr in asesores_disponibles %}
+                                                                <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                                                {% endfor %}
+                                                            {% endif %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-6">
+                                                        <label class="form-label fw-bold small text-muted">Persona / Aliado que recibe *</label>
+                                                        <select name="partner_id" id="partner_select_{{ c.id }}" class="form-select form-select-sm" onchange="toggleNuevoAliado({{ c.id }}, this.value)">
+                                                            <option value="">-- Seleccionar Aliado --</option>
+                                                            {% for part in partners_disponibles %}
+                                                            <option value="{{ part.id }}">{{ part.nombre }} {% if part.contacto %}({{ part.contacto }}){% endif %}</option>
+                                                            {% endfor %}
+                                                            <option value="__NUEVO__">+ Registrar Nueva Persona</option>
+                                                        </select>
+                                                    </div>
                                                 </div>
 
                                                 <!-- Formulario en línea para nuevo aliado si elige __NUEVO__ -->
@@ -395,6 +444,17 @@
 
                                                 <div class="row g-2 mb-3">
                                                     <div class="col-md-6">
+                                                        <label class="form-label fw-bold small text-muted">Asesor Responsable *</label>
+                                                        <select name="asesor_id" class="form-select form-select-sm" required>
+                                                            <option value="">-- Seleccionar Asesor --</option>
+                                                            {% if asesores_disponibles %}
+                                                                {% for asr in asesores_disponibles %}
+                                                                <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                                                {% endfor %}
+                                                            {% endif %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-6">
                                                         <label class="form-label fw-bold small text-muted">Técnico Encargado *</label>
                                                         <select name="technician_id" class="form-select form-select-sm" required>
                                                             <option value="">-- Seleccionar Técnico --</option>
@@ -403,11 +463,12 @@
                                                             {% endfor %}
                                                         </select>
                                                     </div>
-                                                    <div class="col-md-6">
+                                                    <div class="col-md-12 mt-2">
                                                         <label class="form-label fw-bold small text-muted">Tipo de Arreglo *</label>
-                                                        <select name="tipo_arreglo" class="form-select form-select-sm" required>
+                                                        <select name="tipo_arreglo" class="form-select form-select-sm" required onchange="toggleTipoArregloOtro(this, 'otro_tipo_{{ c.id }}')">
                                                             <option value="Cambio de Pantalla / Display">Cambio de Pantalla / Display</option>
                                                             <option value="Cambio de Batería">Cambio de Batería</option>
+                                                            <option value="Flex Batería">Flex Batería</option>
                                                             <option value="Pin de Carga / Puerto USB">Pin de Carga / Puerto USB</option>
                                                             <option value="Cámara Frontal / Trasera">Cámara Frontal / Trasera</option>
                                                             <option value="Reparación de Placa / Corto / IC">Reparación de Placa / Corto / IC</option>
@@ -415,7 +476,11 @@
                                                             <option value="Micrófono / Altavoz / Auricular">Micrófono / Altavoz / Auricular</option>
                                                             <option value="Tapa Trasera / Carcasa / Chasis">Tapa Trasera / Carcasa / Chasis</option>
                                                             <option value="Diagnóstico General / Revisión" selected>Diagnóstico General / Revisión</option>
+                                                            <option value="Otro">Otro (Especificar)</option>
                                                         </select>
+                                                        <div class="mt-2" id="otro_tipo_{{ c.id }}" style="display: none;">
+                                                            <input type="text" name="tipo_arreglo_otro" class="form-control form-control-sm" placeholder="Especifique el tipo de arreglo...">
+                                                        </div>
                                                     </div>
                                                 </div>
 
@@ -425,7 +490,7 @@
                                                 </div>
 
                                                 <div class="mb-2">
-                                                    <label class="form-label fw-bold small text-muted">Fecha Estimada de Entrega (Opcional)</label>
+                                                    <label class="form-label fw-bold small text-muted">Fecha de Entrega (Opcional)</label>
                                                     <input type="date" name="fecha_estimada" class="form-control form-control-sm">
                                                 </div>
                                             </div>
@@ -687,6 +752,288 @@ function toggleNuevoAliado(id, val) {
     const fields = document.getElementById('nuevo_aliado_fields_' + id);
     if (!fields) return;
     fields.style.display = (val === '__NUEVO__') ? 'block' : 'none';
+}
+</script>
+
+<!-- MODAL ELIMINAR CON TOKEN SEGURO (INDIVIDUAL O LOTE) -->
+<div class="modal fade" id="modalEliminarSeguro" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white py-2">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Eliminación Protegida
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formEliminarSeguro" method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="selected_ids" id="eliminar_selected_ids" value="">
+                <div class="modal-body p-4 text-center">
+                    <div class="avatar-lg mx-auto mb-3">
+                        <div class="avatar-title bg-danger-subtle text-danger rounded-circle p-3 d-inline-block">
+                            <i class="fa-solid fa-trash-can fa-2x"></i>
+                        </div>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-2" id="eliminarTitulo">¿Eliminar producto?</h5>
+                    <p class="text-muted small mb-3" id="eliminarDescripcion">
+                        Esta acción es irreversible y eliminará el registro del inventario.
+                    </p>
+                    
+                    <div class="alert alert-warning text-start small py-2 px-3 mb-3">
+                        <i class="fa-solid fa-key me-1"></i> <strong>Se requiere Token de Seguridad:</strong> Ingrese el código de autorización para proceder con la eliminación.
+                    </div>
+
+                    <div class="text-start mb-2">
+                        <label class="form-label small fw-bold text-secondary">Token Secreto de Eliminación:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fa-solid fa-lock text-muted"></i></span>
+                            <input type="password" name="token_secreto" id="inputTokenSecreto" class="form-control" placeholder="Ingrese token secreto" required autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-trash-can me-1"></i> Confirmar Eliminación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL ENVIAR A SOPORTE TÉCNICO EN LOTE -->
+<div class="modal fade" id="modalSoporteLote" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark py-2">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-screwdriver-wrench me-2"></i> Enviar Equipos a Soporte Técnico
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('celulares_bp.enviar_soporte_lote') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="selected_ids" id="soporte_selected_ids" value="">
+                <div class="modal-body p-4">
+                    <div class="alert alert-light border small mb-3 py-2">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="fa-solid fa-mobile-screen-button text-warning me-2 fs-5"></i>
+                            <span class="fw-bold">Equipos seleccionados: <span class="badge bg-primary" id="soporte_badge_cant">0</span></span>
+                        </div>
+                        <div id="soporte_lista_equipos" class="small text-muted text-truncate" style="max-height: 80px; overflow-y: auto;"></div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark">Asesor Responsable *</label>
+                            <select name="asesor_id" class="form-select form-select-sm" required>
+                                <option value="">-- Seleccionar Asesor --</option>
+                                {% if asesores_disponibles %}
+                                    {% for asr in asesores_disponibles %}
+                                    <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark">Técnico Asignado *</label>
+                            <select name="technician_id" class="form-select form-select-sm" required>
+                                <option value="">-- Seleccionar Técnico --</option>
+                                {% if tecnicos_disponibles %}
+                                    {% for tec in tecnicos_disponibles %}
+                                    <option value="{{ tec.id }}">{{ tec.nombre }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Tipo de Arreglo / Servicio</label>
+                        <select name="tipo_arreglo" class="form-select form-select-sm" required onchange="toggleTipoArregloOtro(this, 'otro_tipo_lote')">
+                            <option value="Revisión General / Diagnóstico">Revisión General / Diagnóstico</option>
+                            <option value="Cambio de Pantalla">Cambio de Pantalla</option>
+                            <option value="Cambio de Batería">Cambio de Batería</option>
+                            <option value="Flex Batería">Flex Batería</option>
+                            <option value="Mantenimiento / Limpieza">Mantenimiento / Limpieza</option>
+                            <option value="Puerto de Carga">Puerto de Carga</option>
+                            <option value="Micrófono / Altavoz">Micrófono / Altavoz</option>
+                            <option value="Cámara / Lente">Cámara / Lente</option>
+                            <option value="Placa / Microelectrónica">Placa / Microelectrónica</option>
+                            <option value="Liberación / Software">Liberación / Software</option>
+                            <option value="Otro">Otro (Especificar)</option>
+                        </select>
+                        <div class="mt-2" id="otro_tipo_lote" style="display: none;">
+                            <input type="text" name="tipo_arreglo_otro" class="form-control form-control-sm" placeholder="Especifique el tipo de arreglo...">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Motivo de Falla / Diagnóstico Inicial</label>
+                        <textarea name="motivo_falla" class="form-control form-control-sm" rows="2" placeholder="Detalle la falla presentada por los equipos..." required></textarea>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-dark">Fecha de Entrega (Opcional)</label>
+                        <input type="date" name="fecha_estimada" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-paper-plane me-1"></i> Enviar a Soporte
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPTS PARA SELECCIÓN EN LOTE Y MODALES -->
+<script>
+function toggleTipoArregloOtro(sel, targetContainerId) {
+    const cont = document.getElementById(targetContainerId);
+    if (!cont) return;
+    const input = cont.querySelector('input');
+    if (sel.value === 'Otro') {
+        cont.style.display = 'block';
+        if (input) {
+            input.required = true;
+            input.focus();
+        }
+    } else {
+        cont.style.display = 'none';
+        if (input) {
+            input.required = false;
+            input.value = '';
+        }
+    }
+}
+
+function toggleSelectAll(master) {
+    const checks = document.querySelectorAll('.check-celular');
+    checks.forEach(chk => {
+        chk.checked = master.checked;
+    });
+    actualizarSeleccionados();
+}
+
+function actualizarSeleccionados() {
+    const checks = document.querySelectorAll('.check-celular:checked');
+    const totalChecks = document.querySelectorAll('.check-celular');
+    const master = document.getElementById('checkAllCelulares');
+    const barra = document.getElementById('barraAccionesLote');
+    const cantBadge = document.getElementById('cantSeleccionados');
+
+    if (cantBadge) cantBadge.textContent = checks.length;
+
+    if (master && totalChecks.length > 0) {
+        master.checked = (checks.length === totalChecks.length);
+        master.indeterminate = (checks.length > 0 && checks.length < totalChecks.length);
+    }
+
+    if (barra) {
+        if (checks.length > 0) {
+            barra.classList.remove('d-none');
+        } else {
+            barra.classList.add('d-none');
+        }
+    }
+}
+
+function deseleccionarTodos() {
+    const checks = document.querySelectorAll('.check-celular');
+    checks.forEach(chk => { chk.checked = false; });
+    const master = document.getElementById('checkAllCelulares');
+    if (master) {
+        master.checked = false;
+        master.indeterminate = false;
+    }
+    actualizarSeleccionados();
+}
+
+function getSelectedCelulares() {
+    const checks = document.querySelectorAll('.check-celular:checked');
+    const selected = [];
+    checks.forEach(chk => {
+        selected.push({
+            id: chk.value,
+            nombre: chk.dataset.nombre || '',
+            imei: chk.dataset.imei || ''
+        });
+    });
+    return selected;
+}
+
+function abrirModalEliminarIndividual(id, nombre, imei) {
+    const form = document.getElementById('formEliminarSeguro');
+    const titulo = document.getElementById('eliminarTitulo');
+    const desc = document.getElementById('eliminarDescripcion');
+    const selectedIdsInput = document.getElementById('eliminar_selected_ids');
+    const inputToken = document.getElementById('inputTokenSecreto');
+
+    form.action = `/celulares/eliminar/${id}`;
+    selectedIdsInput.value = '';
+    titulo.textContent = '¿Eliminar producto del inventario?';
+    desc.innerHTML = `Está a punto de eliminar: <strong class="text-dark">${nombre}</strong> ${imei ? `(IMEI: <code>${imei}</code>)` : ''}.`;
+    inputToken.value = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('modalEliminarSeguro'));
+    modal.show();
+}
+
+function abrirModalEliminarLote() {
+    const selected = getSelectedCelulares();
+    if (selected.length === 0) {
+        alert('Por favor seleccione al menos un equipo.');
+        return;
+    }
+
+    const form = document.getElementById('formEliminarSeguro');
+    const titulo = document.getElementById('eliminarTitulo');
+    const desc = document.getElementById('eliminarDescripcion');
+    const selectedIdsInput = document.getElementById('eliminar_selected_ids');
+    const inputToken = document.getElementById('inputTokenSecreto');
+
+    form.action = "{{ url_for('celulares_bp.eliminar_celulares_lote') }}";
+    selectedIdsInput.value = selected.map(s => s.id).join(',');
+    titulo.textContent = `¿Eliminar ${selected.length} productos seleccionados?`;
+    
+    let resumen = selected.slice(0, 5).map(s => s.nombre + (s.imei ? ` (${s.imei})` : '')).join('<br>');
+    if (selected.length > 5) {
+        resumen += `<br><span class="text-muted">... y ${selected.length - 5} más</span>`;
+    }
+    desc.innerHTML = `Se eliminarán <strong>${selected.length} equipos</strong>:<br><div class="border rounded p-2 my-2 bg-light text-start small font-monospace">${resumen}</div>`;
+    inputToken.value = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('modalEliminarSeguro'));
+    modal.show();
+}
+
+function abrirModalSoporteLote() {
+    const selected = getSelectedCelulares();
+    if (selected.length === 0) {
+        alert('Por favor seleccione al menos un equipo.');
+        return;
+    }
+
+    const selectedIdsInput = document.getElementById('soporte_selected_ids');
+    const badgeCant = document.getElementById('soporte_badge_cant');
+    const listaEquipos = document.getElementById('soporte_lista_equipos');
+
+    selectedIdsInput.value = selected.map(s => s.id).join(',');
+    badgeCant.textContent = selected.length;
+
+    let html = '<ul class="list-unstyled mb-0">';
+    selected.forEach(s => {
+        html += `<li>• <strong>${s.nombre}</strong> ${s.imei ? `<span class="badge bg-light text-dark border">${s.imei}</span>` : ''}</li>`;
+    });
+    html += '</ul>';
+    listaEquipos.innerHTML = html;
+
+    const modal = new bootstrap.Modal(document.getElementById('modalSoporteLote'));
+    modal.show();
 }
 </script>
 

@@ -61,24 +61,60 @@
                             <option value="">-- Seleccione Marca --</option>
                             <option value="Apple" {% if celular and celular.marca == 'Apple' %}selected{% endif %}>Apple</option>
                             <option value="Samsung" {% if celular and celular.marca == 'Samsung' %}selected{% endif %}>Samsung</option>
-                            {% if celular and celular.marca and celular.marca not in ['Apple', 'Samsung'] %}
+                            <option value="Meta" {% if celular and celular.marca == 'Meta' %}selected{% endif %}>Meta</option>
+                            <option value="Android" {% if celular and celular.marca == 'Android' %}selected{% endif %}>Android (Xiaomi / Otros)</option>
+                            {% if celular and celular.marca and celular.marca not in ['Apple', 'Samsung', 'Meta', 'Android'] %}
                                 <option value="{{ celular.marca }}" selected>{{ celular.marca }}</option>
                             {% endif %}
                         </select>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label fw-bold small text-muted text-uppercase">Referencia (Modelo)</label>
-                        <select name="modelo_celular" id="celular_modelo" class="form-select fw-semibold" required>
+                        <select name="modelo_celular" id="celular_modelo" class="form-select fw-semibold" onchange="actualizarColoresSugeridos(this.value)" required>
                             <option value="">-- Primero elige Marca --</option>
                         </select>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold small text-muted text-uppercase">Capacidad / RAM</label>
-                        <input type="text" name="memoria" class="form-control" value="{{ celular.memoria if celular else '' }}" placeholder="Ej: 128GB, 512GB SSD">
+                        {% set cap_val = celular.memoria if celular and celular.memoria else '' %}
+                        <div class="input-group">
+                            <select name="memoria" id="celular_memoria" class="form-select fw-semibold" onchange="toggleManualInput(this, 'memoria_manual')">
+                                <option value="">-- Seleccionar --</option>
+                                <option value="N/A" {% if cap_val == 'N/A' %}selected{% endif %}>N/A (No Aplica)</option>
+                                <option value="64GB" {% if cap_val == '64GB' %}selected{% endif %}>64GB</option>
+                                <option value="128GB" {% if cap_val == '128GB' %}selected{% endif %}>128GB</option>
+                                <option value="256GB" {% if cap_val == '256GB' %}selected{% endif %}>256GB</option>
+                                <option value="512GB" {% if cap_val == '512GB' %}selected{% endif %}>512GB</option>
+                                <option value="1T" {% if cap_val == '1T' %}selected{% endif %}>1T</option>
+                                <option value="2T" {% if cap_val == '2T' %}selected{% endif %}>2T</option>
+                                {% if cap_val and cap_val not in ['N/A', '64GB', '128GB', '256GB', '512GB', '1T', '2T'] %}
+                                    <option value="{{ cap_val }}" selected>{{ cap_val }}</option>
+                                {% endif %}
+                                <option value="__OTRO__">✍️ Escribir otro...</option>
+                            </select>
+                            <input type="text" id="memoria_manual" class="form-control d-none" placeholder="Escribe capacidad..." oninput="syncManualValue(this, 'celular_memoria')">
+                            <button type="button" id="btn_cancel_memoria_manual" class="btn btn-outline-secondary d-none" onclick="cancelManualInput('celular_memoria', 'memoria_manual')" title="Volver a la lista">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold small text-muted text-uppercase">Color</label>
-                        <input type="text" name="color" class="form-control" value="{{ celular.color if celular else '' }}" placeholder="Ej: Negro, Azul">
+                        {% set col_val = celular.color if celular and celular.color else '' %}
+                        <div class="input-group">
+                            <select name="color" id="celular_color" class="form-select fw-semibold" onchange="toggleManualInput(this, 'color_manual')">
+                                <option value="">-- Primero elige Referencia --</option>
+                                <option value="N/A" {% if col_val == 'N/A' %}selected{% endif %}>N/A (No Aplica)</option>
+                                {% if col_val and col_val != 'N/A' %}
+                                    <option value="{{ col_val }}" selected>{{ col_val }}</option>
+                                {% endif %}
+                                <option value="__OTRO__">✍️ Escribir otro...</option>
+                            </select>
+                            <input type="text" id="color_manual" class="form-control d-none" placeholder="Escribe color..." oninput="syncManualValue(this, 'celular_color')">
+                            <button type="button" id="btn_cancel_color_manual" class="btn btn-outline-secondary d-none" onclick="cancelManualInput('celular_color', 'color_manual')" title="Volver a la lista">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label fw-bold small text-muted text-uppercase">Batería (%)</label>
@@ -142,11 +178,11 @@
 </div>
 
 <script>
-    // Catálogo específico de Modelos para Apple y Samsung
+    // Catálogo específico de Modelos para Apple, Samsung, Meta y Android (Xiaomi)
     const CATALOGO_PRODUCTOS_CELULAR = {
         'Apple': [
             {
-                categoria: 'iPhones (11 al 18 Pro Max)',
+                categoria: 'iPhones (11 al 18 Duo / Pro Max)',
                 modelos: [
                     'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
                     'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
@@ -154,8 +190,41 @@
                     'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
                     'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
                     'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
-                    'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
-                    'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                    'iPhone 17', 'iPhone 17 Air', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+                    'iPhone 18', 'iPhone 18 Duo', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                ]
+            },
+            {
+                categoria: 'Apple Watch',
+                modelos: [
+                    'Apple Watch Serie 11 (42mm)',
+                    'Apple Watch Serie 11 (46mm)',
+                    'Apple Watch Ultra 3 (49mm)'
+                ]
+            },
+            {
+                categoria: 'MacBook (Air, Pro, Neo)',
+                modelos: [
+                    'MacBook Neo',
+                    'MacBook Air M5',
+                    'MacBook Pro M5',
+                    'MacBook Pro M5 Pro',
+                    'MacBook Pro M5 Max',
+                    'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
+                    'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
+                    'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
+                    'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)'
+                ]
+            },
+            {
+                categoria: 'AirPods',
+                modelos: [
+                    'AirPods Serie 4 (AirPods 4)',
+                    'AirPods Serie 5 (AirPods 5)',
+                    'AirPods Pro 3',
+                    'AirPods Pro 2da Generación (USB-C)',
+                    'AirPods Max (Lightning)',
+                    'AirPods Max (USB-C)'
                 ]
             },
             {
@@ -168,48 +237,271 @@
                     'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)',
                     'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
                 ]
-            },
-            {
-                categoria: 'MacBook (Air, Pro, Neo)',
-                modelos: [
-                    'MacBook Neo',
-                    'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
-                    'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
-                    'MacBook Pro 14" (M1 Pro/Max)', 'MacBook Pro 16" (M1 Pro/Max)',
-                    'MacBook Pro 14" (M2 Pro/Max)', 'MacBook Pro 16" (M2 Pro/Max)',
-                    'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
-                    'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)'
-                ]
-            },
-            {
-                categoria: 'AirPods (Últimas Generaciones)',
-                modelos: [
-                    'AirPods 3ra Generación',
-                    'AirPods 4ta Generación',
-                    'AirPods 4ta Generación con ANC',
-                    'AirPods Pro 2da Generación (USB-C)',
-                    'AirPods Max (Lightning)',
-                    'AirPods Max (USB-C)'
-                ]
             }
         ],
         'Samsung': [
             {
-                categoria: 'Samsung Galaxy Serie S (Desde S24 en adelante)',
+                categoria: 'Samsung Galaxy Serie S (S24, S25, S26)',
                 modelos: [
                     'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
                     'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+                    'Galaxy S26', 'Galaxy S26 Plus', 'Galaxy S26 Ultra',
                     'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
                     'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
-                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE',
+                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra',
                     'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
                     'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
+                ]
+            }
+        ],
+        'Meta': [
+            {
+                categoria: 'Ray-Ban Meta Smart Glasses',
+                modelos: [
+                    'Ray-Ban Meta Wayfarer (Standard)',
+                    'Ray-Ban Meta Wayfarer (Large)',
+                    'Ray-Ban Meta Headliner',
+                    'Ray-Ban Meta Skyler'
+                ]
+            },
+            {
+                categoria: 'Oakley Meta Smart Glasses',
+                modelos: [
+                    'Oakley Meta Performance Edition',
+                    'Oakley Meta Radar EV Edition',
+                    'Oakley Meta Holbrook Smart'
+                ]
+            }
+        ],
+        'Android': [
+            {
+                categoria: 'Xiaomi Serie 15 / 14 (Gama Alta)',
+                modelos: [
+                    'Xiaomi 15 Ultra',
+                    'Xiaomi 15 Pro',
+                    'Xiaomi 15',
+                    'Xiaomi 14 Ultra',
+                    'Xiaomi 14T Pro',
+                    'Xiaomi 14T',
+                    'Xiaomi MIX Flip'
+                ]
+            },
+            {
+                categoria: 'POCO Serie F & X (Últimos Lanzamientos)',
+                modelos: [
+                    'POCO F7 Pro',
+                    'POCO F7',
+                    'POCO F6 Pro',
+                    'POCO F6',
+                    'POCO X7 Pro',
+                    'POCO X6 Pro'
+                ]
+            },
+            {
+                categoria: 'Redmi Note Serie 14 / 13',
+                modelos: [
+                    'Redmi Note 14 Pro+ 5G',
+                    'Redmi Note 14 Pro 5G',
+                    'Redmi Note 14 5G',
+                    'Redmi Note 13 Pro+ 5G',
+                    'Redmi Note 13 Pro 4G/5G',
+                    'Redmi 14C',
+                    'Redmi 13C'
                 ]
             }
         ]
     };
 
-    function actualizarModelosCelular(marca, modeloPreseleccionado = '') {
+    // Mapeo detallado de colores oficiales por modelo o familia
+    const CATALOGO_COLORES = {
+        // SERIE iPHONE 11
+        'iPhone 11': ['Negro (Black)', 'Blanco (White)', 'Verde (Green - tono menta pastel)', 'Amarillo (Yellow)', 'Morado / Malva (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 11 Pro': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+        'iPhone 11 Pro Max': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+
+        // SERIE iPHONE 12
+        'iPhone 12': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 12 Mini': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 12 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+        'iPhone 12 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+
+        // SERIE iPHONE 13
+        'iPhone 13': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 13 Mini': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 13 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+        'iPhone 13 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+
+        // SERIE iPHONE 14
+        'iPhone 14': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 14 Plus': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 14 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+        'iPhone 14 Pro Max': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+
+        // SERIE iPHONE 15
+        'iPhone 15': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+        'iPhone 15 Plus': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+        'iPhone 15 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+        'iPhone 15 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+
+        // SERIE iPHONE 16
+        'iPhone 16': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+        'iPhone 16 Plus': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+        'iPhone 16 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+        'iPhone 16 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+
+        // SERIE iPHONE 17
+        'iPhone 17': ['Lavanda (Lavender)', 'Verde salvia (Sage)', 'Azul neblina (Mist Blue)', 'Blanco (White)', 'Negro (Black)'],
+        'iPhone 17 Air': ['Azul cielo (Sky Blue)', 'Dorado claro (Light Gold)', 'Blanco nube (Cloud White)', 'Negro espacial (Space Black)'],
+        'iPhone 17 Pro': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+        'iPhone 17 Pro Max': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+
+        // SERIE iPHONE 18
+        'iPhone 18': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+        'iPhone 18 Plus': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+        'iPhone 18 Duo': ['Blanco estelar (Starlight)', 'Cielo nocturno (Night Sky - azul oscuro)'],
+        'iPhone 18 Pro': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+        'iPhone 18 Pro Max': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+
+        // MACBOOKS
+        'MacBook Air M5': ['Azul cielo (Sky Blue)', 'Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Plata (Silver)'],
+        'MacBook Neo': ['Plata (Silver)', 'Rosa nube (Cloud Pink)', 'Cítrico (Citrus)', 'Índigo (Indigo)'],
+        'MacBook Pro M5': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+        'MacBook Pro M5 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+        'MacBook Pro M5 Max': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+
+        // AIRPODS
+        'AirPods Pro 3': ['Blanco (White)'],
+        'AirPods Serie 4 (AirPods 4)': ['Blanco (White)'],
+        'AirPods Serie 5 (AirPods 5)': ['Blanco (White)'],
+
+        // APPLE WATCH
+        'Apple Watch Serie 11 (42mm)': [
+            'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+            'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+        ],
+        'Apple Watch Serie 11 (46mm)': [
+            'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+            'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+        ],
+        'Apple Watch Ultra 3 (49mm)': ['Titanio natural (Natural Titanium)', 'Titanio negro (Black Titanium)'],
+
+        // SAMSUNG
+        'Galaxy S25 Ultra': [
+            'Titanio Negro (Titanium Black)', 'Titanio Gris (Titanium Gray)', 'Titanio Plata Azul (Titanium Silverblue)', 'Titanio Blanco Plata (Titanium Whitesilver)',
+            'Titanio Negro Intenso (Titanium Jetblack)', 'Titanio Verde Jade (Titanium Jadegreen)', 'Titanio Oro Rosa (Titanium Pinkgold)'
+        ],
+        'Galaxy S26 Ultra': [
+            'Violeta Cobalto (Cobalt Violet)', 'Azul Cielo (Sky Blue)', 'Negro (Black)', 'Blanco (White)',
+            'Gris (Gray)', 'Oro Rosa (Pink Gold)'
+        ],
+
+        // META
+        'Ray-Ban Meta Wayfarer (Standard)': ['Negro Brillante (Shiny Black - G15)', 'Negro Mate (Matte Black - Polarized)', 'Jeans (Chalky Gray)', 'Caramel (Transitions)'],
+        'Ray-Ban Meta Wayfarer (Large)': ['Negro Brillante (Shiny Black)', 'Negro Mate (Matte Black)'],
+        'Ray-Ban Meta Headliner': ['Negro Brillante (Shiny Black)', 'Caramelo Brillante (Shiny Caramel)'],
+        'Ray-Ban Meta Skyler': ['Negro Brillante (Shiny Black)', 'Rosa Tiza (Chalky Rose)']
+    };
+
+    function actualizarColoresSugeridos(modelo, colorPreseleccionado = '') {
+        const selColor = document.getElementById('celular_color');
+        if (!selColor) return;
+        selColor.innerHTML = '';
+
+        let colores = [];
+        if (modelo && CATALOGO_COLORES[modelo]) {
+            colores = CATALOGO_COLORES[modelo];
+        } else {
+            // Si el modelo específico no tiene lista exacta, buscar coincidencia parcial o cargar lista general
+            for (const key in CATALOGO_COLORES) {
+                if (modelo && modelo.toLowerCase().includes(key.toLowerCase())) {
+                    colores = CATALOGO_COLORES[key];
+                    break;
+                }
+            }
+        }
+
+        if (colores.length > 0) {
+            selColor.innerHTML = '<option value="">-- Seleccionar Color --</option>';
+            selColor.innerHTML += '<option value="N/A">N/A (No Aplica)</option>';
+            colores.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                if (colorPreseleccionado && (c.toLowerCase() === colorPreseleccionado.toLowerCase() || c.toLowerCase().includes(colorPreseleccionado.toLowerCase()))) {
+                    opt.selected = true;
+                }
+                selColor.appendChild(opt);
+            });
+            selColor.innerHTML += '<option value="__OTRO__">✍️ Escribir otro...</option>';
+        } else {
+            selColor.innerHTML = '<option value="">-- Seleccionar Color --</option>';
+            selColor.innerHTML += '<option value="N/A">N/A (No Aplica)</option>';
+            // Si no hay colores específicos para el modelo, cargar todos los colores disponibles organizados
+            const todosColores = new Set();
+            for (const m in CATALOGO_COLORES) {
+                CATALOGO_COLORES[m].forEach(col => todosColores.add(col));
+            }
+            todosColores.forEach(col => {
+                const opt = document.createElement('option');
+                opt.value = col;
+                opt.textContent = col;
+                if (colorPreseleccionado && col.toLowerCase() === colorPreseleccionado.toLowerCase()) {
+                    opt.selected = true;
+                }
+                selColor.appendChild(opt);
+            });
+            selColor.innerHTML += '<option value="__OTRO__">✍️ Escribir otro...</option>';
+        }
+
+        // Si el equipo ya tenía un color personalizado que no está en la lista oficial
+        if (colorPreseleccionado && colorPreseleccionado !== 'N/A' && !selColor.value) {
+            const optCustom = document.createElement('option');
+            optCustom.value = colorPreseleccionado;
+            optCustom.textContent = `${colorPreseleccionado} (Personalizado)`;
+            optCustom.selected = true;
+            selColor.appendChild(optCustom);
+        }
+    }
+
+    // Funciones para permitir escribir libremente en selectores de Capacidad y Color
+    function toggleManualInput(selectElem, inputId) {
+        if (!selectElem) return;
+        const inputElem = document.getElementById(inputId);
+        const btnCancel = document.getElementById(`btn_cancel_${inputId}`);
+        if (selectElem.value === '__OTRO__') {
+            selectElem.classList.add('d-none');
+            if (inputElem) {
+                inputElem.classList.remove('d-none');
+                inputElem.name = selectElem.name; // El input asume el nombre para enviarse en el formulario
+                inputElem.value = '';
+                inputElem.focus();
+            }
+            if (btnCancel) btnCancel.classList.remove('d-none');
+            selectElem.removeAttribute('name');
+        }
+    }
+
+    function cancelManualInput(selectId, inputId) {
+        const selectElem = document.getElementById(selectId);
+        const inputElem = document.getElementById(inputId);
+        const btnCancel = document.getElementById(`btn_cancel_${inputId}`);
+        if (selectElem && inputElem) {
+            inputElem.classList.add('d-none');
+            inputElem.removeAttribute('name');
+            inputElem.value = '';
+
+            selectElem.classList.remove('d-none');
+            selectElem.name = (selectId === 'celular_memoria') ? 'memoria' : 'color';
+            selectElem.value = '';
+        }
+        if (btnCancel) btnCancel.classList.add('d-none');
+    }
+
+    function syncManualValue(inputElem, selectId) {
+        // Mantiene sincronizado el valor
+    }
+
+    function actualizarModelosCelular(marca, modeloPreseleccionado = '', colorPreseleccionado = '') {
         const sel = document.getElementById('celular_modelo');
         if (!sel) return;
         sel.innerHTML = '';
@@ -218,6 +510,7 @@
             if (modeloPreseleccionado) {
                 sel.innerHTML += `<option value="${modeloPreseleccionado}" selected>${modeloPreseleccionado}</option>`;
             }
+            actualizarColoresSugeridos('', colorPreseleccionado);
             return;
         }
 
@@ -245,14 +538,20 @@
             optCustom.selected = true;
             sel.appendChild(optCustom);
         }
+
+        // Actualizar lista desplegable de colores para el modelo actual
+        actualizarColoresSugeridos(sel.value, colorPreseleccionado);
     }
 
     // Inicializar catálogo al cargar
     document.addEventListener('DOMContentLoaded', function() {
         const marcaInit = "{{ celular.marca if celular else '' }}";
         const modeloInit = "{{ celular.modelo_celular if celular else '' }}";
+        const colorInit = "{{ celular.color if celular else '' }}";
         if (marcaInit) {
-            actualizarModelosCelular(marcaInit, modeloInit);
+            actualizarModelosCelular(marcaInit, modeloInit, colorInit);
+        } else {
+            actualizarColoresSugeridos('', colorInit);
         }
     });
 

@@ -1,7 +1,7 @@
 import re
 from flask import Blueprint, request, flash, redirect, render_template, url_for, jsonify
 from flask_login import login_required, current_user
-from models import db, Product, Retoma, obtener_hora_bogota
+from models import db, Product, Retoma, obtener_hora_bogota, AuditLog, TechnicalService, Branch, Technician, Asesor
 from decorators import admin_required
 from decimal import Decimal
 from sqlalchemy.orm import joinedload
@@ -48,9 +48,15 @@ def cuarentena():
             if prod_previo:
                 r_item.es_reingreso = True
 
+    from models import Technician, Asesor
+    tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
+    asesores_disponibles = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
+
     return render_template('retomas/cuarentena.html',
                            retomas=paginacion.items,
                            paginacion=paginacion,
+                           tecnicos_disponibles=tecnicos_disponibles,
+                           asesores_disponibles=asesores_disponibles,
                            q=q)
 
 @retomas_bp.route('/aprobar/<int:id>', methods=['POST'])
@@ -310,3 +316,143 @@ def toggle_ok_venta(id):
 
     flash(f"Estado OK Venta actualizado a {'Aprobado' if retoma.ok_venta else 'Pendiente'}.", "success")
     return redirect(request.referrer or url_for('retomas_bp.cuarentena'))
+
+@retomas_bp.route('/enviar-soporte-lote', methods=['POST'])
+@login_required
+@admin_required
+def enviar_soporte_lote():
+    """Envía un grupo de equipos de retoma en lote a soporte técnico."""
+    ids_str = request.form.get('selected_ids', '').strip()
+    if not ids_str:
+        flash('No seleccionaste ninguna retoma para enviar a soporte.', 'warning')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    ids = [int(x) for x in ids_str.split(',') if x.strip().isdigit()]
+    if not ids:
+        flash('Lista de retomas inválida.', 'warning')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    technician_id = request.form.get('technician_id', type=int)
+    asesor_id = request.form.get('asesor_id', type=int)
+    tipo_arreglo = request.form.get('tipo_arreglo', '').strip()
+    if tipo_arreglo == 'Otro':
+        otro_tipo = request.form.get('tipo_arreglo_otro', '').strip()
+        if otro_tipo:
+            tipo_arreglo = f"Otro: {otro_tipo}"
+    if not tipo_arreglo:
+        tipo_arreglo = 'Diagnóstico General / Revisión'
+    motivo_falla = request.form.get('motivo_falla', '').strip() or 'Envío en lote a revisión técnica'
+    fecha_estimada_str = request.form.get('fecha_estimada', '').strip()
+
+    fecha_estimada = None
+    if fecha_estimada_str:
+        try:
+            from datetime import datetime
+            fecha_estimada = datetime.strptime(fecha_estimada_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+
+    user_branch_default = current_user.branch_id
+    if not user_branch_default:
+        from models import Branch
+        default_b = Branch.query.filter_by(activa=True).first()
+        user_branch_default = default_b.id if default_b else 1
+
+    from models import TechnicalService, AuditLog
+    retomas_list = Retoma.query.filter(Retoma.id.in_(ids)).all()
+
+    enviados = 0
+    try:
+        for r in retomas_list:
+            r_branch_id = r.branch_id or user_branch_default
+
+            servicio = TechnicalService(
+                origen='RETOMA',
+                retoma_id=r.id,
+                product_id=r.producto_generado_id,
+                branch_id=r_branch_id,
+                technician_id=technician_id,
+                asesor_id=asesor_id or r.asesor_retoma_id,
+                created_by_id=current_user.id,
+                marca=r.marca,
+                modelo=r.modelo,
+                imei=r.imei1,
+                color=r.color,
+                motivo_falla=motivo_falla,
+                tipo_arreglo=tipo_arreglo,
+                estado='EN_REVISION',
+                fecha_estimada=fecha_estimada
+            )
+            db.session.add(servicio)
+            r.observaciones = f"[EN TALLER / SOPORTE TÉCNICO]: {motivo_falla} | Falla: {tipo_arreglo}. " + (r.observaciones or '')
+            enviados += 1
+
+        db.session.commit()
+
+        AuditLog.registrar(
+            action='ENVIO_SOPORTE_RETOMAS_LOTE',
+            user_id=current_user.id,
+            motivo=f'Envío en lote de {enviados} retomas a soporte técnico ({tipo_arreglo})',
+            target_id=None,
+            target_type='TECHNICAL_SERVICE_BATCH'
+        )
+
+        flash(f'¡Éxito! Se enviaron {enviados} equipos de retoma a Soporte Técnico.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al enviar retomas a soporte: {str(e)}', 'danger')
+
+    return redirect(url_for('retomas_bp.cuarentena'))
+
+@retomas_bp.route('/eliminar-lote', methods=['POST'])
+@login_required
+@admin_required
+def eliminar_retomas_lote():
+    """Elimina en lote retomas seleccionadas con confirmación de token secreto."""
+    import os
+    token_ingresado = request.form.get('token_secreto', '').strip()
+    token_correcto = os.environ.get('DELETE_TOKEN', '1234').strip()
+
+    if not token_ingresado or token_ingresado != token_correcto:
+        flash('Token secreto incorrecto. Eliminación en lote cancelada.', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    ids_str = request.form.get('selected_ids', '').strip()
+    if not ids_str:
+        flash('No seleccionaste ninguna retoma para eliminar.', 'warning')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    ids = [int(x) for x in ids_str.split(',') if x.strip().isdigit()]
+    if not ids:
+        flash('Lista de retomas inválida.', 'warning')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    from models import AuditLog
+    retomas_list = Retoma.query.filter(Retoma.id.in_(ids)).all()
+    eliminados = 0
+
+    try:
+        for r in retomas_list:
+            # Si ya tiene un producto aprobado vendido, no permitir eliminar
+            if r.producto_generado and r.producto_generado.detalles_venta:
+                continue
+
+            db.session.delete(r)
+            eliminados += 1
+
+        db.session.commit()
+
+        AuditLog.registrar(
+            action='ELIMINACION_RETOMAS_LOTE',
+            user_id=current_user.id,
+            motivo=f'Eliminación en lote de {eliminados} retomas mediante token de seguridad',
+            target_id=None,
+            target_type='RETOMA_BATCH'
+        )
+
+        flash(f'Se eliminaron correctamente {eliminados} retomas del sistema.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar retomas en lote: {str(e)}', 'danger')
+
+    return redirect(url_for('retomas_bp.cuarentena'))

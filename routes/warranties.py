@@ -24,10 +24,11 @@ def index():
         if active_b_id:
             query = query.filter(Warranty.branch_id == int(active_b_id))
 
-    from models import Technician
+    from models import Technician, Asesor
     tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
+    asesores_disponibles = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
     warranties = query.order_by(Warranty.created_at.desc()).all()
-    return render_template('warranties/index.html', warranties=warranties, tecnicos_disponibles=tecnicos_disponibles)
+    return render_template('warranties/index.html', warranties=warranties, tecnicos_disponibles=tecnicos_disponibles, asesores_disponibles=asesores_disponibles)
 
 @warranties_bp.route('/api/search', methods=['GET'])
 @login_required
@@ -124,6 +125,7 @@ def create_warranty():
             receiving_branch_id = branch_def.id if branch_def else 1
 
     # Checklist inicial de recepción
+    asesor_id = request.form.get('asesor_id', type=int)
     estado_estetico = request.form.get('estado_estetico', 'Bueno').strip()
     detalles_esteticos = request.form.get('detalles_esteticos', '').strip()
     porcentaje_bateria = request.form.get('porcentaje_bateria', type=int)
@@ -137,6 +139,7 @@ def create_warranty():
     warranty.reason = reason
     warranty.motivo_reportado = reason
     warranty.recibido_por_id = current_user.id
+    warranty.asesor_id = asesor_id
     warranty.estado_estetico = estado_estetico
     warranty.detalles_esteticos = detalles_esteticos
     warranty.porcentaje_bateria = porcentaje_bateria

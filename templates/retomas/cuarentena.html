@@ -6,7 +6,7 @@
 </div>
 
 <!-- Barra de Búsqueda -->
-<form method="GET" action="{{ url_for('retomas_bp.cuarentena') }}" id="filtroForm" class="mb-4">
+<form method="GET" action="{{ url_for('retomas_bp.cuarentena') }}" id="filtroForm" class="mb-3">
     <div class="input-group shadow-sm" style="max-width: 480px;">
         <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
         <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0"
@@ -18,32 +18,71 @@
     </div>
 </form>
 
-<div class="card card-custom p-0 shadow-sm border-0">
-    <div class="table-responsive">
-        <table class="table table-hover table-sm mb-0 align-middle text-center w-100" style="font-size: 0.85rem;">
-            <thead class="bg-light text-nowrap" style="font-size: 0.8rem;">
+<div class="card card-custom p-0 shadow-sm border-0 w-100 mb-4">
+    <!-- Barra Flotante de Acciones en Lote para Retomas -->
+    <div id="barraAccionesLoteRetomas" class="card-header bg-dark text-white d-flex align-items-center justify-content-between py-2 px-3 border-0 shadow-sm d-none" style="position: sticky; top: 70px; z-index: 1020;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary rounded-pill px-3 py-1 fs-6">
+                <span id="cantSeleccionadosRetomas">0</span> seleccionados
+            </span>
+            <span class="small text-muted d-none d-md-inline">Acciones disponibles para las retomas seleccionadas:</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <!-- Botón Mandar a Soporte Técnico en Lote -->
+            <button type="button" class="btn btn-sm btn-outline-warning text-white rounded-pill px-3 fw-bold shadow-sm" onclick="abrirModalSoporteLoteRetomas()">
+                <i class="fa-solid fa-screwdriver-wrench me-1 text-warning"></i> Enviar a Soporte
+            </button>
+            <!-- Botón Eliminar en Lote (Token Secreto) -->
+            <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 fw-bold shadow-sm" onclick="abrirModalEliminarLoteRetomas()">
+                <i class="fa-solid fa-trash-can me-1"></i> Eliminar Seleccionados
+            </button>
+            <!-- Deseleccionar -->
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white rounded-pill px-2" onclick="deseleccionarTodosRetomas()" title="Deseleccionar todo">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="table-responsive w-100" style="overflow-x: auto;">
+        <table class="table table-hover table-sm mb-0 align-middle text-center w-100" style="font-size: 0.85rem; min-width: 1350px;">
+            <thead class="bg-dark text-white text-nowrap" style="font-size: 0.8rem;">
                 <tr>
-                    <th class="ps-3 py-2 text-start">MARCA</th>
-                    <th class="py-2 text-start">REFERENCIA</th>
-                    <th class="py-2">CAP.</th>
-                    <th class="py-2">BAT.</th>
-                    <th class="py-2">COLOR</th>
-                    <th class="py-2">IMEI</th>
-                    <th class="py-2">IMEI 2</th>
-                    <th class="py-2">PROVEEDOR</th>
-                    <th class="py-2">FECHA</th>
-                    <th class="py-2">VALOR RETOMA</th>
-                    <th class="py-2 text-center">OK CONTAB.</th>
-                    <th class="py-2 text-center">OK VENTA</th>
-                    <th class="pe-3 py-2 text-center">ACCIONES</th>
+                    <th class="ps-3 py-2 text-center" style="width: 40px;">
+                        <input type="checkbox" id="checkAllRetomas" class="form-check-input cursor-pointer" onchange="toggleSelectAllRetomas(this)" title="Seleccionar todas las retomas">
+                    </th>
+                    <th class="py-2 text-start fw-bold">MARCA</th>
+                    <th class="py-2 text-start fw-bold">REFERENCIA</th>
+                    <th class="py-2 fw-bold">CAP.</th>
+                    <th class="py-2 fw-bold">BAT.</th>
+                    <th class="py-2 fw-bold">COLOR</th>
+                    <th class="py-2 fw-bold">IMEI</th>
+                    <th class="py-2 fw-bold">IMEI 2</th>
+                    <th class="py-2 fw-bold">PROVEEDOR</th>
+                    <th class="py-2 fw-bold">FECHA</th>
+                    <th class="py-2 fw-bold">VALOR RETOMA</th>
+                    <th class="py-2 fw-bold text-center">OK CONTAB.</th>
+                    <th class="py-2 fw-bold text-center">OK VENTA</th>
+                    <th class="pe-3 py-2 fw-bold text-center">ACCIONES</th>
                 </tr>
             </thead>
             <tbody class="text-nowrap">
                 {% for r in retomas %}
                 <tr>
-                    <td class="ps-3 fw-bold text-dark text-start">{{ r.marca or '-' }}</td>
+                    <td class="ps-3 text-center">
+                        <input type="checkbox" class="form-check-input check-retoma cursor-pointer"
+                               value="{{ r.id }}"
+                               data-nombre="{{ r.marca or '' }} {{ r.modelo or '' }}"
+                               data-imei="{{ r.imei1 or '' }}"
+                               onchange="actualizarSeleccionadosRetomas()">
+                    </td>
+                    <td class="fw-bold text-dark text-start">{{ r.marca or '-' }}</td>
                     <td class="fw-semibold text-start">
                         {{ r.modelo or '-' }}
+                        {% if r.soporte_activo %}
+                        <span class="badge bg-danger text-white rounded-pill px-2 ms-1" style="font-size: 0.65rem;" title="El equipo está actualmente en soporte técnico">
+                            <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Soporte
+                        </span>
+                        {% endif %}
                         {% if r.es_reingreso %}
                         <span class="badge bg-info text-dark rounded-pill px-2 ms-1" style="font-size: 0.65rem;" title="Este IMEI perteneció a un equipo vendido previamente en la tienda">
                             <i class="fa-solid fa-rotate-left"></i> Reingreso
@@ -448,5 +487,266 @@
             alert("Ocurrió un error de red al intentar actualizar el estado.");
         });
     }
+
+    // Funciones para selección en lote y modales de Retomas
+    function toggleTipoArregloOtroRetoma(sel) {
+        const cont = document.getElementById('otro_tipo_lote_retoma');
+        if (!cont) return;
+        const input = cont.querySelector('input');
+        if (sel.value === 'Otro') {
+            cont.style.display = 'block';
+            if (input) {
+                input.required = true;
+                input.focus();
+            }
+        } else {
+            cont.style.display = 'none';
+            if (input) {
+                input.required = false;
+                input.value = '';
+            }
+        }
+    }
+
+    function toggleSelectAllRetomas(master) {
+        const checks = document.querySelectorAll('.check-retoma');
+        checks.forEach(chk => {
+            chk.checked = master.checked;
+        });
+        actualizarSeleccionadosRetomas();
+    }
+
+    function actualizarSeleccionadosRetomas() {
+        const checks = document.querySelectorAll('.check-retoma:checked');
+        const totalChecks = document.querySelectorAll('.check-retoma');
+        const master = document.getElementById('checkAllRetomas');
+        const barra = document.getElementById('barraAccionesLoteRetomas');
+        const cantBadge = document.getElementById('cantSeleccionadosRetomas');
+
+        if (cantBadge) cantBadge.textContent = checks.length;
+
+        if (master && totalChecks.length > 0) {
+            master.checked = (checks.length === totalChecks.length);
+            master.indeterminate = (checks.length > 0 && checks.length < totalChecks.length);
+        }
+
+        if (barra) {
+            if (checks.length > 0) {
+                barra.classList.remove('d-none');
+            } else {
+                barra.classList.add('d-none');
+            }
+        }
+    }
+
+    function deseleccionarTodosRetomas() {
+        const checks = document.querySelectorAll('.check-retoma');
+        checks.forEach(chk => { chk.checked = false; });
+        const master = document.getElementById('checkAllRetomas');
+        if (master) {
+            master.checked = false;
+            master.indeterminate = false;
+        }
+        actualizarSeleccionadosRetomas();
+    }
+
+    function getSelectedRetomas() {
+        const checks = document.querySelectorAll('.check-retoma:checked');
+        const selected = [];
+        checks.forEach(chk => {
+            selected.push({
+                id: chk.value,
+                nombre: chk.dataset.nombre || '',
+                imei: chk.dataset.imei || ''
+            });
+        });
+        return selected;
+    }
+
+    function abrirModalEliminarLoteRetomas() {
+        const selected = getSelectedRetomas();
+        if (selected.length === 0) {
+            alert('Por favor seleccione al menos una retoma.');
+            return;
+        }
+
+        const selectedIdsInput = document.getElementById('eliminar_retomas_selected_ids');
+        const titulo = document.getElementById('eliminarRetomasTitulo');
+        const desc = document.getElementById('eliminarRetomasDescripcion');
+        const inputToken = document.getElementById('inputTokenSecretoRetomas');
+
+        selectedIdsInput.value = selected.map(s => s.id).join(',');
+        titulo.textContent = `¿Eliminar ${selected.length} retomas seleccionadas?`;
+        
+        let resumen = selected.slice(0, 5).map(s => s.nombre + (s.imei ? ` (${s.imei})` : '')).join('<br>');
+        if (selected.length > 5) {
+            resumen += `<br><span class="text-muted">... y ${selected.length - 5} más</span>`;
+        }
+        desc.innerHTML = `Se eliminarán permanentemente <strong>${selected.length} registros</strong>:<br><div class="border rounded p-2 my-2 bg-light text-start small font-monospace">${resumen}</div>`;
+        inputToken.value = '';
+
+        const modal = new bootstrap.Modal(document.getElementById('modalEliminarLoteRetomas'));
+        modal.show();
+    }
+
+    function abrirModalSoporteLoteRetomas() {
+        const selected = getSelectedRetomas();
+        if (selected.length === 0) {
+            alert('Por favor seleccione al menos una retoma.');
+            return;
+        }
+
+        const selectedIdsInput = document.getElementById('soporte_retomas_selected_ids');
+        const badgeCant = document.getElementById('soporte_retomas_badge_cant');
+        const listaEquipos = document.getElementById('soporte_retomas_lista_equipos');
+
+        selectedIdsInput.value = selected.map(s => s.id).join(',');
+        badgeCant.textContent = selected.length;
+
+        let html = '<ul class="list-unstyled mb-0">';
+        selected.forEach(s => {
+            html += `<li>• <strong>${s.nombre}</strong> ${s.imei ? `<span class="badge bg-light text-dark border">${s.imei}</span>` : ''}</li>`;
+        });
+        html += '</ul>';
+        listaEquipos.innerHTML = html;
+
+        const modal = new bootstrap.Modal(document.getElementById('modalSoporteLoteRetomas'));
+        modal.show();
+    }
 </script>
+
+<!-- MODAL ELIMINAR RETOMAS EN LOTE (TOKEN SECRETO) -->
+<div class="modal fade" id="modalEliminarLoteRetomas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white py-2">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Eliminación Protegida
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formEliminarRetomasLote" method="POST" action="{{ url_for('retomas_bp.eliminar_retomas_lote') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="selected_ids" id="eliminar_retomas_selected_ids" value="">
+                <div class="modal-body p-4 text-center">
+                    <div class="avatar-lg mx-auto mb-3">
+                        <div class="avatar-title bg-danger-subtle text-danger rounded-circle p-3 d-inline-block">
+                            <i class="fa-solid fa-trash-can fa-2x"></i>
+                        </div>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-2" id="eliminarRetomasTitulo">¿Eliminar retomas?</h5>
+                    <p class="text-muted small mb-3" id="eliminarRetomasDescripcion">
+                        Esta acción es irreversible y eliminará los registros de retomas.
+                    </p>
+                    
+                    <div class="alert alert-warning text-start small py-2 px-3 mb-3">
+                        <i class="fa-solid fa-key me-1"></i> <strong>Se requiere Token de Seguridad:</strong> Ingrese el código de autorización para proceder con la eliminación.
+                    </div>
+
+                    <div class="text-start mb-2">
+                        <label class="form-label small fw-bold text-secondary">Token Secreto de Eliminación:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fa-solid fa-lock text-muted"></i></span>
+                            <input type="password" name="token_secreto" id="inputTokenSecretoRetomas" class="form-control" placeholder="Ingrese token secreto" required autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-trash-can me-1"></i> Confirmar Eliminación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL ENVIAR A SOPORTE TÉCNICO EN LOTE PARA RETOMAS -->
+<div class="modal fade" id="modalSoporteLoteRetomas" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark py-2">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-screwdriver-wrench me-2"></i> Enviar Retomas a Soporte Técnico
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('retomas_bp.enviar_soporte_lote') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="selected_ids" id="soporte_retomas_selected_ids" value="">
+                <div class="modal-body p-4">
+                    <div class="alert alert-light border small mb-3 py-2">
+                        <div class="d-flex align-items-center mb-1">
+                            <i class="fa-solid fa-recycle text-warning me-2 fs-5"></i>
+                            <span class="fw-bold">Equipos de Retoma seleccionados: <span class="badge bg-primary" id="soporte_retomas_badge_cant">0</span></span>
+                        </div>
+                        <div id="soporte_retomas_lista_equipos" class="small text-muted text-truncate" style="max-height: 80px; overflow-y: auto;"></div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark">Asesor Responsable *</label>
+                            <select name="asesor_id" class="form-select form-select-sm" required>
+                                <option value="">-- Seleccionar Asesor --</option>
+                                {% if asesores_disponibles %}
+                                    {% for asr in asesores_disponibles %}
+                                    <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark">Técnico Asignado *</label>
+                            <select name="technician_id" class="form-select form-select-sm" required>
+                                <option value="">-- Seleccionar Técnico --</option>
+                                {% if tecnicos_disponibles %}
+                                    {% for tec in tecnicos_disponibles %}
+                                    <option value="{{ tec.id }}">{{ tec.nombre }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Tipo de Arreglo / Servicio</label>
+                        <select name="tipo_arreglo" class="form-select form-select-sm" required onchange="toggleTipoArregloOtroRetoma(this)">
+                            <option value="Revisión General / Diagnóstico">Revisión General / Diagnóstico</option>
+                            <option value="Cambio de Pantalla">Cambio de Pantalla</option>
+                            <option value="Cambio de Batería">Cambio de Batería</option>
+                            <option value="Flex Batería">Flex Batería</option>
+                            <option value="Mantenimiento / Limpieza">Mantenimiento / Limpieza</option>
+                            <option value="Puerto de Carga">Puerto de Carga</option>
+                            <option value="Micrófono / Altavoz">Micrófono / Altavoz</option>
+                            <option value="Cámara / Lente">Cámara / Lente</option>
+                            <option value="Placa / Microelectrónica">Placa / Microelectrónica</option>
+                            <option value="Liberación / Software">Liberación / Software</option>
+                            <option value="Otro">Otro (Especificar)</option>
+                        </select>
+                        <div class="mt-2" id="otro_tipo_lote_retoma" style="display: none;">
+                            <input type="text" name="tipo_arreglo_otro" class="form-control form-control-sm" placeholder="Especifique el tipo de arreglo...">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Motivo de Falla / Diagnóstico Inicial</label>
+                        <textarea name="motivo_falla" class="form-control form-control-sm" rows="2" placeholder="Detalle la falla presentada por los equipos..." required></textarea>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-dark">Fecha de Entrega (Opcional)</label>
+                        <input type="date" name="fecha_estimada" class="form-control form-control-sm">
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-paper-plane me-1"></i> Enviar a Soporte
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -144,7 +144,12 @@
                                 <span>{{ c.partner.nombre if c.partner else 'Tercero' }}</span>
                             </div>
                             {% if c.partner and c.partner.contacto %}
-                                <small class="text-muted font-mono"><i class="fa-brands fa-whatsapp text-success me-1"></i>{{ c.partner.contacto }}</small>
+                                <small class="text-muted font-mono d-block"><i class="fa-brands fa-whatsapp text-success me-1"></i>{{ c.partner.contacto }}</small>
+                            {% endif %}
+                            {% if c.asesor %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 mt-1" style="font-size: 0.72rem;">
+                                    <i class="fa-solid fa-user-tie me-1"></i>{{ c.asesor.nombre }}
+                                </span>
                             {% endif %}
                         </td>
 
@@ -247,26 +252,61 @@
                                         <div class="row g-2 mb-3">
                                             <div class="col-md-4">
                                                 <label class="form-label small fw-bold text-muted">Marca *</label>
-                                                <select name="marca_entrada" class="form-select form-select-sm" required>
+                                                <select name="marca_entrada" id="cambio_marca_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="actualizarModelosCambio('{{ c.id }}', this.value)" required>
+                                                    <option value="">-- Seleccione Marca --</option>
                                                     <option value="Apple" selected>Apple</option>
                                                     <option value="Samsung">Samsung</option>
-                                                    <option value="Ray-Ban Meta">Ray-Ban Meta</option>
-                                                    <option value="Xiaomi">Xiaomi</option>
+                                                    <option value="Meta">Meta</option>
+                                                    <option value="Android">Android (Xiaomi / Otros)</option>
                                                     <option value="Motorola">Motorola</option>
-                                                    <option value="Otra">Otra</option>
+                                                    <option value="Huawei">Huawei</option>
+                                                    <option value="Honor">Honor</option>
+                                                    <option value="OPPO">OPPO</option>
+                                                    <option value="Infinix">Infinix</option>
+                                                    <option value="Tecno">Tecno</option>
+                                                    <option value="Otro">Otro / Otra Marca</option>
                                                 </select>
                                             </div>
-                                            <div class="col-md-5">
+                                            <div class="col-md-4">
                                                 <label class="form-label small fw-bold text-muted">Modelo / Referencia *</label>
-                                                <input type="text" name="modelo_entrada" class="form-control form-control-sm" placeholder="Ej: iPhone 16 Pro Dorado" required>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <label class="form-label small fw-bold text-muted">Color</label>
-                                                <input type="text" name="color_entrada" class="form-control form-control-sm" placeholder="Ej: Dorado, Negro">
+                                                <select name="modelo_entrada" id="cambio_modelo_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="actualizarColoresCambio('{{ c.id }}', this.value)" required>
+                                                    <option value="">-- Primero elija Marca --</option>
+                                                </select>
+                                                <input type="text" name="modelo_entrada_custom" id="cambio_modelo_custom_{{ c.id }}" class="form-control form-control-sm mt-1" placeholder="Escriba el modelo si es 'Otro'" style="display:none;" oninput="syncCustomModeloCambio('{{ c.id }}', this.value)">
                                             </div>
                                             <div class="col-md-4">
-                                                <label class="form-label small fw-bold text-muted">Capacidad / Memoria</label>
-                                                <input type="text" name="memoria_entrada" class="form-control form-control-sm" placeholder="Ej: 128GB, 256GB">
+                                                <label class="form-label small fw-bold text-muted">Capacidad / RAM</label>
+                                                <div class="input-group input-group-sm">
+                                                    <select name="memoria_entrada" id="cambio_memoria_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="toggleManualInputCambio('{{ c.id }}', this, 'cambio_memoria_custom_{{ c.id }}')">
+                                                        <option value="">-- Seleccionar --</option>
+                                                        <option value="N/A">N/A (No Aplica)</option>
+                                                        <option value="64GB">64GB</option>
+                                                        <option value="128GB">128GB</option>
+                                                        <option value="256GB">256GB</option>
+                                                        <option value="512GB">512GB</option>
+                                                        <option value="1T">1T</option>
+                                                        <option value="2T">2T</option>
+                                                        <option value="__OTRO__">✍️ Escribir otro...</option>
+                                                    </select>
+                                                    <input type="text" id="cambio_memoria_custom_{{ c.id }}" class="form-control form-control-sm d-none" placeholder="Escriba capacidad..." oninput="syncManualValueCambio('cambio_memoria_{{ c.id }}', this.value)">
+                                                    <button type="button" id="btn_cancel_memoria_{{ c.id }}" class="btn btn-outline-secondary d-none" onclick="cancelManualInputCambio('cambio_memoria_{{ c.id }}', 'cambio_memoria_custom_{{ c.id }}')" title="Volver a lista">
+                                                        <i class="fa-solid fa-rotate-left"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Color</label>
+                                                <div class="input-group input-group-sm">
+                                                    <select name="color_entrada" id="cambio_color_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="toggleManualInputCambio('{{ c.id }}', this, 'cambio_color_custom_{{ c.id }}')">
+                                                        <option value="">-- Primero elija Referencia --</option>
+                                                        <option value="N/A">N/A (No Aplica)</option>
+                                                        <option value="__OTRO__">✍️ Escribir otro...</option>
+                                                    </select>
+                                                    <input type="text" id="cambio_color_custom_{{ c.id }}" class="form-control form-control-sm d-none" placeholder="Escriba color..." oninput="syncManualValueCambio('cambio_color_{{ c.id }}', this.value)">
+                                                    <button type="button" id="btn_cancel_color_{{ c.id }}" class="btn btn-outline-secondary d-none" onclick="cancelManualInputCambio('cambio_color_{{ c.id }}', 'cambio_color_custom_{{ c.id }}')" title="Volver a lista">
+                                                        <i class="fa-solid fa-rotate-left"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="form-label small fw-bold text-muted">Batería (%)</label>
@@ -313,8 +353,17 @@
                                                     <input type="number" step="1000" name="precio_sugerido_entrada" class="form-control" placeholder="0" required>
                                                 </div>
                                             </div>
-                                            <div class="col-md-12 mt-2">
-                                                <label class="form-label small fw-bold text-muted">Sucursal / Bodega donde se alojará este equipo *</label>
+                                            <div class="col-md-6 mt-2">
+                                                <label class="form-label small fw-bold text-muted">Asesor Responsable *</label>
+                                                <select name="asesor_id" class="form-select form-select-sm" required>
+                                                    <option value="">-- Seleccionar Asesor --</option>
+                                                    {% for asr in asesores %}
+                                                    <option value="{{ asr.id }}" {% if c.asesor_id == asr.id %}selected{% endif %}>{{ asr.nombre }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6 mt-2">
+                                                <label class="form-label small fw-bold text-muted">Sucursal / Bodega donde se alojará *</label>
                                                 <select name="branch_id" class="form-select form-select-sm">
                                                     {% for b in sucursales %}
                                                     <option value="{{ b.id }}" {% if c.branch_id == b.id %}selected{% endif %}>
@@ -474,5 +523,423 @@
         </div>
     </div>
 </div>
+
+<!-- SCRIPTS CATALOGO Y LISTAS DESPLEGABLES INTELIGENTES PARA CAMBIOS -->
+<script>
+const CATALOGO_MAESTRO_MODELOS = {
+    'Apple': [
+        {
+            categoria: 'iPhones Serie 11',
+            modelos: ['iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 12',
+            modelos: ['iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 13',
+            modelos: ['iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 14',
+            modelos: ['iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 15',
+            modelos: ['iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 16',
+            modelos: ['iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 17',
+            modelos: ['iPhone 17', 'iPhone 17 Air', 'iPhone 17 Pro', 'iPhone 17 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 18',
+            modelos: ['iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Duo', 'iPhone 18 Pro', 'iPhone 18 Pro Max']
+        },
+        {
+            categoria: 'MacBooks',
+            modelos: ['MacBook Air M5', 'MacBook Neo', 'MacBook Pro M5', 'MacBook Pro M5 Pro', 'MacBook Pro M5 Max']
+        },
+        {
+            categoria: 'Apple Watch',
+            modelos: ['Apple Watch Serie 11 (42mm)', 'Apple Watch Serie 11 (46mm)', 'Apple Watch Ultra 3 (49mm)']
+        },
+        {
+            categoria: 'AirPods',
+            modelos: ['AirPods Serie 4 (AirPods 4)', 'AirPods Serie 5 (AirPods 5)', 'AirPods Pro 3', 'AirPods Pro 2da Generación (USB-C)', 'AirPods Max (Lightning)', 'AirPods Max (USB-C)']
+        },
+        {
+            categoria: 'iPads',
+            modelos: ['iPad 10ma Gen (A16 Bionic)', 'iPad 11na Gen', 'iPad Mini 6', 'iPad Mini 7', 'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)', 'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)', 'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)']
+        }
+    ],
+    'Samsung': [
+        {
+            categoria: 'Samsung Galaxy Serie S (S24, S25, S26)',
+            modelos: [
+                'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+                'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+                'Galaxy S26', 'Galaxy S26 Plus', 'Galaxy S26 Ultra',
+                'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
+                'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
+                'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra',
+                'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
+                'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
+            ]
+        }
+    ],
+    'Meta': [
+        {
+            categoria: 'Ray-Ban Meta Smart Glasses',
+            modelos: [
+                'Ray-Ban Meta Wayfarer (Standard)',
+                'Ray-Ban Meta Wayfarer (Large)',
+                'Ray-Ban Meta Headliner',
+                'Ray-Ban Meta Skyler'
+            ]
+        },
+        {
+            categoria: 'Oakley Meta Smart Glasses',
+            modelos: [
+                'Oakley Meta Performance Edition',
+                'Oakley Meta Radar EV Edition',
+                'Oakley Meta Holbrook Smart'
+            ]
+        }
+    ],
+    'Android': [
+        {
+            categoria: 'Xiaomi Serie 15 / 14 (Gama Alta)',
+            modelos: [
+                'Xiaomi 15 Ultra',
+                'Xiaomi 15 Pro',
+                'Xiaomi 15',
+                'Xiaomi 14 Ultra',
+                'Xiaomi 14T Pro',
+                'Xiaomi 14T',
+                'Xiaomi MIX Flip'
+            ]
+        },
+        {
+            categoria: 'POCO Serie F & X',
+            modelos: [
+                'POCO F7 Pro',
+                'POCO F7',
+                'POCO F6 Pro',
+                'POCO F6',
+                'POCO X7 Pro',
+                'POCO X6 Pro'
+            ]
+        },
+        {
+            categoria: 'Redmi Note Serie 14 / 13',
+            modelos: [
+                'Redmi Note 14 Pro+ 5G',
+                'Redmi Note 14 Pro 5G',
+                'Redmi Note 14 5G',
+                'Redmi Note 13 Pro+ 5G',
+                'Redmi Note 13 Pro 4G/5G',
+                'Redmi 14C',
+                'Redmi 13C'
+            ]
+        }
+    ],
+    'Motorola': [
+        {
+            categoria: 'Motorola Moto G & Edge',
+            modelos: [
+                'Moto G54', 'Moto G84', 'Moto G24', 'Moto G04', 'Edge 40', 'Edge 40 Neo', 'Edge 50 Pro', 'Edge 50 Ultra', 'Razr 40 Ultra', 'Razr 50 Ultra'
+            ]
+        }
+    ],
+    'Huawei': [
+        {
+            categoria: 'Huawei Pura & Nova',
+            modelos: [
+                'Huawei Pura 70 Ultra', 'Huawei Pura 70 Pro', 'Huawei Pura 70', 'Huawei Nova 12i', 'Huawei Nova 12 SE'
+            ]
+        }
+    ],
+    'Honor': [
+        {
+            categoria: 'Honor Magic & Serie X',
+            modelos: [
+                'Honor Magic 6 Pro', 'Honor Magic 6 Lite', 'Honor 200 Pro', 'Honor 200', 'Honor X8b', 'Honor X7b'
+            ]
+        }
+    ],
+    'OPPO': [
+        {
+            categoria: 'OPPO Reno & Serie A',
+            modelos: [
+                'OPPO Reno 12 Pro', 'OPPO Reno 12', 'OPPO Reno 11 F', 'OPPO A79 5G', 'OPPO A58', 'OPPO A38'
+            ]
+        }
+    ],
+    'Infinix': [
+        {
+            categoria: 'Infinix Note & Hot',
+            modelos: [
+                'Infinix Note 40 Pro', 'Infinix Note 40', 'Infinix GT 20 Pro', 'Infinix Hot 40 Pro', 'Infinix Hot 40i'
+            ]
+        }
+    ],
+    'Tecno': [
+        {
+            categoria: 'Tecno Camon & Spark',
+            modelos: [
+                'Tecno Camon 30 Premier', 'Tecno Camon 30 Pro', 'Tecno Camon 30', 'Tecno Spark 20 Pro+', 'Tecno Spark 20'
+            ]
+        }
+    ]
+};
+
+const CATALOGO_MAESTRO_COLORES = {
+    'iPhone 11': ['Negro (Black)', 'Blanco (White)', 'Verde (Green - tono menta pastel)', 'Amarillo (Yellow)', 'Morado / Malva (Purple)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 11 Pro': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+    'iPhone 11 Pro Max': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+    'iPhone 12': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 12 Mini': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 12 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+    'iPhone 12 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+    'iPhone 13': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 13 Mini': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 13 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+    'iPhone 13 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+    'iPhone 14': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 14 Plus': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 14 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+    'iPhone 14 Pro Max': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+    'iPhone 15': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+    'iPhone 15 Plus': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+    'iPhone 15 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+    'iPhone 15 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+    'iPhone 16': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+    'iPhone 16 Plus': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+    'iPhone 16 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+    'iPhone 16 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+    'iPhone 17': ['Lavanda (Lavender)', 'Verde salvia (Sage)', 'Azul neblina (Mist Blue)', 'Blanco (White)', 'Negro (Black)'],
+    'iPhone 17 Air': ['Azul cielo (Sky Blue)', 'Dorado claro (Light Gold)', 'Blanco nube (Cloud White)', 'Negro espacial (Space Black)'],
+    'iPhone 17 Pro': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+    'iPhone 17 Pro Max': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+    'iPhone 18': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+    'iPhone 18 Plus': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+    'iPhone 18 Duo': ['Blanco estelar (Starlight)', 'Cielo nocturno (Night Sky - azul oscuro)'],
+    'iPhone 18 Pro': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+    'iPhone 18 Pro Max': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+    'MacBook Air M5': ['Azul cielo (Sky Blue)', 'Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Plata (Silver)'],
+    'MacBook Neo': ['Plata (Silver)', 'Rosa nube (Cloud Pink)', 'Cítrico (Citrus)', 'Índigo (Indigo)'],
+    'MacBook Pro M5': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+    'MacBook Pro M5 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+    'MacBook Pro M5 Max': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+    'AirPods Pro 3': ['Blanco (White)'],
+    'AirPods Serie 4 (AirPods 4)': ['Blanco (White)'],
+    'AirPods Serie 5 (AirPods 5)': ['Blanco (White)'],
+    'Apple Watch Serie 11 (42mm)': [
+        'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+        'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+    ],
+    'Apple Watch Serie 11 (46mm)': [
+        'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+        'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+    ],
+    'Apple Watch Ultra 3 (49mm)': ['Titanio natural (Natural Titanium)', 'Titanio negro (Black Titanium)'],
+    'Galaxy S25 Ultra': [
+        'Titanio Negro (Titanium Black)', 'Titanio Gris (Titanium Gray)', 'Titanio Plata Azul (Titanium Silverblue)', 'Titanio Blanco Plata (Titanium Whitesilver)',
+        'Titanio Negro Intenso (Titanium Jetblack)', 'Titanio Verde Jade (Titanium Jadegreen)', 'Titanio Oro Rosa (Titanium Pinkgold)'
+    ],
+    'Galaxy S26 Ultra': [
+        'Violeta Cobalto (Cobalt Violet)', 'Azul Cielo (Sky Blue)', 'Negro (Black)', 'Blanco (White)',
+        'Gris (Gray)', 'Oro Rosa (Pink Gold)'
+    ],
+    'Ray-Ban Meta Wayfarer (Standard)': ['Negro Brillante (Shiny Black - G15)', 'Negro Mate (Matte Black - Polarized)', 'Jeans (Chalky Gray)', 'Caramel (Transitions)'],
+    'Ray-Ban Meta Wayfarer (Large)': ['Negro Brillante (Shiny Black)', 'Negro Mate (Matte Black)'],
+    'Ray-Ban Meta Headliner': ['Negro Brillante (Shiny Black)', 'Caramelo Brillante (Shiny Caramel)'],
+    'Ray-Ban Meta Skyler': ['Negro Brillante (Shiny Black)', 'Rosa Tiza (Chalky Rose)']
+};
+
+function actualizarModelosCambio(id, marca, modeloPreseleccionado = '') {
+    const sel = document.getElementById(`cambio_modelo_${id}`);
+    const customInput = document.getElementById(`cambio_modelo_custom_${id}`);
+    if (!sel) return;
+    sel.innerHTML = '';
+    if (customInput) customInput.style.display = 'none';
+
+    if (!marca) {
+        sel.innerHTML = '<option value="">-- Primero elija Marca --</option>';
+        actualizarColoresCambio(id, '');
+        return;
+    }
+
+    if (marca === 'Otro' || !CATALOGO_MAESTRO_MODELOS[marca]) {
+        sel.innerHTML = '<option value="__OTRO__">Otro Modelo (Escribir abajo)</option>';
+        if (customInput) {
+            customInput.style.display = 'block';
+            customInput.required = true;
+            customInput.value = modeloPreseleccionado || '';
+        }
+        actualizarColoresCambio(id, '');
+        return;
+    }
+
+    sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
+    CATALOGO_MAESTRO_MODELOS[marca].forEach(grp => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = grp.categoria;
+        grp.modelos.forEach(mod => {
+            const opt = document.createElement('option');
+            opt.value = mod;
+            opt.textContent = mod;
+            if (mod === modeloPreseleccionado) {
+                opt.selected = true;
+            }
+            optgroup.appendChild(opt);
+        });
+        sel.appendChild(optgroup);
+    });
+
+    const optOtro = document.createElement('option');
+    optOtro.value = '__OTRO__';
+    optOtro.textContent = '+ Otro Modelo no listado';
+    sel.appendChild(optOtro);
+
+    actualizarColoresCambio(id, sel.value);
+}
+
+function syncCustomModeloCambio(id, val) {
+    const sel = document.getElementById(`cambio_modelo_${id}`);
+    if (sel && sel.value === '__OTRO__') {
+        actualizarColoresCambio(id, val);
+    }
+}
+
+function actualizarColoresCambio(id, modelo, colorPreseleccionado = '') {
+    const sel = document.getElementById(`cambio_color_${id}`);
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    let colores = [];
+    if (modelo && CATALOGO_MAESTRO_COLORES[modelo]) {
+        colores = CATALOGO_MAESTRO_COLORES[modelo];
+    } else {
+        for (const key in CATALOGO_MAESTRO_COLORES) {
+            if (modelo && modelo.toLowerCase().includes(key.toLowerCase())) {
+                colores = CATALOGO_MAESTRO_COLORES[key];
+                break;
+            }
+        }
+    }
+
+    sel.innerHTML = '<option value="">-- Seleccionar Color --</option>';
+    sel.innerHTML += '<option value="N/A">N/A (No Aplica)</option>';
+
+    if (colores.length > 0) {
+        colores.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            if (colorPreseleccionado && (c.toLowerCase() === colorPreseleccionado.toLowerCase() || c.toLowerCase().includes(colorPreseleccionado.toLowerCase()))) {
+                opt.selected = true;
+            }
+            sel.appendChild(opt);
+        });
+    } else {
+        const todosColores = new Set();
+        for (const m in CATALOGO_MAESTRO_COLORES) {
+            CATALOGO_MAESTRO_COLORES[m].forEach(col => todosColores.add(col));
+        }
+        todosColores.forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col;
+            opt.textContent = col;
+            if (colorPreseleccionado && col.toLowerCase() === colorPreseleccionado.toLowerCase()) {
+                opt.selected = true;
+            }
+            sel.appendChild(opt);
+        });
+    }
+
+    sel.innerHTML += '<option value="__OTRO__">✍️ Escribir otro...</option>';
+}
+
+function toggleManualInputCambio(id, selectElem, inputId) {
+    const input = document.getElementById(inputId);
+    const cancelBtnId = inputId.includes('memoria') ? `btn_cancel_memoria_${id}` : `btn_cancel_color_${id}`;
+    const cancelBtn = document.getElementById(cancelBtnId);
+
+    if (selectElem.value === '__OTRO__') {
+        selectElem.classList.add('d-none');
+        if (input) {
+            input.classList.remove('d-none');
+            input.required = true;
+            input.focus();
+        }
+        if (cancelBtn) cancelBtn.classList.remove('d-none');
+    } else {
+        if (input) {
+            input.value = selectElem.value;
+            input.required = false;
+        }
+    }
+}
+
+function cancelManualInputCambio(selectId, inputId) {
+    const sel = document.getElementById(selectId);
+    const inp = document.getElementById(inputId);
+    const id = selectId.split('_').pop();
+    const cancelBtnId = inputId.includes('memoria') ? `btn_cancel_memoria_${id}` : `btn_cancel_color_${id}`;
+    const cancelBtn = document.getElementById(cancelBtnId);
+
+    if (inp) {
+        inp.classList.add('d-none');
+        inp.value = '';
+        inp.required = false;
+    }
+    if (cancelBtn) cancelBtn.classList.add('d-none');
+    if (sel) {
+        sel.classList.remove('d-none');
+        sel.value = '';
+    }
+}
+
+function syncManualValueCambio(selectId, value) {
+    // Para validación y submit de forma transparente
+}
+
+// Inicializar modales de cambios al cargar
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[id^="cambio_marca_"]').forEach(sel => {
+        const id = sel.id.replace('cambio_marca_', '');
+        if (sel.value) {
+            actualizarModelosCambio(id, sel.value);
+        }
+    });
+
+    // Control para cuando seleccionan __OTRO__ en el modelo
+    document.querySelectorAll('[id^="cambio_modelo_"]').forEach(sel => {
+        sel.addEventListener('change', function() {
+            const id = this.id.replace('cambio_modelo_', '');
+            const customInput = document.getElementById(`cambio_modelo_custom_${id}`);
+            if (this.value === '__OTRO__') {
+                if (customInput) {
+                    customInput.style.display = 'block';
+                    customInput.required = true;
+                    customInput.focus();
+                }
+            } else {
+                if (customInput) {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                    customInput.value = '';
+                }
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
 

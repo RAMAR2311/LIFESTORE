@@ -117,7 +117,7 @@
     <div class="col-lg-8 d-flex flex-column h-100">
         <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
             <div>
-                <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-store text-brand-pink me-2"></i> Caja Rápida Visual</h2>
+                <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-store text-brand-pink me-2"></i> Punto de Pago</h2>
                 {% if sucursal_actual %}
                 <small class="text-muted">
                     <i class="fa-solid fa-location-dot text-primary me-1"></i>Sede: <strong>{{ sucursal_actual.nombre }}</strong> ({{ sucursal_actual.prefijo_factura or 'FAC' }})
@@ -248,21 +248,26 @@
             {% endif %}
 
             <!-- Toggle: Pago Único vs Pago Dividido -->
-            <!-- Selector de Asesor (Obligatorio en tienda, exento en bodega) -->
-            {% if not sucursal_actual or sucursal_actual.tipo == 'tienda' %}
+            <!-- Información de Turno de Asesores (Ventas compartidas por apertura de caja) -->
+            {% if turno_activo and turno_activo.asesores_obj %}
             <div class="mb-3">
-                <label class="form-label checkout-label small mb-2"><i class="fa-solid fa-user-tie me-1"></i> Asesor de Venta</label>
-                <select id="asesor-vendedor" class="form-select form-select-lg pos-select shadow-sm" required style="cursor: pointer;">
-                    <option value="" disabled selected>-- Seleccionar Asesor --</option>
-                    {% for a in asesores %}
-                        <option value="{{ a.id }}">{{ a.nombre }}</option>
-                    {% endfor %}
-                </select>
+                <div class="p-2 px-3 rounded border text-light small shadow-sm" style="background: rgba(13, 110, 253, 0.12); border-color: rgba(13, 110, 253, 0.3) !important;">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="text-info fw-bold"><i class="fa-solid fa-users me-1"></i> Asesores de Turno</span>
+                        <span class="badge bg-info text-dark rounded-pill">{{ turno_activo.asesores_obj|length }} activo(s)</span>
+                    </div>
+                    <div class="text-truncate text-muted small" title="{{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}">
+                        {{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}
+                    </div>
+                    <div class="extra-small text-secondary mt-1">
+                        * Las comisiones de este turno se dividen equitativamente entre los asesores registrados al abrir caja.
+                    </div>
+                </div>
             </div>
-            {% else %}
+            {% elif sucursal_actual and sucursal_actual.tipo == 'bodega' %}
             <div class="mb-3">
                 <div class="p-2 px-3 rounded border text-muted small" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
-                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de selección de asesores</strong>
+                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de turnos y comisiones</strong>
                 </div>
             </div>
             {% endif %}
@@ -304,8 +309,21 @@
                         </select>
                     </div>
                     <div>
-                        <label class="form-label extra-small fw-bold checkout-label mb-1">Comprobante / Soporte Transacción <span class="text-danger">*</span></label>
-                        <input type="text" id="abono_comprobante_unico" class="form-control form-control-sm pos-input" placeholder="Ej: Transf. Nequi #849302 / Ref. Bancolombia">
+                        <label class="form-label extra-small fw-bold checkout-label mb-1">Comprobante / Imagen de Soporte <span class="text-danger">*</span></label>
+                        <input type="hidden" id="abono_comprobante_unico" value="">
+                        
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex gap-2">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_btn_upload_unico">Cargar Imagen Comprobante</span>
+                                    <input type="file" id="file_comprobante_unico" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobante(this, 'abono_comprobante_unico', 'label_btn_upload_unico', 'preview_comprobante_unico')">
+                                </label>
+                            </div>
+                            <div id="preview_comprobante_unico" class="small text-truncate text-success fw-bold" style="display: none;">
+                                <i class="fa-solid fa-circle-check me-1"></i> <span id="nombre_archivo_unico"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -377,12 +395,12 @@
                 <div class="row mb-3">
                     <div class="col-md-4 mb-2">
                         <label class="form-label small fw-bold">Marca *</label>
-                        <select id="retoma_marca" class="form-select bg-light fw-semibold" onchange="actualizarModelosRetoma(this.value)">
+                        <select id="retoma_marca" class="form-select bg-light fw-semibold" onchange="actualizarModelosRetoma(this.value)" required>
                             <option value="">-- Seleccione Marca --</option>
                             <option value="Apple">Apple</option>
                             <option value="Samsung">Samsung</option>
-                            <option value="Ray-Ban Meta">Ray-Ban Meta</option>
-                            <option value="Xiaomi">Xiaomi</option>
+                            <option value="Meta">Meta</option>
+                            <option value="Android">Android (Xiaomi / Otros)</option>
                             <option value="Motorola">Motorola</option>
                             <option value="Huawei">Huawei</option>
                             <option value="Honor">Honor</option>
@@ -394,32 +412,51 @@
                     </div>
                     <div class="col-md-4 mb-2">
                         <label class="form-label small fw-bold">Referencia / Modelo *</label>
-                        <select id="retoma_modelo" class="form-select bg-light fw-semibold" required>
+                        <select id="retoma_modelo" class="form-select bg-light fw-semibold" onchange="actualizarColoresRetoma(this.value)" required>
                             <option value="">-- Primero elija Marca --</option>
                         </select>
                         <input type="text" id="retoma_modelo_custom" class="form-control bg-light mt-1" placeholder="Escriba el modelo si es 'Otro'" style="display:none;">
                     </div>
                     <div class="col-md-4 mb-2">
-                        <label class="form-label small fw-bold">Capacidad (Memoria)</label>
-                        <select id="retoma_memoria" class="form-select bg-light">
-                            <option value="">-- Seleccionar --</option>
-                            <option value="64GB">64GB</option>
-                            <option value="128GB">128GB</option>
-                            <option value="256GB">256GB</option>
-                            <option value="512GB">512GB</option>
-                            <option value="1TB">1TB</option>
-                        </select>
+                        <label class="form-label small fw-bold">Capacidad / RAM</label>
+                        <div class="input-group">
+                            <select id="retoma_memoria" class="form-select bg-light fw-semibold" onchange="toggleManualInputGenerico(this, 'retoma_memoria_custom')">
+                                <option value="">-- Seleccionar --</option>
+                                <option value="N/A">N/A (No Aplica)</option>
+                                <option value="64GB">64GB</option>
+                                <option value="128GB">128GB</option>
+                                <option value="256GB">256GB</option>
+                                <option value="512GB">512GB</option>
+                                <option value="1T">1T</option>
+                                <option value="2T">2T</option>
+                                <option value="__OTRO__">✍️ Escribir otro...</option>
+                            </select>
+                            <input type="text" id="retoma_memoria_custom" class="form-control bg-light d-none" placeholder="Escriba capacidad...">
+                            <button type="button" id="btn_cancel_retoma_memoria_custom" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('retoma_memoria', 'retoma_memoria_custom')" title="Volver a lista">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <!-- Fila 2: Color, Batería -->
                 <div class="row mb-3">
                     <div class="col-md-6 mb-2">
                         <label class="form-label small fw-bold">Color</label>
-                        <input type="text" id="retoma_color" class="form-control bg-light" placeholder="Ej: Negro">
+                        <div class="input-group">
+                            <select id="retoma_color" class="form-select bg-light fw-semibold" onchange="toggleManualInputGenerico(this, 'retoma_color_custom')">
+                                <option value="">-- Primero elija Referencia --</option>
+                                <option value="N/A">N/A (No Aplica)</option>
+                                <option value="__OTRO__">✍️ Escribir otro...</option>
+                            </select>
+                            <input type="text" id="retoma_color_custom" class="form-control bg-light d-none" placeholder="Escriba color...">
+                            <button type="button" id="btn_cancel_retoma_color_custom" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('retoma_color', 'retoma_color_custom')" title="Volver a lista">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="col-md-6 mb-2">
                         <label class="form-label small fw-bold">Batería (%)</label>
-                        <input type="text" id="retoma_bateria" class="form-control bg-light" placeholder="Ej: 85">
+                        <input type="text" id="retoma_bateria" class="form-control bg-light" placeholder="Ej: 85% o N/A">
                     </div>
                 </div>
                 <!-- Fila 3: IMEI 1, IMEI 2 -->
@@ -532,25 +569,55 @@
                                 <option value="">-- Seleccione Marca --</option>
                                 <option value="Apple">Apple</option>
                                 <option value="Samsung">Samsung</option>
+                                <option value="Meta">Meta</option>
+                                <option value="Android">Android (Xiaomi / Otros)</option>
+                                <option value="Otro">Otro / Otra Marca</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-2">
                             <label class="form-label small fw-bold">Referencia (Modelo)</label>
-                            <select name="modelo_celular" id="ext_modelo_visual" class="form-select fw-semibold" required>
+                            <select name="modelo_celular" id="ext_modelo_visual" class="form-select fw-semibold" onchange="actualizarColoresExternoVisual(this.value)" required>
                                 <option value="">-- Primero elige Marca --</option>
                             </select>
+                            <input type="text" id="ext_modelo_custom" class="form-control mt-1 d-none" placeholder="Escriba el modelo...">
                         </div>
                         <div class="col-md-4 mb-2">
-                            <label class="form-label small fw-bold">Capacidad</label>
-                            <input type="text" name="memoria" class="form-control" required>
+                            <label class="form-label small fw-bold">Capacidad / RAM</label>
+                            <div class="input-group">
+                                <select name="memoria" id="ext_memoria_visual" class="form-select fw-semibold" onchange="toggleManualInputGenerico(this, 'ext_memoria_manual')">
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="N/A">N/A (No Aplica)</option>
+                                    <option value="64GB">64GB</option>
+                                    <option value="128GB">128GB</option>
+                                    <option value="256GB">256GB</option>
+                                    <option value="512GB">512GB</option>
+                                    <option value="1T">1T</option>
+                                    <option value="2T">2T</option>
+                                    <option value="__OTRO__">✍️ Escribir otro...</option>
+                                </select>
+                                <input type="text" id="ext_memoria_manual" class="form-control d-none" placeholder="Escriba capacidad...">
+                                <button type="button" id="btn_cancel_ext_memoria_manual" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('ext_memoria_visual', 'ext_memoria_manual')" title="Volver a lista">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-md-4 mb-2">
                             <label class="form-label small fw-bold">Color</label>
-                            <input type="text" name="color" class="form-control">
+                            <div class="input-group">
+                                <select name="color" id="ext_color_visual" class="form-select fw-semibold" onchange="toggleManualInputGenerico(this, 'ext_color_manual')">
+                                    <option value="">-- Primero elige Referencia --</option>
+                                    <option value="N/A">N/A (No Aplica)</option>
+                                    <option value="__OTRO__">✍️ Escribir otro...</option>
+                                </select>
+                                <input type="text" id="ext_color_manual" class="form-control d-none" placeholder="Escriba color...">
+                                <button type="button" id="btn_cancel_ext_color_manual" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('ext_color_visual', 'ext_color_manual')" title="Volver a lista">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="col-md-4 mb-2">
                             <label class="form-label small fw-bold">Batería (%)</label>
-                            <input type="text" name="bateria" class="form-control">
+                            <input type="text" name="bateria" class="form-control" placeholder="Ej: 85% o N/A">
                         </div>
                         <div class="col-md-4 mb-2">
                             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -730,6 +797,76 @@
         }
     }
 
+    async function subirImagenComprobante(fileInput, hiddenInputId, labelBtnId, previewId) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(labelBtnId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+        const preview = document.getElementById(previewId);
+        const nombreArchivoSpan = document.getElementById('nombre_archivo_unico');
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo imagen...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf_token
+                },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                if (hiddenInput) hiddenInput.value = data.relative_path || data.filename;
+                if (label) label.textContent = 'Comprobante Listo';
+                if (preview) preview.style.display = 'block';
+                if (nombreArchivoSpan) nombreArchivoSpan.textContent = file.name;
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Cargar Imagen Comprobante';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen del comprobante.');
+            if (label) label.textContent = 'Cargar Imagen Comprobante';
+        }
+    }
+
+    async function subirImagenComprobanteMixto(fileInput, index) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(`label_upload_mixto_${index}`);
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf_token
+                },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                actualizarPagoParcial(index, 'comprobante', data.relative_path || data.filename);
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Cargar Imagen';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen.');
+            if (label) label.textContent = 'Cargar Imagen';
+        }
+    }
+
     function formatoCOP(valor) {
         return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor);
     }
@@ -838,7 +975,7 @@
     }
 
     function updateCartItemPrice(index, newPrice) {
-        let val = parseFloat(newPrice);
+        let val = parseFloat(String(newPrice).replace(/\D/g, ''));
         if (isNaN(val) || val < 0) val = 0;
         carrito[index].precio_final = val;
         renderCart();
@@ -931,7 +1068,7 @@
                     </div>
                     <div class="input-group input-group-sm flex-grow-1" style="max-width: 140px;">
                         <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.75rem;">$</span>
-                        <input type="number" class="form-control pos-input text-end fw-bold border-0 px-2 text-brand-black" value="${Math.round(item.precio_final)}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
+                        <input type="text" inputmode="numeric" class="form-control pos-input text-end fw-bold border-0 px-2 text-brand-black format-price-ext" value="${Math.round(item.precio_final).toLocaleString('es-CO')}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
                     </div>
                 </div>
             `;
@@ -1114,9 +1251,14 @@
                                 </select>
                             </div>
                             <div class="col-sm-6">
-                                <label class="extra-small fw-bold checkout-label mb-1 d-block">Soporte / Comprobante *</label>
-                                <input type="text" class="form-control form-control-sm pos-input" placeholder="Ej: Transf. Nequi #849302" 
-                                       value="${pago.comprobante || ''}" oninput="actualizarPagoParcial(${index}, 'comprobante', this.value)">
+                                <label class="extra-small fw-bold checkout-label mb-1 d-block">Imagen Comprobante *</label>
+                                <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Cargar Imagen'}</span>
+                                    <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                </label>
+                                ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1241,10 +1383,51 @@
         procesarPagoGlobal(datosCliente);
     }
 
-    const CATALOGO_RETOMAS = {
+    // Funciones genéricas para inputs de escritura manual libre / regreso a select
+    function toggleManualInputGenerico(selectElem, inputId) {
+        if (!selectElem) return;
+        const inputElem = document.getElementById(inputId);
+        const btnCancel = document.getElementById(`btn_cancel_${inputId}`);
+        if (selectElem.value === '__OTRO__') {
+            selectElem.classList.add('d-none');
+            if (inputElem) {
+                inputElem.classList.remove('d-none');
+                if (selectElem.name) {
+                    inputElem.name = selectElem.name;
+                    selectElem.removeAttribute('name');
+                }
+                inputElem.value = '';
+                inputElem.focus();
+            }
+            if (btnCancel) btnCancel.classList.remove('d-none');
+        }
+    }
+
+    function cancelManualInputGenerico(selectId, inputId) {
+        const selectElem = document.getElementById(selectId);
+        const inputElem = document.getElementById(inputId);
+        const btnCancel = document.getElementById(`btn_cancel_${inputId}`);
+        if (selectElem && inputElem) {
+            inputElem.classList.add('d-none');
+            inputElem.value = '';
+
+            selectElem.classList.remove('d-none');
+            if (selectId.includes('memoria')) {
+                selectElem.name = 'memoria';
+            } else if (selectId.includes('color')) {
+                selectElem.name = 'color';
+            }
+            inputElem.removeAttribute('name');
+            selectElem.value = '';
+        }
+        if (btnCancel) btnCancel.classList.add('d-none');
+    }
+
+    // Catálogo Maestro Unificado de Modelos
+    const CATALOGO_MAESTRO_MODELOS = {
         'Apple': [
             {
-                categoria: 'iPhones (11 al 18 Pro Max)',
+                categoria: 'iPhones (11 al 18 Duo / Pro Max)',
                 modelos: [
                     'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
                     'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
@@ -1252,72 +1435,123 @@
                     'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
                     'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
                     'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
-                    'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
-                    'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                    'iPhone 17', 'iPhone 17 Air', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+                    'iPhone 18', 'iPhone 18 Duo', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                ]
+            },
+            {
+                categoria: 'Apple Watch',
+                modelos: [
+                    'Apple Watch Serie 11 (42mm)',
+                    'Apple Watch Serie 11 (46mm)',
+                    'Apple Watch Ultra 3 (49mm)'
+                ]
+            },
+            {
+                categoria: 'MacBook (Air, Pro, Neo)',
+                modelos: [
+                    'MacBook Neo',
+                    'MacBook Air M5',
+                    'MacBook Pro M5',
+                    'MacBook Pro M5 Pro',
+                    'MacBook Pro M5 Max',
+                    'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
+                    'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
+                    'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
+                    'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)'
+                ]
+            },
+            {
+                categoria: 'AirPods',
+                modelos: [
+                    'AirPods Serie 4 (AirPods 4)',
+                    'AirPods Serie 5 (AirPods 5)',
+                    'AirPods Pro 3',
+                    'AirPods Pro 2da Generación (USB-C)',
+                    'AirPods Max (Lightning)',
+                    'AirPods Max (USB-C)'
                 ]
             },
             {
                 categoria: 'iPads (A16, Air, Pro)',
                 modelos: [
-                    'iPad 10ma Gen (A16 Bionic)', 'iPad 11na Gen', 'iPad Mini 6', 'iPad Mini 7',
+                    'iPad 10ma Gen (A16 Bionic)',
+                    'iPad 11na Gen',
+                    'iPad Mini 6', 'iPad Mini 7',
                     'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
-                    'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)', 'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
-                ]
-            },
-            {
-                categoria: 'MacBook (Air, Pro)',
-                modelos: [
-                    'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)', 'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
-                    'MacBook Pro 14" (M1/M2/M3)', 'MacBook Pro 16" (M1/M2/M3)', 'MacBook Pro 14" (M4)', 'MacBook Pro 16" (M4)'
-                ]
-            },
-            {
-                categoria: 'AirPods & Apple Watch',
-                modelos: [
-                    'AirPods 3ra Gen', 'AirPods 4ta Gen', 'AirPods 4ta Gen ANC', 'AirPods Pro 2 USB-C', 'AirPods Max',
-                    'Apple Watch SE', 'Apple Watch Series 8', 'Apple Watch Series 9', 'Apple Watch Series 10', 'Apple Watch Ultra 2'
+                    'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)',
+                    'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
                 ]
             }
         ],
         'Samsung': [
             {
-                categoria: 'Samsung Galaxy Serie S & Z',
+                categoria: 'Samsung Galaxy Serie S (S24, S25, S26)',
                 modelos: [
-                    'Galaxy S21', 'Galaxy S21 Ultra', 'Galaxy S22', 'Galaxy S22 Ultra',
-                    'Galaxy S23', 'Galaxy S23 Plus', 'Galaxy S23 Ultra', 'Galaxy S23 FE',
                     'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
                     'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
-                    'Galaxy Z Fold 4', 'Galaxy Z Flip 4', 'Galaxy Z Fold 5', 'Galaxy Z Flip 5',
-                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6', 'Galaxy Z Fold 7', 'Galaxy Z Flip 7'
-                ]
-            },
-            {
-                categoria: 'Samsung Galaxy Serie A & Tablets',
-                modelos: [
-                    'Galaxy A15', 'Galaxy A25', 'Galaxy A35', 'Galaxy A55', 'Galaxy A54', 'Galaxy A34',
-                    'Galaxy Tab S9', 'Galaxy Tab S9 FE', 'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra'
+                    'Galaxy S26', 'Galaxy S26 Plus', 'Galaxy S26 Ultra',
+                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
+                    'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
+                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra',
+                    'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
+                    'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
                 ]
             }
         ],
-        'Ray-Ban Meta': [
+        'Meta': [
             {
-                categoria: 'Gafas Inteligentes Ray-Ban Meta',
+                categoria: 'Ray-Ban Meta Smart Glasses',
                 modelos: [
                     'Ray-Ban Meta Wayfarer (Standard)',
                     'Ray-Ban Meta Wayfarer (Large)',
                     'Ray-Ban Meta Headliner',
-                    'Ray-Ban Meta Skyler',
-                    'Ray-Ban Meta Transitions',
-                    'Ray-Ban Meta Polarized'
+                    'Ray-Ban Meta Skyler'
+                ]
+            },
+            {
+                categoria: 'Oakley Meta Smart Glasses',
+                modelos: [
+                    'Oakley Meta Performance Edition',
+                    'Oakley Meta Radar EV Edition',
+                    'Oakley Meta Holbrook Smart'
                 ]
             }
         ],
-        'Xiaomi': [
+        'Android': [
             {
-                categoria: 'Xiaomi & Redmi',
+                categoria: 'Xiaomi Serie 15 / 14 (Gama Alta)',
                 modelos: [
-                    'Redmi Note 12', 'Redmi Note 12 Pro', 'Redmi Note 13', 'Redmi Note 13 Pro', 'Redmi Note 13 Pro+',
-                    'Redmi 13C', 'Redmi 14C', 'Xiaomi 13T', 'Xiaomi 13T Pro', 'Xiaomi 14', 'Xiaomi 14 Ultra', 'Poco X6 Pro', 'Poco F6'
+                    'Xiaomi 15 Ultra',
+                    'Xiaomi 15 Pro',
+                    'Xiaomi 15',
+                    'Xiaomi 14 Ultra',
+                    'Xiaomi 14T Pro',
+                    'Xiaomi 14T',
+                    'Xiaomi MIX Flip'
+                ]
+            },
+            {
+                categoria: 'POCO Serie F & X',
+                modelos: [
+                    'POCO F7 Pro',
+                    'POCO F7',
+                    'POCO F6 Pro',
+                    'POCO F6',
+                    'POCO X7 Pro',
+                    'POCO X6 Pro'
+                ]
+            },
+            {
+                categoria: 'Redmi Note Serie 14 / 13',
+                modelos: [
+                    'Redmi Note 14 Pro+ 5G',
+                    'Redmi Note 14 Pro 5G',
+                    'Redmi Note 14 5G',
+                    'Redmi Note 13 Pro+ 5G',
+                    'Redmi Note 13 Pro 4G/5G',
+                    'Redmi 14C',
+                    'Redmi 13C'
                 ]
             }
         ],
@@ -1328,10 +1562,201 @@
                     'Moto G54', 'Moto G84', 'Moto G24', 'Moto G04', 'Edge 40', 'Edge 40 Neo', 'Edge 50 Pro', 'Edge 50 Ultra', 'Razr 40 Ultra', 'Razr 50 Ultra'
                 ]
             }
+        ],
+        'Huawei': [
+            {
+                categoria: 'Huawei Pura & Nova',
+                modelos: [
+                    'Huawei Pura 70 Ultra', 'Huawei Pura 70 Pro', 'Huawei Pura 70', 'Huawei Nova 12i', 'Huawei Nova 12 SE'
+                ]
+            }
+        ],
+        'Honor': [
+            {
+                categoria: 'Honor Magic & Serie X',
+                modelos: [
+                    'Honor Magic 6 Pro', 'Honor Magic 6 Lite', 'Honor 200 Pro', 'Honor 200', 'Honor X8b', 'Honor X7b'
+                ]
+            }
+        ],
+        'OPPO': [
+            {
+                categoria: 'OPPO Reno & Serie A',
+                modelos: [
+                    'OPPO Reno 12 Pro', 'OPPO Reno 12', 'OPPO Reno 11 F', 'OPPO A79 5G', 'OPPO A58', 'OPPO A38'
+                ]
+            }
+        ],
+        'Infinix': [
+            {
+                categoria: 'Infinix Note & Hot',
+                modelos: [
+                    'Infinix Note 40 Pro', 'Infinix Note 40', 'Infinix GT 20 Pro', 'Infinix Hot 40 Pro', 'Infinix Hot 40i'
+                ]
+            }
+        ],
+        'Tecno': [
+            {
+                categoria: 'Tecno Camon & Spark',
+                modelos: [
+                    'Tecno Camon 30 Premier', 'Tecno Camon 30 Pro', 'Tecno Camon 30', 'Tecno Spark 20 Pro+', 'Tecno Spark 20'
+                ]
+            }
         ]
     };
 
-    function actualizarModelosRetoma(marca, modeloPreseleccionado = '') {
+    // Mapeo detallado de colores oficiales por modelo
+    const CATALOGO_MAESTRO_COLORES = {
+        // SERIE iPHONE 11
+        'iPhone 11': ['Negro (Black)', 'Blanco (White)', 'Verde (Green - tono menta pastel)', 'Amarillo (Yellow)', 'Morado / Malva (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 11 Pro': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+        'iPhone 11 Pro Max': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+
+        // SERIE iPHONE 12
+        'iPhone 12': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 12 Mini': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 12 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+        'iPhone 12 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+
+        // SERIE iPHONE 13
+        'iPhone 13': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 13 Mini': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 13 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+        'iPhone 13 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+
+        // SERIE iPHONE 14
+        'iPhone 14': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 14 Plus': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 14 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+        'iPhone 14 Pro Max': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+
+        // SERIE iPHONE 15
+        'iPhone 15': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+        'iPhone 15 Plus': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+        'iPhone 15 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+        'iPhone 15 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+
+        // SERIE iPHONE 16
+        'iPhone 16': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+        'iPhone 16 Plus': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+        'iPhone 16 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+        'iPhone 16 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+
+        // SERIE iPHONE 17
+        'iPhone 17': ['Lavanda (Lavender)', 'Verde salvia (Sage)', 'Azul neblina (Mist Blue)', 'Blanco (White)', 'Negro (Black)'],
+        'iPhone 17 Air': ['Azul cielo (Sky Blue)', 'Dorado claro (Light Gold)', 'Blanco nube (Cloud White)', 'Negro espacial (Space Black)'],
+        'iPhone 17 Pro': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+        'iPhone 17 Pro Max': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+
+        // SERIE iPHONE 18
+        'iPhone 18': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+        'iPhone 18 Plus': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+        'iPhone 18 Duo': ['Blanco estelar (Starlight)', 'Cielo nocturno (Night Sky - azul oscuro)'],
+        'iPhone 18 Pro': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+        'iPhone 18 Pro Max': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+
+        // MACBOOKS
+        'MacBook Air M5': ['Azul cielo (Sky Blue)', 'Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Plata (Silver)'],
+        'MacBook Neo': ['Plata (Silver)', 'Rosa nube (Cloud Pink)', 'Cítrico (Citrus)', 'Índigo (Indigo)'],
+        'MacBook Pro M5': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+        'MacBook Pro M5 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+        'MacBook Pro M5 Max': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+
+        // AIRPODS
+        'AirPods Pro 3': ['Blanco (White)'],
+        'AirPods Serie 4 (AirPods 4)': ['Blanco (White)'],
+        'AirPods Serie 5 (AirPods 5)': ['Blanco (White)'],
+
+        // APPLE WATCH
+        'Apple Watch Serie 11 (42mm)': [
+            'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+            'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+        ],
+        'Apple Watch Serie 11 (46mm)': [
+            'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+            'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+        ],
+        'Apple Watch Ultra 3 (49mm)': ['Titanio natural (Natural Titanium)', 'Titanio negro (Black Titanium)'],
+
+        // SAMSUNG
+        'Galaxy S25 Ultra': [
+            'Titanio Negro (Titanium Black)', 'Titanio Gris (Titanium Gray)', 'Titanio Plata Azul (Titanium Silverblue)', 'Titanio Blanco Plata (Titanium Whitesilver)',
+            'Titanio Negro Intenso (Titanium Jetblack)', 'Titanio Verde Jade (Titanium Jadegreen)', 'Titanio Oro Rosa (Titanium Pinkgold)'
+        ],
+        'Galaxy S26 Ultra': [
+            'Violeta Cobalto (Cobalt Violet)', 'Azul Cielo (Sky Blue)', 'Negro (Black)', 'Blanco (White)',
+            'Gris (Gray)', 'Oro Rosa (Pink Gold)'
+        ],
+
+        // META
+        'Ray-Ban Meta Wayfarer (Standard)': ['Negro Brillante (Shiny Black - G15)', 'Negro Mate (Matte Black - Polarized)', 'Jeans (Chalky Gray)', 'Caramel (Transitions)'],
+        'Ray-Ban Meta Wayfarer (Large)': ['Negro Brillante (Shiny Black)', 'Negro Mate (Matte Black)'],
+        'Ray-Ban Meta Headliner': ['Negro Brillante (Shiny Black)', 'Caramelo Brillante (Shiny Caramel)'],
+        'Ray-Ban Meta Skyler': ['Negro Brillante (Shiny Black)', 'Rosa Tiza (Chalky Rose)']
+    };
+
+    function poblarColoresEnSelect(selectElem, modelo, colorPreseleccionado = '') {
+        if (!selectElem) return;
+        selectElem.innerHTML = '';
+
+        let colores = [];
+        if (modelo && CATALOGO_MAESTRO_COLORES[modelo]) {
+            colores = CATALOGO_MAESTRO_COLORES[modelo];
+        } else {
+            for (const key in CATALOGO_MAESTRO_COLORES) {
+                if (modelo && modelo.toLowerCase().includes(key.toLowerCase())) {
+                    colores = CATALOGO_MAESTRO_COLORES[key];
+                    break;
+                }
+            }
+        }
+
+        selectElem.innerHTML = '<option value="">-- Seleccionar Color --</option>';
+        selectElem.innerHTML += '<option value="N/A">N/A (No Aplica)</option>';
+
+        if (colores.length > 0) {
+            colores.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                if (colorPreseleccionado && (c.toLowerCase() === colorPreseleccionado.toLowerCase() || c.toLowerCase().includes(colorPreseleccionado.toLowerCase()))) {
+                    opt.selected = true;
+                }
+                selectElem.appendChild(opt);
+            });
+        } else {
+            const todosColores = new Set();
+            for (const m in CATALOGO_MAESTRO_COLORES) {
+                CATALOGO_MAESTRO_COLORES[m].forEach(col => todosColores.add(col));
+            }
+            todosColores.forEach(col => {
+                const opt = document.createElement('option');
+                opt.value = col;
+                opt.textContent = col;
+                if (colorPreseleccionado && col.toLowerCase() === colorPreseleccionado.toLowerCase()) {
+                    opt.selected = true;
+                }
+                selectElem.appendChild(opt);
+            });
+        }
+
+        selectElem.innerHTML += '<option value="__OTRO__">✍️ Escribir otro...</option>';
+
+        if (colorPreseleccionado && colorPreseleccionado !== 'N/A' && !selectElem.value) {
+            const optCustom = document.createElement('option');
+            optCustom.value = colorPreseleccionado;
+            optCustom.textContent = `${colorPreseleccionado} (Personalizado)`;
+            optCustom.selected = true;
+            selectElem.appendChild(optCustom);
+        }
+    }
+
+    function actualizarColoresRetoma(modelo, colorPreseleccionado = '') {
+        const sel = document.getElementById('retoma_color');
+        poblarColoresEnSelect(sel, modelo, colorPreseleccionado);
+    }
+
+    function actualizarModelosRetoma(marca, modeloPreseleccionado = '', colorPreseleccionado = '') {
         const sel = document.getElementById('retoma_modelo');
         const customInput = document.getElementById('retoma_modelo_custom');
         if (!sel) return;
@@ -1340,20 +1765,22 @@
 
         if (!marca) {
             sel.innerHTML = '<option value="">-- Primero elija Marca --</option>';
+            actualizarColoresRetoma('', colorPreseleccionado);
             return;
         }
 
-        if (marca === 'Otro' || !CATALOGO_RETOMAS[marca]) {
+        if (marca === 'Otro' || !CATALOGO_MAESTRO_MODELOS[marca]) {
             sel.innerHTML = '<option value="__OTRO__">Otro Modelo (Escribir abajo)</option>';
             if (customInput) {
                 customInput.style.display = 'block';
                 customInput.value = modeloPreseleccionado || '';
             }
+            actualizarColoresRetoma('', colorPreseleccionado);
             return;
         }
 
         sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
-        CATALOGO_RETOMAS[marca].forEach(grp => {
+        CATALOGO_MAESTRO_MODELOS[marca].forEach(grp => {
             const optgroup = document.createElement('optgroup');
             optgroup.label = grp.categoria;
             grp.modelos.forEach(mod => {
@@ -1381,6 +1808,8 @@
             }
         }
 
+        actualizarColoresRetoma(sel.value, colorPreseleccionado);
+
         sel.onchange = function() {
             if (this.value === '__OTRO__') {
                 if (customInput) {
@@ -1390,6 +1819,7 @@
             } else {
                 if (customInput) customInput.style.display = 'none';
             }
+            actualizarColoresRetoma(this.value);
         };
     }
 
@@ -1405,14 +1835,36 @@
             
             const marcaVal = r.marca || '';
             const modeloVal = r.modelo || '';
+            const colorVal = r.color || '';
             document.getElementById('retoma_marca').value = marcaVal;
-            actualizarModelosRetoma(marcaVal, modeloVal);
+            actualizarModelosRetoma(marcaVal, modeloVal, colorVal);
 
             document.getElementById('retoma_imei1').value = r.imei1 || '';
             document.getElementById('retoma_imei2').value = r.imei2 || '';
-            document.getElementById('retoma_color').value = r.color || '';
+            
+            // Setear memoria
+            const selMemoria = document.getElementById('retoma_memoria');
+            const memVal = r.memoria || '';
+            if (selMemoria) {
+                selMemoria.value = memVal;
+                if (!selMemoria.value && memVal) {
+                    selMemoria.value = '__OTRO__';
+                    toggleManualInputGenerico(selMemoria, 'retoma_memoria_custom');
+                    const memCustom = document.getElementById('retoma_memoria_custom');
+                    if (memCustom) memCustom.value = memVal;
+                }
+            }
+
+            // Setear color
+            const selColor = document.getElementById('retoma_color');
+            if (selColor && !selColor.value && colorVal) {
+                selColor.value = '__OTRO__';
+                toggleManualInputGenerico(selColor, 'retoma_color_custom');
+                const colCustom = document.getElementById('retoma_color_custom');
+                if (colCustom) colCustom.value = colorVal;
+            }
+
             document.getElementById('retoma_bateria').value = r.bateria || '';
-            document.getElementById('retoma_memoria').value = r.memoria || '';
             document.getElementById('retoma_observaciones').value = r.observaciones || '';
             if (btnEliminar) btnEliminar.style.display = 'block';
             if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>Editar Equipo en Retoma';
@@ -1441,6 +1893,10 @@
         }
         document.getElementById('retoma_imei1').value = '';
         document.getElementById('retoma_imei2').value = '';
+        
+        cancelManualInputGenerico('retoma_color', 'retoma_color_custom');
+        cancelManualInputGenerico('retoma_memoria', 'retoma_memoria_custom');
+        
         document.getElementById('retoma_color').value = '';
         document.getElementById('retoma_bateria').value = '';
         document.getElementById('retoma_memoria').value = '';
@@ -1484,11 +1940,25 @@
             return alert('Ya has agregado un equipo con este mismo IMEI 1 en las retomas de esta venta.');
         }
 
+        // Obtener memoria (select o custom)
+        const memCustom = document.getElementById('retoma_memoria_custom');
+        let memVal = document.getElementById('retoma_memoria').value.trim();
+        if (memVal === '__OTRO__' && memCustom) {
+            memVal = memCustom.value.trim();
+        }
+
+        // Obtener color (select o custom)
+        const colCustom = document.getElementById('retoma_color_custom');
+        let colVal = document.getElementById('retoma_color').value.trim();
+        if (colVal === '__OTRO__' && colCustom) {
+            colVal = colCustom.value.trim();
+        }
+
         const retomaObj = {
             marca: marca,
             modelo: modelo,
-            memoria: document.getElementById('retoma_memoria').value.trim(),
-            color: document.getElementById('retoma_color').value.trim(),
+            memoria: memVal,
+            color: colVal,
             bateria: document.getElementById('retoma_bateria').value.trim(),
             imei1: imei1,
             imei2: document.getElementById('retoma_imei2').value.trim(),
@@ -1552,10 +2022,6 @@ function eliminarRetomaActual() {
         const asesorSelect = document.getElementById('asesor-vendedor');
         const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
 
-        if (!esBodega && !asesorId) {
-            return alert('⚠️ Por favor, selecciona el asesor que realizó la venta antes de continuar.');
-        }
-
         const esMixto = document.getElementById('toggle_pago_mixto').checked;
         const granTotal = obtenerGranTotal();
         let pagosPayload = [];
@@ -1572,7 +2038,7 @@ function eliminarRetomaActual() {
                         return alert(`El pago #${i + 1} (Abono a Terceros) requiere seleccionar el Proveedor destinatario.`);
                     }
                     if (!p.comprobante || !p.comprobante.trim()) {
-                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere el número de comprobante o soporte.`);
+                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere cargar la imagen del comprobante o soporte.`);
                     }
                 }
                 sumaPagos += p.monto;
@@ -1602,7 +2068,7 @@ function eliminarRetomaActual() {
                     return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
                 }
                 if (!comprobanteUnico) {
-                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes ingresar el comprobante o soporte de la transacción.');
+                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes cargar la imagen del comprobante de la transacción.');
                 }
             }
 
@@ -1700,83 +2166,45 @@ function eliminarRetomaActual() {
         }
     }
 
-    // Catálogo específico de Modelos para Apple y Samsung
-    const CATALOGO_PRODUCTOS_EXTERNO_VISUAL = {
-        'Apple': [
-            {
-                categoria: 'iPhones (11 al 18 Pro Max)',
-                modelos: [
-                    'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
-                    'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
-                    'iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
-                    'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
-                    'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
-                    'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
-                    'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
-                    'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
-                ]
-            },
-            {
-                categoria: 'iPads (A16, Air, Pro)',
-                modelos: [
-                    'iPad 10ma Gen (A16 Bionic)',
-                    'iPad 11na Gen',
-                    'iPad Mini 6', 'iPad Mini 7',
-                    'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
-                    'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)',
-                    'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
-                ]
-            },
-            {
-                categoria: 'MacBook (Air, Pro, Neo)',
-                modelos: [
-                    'MacBook Neo',
-                    'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
-                    'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
-                    'MacBook Pro 14" (M1 Pro/Max)', 'MacBook Pro 16" (M1 Pro/Max)',
-                    'MacBook Pro 14" (M2 Pro/Max)', 'MacBook Pro 16" (M2 Pro/Max)',
-                    'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
-                    'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)'
-                ]
-            },
-            {
-                categoria: 'AirPods (Últimas Generaciones)',
-                modelos: [
-                    'AirPods 3ra Generación',
-                    'AirPods 4ta Generación',
-                    'AirPods 4ta Generación con ANC',
-                    'AirPods Pro 2da Generación (USB-C)',
-                    'AirPods Max (Lightning)',
-                    'AirPods Max (USB-C)'
-                ]
-            }
-        ],
-        'Samsung': [
-            {
-                categoria: 'Samsung Galaxy Serie S (Desde S24 en adelante)',
-                modelos: [
-                    'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
-                    'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
-                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
-                    'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
-                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE',
-                    'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
-                    'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
-                ]
-            }
-        ]
-    };
+    function actualizarColoresExternoVisual(modelo) {
+        const selColor = document.getElementById('ext_color_visual');
+        poblarColoresEnSelect(selColor, modelo);
+    }
 
     function actualizarModelosExternoVisual(marca) {
         const sel = document.getElementById('ext_modelo_visual');
+        const customInput = document.getElementById('ext_modelo_custom');
         if (!sel) return;
         sel.innerHTML = '';
-        if (!marca || !CATALOGO_PRODUCTOS_EXTERNO_VISUAL[marca]) {
+        if (customInput) customInput.classList.add('d-none');
+
+        if (!marca) {
             sel.innerHTML = '<option value="">-- Primero elige Marca --</option>';
+            actualizarColoresExternoVisual('');
             return;
         }
+
+        if (marca === 'Otro' || !CATALOGO_MAESTRO_MODELOS[marca]) {
+            sel.innerHTML = '<option value="__OTRO__">Otro Modelo (Escribir abajo)</option>';
+            if (customInput) {
+                customInput.classList.remove('d-none');
+                customInput.name = 'modelo_celular';
+                sel.removeAttribute('name');
+                customInput.value = '';
+                customInput.focus();
+            }
+            actualizarColoresExternoVisual('');
+            return;
+        }
+
+        sel.name = 'modelo_celular';
+        if (customInput) {
+            customInput.classList.add('d-none');
+            customInput.removeAttribute('name');
+        }
+
         sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
-        CATALOGO_PRODUCTOS_EXTERNO_VISUAL[marca].forEach(grp => {
+        CATALOGO_MAESTRO_MODELOS[marca].forEach(grp => {
             const optgroup = document.createElement('optgroup');
             optgroup.label = grp.categoria;
             grp.modelos.forEach(mod => {
@@ -1787,6 +2215,31 @@ function eliminarRetomaActual() {
             });
             sel.appendChild(optgroup);
         });
+
+        const optOtro = document.createElement('option');
+        optOtro.value = '__OTRO__';
+        optOtro.textContent = '+ Otro Modelo no listado';
+        sel.appendChild(optOtro);
+
+        actualizarColoresExternoVisual(sel.value);
+
+        sel.onchange = function() {
+            if (this.value === '__OTRO__') {
+                if (customInput) {
+                    customInput.classList.remove('d-none');
+                    customInput.name = 'modelo_celular';
+                    sel.removeAttribute('name');
+                    customInput.focus();
+                }
+            } else {
+                if (customInput) {
+                    customInput.classList.add('d-none');
+                    customInput.removeAttribute('name');
+                }
+                sel.name = 'modelo_celular';
+            }
+            actualizarColoresExternoVisual(this.value);
+        };
     }
 
     // Lógica para Producto Externo

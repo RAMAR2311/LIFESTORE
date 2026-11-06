@@ -134,11 +134,14 @@
                 <div class="tab-pane fade show active" id="inventario-content" role="tabpanel">
                     <div class="card card-custom border-0 shadow-sm">
                         <div class="card-header bg-white border-0 py-3 ps-4 d-flex justify-content-between align-items-center">
-                            <h5 class="fw-bold m-0 text-brand-black">
-                                <i class="fa-solid fa-cart-shopping me-2 text-brand-blue"></i>Ventas de Equipos del Inventario
-                            </h5>
+                            <div>
+                                <h5 class="fw-bold m-0 text-brand-black">
+                                    <i class="fa-solid fa-cart-shopping me-2 text-brand-blue"></i>Ventas de Equipos del Inventario (Turnos de Caja)
+                                </h5>
+                                <small class="text-muted">Las comisiones de inventario se dividen equitativamente entre los asesores que abrieron caja ese día/turno.</small>
+                            </div>
                             <span class="badge bg-light text-dark border px-3 py-2">
-                                Comisión Fija: <strong>${{ comision_fija|cop }}</strong> por equipo vendido (no aplica en retomas)
+                                Base: <strong>${{ comision_fija|cop }}</strong> / equipo (dividido entre turno)
                             </span>
                         </div>
                         <div class="card-body p-0">
@@ -148,10 +151,10 @@
                                         <tr>
                                             <th class="ps-4" width="8%">Factura</th>
                                             <th width="14%">Fecha y Hora</th>
-                                            <th width="14%">Cajero</th>
+                                            <th width="14%">Cajero / Turno</th>
                                             <th width="32%">Equipos / Productos Vendidos</th>
                                             <th class="text-end" width="12%">Monto Venta</th>
-                                            <th class="text-center" width="10%">Comisión Fija</th>
+                                            <th class="text-center" width="10%">Cuota Comisión</th>
                                             <th class="text-center pe-4" width="10%">Ticket</th>
                                         </tr>
                                     </thead>
@@ -166,8 +169,11 @@
                                                 <div class="fw-semibold text-dark">{{ venta.fecha_venta.strftime('%d/%m/%Y') }}</div>
                                                 <div class="small text-muted">{{ venta.fecha_venta.strftime('%I:%M %p') }}</div>
                                             </td>
-                                            <td class="fw-semibold text-secondary">
-                                                {{ venta.vendedor.nombre if venta.vendedor else 'N/A' }}
+                                            <td>
+                                                <div class="fw-semibold text-secondary">{{ venta.vendedor.nombre if venta.vendedor else 'N/A' }}</div>
+                                                <div class="extra-small text-muted" title="{{ item.asesores_nombres|join(', ') }}">
+                                                    <i class="fa-solid fa-users me-1"></i>{{ item.num_asesores }} asesor(es) en turno
+                                                </div>
                                             </td>
                                             <td>
                                                 <ul class="list-unstyled mb-0 extra-small text-muted ps-1">
@@ -175,9 +181,9 @@
                                                     <li class="mb-1">
                                                         • <strong>{{ prod.nombre }}</strong> (x{{ prod.cantidad }}) 
                                                         {% if prod.es_retoma %}
-                                                            <span class="badge bg-info text-dark ms-1">Retoma (Comisión en Bolsa 15%)</span>
+                                                            <span class="badge bg-info text-dark ms-1">Retoma (Bolsa 15%)</span>
                                                         {% else %}
-                                                            <span class="badge bg-light text-dark border ms-1">+${{ prod.comision_fija|cop }}</span>
+                                                            <span class="badge bg-light text-dark border ms-1">+${{ prod.comision_fija|cop }} <small class="text-muted">(${{ prod.comision_total_item|cop }} / {{ prod.num_asesores }})</small></span>
                                                         {% endif %}
                                                     </li>
                                                     {% endfor %}
@@ -201,7 +207,7 @@
                                         <tr>
                                             <td colspan="7" class="text-center py-5 text-muted">
                                                 <i class="fa-solid fa-folder-open fs-2 mb-2 d-block opacity-50"></i>
-                                                No se encontraron ventas de inventario para este asesor en el mes seleccionado.
+                                                No se encontraron turnos con ventas de inventario para este asesor en el mes seleccionado.
                                             </td>
                                         </tr>
                                         {% endfor %}
@@ -220,7 +226,7 @@
                                 <h5 class="fw-bold m-0 text-brand-black">
                                     <i class="fa-solid fa-recycle me-2 text-success"></i>Bolsa del 15% en Venta de Retomas
                                 </h5>
-                                <small class="text-muted">Calculada sobre: <strong>(Precio Venta - Costo Retoma - Arreglos) × 15%</strong> dividida equitativamente entre el asesor que la retomó y los asesores del turno de venta.</small>
+                                <small class="text-muted">Calculada sobre: <strong>(Precio Venta - Costo Retoma - Arreglos) × 15%</strong> al venderse el equipo, dividida equitativamente entre los asesores que abrieron caja al recibir la retoma y los que abrieron caja al venderla.</small>
                             </div>
                             <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2 fw-bold">
                                 Total Asesor en Retomas: ${{ total_comision_retomas|cop }}

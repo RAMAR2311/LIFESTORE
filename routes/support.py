@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
-from models import db, Technician, TechnicalService, Product, Warranty, Branch, AuditLog
+from models import db, Technician, TechnicalService, Product, Warranty, Branch, AuditLog, BranchStock, StockAdjustment
+from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 from datetime import datetime, date
 import pytz
 
@@ -9,6 +10,7 @@ support_bp = Blueprint('support_bp', __name__)
 TIPOS_ARREGLO = [
     'Cambio de Pantalla / Display',
     'Cambio de Batería',
+    'Flex Batería',
     'Pin de Carga / Puerto USB',
     'Cámara Frontal / Trasera',
     'Micrófono / Altavoz / Auricular',
@@ -67,6 +69,8 @@ def index():
 
     servicios = query.order_by(TechnicalService.fecha_ingreso.desc()).all()
     tecnicos = Technician.query.order_by(Technician.nombre.asc()).all()
+    from models import Asesor
+    asesores = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
 
     # Conteos rápidos para badges de estados
     base_counts = TechnicalService.query
@@ -84,6 +88,7 @@ def index():
         'support/index.html',
         servicios=servicios,
         tecnicos=tecnicos,
+        asesores=asesores,
         tipos_arreglo=TIPOS_ARREGLO,
         filtro_origen=filtro_origen,
         filtro_tecnico=filtro_tecnico,
@@ -145,7 +150,14 @@ def enviar_desde_inventario(product_id):
         return redirect(url_for('celulares_bp.inventario'))
 
     technician_id = request.form.get('technician_id', type=int)
-    tipo_arreglo = request.form.get('tipo_arreglo', '').strip() or 'Diagnóstico General / Revisión'
+    asesor_id = request.form.get('asesor_id', type=int)
+    tipo_arreglo = request.form.get('tipo_arreglo', '').strip()
+    if tipo_arreglo == 'Otro':
+        otro_tipo = request.form.get('tipo_arreglo_otro', '').strip()
+        if otro_tipo:
+            tipo_arreglo = f"Otro: {otro_tipo}"
+    if not tipo_arreglo:
+        tipo_arreglo = 'Diagnóstico General / Revisión'
     motivo_falla = request.form.get('motivo_falla', '').strip()
     fecha_estimada_str = request.form.get('fecha_estimada', '').strip()
 
@@ -160,11 +172,17 @@ def enviar_desde_inventario(product_id):
         except ValueError:
             pass
 
-    # Sucursal actual del usuario o seleccionada
-    branch_id = current_user.branch_id
+    # Sucursal de origen del equipo (se toma la sede donde tiene stock activo o sucursal actual)
+    branch_id = None
+    for bs in producto.branch_stocks:
+        if bs.cantidad > 0:
+            branch_id = bs.branch_id
+            break
     if not branch_id:
-        active_b = session.get('active_branch_id')
-        branch_id = int(active_b) if active_b else None
+        branch_id = current_user.branch_id or (session.get('active_branch_id') or None)
+    if not branch_id:
+        default_b = Branch.query.filter_by(activa=True).first()
+        branch_id = default_b.id if default_b else 1
 
     # Crear la orden de servicio técnico
     servicio = TechnicalService(
@@ -172,6 +190,7 @@ def enviar_desde_inventario(product_id):
         product_id=producto.id,
         branch_id=branch_id,
         technician_id=technician_id,
+        asesor_id=asesor_id,
         created_by_id=current_user.id,
         marca=producto.marca,
         modelo=producto.modelo_celular or producto.nombre,
@@ -206,7 +225,14 @@ def enviar_desde_garantia(warranty_id):
     garantia = Warranty.query.get_or_404(warranty_id)
 
     technician_id = request.form.get('technician_id', type=int)
-    tipo_arreglo = request.form.get('tipo_arreglo', '').strip() or 'Garantía / Reparación de Falla'
+    asesor_id = request.form.get('asesor_id', type=int)
+    tipo_arreglo = request.form.get('tipo_arreglo', '').strip()
+    if tipo_arreglo == 'Otro':
+        otro_tipo = request.form.get('tipo_arreglo_otro', '').strip()
+        if otro_tipo:
+            tipo_arreglo = f"Otro: {otro_tipo}"
+    if not tipo_arreglo:
+        tipo_arreglo = 'Garantía / Reparación de Falla'
     motivo_falla = request.form.get('motivo_falla', '').strip() or (garantia.motivo_reportado or garantia.reason)
     fecha_estimada_str = request.form.get('fecha_estimada', '').strip()
 
@@ -230,6 +256,7 @@ def enviar_desde_garantia(warranty_id):
         product_id=prod.id if prod else None,
         branch_id=garantia.branch_id,
         technician_id=technician_id,
+        asesor_id=asesor_id or garantia.asesor_id,
         created_by_id=current_user.id,
         marca=marca,
         modelo=modelo,
@@ -267,6 +294,7 @@ def actualizar_estado(id):
     solucion = request.form.get('solucion_aplicada', '').strip()
     costo_str = request.form.get('costo_reparacion', '').strip()
     technician_id = request.form.get('technician_id', type=int)
+    asesor_id = request.form.get('asesor_id', type=int)
 
     if nuevo_estado:
         servicio.estado = nuevo_estado
@@ -276,6 +304,8 @@ def actualizar_estado(id):
         servicio.solucion_aplicada = solucion
     if technician_id:
         servicio.technician_id = technician_id
+    if asesor_id:
+        servicio.asesor_id = asesor_id
     if costo_str:
         try:
             servicio.costo_reparacion = float(costo_str.replace(',', '').replace('$', '').strip())
@@ -286,15 +316,65 @@ def actualizar_estado(id):
         servicio.fecha_salida = obtener_hora_bogota()
         servicio.resolved_by_id = current_user.id
 
-        # Si viene de inventario y fue reparado, limpiar la observación de taller
+        # Si viene de inventario, gestionar reintegración y sede
         if servicio.origen == 'INVENTARIO' and servicio.producto:
-            if nuevo_estado == 'REPARADO':
-                servicio.producto.observacion = f"[REPARADO EN TALLER {datetime.now().strftime('%d/%m/%Y')}]: {solucion or 'Listo para la venta'}"
-        
+            target_branch = servicio.branch_id
+            if not target_branch:
+                # Si no tenía sede asignada, usar sede actual o principal
+                target_branch = current_user.branch_id or (session.get('active_branch_id') or None)
+                if not target_branch:
+                    default_b = Branch.query.filter_by(activa=True).first()
+                    target_branch = default_b.id if default_b else 1
+                servicio.branch_id = target_branch
+
+            branch_obj = Branch.query.get(target_branch)
+            branch_nom = branch_obj.nombre if branch_obj else 'Sede de Origen'
+
+            if nuevo_estado in ['REPARADO', 'ENTREGADO']:
+                # Asegurar que el equipo quede en el stock de la sede desde donde fue enviado
+                # Primero, si estaba en otra sucursal con cantidad > 0, removerlo para evitar duplicidad de IMEI
+                for bs in servicio.producto.branch_stocks:
+                    if bs.branch_id != target_branch and bs.cantidad > 0:
+                        bs.cantidad = 0
+
+                # Reintegrar 1 unidad al stock de la sede de origen si aún no tiene stock disponible
+                b_stock_target = get_or_create_branch_stock(target_branch, servicio.producto.id, None, for_update=True)
+                stock_previo = b_stock_target.cantidad
+                if b_stock_target.cantidad <= 0:
+                    b_stock_target.cantidad = 1
+                    sync_global_product_stock(servicio.producto.id, None)
+
+                    ajuste = StockAdjustment(
+                        product_id=servicio.producto.id,
+                        admin_id=current_user.id,
+                        branch_id=target_branch,
+                        tipo_movimiento=f'Reintegro Soporte Técnico #{servicio.id} a {branch_nom}',
+                        stock_anterior=stock_previo,
+                        stock_nuevo=b_stock_target.cantidad
+                    )
+                    db.session.add(ajuste)
+
+                estado_label = "Reparado" if nuevo_estado == 'REPARADO' else "Entregado"
+                servicio.producto.observacion = f"[{estado_label.upper()} EN TALLER {datetime.now().strftime('%d/%m/%Y')} - Reintegrado a {branch_nom}]: {solucion or 'Listo para la venta'}"
+
+            elif nuevo_estado == 'NO_REPARABLE':
+                # Si es no reparable, garantizar que quede en stock 0
+                for bs in servicio.producto.branch_stocks:
+                    bs.cantidad = 0
+                sync_global_product_stock(servicio.producto.id, None)
+                servicio.producto.observacion = f"[NO REPARABLE EN TALLER {datetime.now().strftime('%d/%m/%Y')}]: {solucion or diagnostico or 'Dado de baja'}"
+
         # Si viene de garantía y fue reparado, reflejar en garantía
         if servicio.origen == 'GARANTIA' and servicio.garantia:
-            if nuevo_estado == 'REPARADO':
+            if nuevo_estado in ['REPARADO', 'ENTREGADO']:
                 servicio.garantia.admin_notes = f"[REPARADO EN SOPORTE TÉCNICO]: {solucion or 'Listo para entrega al cliente'}"
+
+        # Si viene de retoma y fue reparado, reflejar en la retoma
+        if servicio.origen == 'RETOMA' and servicio.retoma:
+            if nuevo_estado in ['REPARADO', 'ENTREGADO']:
+                servicio.retoma.observaciones = f"[{nuevo_estado} EN TALLER {datetime.now().strftime('%d/%m/%Y')}]: {solucion or 'Revisión técnica finalizada'}. " + (servicio.retoma.observaciones or '')
+            elif nuevo_estado == 'NO_REPARABLE':
+                servicio.retoma.observaciones = f"[NO REPARABLE EN TALLER {datetime.now().strftime('%d/%m/%Y')}]: {solucion or diagnostico or 'Falla grave irreparable'}. " + (servicio.retoma.observaciones or '')
 
     db.session.commit()
 

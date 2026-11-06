@@ -52,6 +52,13 @@
                                 <i class="fa-solid fa-user-shield text-primary me-1"></i> Recibió: <strong>{{ w.recibido_por.nombre_completo or w.recibido_por.username if w.recibido_por else 'Asesor Tienda' }}</strong>
                             </span>
                         </div>
+                        {% if w.asesor %}
+                            <div class="mt-1">
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 small">
+                                    <i class="fa-solid fa-user-tie me-1"></i> Asesor: <strong>{{ w.asesor.nombre }}</strong>
+                                </span>
+                            </div>
+                        {% endif %}
                         {% if w.entregado_por %}
                             <div class="mt-1">
                                 <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-50 small">
@@ -126,15 +133,20 @@
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label fw-bold small text-muted">Tipo de Arreglo *</label>
-                                                    <select name="tipo_arreglo" class="form-select form-select-sm" required>
+                                                    <select name="tipo_arreglo" class="form-select form-select-sm" required onchange="toggleTipoArregloW(this, 'otro_tipo_w_{{ w.id }}')">
                                                         <option value="Cambio de Pantalla / Display">Cambio de Pantalla / Display</option>
                                                         <option value="Cambio de Batería">Cambio de Batería</option>
+                                                        <option value="Flex Batería">Flex Batería</option>
                                                         <option value="Pin de Carga / Puerto USB">Pin de Carga / Puerto USB</option>
                                                         <option value="Cámara Frontal / Trasera">Cámara Frontal / Trasera</option>
                                                         <option value="Reparación de Placa / Corto / IC">Reparación de Placa / Corto / IC</option>
                                                         <option value="Software / Flasheo / Reinstalación">Software / Flasheo / Reinstalación</option>
                                                         <option value="Diagnóstico General / Revisión" selected>Diagnóstico General / Revisión</option>
+                                                        <option value="Otro">Otro (Especificar)</option>
                                                     </select>
+                                                    <div class="mt-2" id="otro_tipo_w_{{ w.id }}" style="display: none;">
+                                                        <input type="text" name="tipo_arreglo_otro" class="form-control form-control-sm" placeholder="Especifique el tipo de arreglo...">
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -144,7 +156,7 @@
                                             </div>
 
                                             <div class="mb-2">
-                                                <label class="form-label fw-bold small text-muted">Fecha Estimada de Retorno (Opcional)</label>
+                                                <label class="form-label fw-bold small text-muted">Fecha de Entrega (Opcional)</label>
                                                 <input type="date" name="fecha_estimada" class="form-control form-control-sm">
                                             </div>
                                         </div>
@@ -257,7 +269,7 @@
                             </select>
                         </div>
 
-                        <!-- Checklist Inicial de Recepción Física y Custodia -->
+                        <!-- Asesor Responsable y Checklist Inicial de Recepción Física y Custodia -->
                         <div class="card p-3 mb-3 bg-light border-0 rounded-3">
                             <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
                                 <span class="fw-bold small text-uppercase text-muted">
@@ -266,6 +278,21 @@
                                 <span class="badge bg-dark text-white rounded-pill px-2 py-1">
                                     {{ current_user.nombre_completo or current_user.username }}
                                 </span>
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-12">
+                                    <label class="form-label small fw-bold text-brand-black mb-1">
+                                        <i class="fa-solid fa-user-tie text-primary me-1"></i> Asesor Responsable Vigente *
+                                    </label>
+                                    <select name="asesor_id" class="form-select form-select-sm" required>
+                                        <option value="">-- Seleccionar Asesor Responsable --</option>
+                                        {% if asesores_disponibles %}
+                                            {% for asr in asesores_disponibles %}
+                                            <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </select>
+                                </div>
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-6">
@@ -421,6 +448,25 @@
             }
         } catch(e) {
             alert('Error de red al conectar con el servidor.');
+        }
+    }
+
+    function toggleTipoArregloW(sel, targetContainerId) {
+        const cont = document.getElementById(targetContainerId);
+        if (!cont) return;
+        const input = cont.querySelector('input');
+        if (sel.value === 'Otro') {
+            cont.style.display = 'block';
+            if (input) {
+                input.required = true;
+                input.focus();
+            }
+        } else {
+            cont.style.display = 'none';
+            if (input) {
+                input.required = false;
+                input.value = '';
+            }
         }
     }
 </script>

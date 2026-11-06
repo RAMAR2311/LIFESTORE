@@ -218,7 +218,7 @@
                             {% endif %}
                         </td>
 
-                        <!-- Técnico Asignado -->
+                        <!-- Técnico Asignado y Asesor -->
                         <td>
                             {% if s.technician %}
                                 <div class="fw-bold text-dark d-flex align-items-center gap-1">
@@ -226,12 +226,19 @@
                                     <span>{{ s.technician.nombre }}</span>
                                 </div>
                                 {% if s.technician.telefono %}
-                                    <small class="text-muted font-mono"><i class="fa-brands fa-whatsapp text-success me-1"></i>{{ s.technician.telefono }}</small>
+                                    <small class="text-muted font-mono d-block"><i class="fa-brands fa-whatsapp text-success me-1"></i>{{ s.technician.telefono }}</small>
                                 {% endif %}
                             {% else %}
                                 <span class="badge bg-light text-danger border border-danger border-opacity-50 rounded-pill">
                                     <i class="fa-solid fa-triangle-exclamation me-1"></i>Sin Asignar
                                 </span>
+                            {% endif %}
+                            {% if s.asesor %}
+                                <div class="mt-1">
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size: 0.72rem;">
+                                        <i class="fa-solid fa-user-tie me-1"></i>Asesor: {{ s.asesor.nombre }}
+                                    </span>
+                                </div>
                             {% endif %}
                         </td>
 
@@ -303,11 +310,15 @@
                                             </div>
                                             <div class="text-muted font-mono">IMEI: {{ s.imei or 'N/A' }}</div>
                                             <div class="text-muted mt-1"><strong>Falla reportada:</strong> {{ s.motivo_falla }}</div>
+                                            <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                                                <span class="text-muted"><i class="fa-solid fa-shop me-1 text-primary"></i> Sede de origen:</span>
+                                                <span class="badge bg-white text-dark border fw-bold">{{ s.branch.nombre if s.branch else 'Principal' }}</span>
+                                            </div>
                                         </div>
 
                                         <div class="row g-2 mb-3">
                                             <!-- Estado -->
-                                            <div class="col-6">
+                                            <div class="col-4">
                                                 <label class="form-label small fw-bold text-muted">Estado del Arreglo *</label>
                                                 <select name="estado" class="form-select form-select-sm" required>
                                                     <option value="EN_REVISION" {% if s.estado == 'EN_REVISION' %}selected{% endif %}>En Revisión</option>
@@ -318,12 +329,22 @@
                                                 </select>
                                             </div>
                                             <!-- Técnico Asignado -->
-                                            <div class="col-6">
+                                            <div class="col-4">
                                                 <label class="form-label small fw-bold text-muted">Técnico Responsable</label>
                                                 <select name="technician_id" class="form-select form-select-sm">
                                                     <option value="">-- Sin Asignar --</option>
                                                     {% for t in tecnicos %}
                                                     <option value="{{ t.id }}" {% if s.technician_id == t.id %}selected{% endif %}>{{ t.nombre }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <!-- Asesor Responsable -->
+                                            <div class="col-4">
+                                                <label class="form-label small fw-bold text-muted">Asesor Responsable</label>
+                                                <select name="asesor_id" class="form-select form-select-sm">
+                                                    <option value="">-- Sin Asesor --</option>
+                                                    {% for asr in asesores %}
+                                                    <option value="{{ asr.id }}" {% if s.asesor_id == asr.id %}selected{% endif %}>{{ asr.nombre }}</option>
                                                     {% endfor %}
                                                 </select>
                                             </div>

@@ -438,11 +438,14 @@
         <div class="meta-col">
             <p class="meta-title"><i class="fa-solid fa-id-badge me-1"></i> Responsables de Atención</p>
             <p><strong>Cajero:</strong> {{ venta.vendedor.nombre }}</p>
-            <p><strong>Asesor Principal:</strong> {{ venta.asesor.nombre if venta.asesor else 'Ventas Mostrador' }}</p>
             {% if venta.turno and venta.turno.asesores_obj %}
             <p style="font-size: 0.72rem; color: #475569;">
-                <strong>Turno:</strong> {{ venta.turno.asesores_obj|map(attribute='nombre')|join(', ') }}
+                <strong>Asesores de Turno:</strong> {{ venta.turno.asesores_obj|map(attribute='nombre')|join(', ') }}
             </p>
+            {% elif venta.asesor %}
+            <p><strong>Asesor:</strong> {{ venta.asesor.nombre }}</p>
+            {% else %}
+            <p><strong>Atención:</strong> Ventas Mostrador</p>
             {% endif %}
         </div>
     </div>
