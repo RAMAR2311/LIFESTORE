@@ -48,27 +48,27 @@
                     <div class="row g-2" id="tipoSelectorGroup">
                         <div class="col-6">
                             <input type="radio" class="btn-check" name="tipo" id="tipoTienda" value="tienda" checked onchange="onSelectTipoSede('tienda')">
-                            <label class="btn btn-outline-secondary w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoTienda" style="transition: all 0.2s ease;">
+                            <label class="w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoTienda">
                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                     <i class="fa-solid fa-store fs-5 text-primary"></i>
                                     <i class="fa-solid fa-circle-check text-primary check-icon"></i>
                                 </div>
                                 <div>
-                                    <span class="fw-bold d-block text-dark small">Tienda POS</span>
-                                    <span class="text-muted" style="font-size: 0.7rem; line-height: 1.1; display: block;">Ventas &amp; Turnos</span>
+                                    <span class="fw-bold d-block sede-title small">Tienda POS</span>
+                                    <span class="text-muted sede-subtitle" style="font-size: 0.7rem; line-height: 1.1; display: block;">Ventas &amp; Turnos</span>
                                 </div>
                             </label>
                         </div>
                         <div class="col-6">
                             <input type="radio" class="btn-check" name="tipo" id="tipoBodega" value="bodega" onchange="onSelectTipoSede('bodega')">
-                            <label class="btn btn-outline-secondary w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoBodega" style="transition: all 0.2s ease;">
+                            <label class="w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoBodega">
                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                     <i class="fa-solid fa-warehouse fs-5 text-purple" style="color: #9333ea;"></i>
                                     <i class="fa-solid fa-circle-check text-purple check-icon" style="color: #9333ea;"></i>
                                 </div>
                                 <div>
-                                    <span class="fw-bold d-block text-dark small">Bodega Central</span>
-                                    <span class="text-muted" style="font-size: 0.7rem; line-height: 1.1; display: block;">Logística Mayor</span>
+                                    <span class="fw-bold d-block sede-title small">Bodega Central</span>
+                                    <span class="text-muted sede-subtitle" style="font-size: 0.7rem; line-height: 1.1; display: block;">Logística Mayor</span>
                                 </div>
                             </label>
                         </div>
@@ -407,17 +407,30 @@
 .sede-type-card {
     cursor: pointer;
     border: 2px solid rgba(148, 163, 184, 0.3) !important;
-    background: var(--bg-card, #ffffff);
+    background: #ffffff;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: #1e293b !important;
 }
 .sede-type-card:hover {
     border-color: #38bdf8 !important;
     transform: translateY(-2px);
 }
+.sede-type-card .sede-title {
+    color: #0f172a !important;
+}
+.sede-type-card .sede-subtitle {
+    color: #64748b !important;
+}
 .btn-check:checked + .sede-type-card {
     border-color: #2563eb !important;
-    background: rgba(37, 99, 235, 0.08) !important;
+    background: #eff6ff !important;
     box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+}
+.btn-check:checked + .sede-type-card .sede-title {
+    color: #1d4ed8 !important;
+}
+.btn-check:checked + .sede-type-card .sede-subtitle {
+    color: #3b82f6 !important;
 }
 .check-icon {
     display: none;
@@ -429,16 +442,25 @@
 /* Normalización Dark Mode Obsidian & Silver Tech */
 [data-theme="dark"] .sede-type-card {
     background: #0f172a !important;
-    border-color: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #f1f5f9 !important;
 }
-[data-theme="dark"] .sede-type-card .sede-title,
-[data-theme="dark"] .sede-type-card span.text-dark {
+[data-theme="dark"] .sede-type-card .sede-title {
     color: #f8fafc !important;
+}
+[data-theme="dark"] .sede-type-card .sede-subtitle {
+    color: #94a3b8 !important;
 }
 [data-theme="dark"] .btn-check:checked + .sede-type-card {
     border-color: #38bdf8 !important;
-    background: rgba(56, 189, 248, 0.12) !important;
+    background: rgba(56, 189, 248, 0.15) !important;
     box-shadow: 0 4px 14px rgba(56, 189, 248, 0.22);
+}
+[data-theme="dark"] .btn-check:checked + .sede-type-card .sede-title {
+    color: #38bdf8 !important;
+}
+[data-theme="dark"] .btn-check:checked + .sede-type-card .sede-subtitle {
+    color: #bae6fd !important;
 }
 [data-theme="dark"] .table tbody td div.text-dark {
     color: #f8fafc !important;
