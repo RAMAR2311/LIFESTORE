@@ -48,27 +48,27 @@
                     <div class="row g-2" id="tipoSelectorGroup">
                         <div class="col-6">
                             <input type="radio" class="btn-check" name="tipo" id="tipoTienda" value="tienda" checked onchange="onSelectTipoSede('tienda')">
-                            <label class="w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoTienda">
+                            <label class="w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoTienda" id="cardTipoTienda">
                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                     <i class="fa-solid fa-store fs-5 text-primary"></i>
                                     <i class="fa-solid fa-circle-check text-primary check-icon"></i>
                                 </div>
                                 <div>
                                     <span class="fw-bold d-block sede-title small">Tienda POS</span>
-                                    <span class="text-muted sede-subtitle" style="font-size: 0.7rem; line-height: 1.1; display: block;">Ventas &amp; Turnos</span>
+                                    <span class="sede-subtitle" style="font-size: 0.7rem; line-height: 1.1; display: block;">Ventas &amp; Turnos</span>
                                 </div>
                             </label>
                         </div>
                         <div class="col-6">
                             <input type="radio" class="btn-check" name="tipo" id="tipoBodega" value="bodega" onchange="onSelectTipoSede('bodega')">
-                            <label class="w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoBodega">
+                            <label class="w-100 text-start p-2 rounded-3 h-100 d-flex flex-column justify-content-between sede-type-card" for="tipoBodega" id="cardTipoBodega">
                                 <div class="d-flex align-items-center justify-content-between mb-1">
                                     <i class="fa-solid fa-warehouse fs-5 text-purple" style="color: #9333ea;"></i>
                                     <i class="fa-solid fa-circle-check text-purple check-icon" style="color: #9333ea;"></i>
                                 </div>
                                 <div>
                                     <span class="fw-bold d-block sede-title small">Bodega Central</span>
-                                    <span class="text-muted sede-subtitle" style="font-size: 0.7rem; line-height: 1.1; display: block;">Logística Mayor</span>
+                                    <span class="sede-subtitle" style="font-size: 0.7rem; line-height: 1.1; display: block;">Logística Mayor</span>
                                 </div>
                             </label>
                         </div>
@@ -301,7 +301,7 @@
                                                 </div>
                                                 <div class="col-md-3">
                                                     <label class="form-label fw-bold small text-uppercase">Tipo de Sede</label>
-                                                    <select name="tipo" class="form-select pos-input" required>
+                                                    <select name="tipo" class="form-select pos-input sucursal-tipo-select" required>
                                                         <option value="tienda" {% if s.tipo == 'tienda' %}selected{% endif %}>🏪 Tienda (POS)</option>
                                                         <option value="bodega" {% if s.tipo == 'bodega' %}selected{% endif %}>📦 Bodega Central</option>
                                                     </select>
@@ -406,31 +406,31 @@
 /* Estilos interactivos para las tarjetas de Tipo de Sede */
 .sede-type-card {
     cursor: pointer;
-    border: 2px solid rgba(148, 163, 184, 0.3) !important;
-    background: #ffffff;
+    border: 2px solid #cbd5e1 !important;
+    background-color: #ffffff !important;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    color: #1e293b !important;
+    color: #0f172a !important;
 }
 .sede-type-card:hover {
-    border-color: #38bdf8 !important;
+    border-color: #0284c7 !important;
     transform: translateY(-2px);
 }
 .sede-type-card .sede-title {
     color: #0f172a !important;
 }
 .sede-type-card .sede-subtitle {
-    color: #64748b !important;
+    color: #475569 !important;
 }
 .btn-check:checked + .sede-type-card {
-    border-color: #2563eb !important;
-    background: #eff6ff !important;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.18);
+    border-color: #1d4ed8 !important;
+    background-color: #dbeafe !important;
+    box-shadow: 0 4px 14px rgba(29, 78, 216, 0.25) !important;
 }
 .btn-check:checked + .sede-type-card .sede-title {
-    color: #1d4ed8 !important;
+    color: #1e3a8a !important;
 }
 .btn-check:checked + .sede-type-card .sede-subtitle {
-    color: #3b82f6 !important;
+    color: #1d4ed8 !important;
 }
 .check-icon {
     display: none;
@@ -439,7 +439,30 @@
     display: inline-block;
 }
 
+/* Estilos de alto contraste para Selectores de Sucursal */
+.sucursal-tipo-select,
+select.form-select.pos-input {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+.sucursal-tipo-select option,
+select.form-select.pos-input option {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+
 /* Normalización Dark Mode Obsidian & Silver Tech */
+[data-theme="dark"] .sucursal-tipo-select,
+[data-theme="dark"] select.form-select.pos-input {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+}
+[data-theme="dark"] .sucursal-tipo-select option,
+[data-theme="dark"] select.form-select.pos-input option {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
 [data-theme="dark"] .sede-type-card {
     background: #0f172a !important;
     border-color: rgba(255, 255, 255, 0.15) !important;
