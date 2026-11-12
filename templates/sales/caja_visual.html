@@ -150,9 +150,17 @@
             </div>
         </div>
 
-        <!-- Buscador de productos -->
-        <div class="mb-4">
-            <div class="search-bar-silver">
+        <!-- Selector de Categoría + Buscador de productos -->
+        <div class="mb-4 d-flex flex-wrap align-items-center gap-2">
+            <div class="btn-group shadow-sm" role="group" aria-label="Categoría de productos">
+                <button type="button" id="btnCatEquipos" class="btn btn-primary fw-bold px-3 py-2" onclick="seleccionarCategoriaCaja('equipos')">
+                    <i class="fa-solid fa-mobile-screen-button me-1"></i> Equipos
+                </button>
+                <button type="button" id="btnCatAccesorios" class="btn btn-outline-primary fw-bold px-3 py-2" onclick="seleccionarCategoriaCaja('accesorios')">
+                    <i class="fa-solid fa-headphones me-1"></i> Accesorios
+                </button>
+            </div>
+            <div class="search-bar-silver flex-grow-1">
                 <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
                 <input type="text" id="productSearch" placeholder="Buscar producto por nombre, SKU o IMEI..." autocomplete="off">
             </div>
@@ -172,7 +180,7 @@
                     {% endif %}
                 {% endfor %}
             {% endif %}
-            <div class="col-6 col-md-4 col-xl-3 product-card-container" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}" data-imei="{{ p.imei|lower if p.imei else '' }}" data-imei2="{{ p.imei2|lower if p.imei2 else '' }}">
+            <div class="col-6 col-md-4 col-xl-3 product-card-container" data-categoria="{{ 'equipos' if p.tipo_inventario == 'celulares' else 'accesorios' }}" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}" data-imei="{{ p.imei|lower if p.imei else '' }}" data-imei2="{{ p.imei2|lower if p.imei2 else '' }}">
                 <div class="card h-100 border-0 shadow-sm cursor-pointer product-card" 
                      data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario, "imei": p.imei, "imei2": p.imei2, "inventario": p.inventario}|tojson|safe }}'
                      data-variants='{{ vars_data|tojson|safe }}'
@@ -852,6 +860,14 @@
     </div>
 </div>
 
+<script type="application/json" id="listaProveedoresData">
+[
+    {% for prov in providers %}
+    {"id": {{ prov.id }}, "nombre": {{ prov.nombre|tojson }}, "saldo": {{ prov.saldo_pendiente|int }}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+]
+</script>
+
 <script>
     const csrf_token = "{{ csrf_token() }}";
     let carrito = [];
@@ -861,11 +877,7 @@
     let editRetomaIndex = -1;
     let pagosMixtos = [];
 
-    const LISTA_PROVEEDORES = [
-        {% for prov in providers %}
-        { id: {{ prov.id }}, nombre: {{ prov.nombre|tojson }}, saldo: {{ prov.saldo_pendiente|int }} },
-        {% endfor %}
-    ];
+    const LISTA_PROVEEDORES = JSON.parse(document.getElementById('listaProveedoresData')?.textContent || '[]');
 
     const METODOS_DISPONIBLES = [
         { value: 'efectivo',        label: '💵 Efectivo' },
@@ -991,20 +1003,54 @@
         return '$' + num.toLocaleString('es-CO');
     }
 
-    document.getElementById('productSearch').addEventListener('keyup', function(e) {
-        const query = e.target.value.toLowerCase();
+    let categoriaActivaCaja = 'equipos';
+
+    function seleccionarCategoriaCaja(cat) {
+        categoriaActivaCaja = cat;
+        const btnEq = document.getElementById('btnCatEquipos');
+        const btnAcc = document.getElementById('btnCatAccesorios');
+        if (btnEq && btnAcc) {
+            if (cat === 'equipos') {
+                btnEq.classList.remove('btn-outline-primary');
+                btnEq.classList.add('btn-primary');
+                btnAcc.classList.remove('btn-primary');
+                btnAcc.classList.add('btn-outline-primary');
+            } else {
+                btnAcc.classList.remove('btn-outline-primary');
+                btnAcc.classList.add('btn-primary');
+                btnEq.classList.remove('btn-primary');
+                btnEq.classList.add('btn-outline-primary');
+            }
+        }
+        filtrarProductosCaja();
+    }
+
+    function filtrarProductosCaja() {
+        const searchEl = document.getElementById('productSearch');
+        const query = searchEl ? searchEl.value.toLowerCase().trim() : '';
         document.querySelectorAll('.product-card-container').forEach(card => {
-            const name = card.dataset.name;
-            const sku = card.dataset.sku;
+            const name = card.dataset.name || '';
+            const sku = card.dataset.sku || '';
             const imei = card.dataset.imei || '';
             const imei2 = card.dataset.imei2 || '';
-            if (name.includes(query) || sku.includes(query) || imei.includes(query) || imei2.includes(query)) {
-                card.style.display = 'block';
+            const cat = card.dataset.categoria || '';
+
+            if (query.length > 0) {
+                // Si hay texto en la barra de búsqueda, busca en AMBOS (Equipos y Accesorios)
+                if (name.includes(query) || sku.includes(query) || imei.includes(query) || imei2.includes(query)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
             } else {
-                card.style.display = 'none';
+                // Sin texto de búsqueda, filtra por el botón seleccionado (Equipos o Accesorios)
+                card.style.display = (cat === categoriaActivaCaja) ? 'block' : 'none';
             }
         });
-    });
+    }
+
+    document.getElementById('productSearch').addEventListener('input', filtrarProductosCaja);
+    document.addEventListener('DOMContentLoaded', filtrarProductosCaja);
 
     function handleProductClick(el) {
         const pData = JSON.parse(el.dataset.product);
