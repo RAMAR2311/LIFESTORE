@@ -316,9 +316,9 @@
                                             </div>
                                         </div>
 
-                                        <div class="row g-2 mb-3">
+                                        <div class="row g-3 mb-3">
                                             <!-- Estado -->
-                                            <div class="col-4">
+                                            <div class="col-12">
                                                 <label class="form-label small fw-bold text-muted">Estado del Arreglo *</label>
                                                 <select name="estado" class="form-select form-select-sm" required>
                                                     <option value="EN_REVISION" {% if s.estado == 'EN_REVISION' %}selected{% endif %}>En Revisión</option>
@@ -329,7 +329,7 @@
                                                 </select>
                                             </div>
                                             <!-- Técnico Asignado -->
-                                            <div class="col-4">
+                                            <div class="col-12 col-md-6">
                                                 <label class="form-label small fw-bold text-muted">Técnico Responsable</label>
                                                 <select name="technician_id" class="form-select form-select-sm">
                                                     <option value="">-- Sin Asignar --</option>
@@ -339,7 +339,7 @@
                                                 </select>
                                             </div>
                                             <!-- Asesor Responsable -->
-                                            <div class="col-4">
+                                            <div class="col-12 col-md-6">
                                                 <label class="form-label small fw-bold text-muted">Asesor Responsable</label>
                                                 <select name="asesor_id" class="form-select form-select-sm">
                                                     <option value="">-- Sin Asesor --</option>

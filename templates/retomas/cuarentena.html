@@ -307,6 +307,7 @@
                                                 </div>
                                             </div>
                                             {% endif %}
+                                            <div id="retoma_error_{{ r.id }}" class="alert alert-danger d-none py-2 px-3 small mb-3 rounded-3" role="alert"></div>
                                             <div class="row g-3 mb-3">
                                                 <div class="col-md-4">
                                                     <label class="form-label fw-bold text-truncate" title="Costo de Retoma">Costo de Retoma</label>
@@ -658,6 +659,21 @@
         const sugeridoInput = form.querySelector('input[name="precio_sugerido"]');
         const minimoInput = form.querySelector('input[name="precio_minimo"]');
         const totalInput = document.getElementById(`retoma_costo_total_${id}`);
+        const errorBox = document.getElementById(`retoma_error_${id}`);
+
+        const showError = (msg, inputEl) => {
+            if (errorBox) {
+                errorBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation me-1"></i> ${msg}`;
+                errorBox.classList.remove('d-none');
+            }
+            if (inputEl) inputEl.focus();
+            return false;
+        };
+
+        if (errorBox) {
+            errorBox.classList.add('d-none');
+            errorBox.textContent = '';
+        }
 
         const parseNum = (val) => parseInt(String(val || '').replace(/[^\d]/g, ''), 10) || 0;
         const sugerido = parseNum(sugeridoInput ? sugeridoInput.value : 0);
@@ -665,24 +681,16 @@
         const costoTotal = parseNum(totalInput ? totalInput.value : 0);
 
         if (sugerido <= 0) {
-            alert('Debes ingresar un Precio Sugerido Venta mayor a $0.');
-            if (sugeridoInput) sugeridoInput.focus();
-            return false;
+            return showError('Debes ingresar un <strong>Precio Sugerido Venta</strong> mayor a $0.', sugeridoInput);
         }
         if (minimo <= 0) {
-            alert('Debes ingresar un Precio Mínimo Permitido mayor a $0.');
-            if (minimoInput) minimoInput.focus();
-            return false;
+            return showError('Debes ingresar un <strong>Precio Mínimo Permitido</strong> mayor a $0.', minimoInput);
         }
         if (sugerido < costoTotal) {
-            alert(`El Precio Sugerido Venta ($${sugerido.toLocaleString('es-CO')}) no puede ser menor al Costo Total ($${costoTotal.toLocaleString('es-CO')}).`);
-            if (sugeridoInput) sugeridoInput.focus();
-            return false;
+            return showError(`El <strong>Precio Sugerido Venta</strong> ($${sugerido.toLocaleString('es-CO')}) no puede ser menor al Costo Total ($${costoTotal.toLocaleString('es-CO')}).`, sugeridoInput);
         }
         if (minimo < costoTotal) {
-            alert(`El Precio Mínimo Permitido ($${minimo.toLocaleString('es-CO')}) no puede ser menor al Costo Total ($${costoTotal.toLocaleString('es-CO')}).`);
-            if (minimoInput) minimoInput.focus();
-            return false;
+            return showError(`El <strong>Precio Mínimo Permitido</strong> ($${minimo.toLocaleString('es-CO')}) no puede ser menor al Costo Total ($${costoTotal.toLocaleString('es-CO')}).`, minimoInput);
         }
 
         if (typeof cleanPrices === 'function') {
