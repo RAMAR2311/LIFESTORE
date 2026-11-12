@@ -1272,6 +1272,8 @@ def catalogo():
 
     # Conteo rápido de KPIs del catálogo
     total_catalogo = base_query.count()
+    from models import ReferenceImage
+    ref_images_map = {r.modelo_celular: r.imagen for r in ReferenceImage.query.all()}
 
     return render_template(
         'sales/catalogo.html',
@@ -1283,7 +1285,8 @@ def catalogo():
         branch_filtro=branch_filtro,
         sucursales_activas=sucursales_activas,
         estado_filtro=estado_filtro,
-        total_catalogo=total_catalogo
+        total_catalogo=total_catalogo,
+        ref_images_map=ref_images_map
     )
 
 @sales_bp.route('/caja_visual', methods=['GET'])
@@ -1374,10 +1377,13 @@ def caja_visual():
     providers = Provider.query.order_by(Provider.nombre).all()
     from models import GiftCombo
     combos_obsequio = GiftCombo.query.filter_by(activo=True).all()
+    from models import ReferenceImage
+    ref_images_map = {r.modelo_celular: r.imagen for r in ReferenceImage.query.all()}
     
     return render_template(
         'sales/caja_visual.html', 
         productos=productos, 
+        ref_images_map=ref_images_map,
         asesores=asesores, 
         providers=providers, 
         combos_obsequio=combos_obsequio,

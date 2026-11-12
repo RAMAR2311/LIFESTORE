@@ -169,10 +169,11 @@ def inventario():
                 break
         celular_ubicaciones[c.id] = ubicacion
 
-    from models import Technician, Asesor
+    from models import Technician, Asesor, ReferenceImage
     tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
     asesores_disponibles = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
     sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    ref_images_map = {r.modelo_celular: r.imagen for r in ReferenceImage.query.all()}
 
     partners_disponibles = ExchangePartner.query.filter_by(activo=True).order_by(ExchangePartner.nombre.asc()).all()
     return render_template('celulares/inventario.html',
@@ -186,6 +187,7 @@ def inventario():
                            referencias_seleccionadas=referencias_seleccionadas,
                            referencia=referencias_seleccionadas[0] if len(referencias_seleccionadas) == 1 else '',
                            referencias_disponibles=referencias_disponibles,
+                           ref_images_map=ref_images_map,
                            estado=estado,
                            stock_activo=stock_activo,
                            costo_total=costo_total,
@@ -194,6 +196,60 @@ def inventario():
                            celular_ubicaciones=celular_ubicaciones,
                            sucursales_activas=sucursales_activas,
                            active_b_id=active_b_id)
+
+
+@celulares_bp.route('/imagenes-referencia', methods=['POST'])
+@login_required
+@admin_required
+def guardar_imagen_referencia():
+    from models import ReferenceImage
+    modelo_celular = request.form.get('modelo_celular', '').strip()
+    archivo = request.files.get('imagen')
+
+    if not modelo_celular:
+        flash('Debes seleccionar o escribir una referencia/modelo.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    if not archivo or not archivo.filename:
+        flash('Debes seleccionar una imagen válida.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    filename = secure_filename(archivo.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+        flash('Formato de imagen no permitido. Usa JPG, PNG, WEBP o GIF.', 'danger')
+        return redirect(url_for('celulares_bp.inventario'))
+
+    nuevo_nombre = f"ref_{int(obtener_hora_bogota().timestamp())}_{filename}"
+    upload_folder = os.path.join(current_app.root_path, 'static', 'uploads')
+    os.makedirs(upload_folder, exist_ok=True)
+    archivo.save(os.path.join(upload_folder, nuevo_nombre))
+
+    ref_img = ReferenceImage.query.filter_by(modelo_celular=modelo_celular).first()
+    if not ref_img:
+        ref_img = ReferenceImage(modelo_celular=modelo_celular, imagen=nuevo_nombre)
+        db.session.add(ref_img)
+    else:
+        ref_img.imagen = nuevo_nombre
+        ref_img.updated_at = obtener_hora_bogota()
+
+    db.session.commit()
+    flash(f'Imagen fija asignada a la referencia "{modelo_celular}".', 'success')
+    return redirect(url_for('celulares_bp.inventario'))
+
+
+@celulares_bp.route('/imagenes-referencia/eliminar', methods=['POST'])
+@login_required
+@admin_required
+def eliminar_imagen_referencia():
+    from models import ReferenceImage
+    modelo_celular = request.form.get('modelo_celular', '').strip()
+    ref_img = ReferenceImage.query.filter_by(modelo_celular=modelo_celular).first()
+    if ref_img:
+        db.session.delete(ref_img)
+        db.session.commit()
+        flash(f'Imagen fija eliminada para "{modelo_celular}".', 'info')
+    return redirect(url_for('celulares_bp.inventario'))
 
 @celulares_bp.route('/prestar/<int:id>', methods=['POST'])
 @login_required

@@ -1284,3 +1284,17 @@ class SystemSetting(db.Model):
         return setting
 
 
+class ReferenceImage(db.Model):
+    """Imagen fija asignada a una referencia/modelo de celular."""
+    __tablename__ = 'reference_images'
+
+    id = db.Column(db.Integer, primary_key=True)
+    modelo_celular = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    imagen = db.Column(db.String(255), nullable=False)
+    updated_at = db.Column(db.DateTime, default=obtener_hora_bogota, onupdate=obtener_hora_bogota)
+
+    def __init__(self, **kwargs):
+        super(ReferenceImage, self).__init__(**kwargs)
+
+
+

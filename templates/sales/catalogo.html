@@ -173,6 +173,13 @@ function enviarAlCarritoDesdeCatalogo(btn) {
                 </div>
             </div>
 
+            {% set img_mostrar = p.imagen or (ref_images_map.get(p.modelo_celular) if (ref_images_map is defined and p.modelo_celular) else None) %}
+            {% if img_mostrar %}
+            <div class="bg-light border-bottom text-center p-2" style="height: 150px;">
+                <img src="{{ url_for('static', filename='uploads/' ~ img_mostrar) }}" alt="{{ p.modelo_celular or p.nombre }}" style="height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
+            {% endif %}
+
             <div class="card-body p-3 d-flex flex-column">
                 <!-- Marca & Referencia Principal -->
                 <div class="mb-1">
