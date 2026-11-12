@@ -249,7 +249,7 @@
                     {% if venta.pagos|length > 1 %}
                     PAGO DIVIDIDO
                     {% else %}
-                    {{ venta.metodo_pago_display|upper }}
+                    {{ venta.metodo_pago_cliente|upper }}
                     {% endif %}
                 </div>
             </div>
@@ -298,9 +298,8 @@
                         {% endif %}
 
                         {% if prod %}
-                        {# Limpiar prefijo 'Celular' si se trata de computadores, laptops, tablets, iPads, gafas, etc.
-                        #}
-                        {% set prod_nombre = prod.nombre or 'Producto' %}
+                        {# Limpiar prefijo 'Celular' si se trata de computadores, laptops, tablets, iPads, etc. y prefijos 'Externo' #}
+                        {% set prod_nombre = (prod.nombre or 'Producto')|replace('Externo ', '')|replace('Acc. Externo ', '') %}
                         {% if prod_nombre.startswith('Celular ') %}
                         {% set lower_name = prod_nombre|lower %}
                         {% if 'macbook' in lower_name or 'laptop' in lower_name or 'computador' in lower_name or 'pc' in
@@ -316,15 +315,6 @@
                         {% endif %}
 
                         <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
-                            {% if prod.inventario %}
-                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: {{ prod.inventario }}
-                            </div>
-                            {% elif prod.proveedor %}
-                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo ({{
-                                prod.proveedor }})</div>
-                            {% elif prod.tipo_inventario == 'externos' %}
-                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo</div>
-                            {% endif %}
                             {% if prod.memoria %}Cap: {{ prod.memoria }} {% endif %}
                             {% if prod.bateria %}Bat: {{ prod.bateria }}% {% endif %}
                             {% if prod.color %}Col: {{ prod.color }}{% endif %}
@@ -333,22 +323,16 @@
                             {% if prod.imei2 %}| IMEI 2: {{ prod.imei2 }}{% endif %}
                         </div>
                         {% elif detalle.nombre_manual %}
-                        {{ detalle.nombre_manual[:50] }}{% if detalle.nombre_manual|length > 50 %}...{% endif %}
-                        {% if prov_inv %}
+                        {% set manual_clean = detalle.nombre_manual|replace('Externo ', '')|replace('Acc. Externo ', '') %}
+                        {{ manual_clean[:50] }}{% if manual_clean|length > 50 %}...{% endif %}
+                        {% if prov_inv and prov_inv.numero_factura and 'IMEI' in prov_inv.numero_factura %}
                         <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
-                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo {% if
-                                prov_inv.provider %}({{ prov_inv.provider.nombre }}){% endif %}</div>
-                            {% if prov_inv.numero_factura and 'IMEI' in prov_inv.numero_factura %}
                             <div>{{ prov_inv.numero_factura }}</div>
-                            {% endif %}
                         </div>
                         {% endif %}
                         {% elif prov_inv %}
-                        {{ (prov_inv.numero_factura or prov_inv.descripcion or 'Equipo Externo')[:45] }}
-                        <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
-                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo {% if
-                                prov_inv.provider %}({{ prov_inv.provider.nombre }}){% endif %}</div>
-                        </div>
+                        {% set desc_clean = (prov_inv.numero_factura or prov_inv.descripcion or 'Equipo')|replace('Externo ', '')|replace('Equipo Externo', 'Equipo') %}
+                        {{ desc_clean[:45] }}
                         {% else %}
                         Artículo (ID: {{ detalle.product_id or 'S/N' }})
                         {% endif %}
@@ -404,8 +388,7 @@
                     PAGOS:</p>
                 {% for pago in venta.pagos %}
                 <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0;">
-                    <span style="text-transform: capitalize;">{{ 'Bold' if pago.metodo_pago in ['bold', 'bolt'] else
-                        pago.metodo_pago }}:</span>
+                    <span style="text-transform: capitalize;">{{ pago.metodo_pago_cliente }}:</span>
                     <span style="font-weight: 700;">${{ (pago.monto)|cop }}</span>
                 </div>
                 {% endfor %}

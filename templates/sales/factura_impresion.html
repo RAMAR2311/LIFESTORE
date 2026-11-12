@@ -470,15 +470,15 @@
             <tr>
                 <td style="text-align: center; font-weight: 700;">{{ detalle.cantidad_vendida }}</td>
                 <td style="font-family: 'Roboto Mono', monospace; font-size: 0.72rem;">
-                    {{ (prod.sku if prod else 'EXTERNO') }}
+                    {{ (prod.sku if (prod and prod.sku and not prod.sku.startswith('EXT-')) else 'REF') }}
                 </td>
                 <td>
                     <div class="prod-title">
                         {% if prod %}
-                            {{ prod.nombre }}
+                            {{ prod.nombre|replace('Externo ', '')|replace('Acc. Externo ', '') }}
                             {% if detalle.variante %} - <span style="font-weight: 500;">{{ detalle.variante.nombre_variante }}</span>{% endif %}
                         {% elif detalle.nombre_manual %}
-                            {{ detalle.nombre_manual }}
+                            {{ detalle.nombre_manual|replace('Externo ', '')|replace('Acc. Externo ', '') }}
                         {% else %}
                             Ítem ID #{{ detalle.product_id or 'S/N' }}
                         {% endif %}
@@ -546,7 +546,8 @@
                         {% elif pago.metodo_pago in ['bold', 'bolt'] %}<i class="fa-solid fa-bolt me-1 text-warning"></i> Bold
                         {% elif pago.metodo_pago == 'addi' %}<i class="fa-solid fa-cart-shopping me-1 text-info"></i> Addi
                         {% elif pago.metodo_pago == 'sistecredito' %}<i class="fa-solid fa-id-card me-1 text-primary"></i> Sistecrédito
-                        {% else %}{{ pago.metodo_pago }}
+                        {% elif pago.metodo_pago == 'abono_tercero' %}<i class="fa-solid fa-globe me-1 text-primary"></i> Pago Electrónico
+                        {% else %}{{ pago.metodo_pago_cliente }}
                         {% endif %}
                     </span>
                     <span style="font-family: 'Roboto Mono', monospace;">${{ pago.monto|cop }}</span>
@@ -554,7 +555,7 @@
                 {% endfor %}
             {% else %}
                 <div class="payment-row">
-                    <span style="text-transform: capitalize;">{{ venta.metodo_pago }}</span>
+                    <span style="text-transform: capitalize;">{{ venta.metodo_pago_cliente }}</span>
                     <span style="font-family: 'Roboto Mono', monospace;">${{ venta.monto_total|cop }}</span>
                 </div>
             {% endif %}

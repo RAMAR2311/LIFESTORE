@@ -382,6 +382,32 @@ class Sale(db.Model):
             return nombres.get(m, m.capitalize())
         return 'Pago Mixto'
 
+    @property
+    def metodo_pago_cliente(self):
+        """Retorna el método de pago limpio y comercial para la factura o ticket del cliente.
+        Evita mostrar términos internos como 'Abono a Terceros' mostrando 'Pago Electrónico'."""
+        if not self.pagos:
+            m = (self.metodo_pago or 'efectivo').lower()
+            if m == 'abono_tercero':
+                return 'Pago Electrónico'
+            nombres = {
+                'efectivo': 'Efectivo',
+                'nequi': 'Nequi',
+                'bancolombia': 'Bancolombia',
+                'davivienda': 'Davivienda',
+                'daviplata': 'Daviplata',
+                'bold': 'Bold',
+                'bolt': 'Bold',
+                'addi': 'Addi',
+                'sistecredito': 'Sistecrédito',
+                'sitecredito': 'Sistecrédito',
+                'tarjeta_credito': 'Tarjeta de Crédito'
+            }
+            return nombres.get(m, m.capitalize())
+        if len(self.pagos) == 1:
+            return self.pagos[0].metodo_pago_cliente
+        return 'Pago Dividido'
+
 class SalePayment(db.Model):
     """Modelo para soportar pagos mixtos/parciales por venta.
     Permite registrar múltiples métodos de pago en una sola venta.
@@ -396,6 +422,27 @@ class SalePayment(db.Model):
     comprobante = db.Column(db.String(255), nullable=True)
 
     provider = db.relationship('Provider', backref=db.backref('sale_payments', lazy=True))
+
+    @property
+    def metodo_pago_cliente(self):
+        """Nombre comercial del método de pago para el cliente en factura/ticket."""
+        m = (self.metodo_pago or 'efectivo').lower()
+        if m == 'abono_tercero':
+            return 'Pago Electrónico'
+        nombres = {
+            'efectivo': 'Efectivo',
+            'nequi': 'Nequi',
+            'bancolombia': 'Bancolombia',
+            'davivienda': 'Davivienda',
+            'daviplata': 'Daviplata',
+            'bold': 'Bold',
+            'bolt': 'Bold',
+            'addi': 'Addi',
+            'sistecredito': 'Sistecrédito',
+            'sitecredito': 'Sistecrédito',
+            'tarjeta_credito': 'Tarjeta de Crédito'
+        }
+        return nombres.get(m, m.capitalize())
 
     def __init__(self, **kwargs):
         super(SalePayment, self).__init__(**kwargs)
