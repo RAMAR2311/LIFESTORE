@@ -1257,8 +1257,16 @@ def trazabilidad():
     
     eventos = []
     producto_info = None
+    estado_actual = None
+    es_coordinador = getattr(current_user, 'rol', '') == 'coordinador'
     
     if clean_imei:
+        from models import (
+            StockAdjustment, StockTransferItem, StockTransfer,
+            ProviderInvoice, Retoma, Maneo, Warranty,
+            TechnicalService, DeviceExchange, BranchStock, Branch
+        )
+
         # 1. Buscar productos que contengan el IMEI (históricos o activos)
         productos = Product.query.filter(
             or_(
@@ -1270,6 +1278,20 @@ def trazabilidad():
             )
         ).all()
         
+        # Buscar también productos hermanos (ej. si existió con -EXT o duplicado)
+        hermanos = Product.query.filter(
+            or_(
+                Product.imei == f"{clean_imei}-EXT",
+                Product.imei == clean_imei,
+                Product.imei2 == clean_imei
+            )
+        ).all()
+        for h in hermanos:
+            if h not in productos:
+                productos.append(h)
+
+        p_ids = [p.id for p in productos]
+
         # Guardar info principal del equipo si se encuentra
         if productos:
             p_latest = productos[-1] # El registro más reciente
@@ -1286,32 +1308,32 @@ def trazabilidad():
                 'proveedor': p_latest.proveedor,
                 'inventario': p_latest.inventario,
                 'stock_actual': p_latest.total_stock,
-                'precio_costo': p_latest.precio_costo,
+                'precio_costo': None if es_coordinador else p_latest.precio_costo,
                 'precio_sugerido': p_latest.precio_sugerido
             }
 
-        p_ids = [p.id for p in productos]
-
         # Evento 1: Ingreso a inventario (para cada producto encontrado)
         for p in productos:
+            detalles_ingreso = {
+                'Producto': p.nombre,
+                'Proveedor': p.proveedor or 'Cliente/Externo',
+                'Inventario': p.inventario or 'N/A',
+                'Precio Sugerido': f"${float(p.precio_sugerido or 0):,.0f}".replace(',', '.'),
+                'Estado Stock': 'En Stock (Disponible)' if p.total_stock > 0 else 'Agotado (Vendido / Salida)'
+            }
+            if not es_coordinador:
+                detalles_ingreso['Precio Costo'] = f"${float(p.precio_costo or 0):,.0f}".replace(',', '.')
+
             eventos.append({
                 'tipo': 'COMPRA_INGRESO',
                 'titulo': f'Ingreso a Inventario ({p.inventario or "Tienda"})',
                 'fecha': p.fecha_creacion,
                 'icono': 'fa-solid fa-boxes-stacked text-primary',
                 'badge_color': 'bg-primary text-white',
-                'detalles': {
-                    'Producto': p.nombre,
-                    'Proveedor': p.proveedor or 'Cliente/Externo',
-                    'Inventario': p.inventario or 'N/A',
-                    'Precio Costo': f"${float(p.precio_costo or 0):,.0f}".replace(',', '.'),
-                    'Precio Sugerido': f"${float(p.precio_sugerido or 0):,.0f}".replace(',', '.'),
-                    'Estado Stock': 'En Stock (Disponible)' if p.total_stock > 0 else 'Agotado (Vendido)'
-                }
+                'detalles': detalles_ingreso
             })
 
         # Evento 1.1: Ajustes e Ingresos de Stock (StockAdjustment) con sucursal
-        from models import StockAdjustment
         if p_ids:
             ajustes = StockAdjustment.query.filter(StockAdjustment.product_id.in_(p_ids)).all()
             for aj in ajustes:
@@ -1319,7 +1341,7 @@ def trazabilidad():
                 admin_name = aj.admin.nombre if aj.admin else 'Sistema'
                 eventos.append({
                     'tipo': 'AJUSTE_STOCK',
-                    'titulo': f'Movimiento: {aj.tipo_movimiento}',
+                    'titulo': f'Ajuste de Stock: {aj.tipo_movimiento}',
                     'fecha': aj.fecha_ajuste,
                     'icono': 'fa-solid fa-sliders text-secondary',
                     'badge_color': 'bg-secondary text-white',
@@ -1328,12 +1350,12 @@ def trazabilidad():
                         'Registrado por': admin_name,
                         'Stock Anterior': aj.stock_anterior,
                         'Stock Nuevo': aj.stock_nuevo,
-                        'Tipo': aj.tipo_movimiento
+                        'Tipo Movimiento': aj.tipo_movimiento
                     }
                 })
 
         # Evento 1.2: Traslados entre sedes (StockTransferItem -> StockTransfer)
-        from models import StockTransferItem, StockTransfer
+        transf_items = []
         if p_ids:
             transf_items = StockTransferItem.query.filter(StockTransferItem.product_id.in_(p_ids)).all()
             for ti in transf_items:
@@ -1350,7 +1372,7 @@ def trazabilidad():
                         'icono': 'fa-solid fa-truck-arrow-right text-info',
                         'badge_color': 'bg-info text-dark',
                         'detalles': {
-                            'Transferencia': f"#{t.id} - {t.numero_guia}",
+                            'Transferencia': f"#{t.id} - {t.numero_guia or 'Sin guía'}",
                             'Ruta': f"{origen_nom} ➔ {destino_nom}",
                             'Estado': t.estado.upper(),
                             'Cantidad': ti.cantidad,
@@ -1361,21 +1383,6 @@ def trazabilidad():
                     })
 
         # 2. Buscar Ventas (SaleDetail) vinculadas a los productos o al IMEI
-        from models import ProviderInvoice
-        
-        # Buscar también productos hermanos (ej. si existió con -EXT o duplicado)
-        hermanos = Product.query.filter(
-            or_(
-                Product.imei == f"{clean_imei}-EXT",
-                Product.imei == clean_imei,
-                Product.imei2 == clean_imei
-            )
-        ).all()
-        for h in hermanos:
-            if h.id not in p_ids:
-                p_ids.append(h.id)
-
-        # Buscar ventas directas en SaleDetail
         detalles_venta = []
         if p_ids:
             detalles_venta = SaleDetail.query.filter(SaleDetail.product_id.in_(p_ids)).all()
@@ -1413,43 +1420,41 @@ def trazabilidad():
             })
 
         # Si aún no encontró la venta en SaleDetail, buscar a través de ProviderInvoice generada para este IMEI
-        if clean_imei:
-            invoices_prov = ProviderInvoice.query.filter(
-                or_(
-                    ProviderInvoice.numero_factura.ilike(f"%{clean_imei}%"),
-                    ProviderInvoice.descripcion.ilike(f"%{clean_imei}%")
-                )
-            ).all()
-            for inv in invoices_prov:
-                if inv.sale and inv.sale.id not in ventas_procesadas:
-                    v = inv.sale
-                    ventas_procesadas.add(v.id)
-                    cliente_nombre = 'Cliente General'
-                    if hasattr(v, 'cliente') and v.cliente:
-                        cliente_nombre = f"{v.cliente.nombre} (Doc: {v.cliente.documento})"
-                    
-                    branch_venta = v.branch.nombre if getattr(v, 'branch', None) else (v.sucursal or 'N/A')
+        invoices_prov = ProviderInvoice.query.filter(
+            or_(
+                ProviderInvoice.numero_factura.ilike(f"%{clean_imei}%"),
+                ProviderInvoice.descripcion.ilike(f"%{clean_imei}%")
+            )
+        ).all()
+        for inv in invoices_prov:
+            if inv.sale and inv.sale.id not in ventas_procesadas:
+                v = inv.sale
+                ventas_procesadas.add(v.id)
+                cliente_nombre = 'Cliente General'
+                if hasattr(v, 'cliente') and v.cliente:
+                    cliente_nombre = f"{v.cliente.nombre} (Doc: {v.cliente.documento})"
+                
+                branch_venta = v.branch.nombre if getattr(v, 'branch', None) else (v.sucursal or 'N/A')
 
-                    eventos.append({
-                        'tipo': 'VENTA',
-                        'titulo': f'Venta de Celular (Factura #{v.id})',
-                        'fecha': v.fecha_venta,
-                        'icono': 'fa-solid fa-cart-shopping text-success',
-                        'badge_color': 'bg-success text-white',
-                        'sale_id': v.id,
-                        'detalles': {
-                            'Factura': f"#{v.id}",
-                            'Cliente': cliente_nombre,
-                            'Vendedor': v.vendedor.nombre if v.vendedor else 'N/A',
-                            'Sucursal': branch_venta,
-                            'Monto Venta': f"${float(v.monto_total or 0):,.0f}".replace(',', '.'),
-                            'Método de Pago': v.metodo_pago_display,
-                            'Proveedor Liquidado': inv.provider.nombre if inv.provider else 'N/A'
-                        }
-                    })
+                eventos.append({
+                    'tipo': 'VENTA',
+                    'titulo': f'Venta de Celular (Factura #{v.id})',
+                    'fecha': v.fecha_venta,
+                    'icono': 'fa-solid fa-cart-shopping text-success',
+                    'badge_color': 'bg-success text-white',
+                    'sale_id': v.id,
+                    'detalles': {
+                        'Factura': f"#{v.id}",
+                        'Cliente': cliente_nombre,
+                        'Vendedor': v.vendedor.nombre if v.vendedor else 'N/A',
+                        'Sucursal': branch_venta,
+                        'Monto Venta': f"${float(v.monto_total or 0):,.0f}".replace(',', '.'),
+                        'Método de Pago': v.metodo_pago_display,
+                        'Proveedor Liquidado': inv.provider.nombre if inv.provider else 'N/A'
+                    }
+                })
 
         # 3. Buscar Retomas (Retoma) vinculadas al IMEI
-        from models import Retoma
         retomas = Retoma.query.filter(
             or_(
                 Retoma.imei1 == clean_imei,
@@ -1461,6 +1466,18 @@ def trazabilidad():
 
         for r in retomas:
             branch_retoma = r.branch.nombre if getattr(r, 'branch', None) else (r.venta.sucursal if r.venta else 'N/A')
+            detalles_retoma = {
+                'Equipo Entregado': f"{r.marca or ''} {r.modelo}".strip(),
+                'Sucursal Receptor': branch_retoma,
+                'Vendedor Receptor': r.vendedor.nombre if r.vendedor else 'N/A',
+                'Estado': r.estado.upper(),
+                'OK Contabilidad': 'SÍ' if r.ok_contabilidad else 'NO',
+                'Observaciones': r.observaciones or 'Sin notas'
+            }
+            if not es_coordinador:
+                detalles_retoma['Valor de Retoma'] = f"${float(r.valor_retoma or 0):,.0f}".replace(',', '.')
+                detalles_retoma['Costo Arreglos'] = f"${float(r.arreglos or 0):,.0f}".replace(',', '.')
+
             eventos.append({
                 'tipo': 'RETOMA',
                 'titulo': f'Recibido como Retoma (Retoma #{r.id})',
@@ -1468,16 +1485,7 @@ def trazabilidad():
                 'icono': 'fa-solid fa-recycle text-warning',
                 'badge_color': 'bg-warning text-dark',
                 'sale_id': r.sale_id,
-                'detalles': {
-                    'Equipo Entregado': f"{r.marca or ''} {r.modelo}".strip(),
-                    'Sucursal Receptor': branch_retoma,
-                    'Valor de Retoma': f"${float(r.valor_retoma or 0):,.0f}".replace(',', '.'),
-                    'Costo Arreglos': f"${float(r.arreglos or 0):,.0f}".replace(',', '.'),
-                    'Vendedor Receptor': r.vendedor.nombre if r.vendedor else 'N/A',
-                    'Estado': r.estado.upper(),
-                    'OK Contabilidad': 'SÍ' if r.ok_contabilidad else 'NO',
-                    'Observaciones': r.observaciones or 'Sin notas'
-                }
+                'detalles': detalles_retoma
             })
 
         # 4. Buscar Préstamos de Maneo vinculados
@@ -1499,8 +1507,123 @@ def trazabilidad():
                     }
                 })
 
-        # 5. Buscar Garantías vinculadas a las ventas del IMEI o producto
-        from models import Warranty
+        # 5. SOPORTE TÉCNICO / REPARACIONES (TechnicalService)
+        servicios_tec = TechnicalService.query.filter(
+            or_(
+                TechnicalService.imei == clean_imei,
+                TechnicalService.imei.like(f"%{clean_imei}%"),
+                (TechnicalService.product_id.in_(p_ids)) if p_ids else False
+            )
+        ).all()
+
+        for st in servicios_tec:
+            taller_nombre = st.technician.nombre if st.technician else 'Taller Externo'
+            if st.technician and st.technician.telefono:
+                taller_nombre += f" (Tel: {st.technician.telefono})"
+            
+            branch_st = st.branch.nombre if st.branch else 'Sede Central'
+            responsable = st.asesor.nombre if st.asesor else (st.created_by.nombre if st.created_by else 'N/A')
+
+            detalles_st = {
+                'Taller / Técnico': taller_nombre,
+                'Origen': 'Garantía de Cliente' if st.origen == 'GARANTIA' else 'Inventario Tienda',
+                'Motivo / Falla': st.motivo_falla,
+                'Tipo de Arreglo': st.tipo_arreglo,
+                'Estado': st.estado.replace('_', ' '),
+                'Sucursal Remitente': branch_st,
+                'Diagnóstico Técnico': st.diagnostico_tecnico or 'En revisión preliminar',
+                'Solución / Reparación': st.solucion_aplicada or 'En proceso',
+                'Responsable': responsable,
+                'Fecha Estimada Entrega': st.fecha_estimada.strftime('%d/%m/%Y') if st.fecha_estimada else 'No estimada',
+                'Fecha Retorno Taller': st.fecha_salida.strftime('%d/%m/%Y %H:%M') if st.fecha_salida else 'Aún en taller técnico'
+            }
+            if not es_coordinador:
+                detalles_st['Costo Reparación'] = f"${float(st.costo_reparacion or 0):,.0f}".replace(',', '.')
+
+            badge_st = 'bg-warning text-dark' if st.estado in ['EN_REVISION', 'EN_REPARACION'] else ('bg-success text-white' if st.estado in ['REPARADO', 'ENTREGADO'] else 'bg-secondary text-white')
+
+            eventos.append({
+                'tipo': 'SOPORTE_TECNICO',
+                'titulo': f'Envío a Soporte Técnico: {st.tipo_arreglo} ({st.estado.replace("_", " ")})',
+                'fecha': st.fecha_ingreso,
+                'icono': 'fa-solid fa-screwdriver-wrench text-warning',
+                'badge_color': badge_st,
+                'detalles': detalles_st
+            })
+
+            # Si el servicio técnico ya fue resuelto y entregado, generar hito de retorno
+            if st.fecha_salida:
+                eventos.append({
+                    'tipo': 'SOPORTE_RETORNO',
+                    'titulo': f'Retorno de Soporte Técnico: {st.estado.replace("_", " ")}',
+                    'fecha': st.fecha_salida,
+                    'icono': 'fa-solid fa-circle-check text-success',
+                    'badge_color': 'bg-success text-white',
+                    'detalles': {
+                        'Taller': taller_nombre,
+                        'Resultado': st.estado.replace('_', ' '),
+                        'Solución Aplicada': st.solucion_aplicada or 'Reparación completada',
+                        'Recibido en Sucursal': branch_st,
+                        'Fecha Entrega': st.fecha_salida.strftime('%d/%m/%Y %H:%M')
+                    }
+                })
+
+        # 6. CAMBIOS DE CELULARES (DeviceExchange)
+        cambios_salida = DeviceExchange.query.filter(
+            or_(
+                DeviceExchange.imei_salida == clean_imei,
+                DeviceExchange.imei_salida.like(f"%{clean_imei}%"),
+                (DeviceExchange.product_salida_id.in_(p_ids)) if p_ids else False
+            )
+        ).all()
+
+        for cs in cambios_salida:
+            partner_nom = cs.partner.nombre if cs.partner else 'Tercero / Aliado'
+            branch_cs = cs.branch.nombre if cs.branch else 'Sede Central'
+            eventos.append({
+                'tipo': 'CAMBIO_SALIDA',
+                'titulo': f'Salida por Intercambio con Aliado ({partner_nom})',
+                'fecha': cs.fecha_salida,
+                'icono': 'fa-solid fa-right-left text-danger',
+                'badge_color': 'bg-danger text-white',
+                'detalles': {
+                    'Aliado Comercial': partner_nom,
+                    'Estado del Cambio': cs.estado,
+                    'Motivo de Salida': cs.motivo_salida or 'Intercambio de mercancía',
+                    'Equipo Recibido a Cambio': f"{cs.marca_entrada or ''} {cs.modelo_entrada or ''} (IMEI: {cs.imei1_entrada or 'Pendiente'})".strip() if cs.modelo_entrada else 'Pendiente por definir',
+                    'Sucursal': branch_cs,
+                    'Registrado por': cs.usuario.nombre if cs.usuario else 'N/A',
+                    'Fecha Resolución': cs.fecha_resolucion.strftime('%d/%m/%Y %H:%M') if cs.fecha_resolucion else 'Pendiente'
+                }
+            })
+
+        cambios_entrada = DeviceExchange.query.filter(
+            or_(
+                DeviceExchange.imei1_entrada == clean_imei,
+                DeviceExchange.imei2_entrada == clean_imei,
+                (DeviceExchange.product_entrada_id.in_(p_ids)) if p_ids else False
+            )
+        ).all()
+
+        for ce in cambios_entrada:
+            partner_nom = ce.partner.nombre if ce.partner else 'Tercero / Aliado'
+            branch_ce = ce.branch.nombre if ce.branch else 'Sede Central'
+            eventos.append({
+                'tipo': 'CAMBIO_ENTRADA',
+                'titulo': f'Ingreso por Intercambio desde Aliado ({partner_nom})',
+                'fecha': ce.fecha_resolucion or ce.fecha_salida,
+                'icono': 'fa-solid fa-arrow-right-to-bracket text-info',
+                'badge_color': 'bg-info text-dark',
+                'detalles': {
+                    'Aliado Comercial': partner_nom,
+                    'Equipo Entregado a Cambio': f"{ce.modelo_salida or 'N/A'} (IMEI: {ce.imei_salida or 'N/A'})",
+                    'Estado': ce.estado,
+                    'Sucursal Receptora': branch_ce,
+                    'Fecha Ingreso': ce.fecha_resolucion.strftime('%d/%m/%Y %H:%M') if ce.fecha_resolucion else 'N/A'
+                }
+            })
+
+        # 7. GARANTÍAS DE CLIENTES (Warranty)
         warranties_encontradas = []
         if p_ids:
             warranties_encontradas.extend(Warranty.query.filter(Warranty.product_id.in_(p_ids)).all())
@@ -1510,23 +1633,238 @@ def trazabilidad():
                 if wv not in warranties_encontradas:
                     warranties_encontradas.append(wv)
         
+        # Búsqueda por IMEI en campos descriptivos de Warranty
+        w_directas = Warranty.query.filter(
+            or_(
+                Warranty.nombre_manual.ilike(f"%{clean_imei}%"),
+                Warranty.detalles_esteticos.ilike(f"%{clean_imei}%"),
+                Warranty.motivo_reportado.ilike(f"%{clean_imei}%")
+            )
+        ).all()
+        for wd in w_directas:
+            if wd not in warranties_encontradas:
+                warranties_encontradas.append(wd)
+        
         for w in warranties_encontradas:
             branch_garantia = w.branch.nombre if getattr(w, 'branch', None) else 'N/A'
+            recibido_nom = w.recibido_por.nombre if w.recibido_por else (w.asesor.nombre if w.asesor else 'N/A')
+            entregado_nom = w.entregado_por.nombre if w.entregado_por else 'Pendiente'
             eventos.append({
                 'tipo': 'GARANTIA',
-                'titulo': f'Reclamo de Garantía #{w.id}',
+                'titulo': f'Reclamo de Garantía #{w.id} ({w.resolution or "Pendiente"})',
                 'fecha': w.created_at,
                 'icono': 'fa-solid fa-shield-halved text-danger',
                 'badge_color': 'bg-danger text-white',
+                'sale_id': w.sale_id,
                 'detalles': {
-                    'Garantía': f"#{w.id}",
+                    'Garantía ID': f"#{w.id}",
                     'Sucursal Receptora': branch_garantia,
-                    'Motivo': w.reason,
-                    'Estado': w.resolution,
-                    'Factura Venta': f"#{w.sale_id}" if w.sale_id else 'N/A',
-                    'Notas': w.admin_notes or 'Sin observaciones'
+                    'Motivo Reportado': w.motivo_reportado or w.reason,
+                    'Estado Resolución': w.resolution,
+                    'Estado Estético Recibido': w.estado_estetico or 'No especificado',
+                    'Detalles Físicos': w.detalles_esteticos or 'Sin detalles',
+                    'Batería al Recibir': f"{w.porcentaje_bateria}%" if w.porcentaje_bateria else 'N/A',
+                    'Recibido por': recibido_nom,
+                    'Factura Venta Asociada': f"#{w.sale_id}" if w.sale_id else 'N/A',
+                    'Entregado al Cliente por': entregado_nom,
+                    'Fecha Entrega Cliente': w.fecha_entrega.strftime('%d/%m/%Y %H:%M') if w.fecha_entrega else 'Pendiente de entrega',
+                    'Observaciones': w.admin_notes or 'Sin observaciones'
                 }
             })
+
+        # Reconstruir producto_info si no existía como Product formal
+        if not producto_info:
+            if servicios_tec:
+                st0 = servicios_tec[0]
+                producto_info = {
+                    'id': None,
+                    'nombre': f"{st0.marca or ''} {st0.modelo or ''}".strip() or f"Celular IMEI {clean_imei}",
+                    'marca': st0.marca or 'N/A',
+                    'modelo': st0.modelo or 'N/A',
+                    'color': st0.color or 'N/A',
+                    'bateria': 'N/A',
+                    'memoria': 'N/A',
+                    'imei1': clean_imei,
+                    'imei2': None,
+                    'proveedor': 'Soporte Técnico',
+                    'inventario': 'Taller / Soporte',
+                    'stock_actual': 0,
+                    'precio_costo': None,
+                    'precio_sugerido': None
+                }
+            elif retomas:
+                r0 = retomas[0]
+                producto_info = {
+                    'id': None,
+                    'nombre': f"{r0.marca or ''} {r0.modelo or ''}".strip(),
+                    'marca': r0.marca or 'N/A',
+                    'modelo': r0.modelo or 'N/A',
+                    'color': r0.color or 'N/A',
+                    'bateria': r0.bateria or 'N/A',
+                    'memoria': r0.capacidad or 'N/A',
+                    'imei1': r0.imei1 or clean_imei,
+                    'imei2': r0.imei2,
+                    'proveedor': 'Retoma Cliente',
+                    'inventario': 'Retoma',
+                    'stock_actual': 0,
+                    'precio_costo': None,
+                    'precio_sugerido': None
+                }
+            elif cambios_salida or cambios_entrada:
+                c0 = (cambios_salida or cambios_entrada)[0]
+                partner_nom = c0.partner.nombre if c0.partner else 'Tercero'
+                producto_info = {
+                    'id': None,
+                    'nombre': f"{c0.marca_entrada or ''} {c0.modelo_entrada or ''}".strip() or (c0.modelo_salida or f"Celular IMEI {clean_imei}"),
+                    'marca': c0.marca_entrada or 'N/A',
+                    'modelo': c0.modelo_entrada or c0.modelo_salida or 'N/A',
+                    'color': c0.color_entrada or 'N/A',
+                    'bateria': 'N/A',
+                    'memoria': c0.memoria_entrada or 'N/A',
+                    'imei1': clean_imei,
+                    'imei2': None,
+                    'proveedor': f'Aliado: {partner_nom}',
+                    'inventario': 'Cambio Celulares',
+                    'stock_actual': 0,
+                    'precio_costo': None,
+                    'precio_sugerido': None
+                }
+            elif warranties_encontradas:
+                w0 = warranties_encontradas[0]
+                producto_info = {
+                    'id': None,
+                    'nombre': w0.nombre_manual or f"Celular IMEI {clean_imei}",
+                    'marca': 'Garantía',
+                    'modelo': w0.nombre_manual or 'N/A',
+                    'color': 'N/A',
+                    'bateria': w0.porcentaje_bateria or 'N/A',
+                    'memoria': 'N/A',
+                    'imei1': clean_imei,
+                    'imei2': None,
+                    'proveedor': 'Garantía Cliente',
+                    'inventario': 'Garantía',
+                    'stock_actual': 0,
+                    'precio_costo': None,
+                    'precio_sugerido': None
+                }
+
+        # 8. DETERMINAR EL ESTADO Y UBICACIÓN ACTUAL ("¿DÓNDE ESTÁ AHORA?")
+        # Prioridad 1: Soporte Técnico activo
+        st_activo = next((s for s in servicios_tec if s.estado in ['EN_REVISION', 'EN_REPARACION']), None)
+        # Prioridad 2: Préstamo de Maneo activo a local vecino
+        maneo_activo = next((m for p in productos for m in p.maneos if m.estado == 'PENDIENTE'), None)
+        # Prioridad 3: Cambio de mercancía activo (salida a aliado)
+        cambio_activo = next((c for c in cambios_salida if c.estado == 'PENDIENTE'), None)
+        # Prioridad 4: Garantía en trámite / custodia
+        garantia_activa = next((w for w in warranties_encontradas if w.resolution in ['Pendiente', 'En Revisión', 'En Proceso'] and not w.fecha_entrega), None)
+        # Prioridad 5: Traslado en tránsito
+        traslado_activo = next((ti.transferencia for ti in transf_items if ti.transferencia and ti.transferencia.estado in ['PENDIENTE', 'EN_TRANSITO']), None)
+
+        if st_activo:
+            taller_n = st_activo.technician.nombre if st_activo.technician else 'Taller Externo'
+            estado_actual = {
+                'estado': f'En Soporte Técnico ({st_activo.estado.replace("_", " ")})',
+                'badge_class': 'bg-warning text-dark',
+                'icono': 'fa-solid fa-screwdriver-wrench',
+                'ubicacion': f"Taller: {taller_n}",
+                'custodio': f"{taller_n} (Remitente: {st_activo.branch.nombre if st_activo.branch else 'Sede Central'})",
+                'ultimo_movimiento': st_activo.fecha_ingreso,
+                'descripcion': f"Falla: {st_activo.motivo_falla} | Diagnóstico: {st_activo.diagnostico_tecnico or 'En revisión preliminar'}"
+            }
+        elif maneo_activo:
+            estado_actual = {
+                'estado': 'En Préstamo a Local Vecino (Maneo)',
+                'badge_class': 'bg-info text-dark',
+                'icono': 'fa-solid fa-handshake',
+                'ubicacion': f"Local Vecino: {maneo_activo.local_vecino}",
+                'custodio': f"{maneo_activo.local_vecino} (Sucursal: {maneo_activo.branch.nombre if maneo_activo.branch else 'Tienda'})",
+                'ultimo_movimiento': maneo_activo.fecha_prestamo,
+                'descripcion': f"Prestado para exhibición / negocio con local vecino desde el {maneo_activo.fecha_prestamo.strftime('%d/%m/%Y')}"
+            }
+        elif cambio_activo:
+            partner_n = cambio_activo.partner.nombre if cambio_activo.partner else 'Aliado Comercial'
+            estado_actual = {
+                'estado': 'En Proceso de Cambio / Trueque',
+                'badge_class': 'bg-primary text-white',
+                'icono': 'fa-solid fa-right-left',
+                'ubicacion': f"En poder del Aliado: {partner_n}",
+                'custodio': partner_n,
+                'ultimo_movimiento': cambio_activo.fecha_salida,
+                'descripcion': f"Salida entregada al aliado para intercambio. Motivo: {cambio_activo.motivo_salida or 'Cambio comercial'}"
+            }
+        elif garantia_activa:
+            branch_w = garantia_activa.branch.nombre if getattr(garantia_activa, 'branch', None) else 'Sede Principal'
+            estado_actual = {
+                'estado': 'En Custodia por Garantía',
+                'badge_class': 'bg-danger text-white',
+                'icono': 'fa-solid fa-shield-halved',
+                'ubicacion': f"Custodia en Sucursal: {branch_w}",
+                'custodio': f"Sucursal {branch_w}",
+                'ultimo_movimiento': garantia_activa.created_at,
+                'descripcion': f"Reclamo #{garantia_activa.id} por falla: {garantia_activa.motivo_reportado or garantia_activa.reason}"
+            }
+        elif traslado_activo:
+            orig_n = traslado_activo.origen.nombre if traslado_activo.origen else 'N/A'
+            dest_n = traslado_activo.destino.nombre if traslado_activo.destino else 'N/A'
+            estado_actual = {
+                'estado': 'En Traslado entre Sedes (En Tránsito)',
+                'badge_class': 'bg-primary text-white',
+                'icono': 'fa-solid fa-truck-fast',
+                'ubicacion': f"Ruta: {orig_n} ➔ {dest_n}",
+                'custodio': f"Guía #{traslado_activo.numero_guia or traslado_activo.id} (Mensajería / Traslado)",
+                'ultimo_movimiento': traslado_activo.fecha_creacion,
+                'descripcion': f"Enviado por {traslado_activo.solicitante.nombre if traslado_activo.solicitante else 'Usuario'} hacia {dest_n}"
+            }
+        elif any(p.total_stock > 0 for p in productos):
+            stocks_pos = BranchStock.query.filter(BranchStock.product_id.in_(p_ids), BranchStock.cantidad > 0).all() if p_ids else []
+            if stocks_pos:
+                sucursales_str = ", ".join([f"{bs.branch.nombre} ({bs.cantidad} und)" for bs in stocks_pos if bs.branch])
+                sede_principal = stocks_pos[0].branch.nombre if stocks_pos[0].branch else 'Tienda'
+                p_ref = productos[-1]
+                estado_actual = {
+                    'estado': 'Disponible en Stock',
+                    'badge_class': 'bg-success text-white',
+                    'icono': 'fa-solid fa-circle-check',
+                    'ubicacion': sucursales_str or sede_principal,
+                    'custodio': f"Sucursal {sede_principal}",
+                    'ultimo_movimiento': p_ref.fecha_creacion,
+                    'descripcion': f"El celular está disponible físicamente para la venta en: {sucursales_str}"
+                }
+            else:
+                p_ref = productos[-1]
+                estado_actual = {
+                    'estado': 'Disponible en Stock',
+                    'badge_class': 'bg-success text-white',
+                    'icono': 'fa-solid fa-circle-check',
+                    'ubicacion': p_ref.inventario or 'Tienda Principal',
+                    'custodio': 'Tienda',
+                    'ultimo_movimiento': p_ref.fecha_creacion,
+                    'descripcion': 'El equipo registra stock disponible en inventario.'
+                }
+        elif detalles_venta:
+            ult_det = detalles_venta[-1]
+            ult_v = ult_det.venta
+            cli_nom = ult_v.cliente.nombre if (ult_v and hasattr(ult_v, 'cliente') and ult_v.cliente) else 'Cliente General'
+            branch_v = ult_v.branch.nombre if (ult_v and getattr(ult_v, 'branch', None)) else (ult_v.sucursal if ult_v else 'Tienda')
+            estado_actual = {
+                'estado': 'Vendido al Cliente',
+                'badge_class': 'bg-dark text-white',
+                'icono': 'fa-solid fa-user-check',
+                'ubicacion': f"En poder del Cliente ({cli_nom})",
+                'custodio': f"Cliente: {cli_nom} (Factura #{ult_v.id if ult_v else 'N/A'})",
+                'ultimo_movimiento': ult_v.fecha_venta if ult_v else None,
+                'descripcion': f"Vendido el {ult_v.fecha_venta.strftime('%d/%m/%Y')} en sucursal {branch_v}." if ult_v else "Equipo vendido."
+            }
+        else:
+            estado_actual = {
+                'estado': 'Fuera de Stock / Baja',
+                'badge_class': 'bg-secondary text-white',
+                'icono': 'fa-solid fa-box-archive',
+                'ubicacion': 'Sin inventario físico en sedes',
+                'custodio': 'Histórico',
+                'ultimo_movimiento': eventos[-1]['fecha'] if eventos else None,
+                'descripcion': 'El equipo no registra stock activo actualmente.'
+            }
 
         # Ordenar eventos cronológicamente (de más antiguo a más reciente)
         eventos.sort(key=lambda x: x['fecha'] if x['fecha'] else datetime.min)
@@ -1534,5 +1872,6 @@ def trazabilidad():
     return render_template('celulares/trazabilidad.html',
                            imei=clean_imei,
                            producto_info=producto_info,
+                           estado_actual=estado_actual,
                            eventos=eventos)
 
