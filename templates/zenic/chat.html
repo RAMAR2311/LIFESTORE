@@ -22,9 +22,21 @@
     --z-warn:       #b45309;
   }
 
-  body { background: var(--z-dark) !important; color: var(--z-text) !important; }
-
-  .navbar-custom { background: #FFFFFF !important; border-bottom: 1px solid var(--z-border) !important; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02) !important; }
+  [data-bs-theme="dark"], body.dark-mode {
+    --z-dark:       #0f172a;
+    --z-card:       #1e293b;
+    --z-surface:    #1e293b;
+    --z-border:     #334155;
+    --z-primary:    #f8fafc;
+    --z-primary-glow: rgba(255, 255, 255, 0.08);
+    --z-primary-dark: #cbd5e1;
+    --z-text:       #f1f5f9;
+    --z-muted:      #94a3b8;
+    --z-user-bg:    #1e293b;
+    --z-user-border:#334155;
+    --z-ai-bg:      #0f172a;
+    --z-ai-border:  #334155;
+  }
 
   /* ── Wrapper principal ─────────────────────── */
   .zenic-wrapper {
@@ -379,6 +391,7 @@
         <button class="suggestion-btn" onclick="usarSugerencia(this)"><i class="fa-solid fa-truck"></i>¿A qué proveedores les debemos y cuánto?</button>
         <button class="suggestion-btn" onclick="usarSugerencia(this)"><i class="fa-solid fa-hand-holding-dollar"></i>¿Qué clientes de bodega tienen cartera vencida?</button>
         <button class="suggestion-btn" onclick="usarSugerencia(this)"><i class="fa-solid fa-mobile-screen"></i>¿Qué celulares iPhone tenemos disponibles y a qué precio?</button>
+        <button class="suggestion-btn" onclick="usarSugerencia(this)"><i class="fa-solid fa-screwdriver-wrench"></i>¿Qué equipos están en soporte técnico ahora?</button>
       </div>
 
       <div class="suggestions-grid" id="suggRegistrar" style="width:100%;max-width:680px;display:none;">
@@ -394,11 +407,23 @@
 
   <!-- Input -->
   <div class="zenic-input-area">
+    <div id="voiceBar" style="display:none;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;margin-bottom:8px;border-radius:12px;background:rgba(220,38,38,.08);border:1px solid rgba(220,38,38,.25);">
+      <div class="d-flex align-items-center gap-2 text-danger fw-semibold small">
+        <span style="width:10px;height:10px;border-radius:50%;background:#dc2626;display:inline-block;animation:pulse 1s infinite;"></span>
+        <span>Grabando nota de voz...</span>
+        <span id="voiceTimer" class="badge bg-danger">0:00</span>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button" id="cancelVoiceBtn" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Cancelar</button>
+        <button type="button" id="sendVoiceBtn" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold"><i class="fa-solid fa-paper-plane me-1"></i>Enviar audio</button>
+      </div>
+    </div>
     <div class="input-row">
-      <textarea id="zenicInput" placeholder="Pregunta por los datos o pídeme registrar algo..." rows="1"></textarea>
+      <textarea id="zenicInput" placeholder="Pregunta por los datos, pide registrar algo o envía una nota de voz..." rows="1"></textarea>
+      <button type="button" id="micBtn" title="Grabar nota de voz" style="background:transparent;border:1px solid var(--z-border);color:var(--z-text);width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;"><i class="fa-solid fa-microphone"></i></button>
       <button id="sendBtn" title="Enviar (Enter)"><i class="fa-solid fa-paper-plane"></i></button>
     </div>
-    <div class="input-hint">Enter para enviar · Shift+Enter para nueva línea</div>
+    <div class="input-hint">Enter para enviar · Shift+Enter para nueva línea · 🎙️ Nota de voz</div>
   </div>
 
 </div>
@@ -412,8 +437,31 @@
 
   const csrfToken = "{{ csrf_token() }}";
 
+  const STORAGE_KEY = 'zenic_historial_{{ current_user.id }}';
   let historial = [];
   let enviando  = false;
+
+  function guardarHistorial() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(historial.slice(-24)));
+    } catch (e) {}
+  }
+
+  function restaurarHistorial() {
+    try {
+      const guardado = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      if (Array.isArray(guardado) && guardado.length > 0) {
+        historial = guardado;
+        if (welcome) welcome.style.display = 'none';
+        guardado.forEach(t => {
+          if (t.role && t.content) {
+            chat.appendChild(crearBurbuja(t.role, t.content).wrap);
+          }
+        });
+        scrollAbajo();
+      }
+    } catch (e) {}
+  }
 
   // ── Sugerencias ───────────────────────────────
   function cambiarTab(btn) {
@@ -443,6 +491,7 @@
 
   function limpiarChat() {
     historial = [];
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
     chat.querySelectorAll('.bubble-wrap').forEach(b => b.remove());
     if (welcome) welcome.style.display = '';
     errorBanner.style.display = 'none';
@@ -728,6 +777,7 @@
 
     chat.appendChild(crearBurbuja('user', texto).wrap);
     historial.push({ role: 'user', content: texto });
+    guardarHistorial();
     input.value = '';
     input.style.height = 'auto';
     scrollAbajo();
@@ -759,7 +809,10 @@
       });
       chat.appendChild(wrap);
 
-      if (datos.respuesta) historial.push({ role: 'assistant', content: datos.respuesta });
+      if (datos.respuesta) {
+        historial.push({ role: 'assistant', content: datos.respuesta });
+        guardarHistorial();
+      }
 
       if (datos.accion_pendiente) {
         inner.insertBefore(
@@ -774,10 +827,248 @@
     } finally {
       setEnviando(false);
       scrollAbajo();
-      input.focus();
+      // ── Notas de voz (MediaRecorder → /zenic/transcribir) ──
+  const micBtn         = document.getElementById('micBtn');
+  const voiceBar       = document.getElementById('voiceBar');
+  const voiceTimer     = document.getElementById('voiceTimer');
+  const cancelVoiceBtn = document.getElementById('cancelVoiceBtn');
+  const sendVoiceBtn   = document.getElementById('sendVoiceBtn');
+
+  let mediaRecorder = null;
+  let audioChunks   = [];
+  let voiceInterval = null;
+  let voiceSeconds  = 0;
+  let audioStream   = null;
+  let enviarAlParar = false;
+
+  function detenerStream() {
+    if (audioStream) {
+      audioStream.getTracks().forEach(t => t.stop());
+      audioStream = null;
+    }
+    clearInterval(voiceInterval);
+    voiceInterval = null;
+    voiceBar.style.display = 'none';
+    micBtn.disabled = false;
+  }
+
+  micBtn.addEventListener('click', async () => {
+    if (enviando) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('Tu navegador no soporta grabación de audio.');
+      return;
+    }
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+      mediaRecorder = mimeType ? new MediaRecorder(audioStream, { mimeType }) : new MediaRecorder(audioStream);
+      audioChunks = [];
+      enviarAlParar = false;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        detenerStream();
+        if (!enviarAlParar || blob.size === 0) return;
+
+        setEnviando(true);
+        const typing = crearTyping();
+        chat.appendChild(typing);
+        scrollAbajo();
+
+        try {
+          const formData = new FormData();
+          formData.append('audio', blob, 'nota_voz.webm');
+          const resp = await fetch('/zenic/transcribir', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+            body: formData
+          });
+          const datos = await resp.json().catch(() => ({ error: 'Error al transcribir el audio.' }));
+          typing.remove();
+
+          if (datos.error || !datos.texto) {
+            showError(datos.error || 'No se pudo entender el audio.');
+            setEnviando(false);
+            return;
+          }
+
+          setEnviando(false);
+          input.value = datos.texto;
+          await enviar();
+        } catch (err) {
+          typing.remove();
+          setEnviando(false);
+          showError('Error de conexión al transcribir la nota de voz.');
+        }
+      };
+
+      mediaRecorder.start();
+      voiceSeconds = 0;
+      voiceTimer.textContent = '0:00';
+      voiceBar.style.display = 'flex';
+      micBtn.disabled = true;
+      voiceInterval = setInterval(() => {
+        voiceSeconds++;
+        const m = Math.floor(voiceSeconds / 60);
+        const s = String(voiceSeconds % 60).padStart(2, '0');
+        voiceTimer.textContent = `${m}:${s}`;
+        if (voiceSeconds >= 120) {
+          enviarAlParar = true;
+          if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        }
+      }, 1000);
+    } catch (err) {
+      detenerStream();
+      showError('No se pudo acceder al micrófono. Verifica los permisos del navegador.');
+    }
+  });
+
+  cancelVoiceBtn.addEventListener('click', () => {
+    enviarAlParar = false;
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    } else {
+      detenerStream();
+    }
+  });
+
+  sendVoiceBtn.addEventListener('click', () => {
+    enviarAlParar = true;
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  });
+
+  restaurarHistorial();
+  input.focus();
     }
   }
 
+  // ── Notas de voz (MediaRecorder → /zenic/transcribir) ──
+  const micBtn         = document.getElementById('micBtn');
+  const voiceBar       = document.getElementById('voiceBar');
+  const voiceTimer     = document.getElementById('voiceTimer');
+  const cancelVoiceBtn = document.getElementById('cancelVoiceBtn');
+  const sendVoiceBtn   = document.getElementById('sendVoiceBtn');
+
+  let mediaRecorder = null;
+  let audioChunks   = [];
+  let voiceInterval = null;
+  let voiceSeconds  = 0;
+  let audioStream   = null;
+  let enviarAlParar = false;
+
+  function detenerStream() {
+    if (audioStream) {
+      audioStream.getTracks().forEach(t => t.stop());
+      audioStream = null;
+    }
+    clearInterval(voiceInterval);
+    voiceInterval = null;
+    voiceBar.style.display = 'none';
+    micBtn.disabled = false;
+  }
+
+  micBtn.addEventListener('click', async () => {
+    if (enviando) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('Tu navegador no soporta grabación de audio.');
+      return;
+    }
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+      mediaRecorder = mimeType ? new MediaRecorder(audioStream, { mimeType }) : new MediaRecorder(audioStream);
+      audioChunks = [];
+      enviarAlParar = false;
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        detenerStream();
+        if (!enviarAlParar || blob.size === 0) return;
+
+        setEnviando(true);
+        const typing = crearTyping();
+        chat.appendChild(typing);
+        scrollAbajo();
+
+        try {
+          const formData = new FormData();
+          formData.append('audio', blob, 'nota_voz.webm');
+          const resp = await fetch('/zenic/transcribir', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+            body: formData
+          });
+          const datos = await resp.json().catch(() => ({ error: 'Error al transcribir el audio.' }));
+          typing.remove();
+
+          if (datos.error || !datos.texto) {
+            showError(datos.error || 'No se pudo entender el audio.');
+            setEnviando(false);
+            return;
+          }
+
+          setEnviando(false);
+          input.value = datos.texto;
+          await enviar();
+        } catch (err) {
+          typing.remove();
+          setEnviando(false);
+          showError('Error de conexión al transcribir la nota de voz.');
+        }
+      };
+
+      mediaRecorder.start();
+      voiceSeconds = 0;
+      voiceTimer.textContent = '0:00';
+      voiceBar.style.display = 'flex';
+      micBtn.disabled = true;
+      voiceInterval = setInterval(() => {
+        voiceSeconds++;
+        const m = Math.floor(voiceSeconds / 60);
+        const s = String(voiceSeconds % 60).padStart(2, '0');
+        voiceTimer.textContent = `${m}:${s}`;
+        if (voiceSeconds >= 120) {
+          enviarAlParar = true;
+          if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        }
+      }, 1000);
+    } catch (err) {
+      detenerStream();
+      showError('No se pudo acceder al micrófono. Verifica los permisos del navegador.');
+    }
+  });
+
+  cancelVoiceBtn.addEventListener('click', () => {
+    enviarAlParar = false;
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    } else {
+      detenerStream();
+    }
+  });
+
+  sendVoiceBtn.addEventListener('click', () => {
+    enviarAlParar = true;
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  });
+
+  restaurarHistorial();
   input.focus();
 </script>
 

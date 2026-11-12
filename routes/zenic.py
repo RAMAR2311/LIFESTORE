@@ -27,6 +27,7 @@ from models import (
     db, Sale, SaleDetail, SalePayment, SaleClient, Product, ProductVariant,
     Retoma, ArqueoCaja, Expense, Cliente, Provider, ProviderInvoice,
     Warranty, Maneo, PriceApproval, Asesor, User, StockAdjustment,
+    TechnicalService, Technician, Branch, BranchStock, CashShift,
     obtener_hora_bogota
 )
 
@@ -688,6 +689,76 @@ def _t_consultar_maneos(args: dict) -> dict:
     }
 
 
+def _t_consultar_soporte(args: dict) -> dict:
+    """Consulta órdenes de soporte técnico / taller."""
+    estado = (args.get('estado') or '').strip().upper()
+    termino = (args.get('termino') or '').strip()
+    limite = min(int(args.get('limite') or 25), 60)
+
+    q = TechnicalService.query.order_by(TechnicalService.fecha_ingreso.desc())
+    if estado:
+        q = q.filter(TechnicalService.estado == estado)
+    if args.get('periodo') or args.get('desde') or args.get('hasta'):
+        desde, hasta, _ = _rango(args)
+        ini, fin = _limites(desde, hasta)
+        q = q.filter(TechnicalService.fecha_ingreso >= ini, TechnicalService.fecha_ingreso < fin)
+
+    ordenes = q.limit(120).all()
+    if termino:
+        ordenes = [
+            o for o in ordenes
+            if _coincide(termino, o.marca, o.modelo, o.imei, o.motivo_falla, o.diagnostico_tecnico)
+        ]
+
+    total_costo = sum(float(o.costo_reparacion or 0) for o in ordenes)
+    return {
+        'total_encontrados': len(ordenes),
+        'costo_total_reparaciones': _cop(total_costo),
+        'ordenes': [
+            {
+                'id': o.id,
+                'origen': o.origen,
+                'equipo': f"{o.marca or ''} {o.modelo or ''}".strip() or 'N/D',
+                'imei': o.imei,
+                'falla': o.motivo_falla,
+                'estado': o.estado,
+                'tecnico': o.tecnico.nombre if getattr(o, 'tecnico', None) else 'Sin asignar',
+                'asesor': o.asesor.nombre if getattr(o, 'asesor', None) else 'Sin asesor',
+                'sede': o.branch.nombre if getattr(o, 'branch', None) else 'Principal',
+                'costo_reparacion': _cop(o.costo_reparacion),
+                'fecha_ingreso': o.fecha_ingreso.strftime('%Y-%m-%d %H:%M') if o.fecha_ingreso else None,
+            }
+            for o in ordenes[:limite]
+        ],
+    }
+
+
+def _t_consultar_sucursales(args: dict) -> dict:
+    """Consulta sedes activas, turnos de caja abiertos y resumen de stock por sede."""
+    sedes = Branch.query.filter_by(activa=True).order_by(Branch.nombre.asc()).all()
+    turnos_abiertos = CashShift.query.filter_by(estado='ABIERTO').all()
+    turnos_por_sede = {}
+    for t in turnos_abiertos:
+        turnos_por_sede.setdefault(t.branch_id, []).append({
+            'id': t.id,
+            'usuario': t.user.nombre if getattr(t, 'user', None) else f'Usuario #{t.user_id}',
+            'monto_inicial': _cop(t.monto_inicial),
+            'fecha_apertura': t.fecha_apertura.strftime('%Y-%m-%d %H:%M') if t.fecha_apertura else None,
+        })
+
+    resultado = []
+    for s in sedes:
+        stock_total = db.session.query(db.func.coalesce(db.func.sum(BranchStock.cantidad), 0)).filter_by(branch_id=s.id).scalar()
+        resultado.append({
+            'id': s.id,
+            'nombre': s.nombre,
+            'telefono': s.telefono,
+            'unidades_en_stock': int(stock_total or 0),
+            'turnos_abiertos': turnos_por_sede.get(s.id, []),
+        })
+    return {'total_sedes': len(resultado), 'sedes': resultado}
+
+
 HERRAMIENTAS_LECTURA = {
     'buscar_producto': _t_buscar_producto,
     'buscar_celular': _t_buscar_celular,
@@ -703,6 +774,8 @@ HERRAMIENTAS_LECTURA = {
     'consultar_clientes': _t_consultar_clientes,
     'consultar_garantias': _t_consultar_garantias,
     'consultar_maneos': _t_consultar_maneos,
+    'consultar_soporte': _t_consultar_soporte,
+    'consultar_sucursales': _t_consultar_sucursales,
 }
 
 
@@ -1344,6 +1417,13 @@ def _fn(nombre, descripcion, propiedades, requeridos=None):
 
 
 ESQUEMAS = [
+    _fn('consultar_soporte', 'Consulta órdenes de soporte técnico / taller (equipos en revisión, reparación, reparados, entregados o no reparables).', {
+        'estado': {'type': 'string', 'enum': ['EN_REVISION', 'EN_REPARACION', 'REPARADO', 'ENTREGADO', 'NO_REPARABLE']},
+        'termino': {'type': 'string', 'description': 'Equipo, IMEI, falla o cliente.'},
+        'periodo': {'type': 'string', 'enum': ['hoy', 'ayer', 'semana', 'mes']},
+        'limite': {'type': 'integer'},
+    }),
+    _fn('consultar_sucursales', 'Consulta las sedes activas, unidades en stock por sede y turnos de caja abiertos.', {}),
     # ── Consulta ───────────────────────────────────────────────────────────
     _fn('buscar_producto',
         "Busca accesorios y productos de tienda/bodega por nombre o SKU. Devuelve product_id, "
@@ -1520,18 +1600,27 @@ def _resumen_sistema() -> str:
     lineas = []
 
     try:
-        ventas_hoy = Sale.query.filter(Sale.fecha_venta >= ini_hoy, Sale.fecha_venta < fin_hoy).all()
-        ventas_mes = Sale.query.filter(Sale.fecha_venta >= ini_mes, Sale.fecha_venta < fin_mes).all()
+        cnt_hoy, sum_hoy = db.session.query(
+            db.func.count(Sale.id),
+            db.func.coalesce(db.func.sum(Sale.monto_total), 0),
+        ).filter(Sale.fecha_venta >= ini_hoy, Sale.fecha_venta < fin_hoy).first()
+        cnt_mes, sum_mes = db.session.query(
+            db.func.count(Sale.id),
+            db.func.coalesce(db.func.sum(Sale.monto_total), 0),
+        ).filter(Sale.fecha_venta >= ini_mes, Sale.fecha_venta < fin_mes).first()
         lineas.append(
-            f"- Ventas hoy: {len(ventas_hoy)} por {_cop(sum(float(v.monto_total or 0) for v in ventas_hoy))} | "
-            f"Mes: {len(ventas_mes)} por {_cop(sum(float(v.monto_total or 0) for v in ventas_mes))}"
+            f"- Ventas hoy: {cnt_hoy or 0} por {_cop(sum_hoy)} | "
+            f"Mes: {cnt_mes or 0} por {_cop(sum_mes)}"
         )
     except Exception:
         lineas.append("- Ventas: no disponible.")
 
     try:
-        gastos_mes = Expense.query.filter(Expense.fecha_gasto >= ini_mes, Expense.fecha_gasto < fin_mes).all()
-        lineas.append(f"- Gastos del mes: {_cop(sum(float(g.monto or 0) for g in gastos_mes))} en {len(gastos_mes)} registros")
+        cnt_gastos, sum_gastos = db.session.query(
+            db.func.count(Expense.id),
+            db.func.coalesce(db.func.sum(Expense.monto), 0),
+        ).filter(Expense.fecha_gasto >= ini_mes, Expense.fecha_gasto < fin_mes).first()
+        lineas.append(f"- Gastos del mes: {_cop(sum_gastos)} en {cnt_gastos or 0} registros")
     except Exception:
         lineas.append("- Gastos: no disponible.")
 
@@ -1562,23 +1651,27 @@ def _resumen_sistema() -> str:
         aprobaciones = PriceApproval.query.filter_by(estado='pendiente').count()
         if aprobaciones:
             alertas.append(f"{aprobaciones} aprobaciones de precio pendientes")
+        en_taller = TechnicalService.query.filter(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])).count()
+        if en_taller:
+            alertas.append(f"{en_taller} equipos en soporte técnico")
     except Exception:
         pass
     lineas.append(f"- Alertas: {', '.join(alertas) if alertas else 'ninguna'}")
 
-    sucursales = []
+    sedes_activas = []
     try:
-        sucursales = sorted({u.sucursal for u in User.query.all() if u.sucursal})
+        sedes_activas = [b.nombre for b in Branch.query.filter_by(activa=True).order_by(Branch.nombre.asc()).all()]
     except Exception:
         pass
 
     ahora = obtener_hora_bogota()
+    sedes_txt = ', '.join(sedes_activas) if sedes_activas else 'Tienda Central / Principal'
     return f"""Eres ZENIC, el asistente de IA del sistema de gestión LifeStore, una tienda de \
 telefonía y accesorios en Colombia. Hablas con {current_user.nombre} (administrador, \
 sucursal {_sucursal_default()}).
 
 Fecha y hora actual en Bogotá: {ahora.strftime('%A %d de %B de %Y, %H:%M')} ({ahora.date()}).
-Sede: Tienda Central / Principal (única tienda unificada).
+Sedes activas: {sedes_txt}.
 Moneda: pesos colombianos (COP), sin decimales.
 
 ESTADO ACTUAL (resumen):
@@ -1850,3 +1943,45 @@ def cancelar():
     session.pop('zenic_pendiente', None)
     session.modified = True
     return jsonify({'exito': True})
+
+
+@zenic_bp.route('/transcribir', methods=['POST'])
+@login_required
+@admin_required
+def transcribir():
+    """Transcribe una nota de voz en español usando OpenAI Whisper."""
+    audio_file = request.files.get('audio')
+    if not audio_file:
+        return jsonify({'error': 'No se recibió ningún archivo de audio.'}), 400
+
+    audio_bytes = audio_file.read()
+    if not audio_bytes:
+        return jsonify({'error': 'El audio está vacío.'}), 400
+    if len(audio_bytes) > 10 * 1024 * 1024:
+        return jsonify({'error': 'El audio supera el límite de 10 MB.'}), 400
+
+    client, error = _cliente_openai()
+    if error:
+        return jsonify({'error': error}), 500
+
+    filename = audio_file.filename or 'nota_voz.webm'
+    content_type = audio_file.content_type or 'audio/webm'
+
+    try:
+        transcripcion = client.audio.transcriptions.create(
+            model='whisper-1',
+            file=(filename, audio_bytes, content_type),
+            language='es',
+            prompt=(
+                'LifeStore, tienda de celulares y accesorios en Colombia. '
+                'Términos comunes: retoma, arqueo, maneo, soporte técnico, bodega, '
+                'nequi, bancolombia, daviplata, transferencia, efectivo, tarjeta, '
+                'iPhone, Samsung, Xiaomi, Motorola, IMEI, pesos.'
+            ),
+        )
+        texto = (getattr(transcripcion, 'text', '') or '').strip()
+        if not texto:
+            return jsonify({'error': 'No se detectó voz en el audio.'}), 400
+        return jsonify({'texto': texto})
+    except Exception as exc:
+        return jsonify({'error': f'Error transcribiendo el audio: {exc}'}), 500
