@@ -78,9 +78,14 @@
                     <td class="fw-bold text-dark text-start">{{ r.marca or '-' }}</td>
                     <td class="fw-semibold text-start">
                         {{ r.modelo or '-' }}
-                        {% if r.soporte_activo %}
+                        {% if r.soporte_activo or r.estado == 'en_soporte' %}
                         <span class="badge bg-danger text-white rounded-pill px-2 ms-1" style="font-size: 0.65rem;" title="El equipo está actualmente en soporte técnico">
-                            <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Soporte
+                            <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Taller
+                        </span>
+                        {% endif %}
+                        {% if r.arreglos and r.arreglos > 0 %}
+                        <span class="badge bg-warning bg-opacity-10 text-dark border border-warning border-opacity-50 rounded-pill px-2 ms-1" style="font-size: 0.65rem;" title="Arreglos técnicos cargados: ${{ r.arreglos|cop }}">
+                            <i class="fa-solid fa-wrench me-1 text-warning"></i> +${{ r.arreglos|cop }}
                         </span>
                         {% endif %}
                         {% if r.es_reingreso %}
@@ -127,6 +132,10 @@
                                 <span class="badge bg-success rounded-pill px-2 py-1" title="Aprobado y enviado a Inventario">
                                     <i class="fa-solid fa-check me-1"></i> Inventario
                                 </span>
+                            {% elif r.estado == 'en_soporte' or r.soporte_activo %}
+                                <span class="badge bg-warning text-dark rounded-pill px-2 py-1" title="El equipo está actualmente en soporte técnico">
+                                    <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Taller
+                                </span>
                             {% else %}
                                 <button type="button"
                                         class="btn btn-sm btn-primary py-1 px-2 fw-bold text-nowrap rounded-2"
@@ -135,6 +144,15 @@
                                         title="Pasar al Inventario">
                                     <i class="fa-solid fa-boxes-packing me-1"></i> Aprobar
                                 </button>
+                            {% endif %}
+
+                            {% if r.estado != 'aprobado' and r.estado != 'en_soporte' and not r.soporte_activo %}
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-warning text-dark py-1 px-2 rounded-2"
+                                    onclick="enviarRetomaIndividualASoporte({{ r.id }})"
+                                    title="Enviar este equipo a Soporte Técnico">
+                                <i class="fa-solid fa-screwdriver-wrench"></i>
+                            </button>
                             {% endif %}
 
                             <button type="button"
@@ -277,18 +295,27 @@
                                                     <input type="text" name="inventario" class="form-control bg-light" value="PRINCIPAL" placeholder="Ej: PRINCIPAL, VITRINA, BODEGA" required>
                                                 </div>
                                             </div>
+                                            {% if r.arreglos and r.arreglos > 0 %}
+                                            <div class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center gap-2 small rounded-3 border-0 bg-warning bg-opacity-10 text-dark">
+                                                <i class="fa-solid fa-screwdriver-wrench text-warning fs-5"></i>
+                                                <div>
+                                                    <strong>Costo de Soporte Técnico Cargado:</strong>
+                                                    Se importaron automáticamente <strong>${{ r.arreglos|cop }}</strong> del taller a este campo de arreglos.
+                                                </div>
+                                            </div>
+                                            {% endif %}
                                             <div class="row g-3 mb-3">
                                                 <div class="col-md-4">
                                                     <label class="form-label fw-bold text-truncate" title="Costo de Retoma">Costo de Retoma</label>
                                                     <input type="text" class="form-control bg-light" value="${{ r.valor_retoma|cop }}" readonly>
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Arreglos</label>
-                                                    <input type="text" id="retoma_arreglos_{{ r.id }}" name="arreglos" class="form-control bg-light format-price" value="0" data-valor-base="{{ r.valor_retoma|int }}" oninput="updateTotalCosto({{ r.id }}, this.dataset.valorBase)">
+                                                    <label class="form-label fw-bold">Arreglos / Soporte</label>
+                                                    <input type="text" id="retoma_arreglos_{{ r.id }}" name="arreglos" class="form-control bg-light format-price" value="{{ r.arreglos|int if r.arreglos else 0 }}" data-valor-base="{{ r.valor_retoma|int }}" oninput="updateTotalCosto({{ r.id }}, this.dataset.valorBase)">
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label fw-bold text-truncate" title="Costo Total">Costo Total</label>
-                                                    <input type="text" id="retoma_costo_total_{{ r.id }}" class="form-control bg-light fw-bold text-success" value="${{ r.valor_retoma|cop }}" readonly>
+                                                    <input type="text" id="retoma_costo_total_{{ r.id }}" class="form-control bg-light fw-bold text-success" value="${{ ((r.valor_retoma or 0) + (r.arreglos or 0))|cop }}" readonly>
                                                 </div>
                                             </div>
                                             <div class="row g-3">
@@ -612,6 +639,16 @@
 
         const modal = new bootstrap.Modal(document.getElementById('modalSoporteLoteRetomas'));
         modal.show();
+    }
+
+    function enviarRetomaIndividualASoporte(id) {
+        document.querySelectorAll('.retoma-checkbox').forEach(cb => cb.checked = false);
+        const targetCb = document.querySelector(`.retoma-checkbox[value="${id}"]`);
+        if (targetCb) {
+            targetCb.checked = true;
+            actualizarSeleccionadosRetomas();
+            abrirModalSoporteLoteRetomas();
+        }
     }
 </script>
 

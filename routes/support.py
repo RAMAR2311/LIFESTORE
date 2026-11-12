@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
-from models import db, Technician, TechnicalService, Product, Warranty, Branch, AuditLog, BranchStock, StockAdjustment
+from models import db, Technician, TechnicalService, Product, Warranty, Branch, AuditLog, BranchStock, StockAdjustment, Retoma
 from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 from datetime import datetime, date
+from decimal import Decimal
 import pytz
 
 support_bp = Blueprint('support_bp', __name__)
@@ -369,12 +370,35 @@ def actualizar_estado(id):
             if nuevo_estado in ['REPARADO', 'ENTREGADO']:
                 servicio.garantia.admin_notes = f"[REPARADO EN SOPORTE TÉCNICO]: {solucion or 'Listo para entrega al cliente'}"
 
-        # Si viene de retoma y fue reparado, reflejar en la retoma
-        if servicio.origen == 'RETOMA' and servicio.retoma:
+        # Si viene de retoma o está vinculado a una retoma:
+        ret = servicio.retoma
+        if not ret and (servicio.origen == 'RETOMA' or servicio.imei):
+            ret = Retoma.query.filter(
+                (Retoma.imei1 == servicio.imei) | (Retoma.imei2 == servicio.imei)
+            ).order_by(Retoma.id.desc()).first()
+            if ret:
+                servicio.retoma_id = ret.id
+
+        if ret:
             if nuevo_estado in ['REPARADO', 'ENTREGADO']:
-                servicio.retoma.observaciones = f"[{nuevo_estado} EN TALLER {datetime.now().strftime('%d/%m/%Y')}]: {solucion or 'Revisión técnica finalizada'}. " + (servicio.retoma.observaciones or '')
+                # 1. Volver a retomas: cambiar estado a 'en_evaluacion' para que vuelva a estar lista para ingresar a inventario
+                ret.estado = 'en_evaluacion'
+                
+                # 2. Traer el valor del soporte automáticamente al campo de arreglos
+                costo_rep_dec = Decimal(str(servicio.costo_reparacion or 0.0))
+                ret.arreglos = costo_rep_dec
+                
+                # 3. Si la retoma ya tenía un producto_generado, actualizar su costo
+                if ret.producto_generado:
+                    ret.producto_generado.precio_costo = ret.valor_retoma + costo_rep_dec
+                
+                # 4. Registrar en observaciones de la retoma
+                taller_n = servicio.technician.nombre if servicio.technician else 'Taller Técnico'
+                fecha_hoy_str = datetime.now().strftime('%d/%m/%Y')
+                ret.observaciones = f"[{nuevo_estado} EN TALLER {fecha_hoy_str}]: Retornó de {taller_n}. Costo reparación cargado a arreglos: ${costo_rep_dec:,.0f} | Solución: {solucion or 'Listo para inventario'}. " + (ret.observaciones or '')
             elif nuevo_estado == 'NO_REPARABLE':
-                servicio.retoma.observaciones = f"[NO REPARABLE EN TALLER {datetime.now().strftime('%d/%m/%Y')}]: {solucion or diagnostico or 'Falla grave irreparable'}. " + (servicio.retoma.observaciones or '')
+                ret.estado = 'en_evaluacion'
+                ret.observaciones = f"[SOPORTE NO REPARABLE {datetime.now().strftime('%d/%m/%Y')}]: {solucion or diagnostico or 'Falla grave irreparable'}. " + (ret.observaciones or '')
 
     db.session.commit()
 
