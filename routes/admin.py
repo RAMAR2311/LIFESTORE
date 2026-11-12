@@ -1391,6 +1391,8 @@ def ventas_vendedores():
                                     })
 
                 # 3. Consolidado Acumulado del Mes
+                total_comision_inventario = total_comision_inventario.quantize(Decimal('1'))
+                total_comision_retomas = total_comision_retomas.quantize(Decimal('1'))
                 total_comision_mes = total_comision_inventario + total_comision_retomas
 
                 # 4. Historial de Anticipos y Pagos del Asesor en el Mes
@@ -1408,7 +1410,7 @@ def ventas_vendedores():
                         total_liquidado += monto_pago
 
                 total_pagado = total_anticipos + total_liquidado
-                saldo_pendiente = max(Decimal('0.0'), total_comision_mes - total_pagado)
+                saldo_pendiente = max(Decimal('0'), (total_comision_mes - total_pagado).quantize(Decimal('1')))
 
             except Exception as e:
                 flash(f"Error al procesar comisiones: {str(e)}", 'danger')
@@ -1435,6 +1437,71 @@ def ventas_vendedores():
     )
 
 
+def parse_monto_comision(monto_raw):
+    """
+    Parsea de forma segura cualquier monto monetario a Decimal entero en COP,
+    evitando que strings decimales como '1850.00' o '10000.0' se multipliquen
+    por 10, 100 o 1000 al eliminar el punto indiscriminadamente.
+    """
+    if monto_raw is None:
+        return Decimal('0')
+    if isinstance(monto_raw, (int, float, Decimal)):
+        return Decimal(str(int(round(float(monto_raw)))))
+
+    s = str(monto_raw).replace('$', '').strip()
+    if not s:
+        return Decimal('0')
+
+    # Si contiene tanto coma como punto (ej: 1.850.000,00 o 1,850,000.00)
+    if '.' in s and ',' in s:
+        if s.rfind(',') > s.rfind('.'):
+            # Formato hispano/colombiano: 1.850.000,00
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            # Formato anglosajón: 1,850,000.00
+            s = s.replace(',', '')
+    elif ',' in s:
+        partes = s.split(',')
+        if len(partes) == 2 and len(partes[1]) in [1, 2]:
+            s = partes[0] + '.' + partes[1]
+        else:
+            s = s.replace(',', '')
+    elif '.' in s:
+        partes = s.split('.')
+        if len(partes) > 2:
+            # Múltiples puntos: separadores de miles "1.850.000"
+            s = s.replace('.', '')
+        else:
+            # Un solo punto:
+            left, right = partes[0], partes[1]
+            if len(right) in [1, 2]:
+                # Decimales estándar en Python / centavos
+                s = left if set(right) == {'0'} else (left + '.' + right)
+            elif len(right) == 3:
+                # Si a la derecha hay 3 dígitos:
+                # - Si la parte izquierda tiene 1 a 3 dígitos (ej: "10.000", "1.850", "250.000"),
+                #   es un separador de miles colombiano escrito manualmente.
+                # - Si la parte izquierda tiene 4 o más dígitos (ej: "1850.000", "10000.000"),
+                #   es un número con decimales de precisión proveniente de Python/SQL.
+                if len(left) <= 3:
+                    s = left + right
+                else:
+                    s = left if set(right) == {'0'} else (left + '.' + right)
+            else:
+                try:
+                    val = float(s)
+                    return Decimal(str(int(round(val))))
+                except:
+                    s = s.replace('.', '')
+
+    try:
+        val = Decimal(s)
+        return Decimal(str(int(round(val))))
+    except Exception:
+        limpio = ''.join(c for c in s if c.isdigit() or c == '.')
+        return Decimal(str(int(round(float(limpio or 0)))))
+
+
 @admin_bp.route('/comisiones/anticipo', methods=['POST'])
 @login_required
 @admin_required
@@ -1448,8 +1515,7 @@ def registrar_anticipo_comision():
 
     asesor = Asesor.query.get_or_404(asesor_id)
     try:
-        monto_clean = str(monto_raw).replace('$', '').replace('.', '').replace(',', '').strip()
-        monto = Decimal(monto_clean)
+        monto = parse_monto_comision(monto_raw)
         if monto <= 0:
             raise ValueError("El monto debe ser mayor a 0.")
     except Exception as e:
@@ -1489,8 +1555,7 @@ def liquidar_saldo_comision():
 
     asesor = Asesor.query.get_or_404(asesor_id)
     try:
-        monto_clean = str(monto_raw).replace('$', '').replace('.', '').replace(',', '').strip()
-        monto = Decimal(monto_clean)
+        monto = parse_monto_comision(monto_raw)
         if monto <= 0:
             raise ValueError("El monto a liquidar debe ser mayor a 0.")
     except Exception as e:
@@ -1813,8 +1878,10 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
                         comision_retomas += cuota_asesor
                         retomas_count += 1
 
-    total_comisiones = comision_inventario + comision_retomas
-    total_devengado = salario_base + total_comisiones
+    comision_inventario = comision_inventario.quantize(Decimal('1'))
+    comision_retomas = comision_retomas.quantize(Decimal('1'))
+    total_comisiones = (comision_inventario + comision_retomas).quantize(Decimal('1'))
+    total_devengado = (salario_base + total_comisiones).quantize(Decimal('1'))
 
     # 3. Deducciones por Vales Aprobados en el Mes
     vales_mes = Vale.query.filter(
@@ -1842,7 +1909,7 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
             total_liquidado_previo += monto_p
 
     total_deducciones = total_vales + total_anticipos
-    neto_a_pagar = max(Decimal('0.0'), total_devengado - total_deducciones - total_liquidado_previo)
+    neto_a_pagar = max(Decimal('0'), (total_devengado - total_deducciones - total_liquidado_previo).quantize(Decimal('1')))
 
     return {
         'asesor': asesor,

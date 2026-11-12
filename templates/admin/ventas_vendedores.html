@@ -396,7 +396,7 @@
                                     <div class="input-group">
                                         <span class="input-group-text bg-light">$</span>
                                         <input type="number" name="monto" class="form-control form-control-lg bg-light fw-bold text-success" 
-                                               min="1000" max="{{ saldo_pendiente if saldo_pendiente > 0 else '' }}" required placeholder="0">
+                                               min="1000" max="{{ saldo_pendiente|round(0)|int if saldo_pendiente > 0 else '' }}" required placeholder="0">
                                     </div>
                                     <small class="text-muted">No puede superar el saldo pendiente del mes.</small>
                                 </div>
@@ -447,7 +447,7 @@
                                     <div class="fs-3 fw-bold text-success">${{ saldo_pendiente|cop }}</div>
                                     <small class="text-muted">Se generará un pago que dejará el saldo del mes en $0.</small>
                                 </div>
-                                <input type="hidden" name="monto" value="{{ saldo_pendiente }}">
+                                <input type="hidden" name="monto" value="{{ saldo_pendiente|round(0)|int }}">
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Método de Liquidación <span class="text-danger">*</span></label>
                                     <select name="metodo_pago" class="form-select bg-light" required>
