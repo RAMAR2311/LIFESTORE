@@ -1875,3 +1875,187 @@ def trazabilidad():
                            estado_actual=estado_actual,
                            eventos=eventos)
 
+
+@celulares_bp.route('/alertas', methods=['GET'])
+@login_required
+def alertas_estancados():
+    from models import SystemSetting, Product, Branch, BranchStock
+    from datetime import datetime, timedelta
+
+    # 1. Obtener umbral de meses configurado o solicitado
+    meses_sistema = int(SystemSetting.get_value('meses_alerta_estancados', '3'))
+    meses_solicitados = request.args.get('meses', type=int)
+    if not meses_solicitados or meses_solicitados < 1:
+        meses_actual = meses_sistema
+    else:
+        meses_actual = meses_solicitados
+
+    # Filtros opcionales
+    sucursal_id = request.args.get('sucursal_id', type=int)
+    marca_filtro = request.args.get('marca', '').strip()
+    q_filtro = request.args.get('q', '').strip()
+
+    # Fecha de corte
+    dias_umbral = int(meses_actual * 30.4375)
+    ahora = datetime.now()
+    fecha_corte = ahora - timedelta(days=dias_umbral)
+
+    query = Product.query.filter(
+        Product.tipo_inventario == 'celulares',
+        Product.cantidad_stock > 0,
+        Product.fecha_creacion <= fecha_corte
+    )
+
+    if marca_filtro:
+        query = query.filter(Product.marca.ilike(f"%{marca_filtro}%"))
+
+    if q_filtro:
+        query = query.filter(
+            or_(
+                Product.nombre.ilike(f"%{q_filtro}%"),
+                Product.modelo_celular.ilike(f"%{q_filtro}%"),
+                Product.imei.ilike(f"%{q_filtro}%"),
+                Product.imei2.ilike(f"%{q_filtro}%"),
+                Product.sku.ilike(f"%{q_filtro}%")
+            )
+        )
+
+    # Filtrar por sucursal si se especifica
+    if sucursal_id:
+        query = query.join(BranchStock).filter(
+            BranchStock.branch_id == sucursal_id,
+            BranchStock.cantidad > 0
+        )
+    elif current_user.rol != 'admin' and current_user.branch_id:
+        query = query.join(BranchStock).filter(
+            BranchStock.branch_id == current_user.branch_id,
+            BranchStock.cantidad > 0
+        )
+
+    productos_raw = query.order_by(Product.fecha_creacion.asc()).all()
+
+    es_coordinador = getattr(current_user, 'rol', '') == 'coordinador'
+
+    equipos = []
+    costo_total = 0.0
+    venta_total = 0.0
+    total_dias = 0
+    max_dias = 0
+    equipo_mas_antiguo = None
+
+    for p in productos_raw:
+        dias = (ahora - p.fecha_creacion).days if p.fecha_creacion else 0
+        meses_transcurridos = round(dias / 30.4375, 1)
+        
+        # Texto legible de tiempo (ej. "3 meses y 14 días")
+        m_ent = dias // 30
+        d_rem = dias % 30
+        tiempo_texto = f"{m_ent} mes{'es' if m_ent != 1 else ''}"
+        if d_rem > 0:
+            tiempo_texto += f" y {d_rem} día{'s' if d_rem != 1 else ''}"
+
+        # Nivel de severidad
+        if meses_transcurridos >= meses_actual * 1.5:
+            severidad = 'CRÍTICA'
+            badge_severidad = 'bg-danger text-white'
+        else:
+            severidad = 'ALERTA'
+            badge_severidad = 'bg-warning text-dark'
+
+        # Ubicación física actual vía BranchStock
+        stocks_pos = [bs for bs in p.branch_stocks if bs.cantidad > 0]
+        if stocks_pos:
+            ubicacion = ", ".join([f"{bs.branch.nombre} ({bs.cantidad} und)" for bs in stocks_pos if bs.branch])
+        else:
+            ubicacion = p.inventario or 'Tienda'
+
+        c_unit = float(p.precio_costo or 0)
+        sug_unit = float(p.precio_sugerido or 0)
+        min_unit = float(p.precio_minimo or 0)
+
+        costo_total += c_unit * p.total_stock
+        venta_total += sug_unit * p.total_stock
+        total_dias += dias
+
+        if dias > max_dias:
+            max_dias = dias
+            equipo_mas_antiguo = p.nombre
+
+        equipos.append({
+            'id': p.id,
+            'nombre': p.nombre,
+            'marca': p.marca,
+            'modelo': p.modelo_celular,
+            'color': p.color,
+            'memoria': p.memoria,
+            'bateria': p.bateria,
+            'imei': p.imei,
+            'imei2': p.imei2,
+            'stock': p.total_stock,
+            'ubicacion': ubicacion,
+            'fecha_ingreso': p.fecha_creacion,
+            'dias_en_stock': dias,
+            'meses_transcurridos': meses_transcurridos,
+            'tiempo_texto': tiempo_texto,
+            'severidad': severidad,
+            'badge_severidad': badge_severidad,
+            'precio_costo': None if es_coordinador else c_unit,
+            'precio_sugerido': sug_unit,
+            'precio_minimo': min_unit,
+            'imagen': p.imagen
+        })
+
+    kpis = {
+        'total_equipos': len(equipos),
+        'costo_total': costo_total if not es_coordinador else None,
+        'venta_sugerida_total': venta_total,
+        'dias_promedio': round(total_dias / len(equipos)) if equipos else 0,
+        'dias_maximo': max_dias,
+        'equipo_mas_antiguo': equipo_mas_antiguo
+    }
+
+    # Marcas disponibles para filtro
+    marcas_disponibles = [
+        r[0] for r in db.session.query(Product.marca).filter(
+            Product.tipo_inventario == 'celulares',
+            Product.marca != None,
+            Product.marca != ''
+        ).distinct().order_by(Product.marca.asc()).all() if r[0]
+    ]
+
+    sucursales = Branch.query.filter_by(activa=True).all()
+
+    return render_template(
+        'celulares/alertas.html',
+        equipos=equipos,
+        kpis=kpis,
+        meses_actual=meses_actual,
+        meses_sistema=meses_sistema,
+        sucursales=sucursales,
+        sucursal_id=sucursal_id,
+        marca_filtro=marca_filtro,
+        q_filtro=q_filtro,
+        marcas_disponibles=marcas_disponibles,
+        es_coordinador=es_coordinador
+    )
+
+
+@celulares_bp.route('/alertas/configurar', methods=['POST'])
+@login_required
+@admin_required
+def configurar_alerta_estancados():
+    from models import SystemSetting
+    meses = request.form.get('meses', type=int)
+    if not meses or meses < 1:
+        flash('El umbral de meses debe ser un número entero mayor o igual a 1.', 'danger')
+        return redirect(url_for('celulares_bp.alertas_estancados'))
+
+    SystemSetting.set_value(
+        'meses_alerta_estancados',
+        str(meses),
+        'Umbral predeterminado de meses para alertar celulares estancados sin venderse'
+    )
+    flash(f'¡Umbral predeterminado actualizado! Ahora el sistema alertará automáticamente equipos con más de {meses} meses sin venderse.', 'success')
+    return redirect(url_for('celulares_bp.alertas_estancados', meses=meses))
+
+

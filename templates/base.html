@@ -1675,6 +1675,12 @@
                             <a class="sidebar-sublink" href="{{ url_for('celulares_bp.trazabilidad') }}">
                                 <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad IMEI
                             </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('celulares_bp.alertas_estancados') }}">
+                                <span><i class="fa-solid fa-triangle-exclamation me-2 text-warning" style="width: 16px;"></i> Alertas de Equipos</span>
+                                {% if equipos_estancados_count and equipos_estancados_count > 0 %}
+                                    <span class="badge bg-danger rounded-pill">{{ equipos_estancados_count }}</span>
+                                {% endif %}
+                            </a>
                             <a class="sidebar-sublink" href="{{ url_for('admin_bp.gift_combos') }}">
                                 <i class="fa-solid fa-gifts me-2 text-warning" style="width: 16px;"></i> Combos de Obsequios
                             </a>
@@ -1831,6 +1837,12 @@
                             </a>
                             <a class="sidebar-sublink" href="{{ url_for('celulares_bp.trazabilidad') }}">
                                 <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad IMEI
+                            </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('celulares_bp.alertas_estancados') }}">
+                                <span><i class="fa-solid fa-triangle-exclamation me-2 text-warning" style="width: 16px;"></i> Alertas de Equipos</span>
+                                {% if equipos_estancados_count and equipos_estancados_count > 0 %}
+                                    <span class="badge bg-danger rounded-pill">{{ equipos_estancados_count }}</span>
+                                {% endif %}
                             </a>
                             <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
                                 <span><i class="fa-solid fa-truck-moving me-2" style="width: 16px;"></i> Traslados de Stock</span>

@@ -1250,3 +1250,37 @@ class DeviceExchange(db.Model):
     def __init__(self, **kwargs):
         super(DeviceExchange, self).__init__(**kwargs)
 
+
+class SystemSetting(db.Model):
+    """Configuración general del sistema (clave-valor persistente)."""
+    __tablename__ = 'system_settings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    clave = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    valor = db.Column(db.String(255), nullable=False)
+    descripcion = db.Column(db.String(255), nullable=True)
+    updated_at = db.Column(db.DateTime, default=obtener_hora_bogota, onupdate=obtener_hora_bogota)
+
+    @classmethod
+    def get_value(cls, clave, default=None):
+        try:
+            setting = cls.query.filter_by(clave=clave).first()
+            return setting.valor if setting else default
+        except Exception:
+            return default
+
+    @classmethod
+    def set_value(cls, clave, valor, descripcion=None):
+        setting = cls.query.filter_by(clave=clave).first()
+        if not setting:
+            setting = cls(clave=clave, valor=str(valor), descripcion=descripcion)
+            db.session.add(setting)
+        else:
+            setting.valor = str(valor)
+            if descripcion:
+                setting.descripcion = descripcion
+            setting.updated_at = obtener_hora_bogota()
+        db.session.commit()
+        return setting
+
+

@@ -203,6 +203,28 @@ def create_app():
                 q_ex = q_ex.filter(DeviceExchange.branch_id == active_id)
             pending_exchanges_count = q_ex.count()
 
+            # Conteo de equipos estancados en inventario (> meses configurados sin venderse)
+            from models import SystemSetting, Product, BranchStock
+            from datetime import datetime, timedelta
+            try:
+                meses_alert = int(SystemSetting.get_value('meses_alerta_estancados', '3'))
+            except Exception:
+                meses_alert = 3
+            fecha_umbral_estancado = datetime.now() - timedelta(days=int(meses_alert * 30.4375))
+            q_estancados = Product.query.filter(
+                Product.tipo_inventario == 'celulares',
+                Product.cantidad_stock > 0,
+                Product.fecha_creacion <= fecha_umbral_estancado
+            )
+            if current_user.rol != 'admin' and current_user.branch_id:
+                q_estancados = q_estancados.join(BranchStock).filter(
+                    BranchStock.branch_id == current_user.branch_id,
+                    BranchStock.cantidad > 0
+                )
+            equipos_estancados_count = q_estancados.count()
+        else:
+            equipos_estancados_count = 0
+
         return {
             'get_active_branch_id': get_active_branch_id,
             'active_branch_id': active_id,
@@ -211,7 +233,8 @@ def create_app():
             'pending_transfers_count': pending_transfers_count,
             'pending_vales_count': pending_vales_count,
             'pending_support_count': pending_support_count,
-            'pending_exchanges_count': pending_exchanges_count
+            'pending_exchanges_count': pending_exchanges_count,
+            'equipos_estancados_count': equipos_estancados_count
         }
 
     @app.route('/')
