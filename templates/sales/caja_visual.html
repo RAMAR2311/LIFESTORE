@@ -2638,6 +2638,34 @@ function eliminarRetomaActual() {
             });
         });
     }
+
+    // Auto-agregar producto enviado desde el Catálogo Celulares
+    document.addEventListener('DOMContentLoaded', function() {
+        const pendingItemStr = sessionStorage.getItem('catalogo_add_item');
+        if (pendingItemStr) {
+            sessionStorage.removeItem('catalogo_add_item');
+            try {
+                const item = JSON.parse(pendingItemStr);
+                if (item && item.productId && typeof addToCart === 'function') {
+                    addToCart(
+                        item.productId,
+                        item.variantId || null,
+                        item.nombre,
+                        item.sku,
+                        item.precio,
+                        item.maxStock,
+                        item.variantName || null,
+                        item.tipoInventario || 'celulares',
+                        item.imei || null,
+                        item.imei2 || null,
+                        item.inventario || null
+                    );
+                }
+            } catch (e) {
+                console.error('Error al cargar producto desde catálogo:', e);
+            }
+        }
+    });
 </script>
 
 {% endblock %}

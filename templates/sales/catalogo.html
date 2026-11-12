@@ -94,6 +94,24 @@ function cambiarEstadoFiltro(val) {
     document.getElementById('inputEstadoFiltro').value = val;
     document.getElementById('filtroCatalogoForm').submit();
 }
+
+function enviarAlCarritoDesdeCatalogo(btn) {
+    const item = {
+        productId: parseInt(btn.dataset.id, 10),
+        variantId: null,
+        nombre: btn.dataset.nombre,
+        sku: btn.dataset.sku,
+        precio: parseFloat(btn.dataset.precio) || 0,
+        maxStock: parseInt(btn.dataset.stock, 10) || 1,
+        variantName: null,
+        tipoInventario: btn.dataset.tipo || 'celulares',
+        imei: btn.dataset.imei || null,
+        imei2: btn.dataset.imei2 || null,
+        inventario: btn.dataset.inventario || null
+    };
+    sessionStorage.setItem('catalogo_add_item', JSON.stringify(item));
+    window.location.href = "{{ url_for('sales_bp.caja_visual') }}";
+}
 </script>
 
 <style>
@@ -214,6 +232,25 @@ function cambiarEstadoFiltro(val) {
                         <span class="text-success fw-bolder fs-5">${{ p.precio_sugerido|cop }}</span>
                     </div>
                 </div>
+
+                <!-- Botón Enviar al Carrito (Punto de Pago) -->
+                {% if item.estado_op == 'DISPONIBLE' %}
+                <div class="mt-3 d-grid">
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold shadow-sm py-2"
+                            data-id="{{ p.id }}"
+                            data-nombre="{{ p.nombre }}"
+                            data-sku="{{ p.sku }}"
+                            data-precio="{{ p.precio_sugerido }}"
+                            data-stock="{{ p.cantidad_stock }}"
+                            data-tipo="{{ p.tipo_inventario }}"
+                            data-imei="{{ p.imei or '' }}"
+                            data-imei2="{{ p.imei2 or '' }}"
+                            data-inventario="{{ p.inventario or '' }}"
+                            onclick="enviarAlCarritoDesdeCatalogo(this)">
+                        <i class="fa-solid fa-cart-plus me-1"></i> Enviar al Carrito
+                    </button>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Pie de tarjeta con proveedor / observaciones si existen -->
