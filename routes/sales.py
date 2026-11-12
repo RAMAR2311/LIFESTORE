@@ -1140,15 +1140,14 @@ def catalogo():
     page = request.args.get('page', 1, type=int)
     per_page = 24
     
-    # 1. Base query: Celulares que NO estén vendidos
+    # 1. Base query: Celulares disponibles o en procesos operativos (incluye reingresos por retoma)
     base_query = Product.query.options(
         selectinload(Product.branch_stocks).joinedload(BranchStock.branch),
         selectinload(Product.maneos),
         selectinload(Product.servicios_tecnicos).joinedload(TechnicalService.technician),
         selectinload(Product.cambios_salida).joinedload(DeviceExchange.partner)
     ).filter(
-        Product.tipo_inventario == 'celulares',
-        ~Product.detalles_venta.any()
+        Product.tipo_inventario == 'celulares'
     )
 
     # 2. Filtro por Estado Operativo
@@ -1207,7 +1206,6 @@ def catalogo():
         Product.tipo_inventario == 'celulares',
         Product.modelo_celular != None,
         Product.modelo_celular != '',
-        ~Product.detalles_venta.any(),
         or_(
             Product.cantidad_stock > 0,
             Product.maneos.any(Maneo.estado == 'PENDIENTE'),
