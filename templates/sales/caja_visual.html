@@ -617,7 +617,7 @@
                                 <small class="text-muted d-block">{{ c.descripcion }}</small>
                                 {% endif %}
                             </div>
-                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold" onclick="aplicarComboObsequio({{ c.id }})">
+                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold" data-combo-id="{{ c.id }}" onclick="aplicarComboObsequio(this.dataset.comboId)">
                                 <i class="fa-solid fa-plus me-1"></i> Aplicar
                             </button>
                         </div>
@@ -2345,7 +2345,7 @@ function eliminarRetomaActual() {
 
 
     async function procesarPagoGlobal(datosCliente = null) {
-        const esBodega = {% if sucursal_actual and sucursal_actual.tipo == 'bodega' %}true{% else %}false{% endif %};
+        const esBodega = ("{{ 'true' if sucursal_actual and sucursal_actual.tipo == 'bodega' else 'false' }}" === "true");
         const asesorSelect = document.getElementById('asesor-vendedor');
         const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
 
