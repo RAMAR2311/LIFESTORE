@@ -56,6 +56,8 @@ def procesar_venta():
         # Determinar el método de pago principal (para la columna legacy de retrocompatibilidad)
         if len(pagos_data) == 1:
             metodo_pago_principal = pagos_data[0].get('metodo_pago', 'efectivo')
+            if metodo_pago_principal == 'bolt':
+                metodo_pago_principal = 'bold'
         else:
             metodo_pago_principal = 'mixto'
 
@@ -133,15 +135,42 @@ def procesar_venta():
                 branch_defecto = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
                 sale_branch_id = branch_defecto.id if branch_defecto else 1
         else:
-            # Para administradores: usa sucursal activa seleccionada o 'Principal'
+            # Para administradores: usa sucursal activa seleccionada si existe
             active_b = session.get('active_branch_id')
             if active_b:
                 sale_branch_id = int(active_b)
             else:
-                branch_princ = Branch.query.filter((Branch.nombre.ilike('%principal%')) | (Branch.codigo == 'LOC1')).first()
-                if not branch_princ:
-                    branch_princ = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
-                sale_branch_id = branch_princ.id if branch_princ else 1
+                # "Todas las Sedes (Global)":
+                # Detectar automáticamente la sucursal de destino según dónde esté el stock de los productos
+                detected_branch_id = None
+                for it in items:
+                    p_id = it.get('product_id')
+                    v_id = it.get('variant_id')
+                    cant = int(it.get('cantidad', 1))
+                    if p_id:
+                        query_bs = BranchStock.query.filter(
+                            BranchStock.product_id == p_id,
+                            BranchStock.cantidad >= cant
+                        )
+                        if v_id:
+                            query_bs = query_bs.filter(BranchStock.variant_id == v_id)
+                        else:
+                            query_bs = query_bs.filter(BranchStock.variant_id.is_(None))
+                        
+                        stocks = query_bs.all()
+                        stocks_tienda = [s for s in stocks if s.branch and s.branch.tipo == 'tienda' and s.branch.activa]
+                        cands = stocks_tienda if stocks_tienda else [s for s in stocks if s.branch and s.branch.activa]
+                        if cands:
+                            detected_branch_id = cands[0].branch_id
+                            break
+                
+                if detected_branch_id:
+                    sale_branch_id = detected_branch_id
+                else:
+                    branch_princ = Branch.query.filter((Branch.nombre.ilike('%principal%')) | (Branch.codigo == 'LOC1')).first()
+                    if not branch_princ:
+                        branch_princ = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+                    sale_branch_id = branch_princ.id if branch_princ else 1
 
         sale_branch = Branch.query.with_for_update().get(sale_branch_id)
         if not sale_branch:
@@ -179,6 +208,8 @@ def procesar_venta():
         db.session.flush()
 
         monto_total = Decimal('0.00')
+        costo_total_obsequios = Decimal('0.00')
+        tiene_obsequio = False
 
         from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 
@@ -188,7 +219,11 @@ def procesar_venta():
             cantidad_vendida = int(item.get('cantidad', 0))
             precio_venta_final = Decimal(str(item.get('precio_final', '0.00')))
             es_manual = item.get('es_manual', False)
-            es_obsequio = item.get('es_obsequio', False)
+            es_obsequio = bool(item.get('es_obsequio', False)) or (precio_venta_final == Decimal('0.00'))
+
+            if es_obsequio:
+                tiene_obsequio = True
+                precio_venta_final = Decimal('0.00')
 
             if cantidad_vendida <= 0:
                 raise ValueError("La cantidad vendida debe ser mayor a 0.")
@@ -197,6 +232,10 @@ def procesar_venta():
                 # Producto manual (prestado) — no descuenta stock
                 nombre_manual = item.get('nombre_manual', 'Producto Externo')
                 precio_costo_manual = Decimal(str(item.get('precio_costo', '0.00')))
+                costo_u = precio_costo_manual or Decimal('0.00')
+
+                if es_obsequio:
+                    costo_total_obsequios += (costo_u * Decimal(str(cantidad_vendida)))
 
                 detalle = SaleDetail(
                     sale_id=nueva_venta.id,
@@ -205,7 +244,9 @@ def procesar_venta():
                     cantidad_vendida=cantidad_vendida,
                     precio_venta_final=precio_venta_final,
                     nombre_manual=nombre_manual,
-                    precio_costo_manual=precio_costo_manual
+                    precio_costo_manual=precio_costo_manual,
+                    es_obsequio=es_obsequio,
+                    costo_unitario=costo_u
                 )
                 db.session.add(detalle)
                 monto_total += (precio_venta_final * cantidad_vendida)
@@ -231,7 +272,33 @@ def procesar_venta():
                     raise ValueError(f"El producto con ID {product_id} no existe.")
 
                 # Bloqueo y validación de stock local en BranchStock
-                branch_stock = get_or_create_branch_stock(sale_branch_id, producto.id, variant_id, for_update=True)
+                target_item_branch_id = sale_branch_id
+                target_item_branch_nombre = sale_branch_nombre
+                branch_stock = get_or_create_branch_stock(target_item_branch_id, producto.id, variant_id, for_update=True)
+                
+                # Si es un producto externo registrado en caja y no tenía BranchStock inicializado:
+                if producto.tipo_inventario == 'externos' and branch_stock.cantidad < cantidad_vendida:
+                    branch_stock.cantidad = max(cantidad_vendida, producto.cantidad_stock or 1)
+                    sync_global_product_stock(producto.id, variant_id)
+                    db.session.flush()
+                
+                # Si en target_item_branch_id no hay suficiente stock pero el admin está en "Todas las Sedes",
+                # buscar automáticamente la sucursal donde sí existe el stock
+                if current_user.rol == 'admin' and not session.get('active_branch_id') and branch_stock.cantidad < cantidad_vendida:
+                    query_alt = BranchStock.query.filter(
+                        BranchStock.product_id == producto.id,
+                        BranchStock.cantidad >= cantidad_vendida
+                    )
+                    if variant_id:
+                        query_alt = query_alt.filter(BranchStock.variant_id == variant_id)
+                    else:
+                        query_alt = query_alt.filter(BranchStock.variant_id.is_(None))
+                    
+                    alt_bs = query_alt.first()
+                    if alt_bs and alt_bs.branch:
+                        target_item_branch_id = alt_bs.branch_id
+                        target_item_branch_nombre = alt_bs.branch.nombre
+                        branch_stock = get_or_create_branch_stock(target_item_branch_id, producto.id, variant_id, for_update=True)
                 
                 if variant_id:
                     variante = ProductVariant.query.with_for_update().get(variant_id)
@@ -240,7 +307,7 @@ def procesar_venta():
                     
                     if branch_stock.cantidad < cantidad_vendida:
                         raise ValueError(
-                            f"Stock insuficiente en la sucursal '{sale_branch_nombre}' para '{producto.nombre} ({variante.nombre_variante})'. "
+                            f"Stock insuficiente en la sucursal '{target_item_branch_nombre}' para '{producto.nombre} ({variante.nombre_variante})'. "
                             f"Disponible local: {branch_stock.cantidad}, Solicitado: {cantidad_vendida}."
                         )
                     
@@ -254,7 +321,7 @@ def procesar_venta():
                     ajuste = StockAdjustment(
                         product_id=producto.id,
                         admin_id=current_user.id,
-                        branch_id=sale_branch_id,
+                        branch_id=target_item_branch_id,
                         tipo_movimiento=f"Venta Tienda (Subcat: {variante.nombre_variante}) #{nueva_venta.id}",
                         stock_anterior=stock_anterior_local,
                         stock_nuevo=branch_stock.cantidad
@@ -263,7 +330,7 @@ def procesar_venta():
                 else:
                     if branch_stock.cantidad < cantidad_vendida:
                         raise ValueError(
-                            f"Stock insuficiente en la sucursal '{sale_branch_nombre}' para '{producto.nombre}'. "
+                            f"Stock insuficiente en la sucursal '{target_item_branch_nombre}' para '{producto.nombre}'. "
                             f"Disponible local: {branch_stock.cantidad}, Solicitado: {cantidad_vendida}."
                         )
                     
@@ -277,12 +344,26 @@ def procesar_venta():
                     ajuste = StockAdjustment(
                         product_id=producto.id,
                         admin_id=current_user.id,
-                        branch_id=sale_branch_id,
+                        branch_id=target_item_branch_id,
                         tipo_movimiento=f"Venta Tienda #{nueva_venta.id}",
                         stock_anterior=stock_anterior_local,
                         stock_nuevo=branch_stock.cantidad
                     )
                     db.session.add(ajuste)
+
+                costo_u = Decimal('0.00')
+                if variant_id:
+                    variante = ProductVariant.query.with_for_update().get(variant_id)
+                    if variante and variante.precio_costo is not None:
+                        costo_u = Decimal(str(variante.precio_costo))
+                    elif producto and producto.precio_costo is not None:
+                        costo_u = Decimal(str(producto.precio_costo))
+                else:
+                    if producto and producto.precio_costo is not None:
+                        costo_u = Decimal(str(producto.precio_costo))
+
+                if es_obsequio:
+                    costo_total_obsequios += (costo_u * Decimal(str(cantidad_vendida)))
 
                 if not es_obsequio and precio_venta_final < precio_limite_autorizado:
                     raise ValueError(f"No autorizado: El precio ({precio_venta_final}) del producto '{producto.nombre}' está por debajo del límite permitido ({precio_limite_autorizado}).")
@@ -292,7 +373,9 @@ def procesar_venta():
                     product_id=producto.id,
                     variant_id=variant_id,
                     cantidad_vendida=cantidad_vendida,
-                    precio_venta_final=precio_venta_final
+                    precio_venta_final=precio_venta_final,
+                    es_obsequio=es_obsequio,
+                    costo_unitario=costo_u
                 )
                 db.session.add(detalle)
                 db.session.flush()
@@ -336,11 +419,29 @@ def procesar_venta():
         monto_total = max(Decimal('0.00'), monto_total - monto_retomas_total)
 
         nueva_venta.monto_total = monto_total
+        nueva_venta.tiene_obsequio = tiene_obsequio
+        nueva_venta.costo_total_obsequios = costo_total_obsequios
+        nueva_venta.ingreso_neto_real = max(Decimal('0.00'), monto_total - costo_total_obsequios)
 
         # Registrar los pagos mixtos en la tabla sale_payments
         total_pagos = Decimal('0.00')
+        nombres_metodos = {
+            'efectivo': 'Efectivo',
+            'nequi': 'Nequi',
+            'bancolombia': 'Bancolombia',
+            'davivienda': 'Davivienda',
+            'daviplata': 'Daviplata',
+            'bold': 'Bold (Datáfono)',
+            'bolt': 'Bold (Datáfono)',
+            'addi': 'Addi',
+            'sistecredito': 'Sistecrédito',
+            'sitecredito': 'Sistecrédito',
+            'abono_tercero': 'Abono a Terceros / Proveedor'
+        }
         for pago_info in pagos_data:
             metodo = pago_info.get('metodo_pago', 'efectivo')
+            if metodo == 'bolt':
+                metodo = 'bold'
             monto_pago = pago_info.get('monto')
             p_provider_id = pago_info.get('provider_id') or provider_id
             p_comprobante = pago_info.get('comprobante', '').strip() if pago_info.get('comprobante') else None
@@ -356,6 +457,11 @@ def procesar_venta():
                     continue # Salto el pago si el total a pagar es 0 (ej. cubierto 100% por retoma)
                 raise ValueError(f"El monto del pago por '{metodo}' debe ser mayor a 0.")
             
+            # Validación obligatoria de comprobante para cualquier método de pago diferente a efectivo
+            if metodo not in ['efectivo', 'retoma'] and not p_comprobante:
+                nombre_legible = nombres_metodos.get(metodo, metodo.capitalize())
+                raise ValueError(f"El método de pago '{nombre_legible}' exige obligatoriamente adjuntar la imagen del comprobante de pago antes de efectuar la venta.")
+
             # Validación y contabilidad para Método de Pago: Abono a Terceros / Proveedor
             if metodo == 'abono_tercero':
                 if not p_provider_id:
@@ -372,7 +478,8 @@ def procesar_venta():
                     provider_id=prov_dest.id,
                     monto_abonado=monto_pago,
                     metodo_pago='abono_tercero',
-                    observacion=f"Abono directo por Venta #{nueva_venta.id} - Soporte: {p_comprobante}",
+                    observacion=f"Abono directo por Venta #{nueva_venta.id}",
+                    comprobante=p_comprobante,
                     fecha_pago=fecha_venta_obj
                 )
                 db.session.add(nuevo_abono_prov)
@@ -382,7 +489,7 @@ def procesar_venta():
                 metodo_pago=metodo,
                 monto=monto_pago,
                 provider_id=p_provider_id if metodo == 'abono_tercero' else None,
-                comprobante=p_comprobante if metodo == 'abono_tercero' else None
+                comprobante=p_comprobante if metodo != 'efectivo' else None
             )
             db.session.add(pago)
             total_pagos += monto_pago
@@ -654,12 +761,15 @@ def historial():
     # Auditar y cruzar sumatorios de métricas de pago
     # Sistema híbrido: usa SalePayment si existe, caso contrario cae al metodo_pago legacy
     total_efectivo = Decimal('0')
+    total_nequi = Decimal('0')
     total_bancolombia = Decimal('0')
+    total_davivienda = Decimal('0')
     total_daviplata = Decimal('0')
-    total_tarjeta_credito = Decimal('0')
+    total_bold = Decimal('0')
     total_addi = Decimal('0')
-    total_sitecredito = Decimal('0')
-    total_otros = Decimal('0')  # Para retomas, nequi viejo, etc.
+    total_sistecredito = Decimal('0')
+    total_abono_tercero = Decimal('0')
+    total_otros = Decimal('0')
     total_retomas = Decimal('0')
     total_mixto = 0  # Contador de ventas con pago mixto
 
@@ -668,16 +778,24 @@ def historial():
             for pago in v.pagos:
                 if pago.metodo_pago == 'efectivo':
                     total_efectivo += pago.monto
+                elif pago.metodo_pago == 'nequi':
+                    total_nequi += pago.monto
                 elif pago.metodo_pago == 'bancolombia':
                     total_bancolombia += pago.monto
+                elif pago.metodo_pago == 'davivienda':
+                    total_davivienda += pago.monto
                 elif pago.metodo_pago == 'daviplata':
                     total_daviplata += pago.monto
-                elif pago.metodo_pago == 'tarjeta_credito':
-                    total_tarjeta_credito += pago.monto
+                elif pago.metodo_pago in ['bold', 'bolt', 'tarjeta_credito']:
+                    total_bold += pago.monto
                 elif pago.metodo_pago == 'addi':
                     total_addi += pago.monto
-                elif pago.metodo_pago == 'sitecredito':
-                    total_sitecredito += pago.monto
+                elif pago.metodo_pago in ['sistecredito', 'sitecredito']:
+                    total_sistecredito += pago.monto
+                elif pago.metodo_pago == 'abono_tercero':
+                    total_abono_tercero += pago.monto
+                elif pago.metodo_pago == 'retoma':
+                    total_retomas += pago.monto
                 else:
                     total_otros += pago.monto
             if len(v.pagos) > 1:
@@ -685,16 +803,22 @@ def historial():
         else:  # Retrocompatibilidad con ventas antiguas sin SalePayment
             if v.metodo_pago == 'efectivo':
                 total_efectivo += v.monto_total
+            elif v.metodo_pago == 'nequi':
+                total_nequi += v.monto_total
             elif v.metodo_pago == 'bancolombia':
                 total_bancolombia += v.monto_total
+            elif v.metodo_pago == 'davivienda':
+                total_davivienda += v.monto_total
             elif v.metodo_pago == 'daviplata':
                 total_daviplata += v.monto_total
-            elif v.metodo_pago == 'tarjeta_credito':
-                total_tarjeta_credito += v.monto_total
+            elif v.metodo_pago in ['bold', 'bolt', 'tarjeta_credito']:
+                total_bold += v.monto_total
             elif v.metodo_pago == 'addi':
                 total_addi += v.monto_total
-            elif v.metodo_pago == 'sitecredito':
-                total_sitecredito += v.monto_total
+            elif v.metodo_pago in ['sistecredito', 'sitecredito']:
+                total_sistecredito += v.monto_total
+            elif v.metodo_pago == 'abono_tercero':
+                total_abono_tercero += v.monto_total
             else:
                 total_otros += v.monto_total
 
@@ -703,11 +827,16 @@ def historial():
                            ventas=ventas, 
                            paginacion=paginacion,
                            total_efectivo=total_efectivo,
+                           total_nequi=total_nequi,
                            total_bancolombia=total_bancolombia,
+                           total_davivienda=total_davivienda,
                            total_daviplata=total_daviplata,
-                           total_tarjeta_credito=total_tarjeta_credito,
+                           total_bold=total_bold,
+                           total_tarjeta_credito=total_bold,
                            total_addi=total_addi,
-                           total_sitecredito=total_sitecredito,
+                           total_sistecredito=total_sistecredito,
+                           total_sitecredito=total_sistecredito,
+                           total_abono_tercero=total_abono_tercero,
                            total_otros=total_otros,
                            total_mixto=total_mixto,
                            fecha_inicio=fecha_inicio,
@@ -1160,42 +1289,144 @@ def caja_visual():
     from models import obtener_hora_bogota
     hoy_bogota = obtener_hora_bogota()
     
-    user_branch_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else (session.get('active_branch_id') or 1)
-    sucursal_obj = Branch.query.get(user_branch_id)
+    # Determinar si hay una sucursal específica activa
+    active_b_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else session.get('active_branch_id')
+    
+    if active_b_id:
+        user_branch_id = int(active_b_id)
+        sucursal_obj = Branch.query.get(user_branch_id)
+    else:
+        user_branch_id = None
+        sucursal_obj = None
+
     es_tienda = bool(sucursal_obj and sucursal_obj.tipo == 'tienda')
-    turno_activo = obtener_turno_sucursal(user_branch_id) if es_tienda else None
+    turno_activo = obtener_turno_sucursal(user_branch_id) if (es_tienda and user_branch_id) else None
 
     # Exigencia de apertura de caja y asesores aplica ÚNICAMENTE a sucursales de tipo 'tienda'
     if es_tienda and not turno_activo and current_user.rol == 'vendedor':
         flash(f"Debes abrir turno de caja antes de realizar ventas en la tienda '{sucursal_obj.nombre}'.", "warning")
         return redirect(url_for('arqueo_bp.abrir_turno'))
 
-    if current_user.rol == 'vendedor':
-        productos_query = Product.query.join(
-            BranchStock,
-            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == user_branch_id)
-        ).filter(
-            Product.tipo_inventario.in_(['tienda', 'celulares']),
-            BranchStock.cantidad > 0
-        ).order_by(Product.nombre.asc()).all()
-        productos = productos_query
+    from services.stock_service import get_or_create_branch_stock
+    
+    candidatos = Product.query.filter(
+        Product.tipo_inventario.in_(['tienda', 'celulares'])
+    ).order_by(Product.nombre.asc()).all()
+    
+    productos = []
+    
+    if user_branch_id:
+        # Modo Sucursal Específica: filtrar productos y variantes solo de esta sede
+        for p in candidatos:
+            if p.variantes:
+                stock_total_local = 0
+                for v in p.variantes:
+                    bs_var = BranchStock.query.filter_by(
+                        branch_id=user_branch_id,
+                        product_id=p.id,
+                        variant_id=v.id
+                    ).first()
+                    v.stock_local = bs_var.cantidad if bs_var else 0
+                    stock_total_local += v.stock_local
+                p.stock_local = stock_total_local
+                if stock_total_local > 0:
+                    productos.append(p)
+            else:
+                bs = BranchStock.query.filter_by(
+                    branch_id=user_branch_id,
+                    product_id=p.id,
+                    variant_id=None
+                ).first()
+                p.stock_local = bs.cantidad if bs else 0
+                if p.stock_local > 0:
+                    productos.append(p)
     else:
-        productos_query = Product.query.filter(Product.tipo_inventario.in_(['tienda', 'celulares'])).order_by(Product.nombre.asc()).all()
-        productos = [p for p in productos_query if p.total_stock > 0]
+        # Modo Admin "Todas las Sedes (Global)":
+        # Mostrar todos los productos con stock disponible en el sistema e identificar de qué sede son
+        for p in candidatos:
+            if p.total_stock > 0:
+                p.stock_local = p.total_stock
+                stocks_en_sedes = BranchStock.query.filter(
+                    BranchStock.product_id == p.id,
+                    BranchStock.cantidad > 0
+                ).all()
+                sedes_unicas = list({s.branch.nombre for s in stocks_en_sedes if s.branch})
+                if len(sedes_unicas) == 1:
+                    p.sede_nombre = sedes_unicas[0]
+                elif len(sedes_unicas) > 1:
+                    p.sede_nombre = "Múltiples Sedes"
+                else:
+                    p.sede_nombre = None
+                    
+                if p.variantes:
+                    for v in p.variantes:
+                        v.stock_local = v.cantidad_stock
+                productos.append(p)
     
     asesores = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre).all()
     providers = Provider.query.order_by(Provider.nombre).all()
-    sucursal_obj = Branch.query.get(user_branch_id)
+    from models import GiftCombo
+    combos_obsequio = GiftCombo.query.filter_by(activo=True).all()
     
     return render_template(
         'sales/caja_visual.html', 
         productos=productos, 
         asesores=asesores, 
         providers=providers, 
+        combos_obsequio=combos_obsequio,
         hoy=hoy_bogota.strftime('%Y-%m-%d'),
         turno_activo=turno_activo,
         sucursal_actual=sucursal_obj
     )
+
+
+@sales_bp.route('/api/gift-combos', methods=['GET'])
+@login_required
+def api_gift_combos():
+    from models import GiftCombo, BranchStock
+    combos = GiftCombo.query.filter_by(activo=True).all()
+    active_b_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else session.get('active_branch_id')
+    
+    combos_data = []
+    for c in combos:
+        items_data = []
+        disponible = True
+        for it in c.items:
+            p = it.producto
+            if not p:
+                continue
+            stock_local = 0
+            if active_b_id:
+                bs = BranchStock.query.filter_by(branch_id=int(active_b_id), product_id=p.id, variant_id=None).first()
+                stock_local = bs.cantidad if bs else 0
+            else:
+                stock_local = p.total_stock
+
+            if stock_local < it.cantidad:
+                disponible = False
+            
+            items_data.append({
+                'product_id': p.id,
+                'nombre': p.nombre,
+                'sku': p.sku,
+                'precio_sugerido': float(p.precio_sugerido or 0),
+                'precio_costo': float(p.precio_costo or 0),
+                'tipo_inventario': p.tipo_inventario,
+                'imei': p.imei,
+                'imei2': p.imei2,
+                'cantidad': it.cantidad,
+                'stock_local': stock_local
+            })
+        
+        combos_data.append({
+            'id': c.id,
+            'nombre': c.nombre,
+            'descripcion': c.descripcion or '',
+            'items': items_data,
+            'disponible': disponible
+        })
+        
+    return jsonify({'success': True, 'combos': combos_data})
 
 
 # Endpoint para Editar Métodos de Pago y Valor de Venta

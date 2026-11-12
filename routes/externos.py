@@ -195,6 +195,14 @@ def api_nuevo_desde_caja():
     
     try:
         db.session.add(nuevo)
+        db.session.flush()
+
+        target_branch_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else (session.get('active_branch_id') or 1)
+        from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
+        bs = get_or_create_branch_stock(int(target_branch_id), nuevo.id, None)
+        bs.cantidad = 1
+        sync_global_product_stock(nuevo.id, None)
+
         db.session.commit()
         return jsonify({
             'success': True,
@@ -245,6 +253,14 @@ def api_nuevo_accesorio_caja():
     
     try:
         db.session.add(nuevo)
+        db.session.flush()
+
+        target_branch_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else (session.get('active_branch_id') or 1)
+        from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
+        bs = get_or_create_branch_stock(int(target_branch_id), nuevo.id, None)
+        bs.cantidad = 1
+        sync_global_product_stock(nuevo.id, None)
+
         db.session.commit()
         return jsonify({
             'success': True,

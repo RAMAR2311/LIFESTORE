@@ -107,7 +107,12 @@
                                         <div class="d-flex flex-column gap-1">
                                             <span class="badge bg-warning text-dark border rounded-pill">Mixto</span>
                                             {% for pago in v.pagos %}
-                                                <small class="text-muted" style="font-size: 0.7rem;">- {{ pago.metodo_pago|capitalize }}: ${{ pago.monto|cop }}</small>
+                                                <small class="text-muted" style="font-size: 0.7rem;">
+                                                    - {{ 'Bold' if pago.metodo_pago in ['bold', 'bolt'] else pago.metodo_pago|capitalize }}: ${{ pago.monto|cop }}
+                                                    {% if pago.comprobante %}
+                                                        <a href="/static/{{ pago.comprobante }}" target="_blank" class="text-warning ms-1" title="Ver Comprobante"><i class="fa-solid fa-image"></i></a>
+                                                    {% endif %}
+                                                </small>
                                             {% endfor %}
                                         </div>
                                     {% else %}

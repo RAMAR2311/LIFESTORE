@@ -131,6 +131,13 @@
                     </span>
                     {% endif %}
                 </small>
+                {% else %}
+                <small class="text-muted">
+                    <i class="fa-solid fa-globe text-primary me-1"></i>Sede: <strong>Todas las Sedes (Global)</strong>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill ms-2">
+                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Enrutamiento automático a sede del producto
+                    </span>
+                </small>
                 {% endif %}
             </div>
             <div class="d-flex gap-2">
@@ -154,12 +161,15 @@
         <!-- Grilla de productos -->
         <div class="row g-3 overflow-auto pb-4" id="productsGrid" style="max-height: calc(100vh - 250px);">
             {% for p in productos %}
-            {% set total_stock = p.cantidad_stock %}
+            {% set total_stock = p.stock_local if p.stock_local is defined else p.cantidad_stock %}
             {% set vars_data = [] %}
             {% if p.variantes %}
-                {% set total_stock = p.variantes | sum(attribute='cantidad_stock') %}
+                {% set total_stock = p.stock_local if p.stock_local is defined else (p.variantes | sum(attribute='cantidad_stock')) %}
                 {% for v in p.variantes %}
-                    {% set _ = vars_data.append({"id": v.id, "nombre": v.nombre_variante, "stock": v.cantidad_stock, "precio_sugerido": v.precio_sugerido or p.precio_sugerido or 0}) %}
+                    {% set v_stock = v.stock_local if v.stock_local is defined else v.cantidad_stock %}
+                    {% if v_stock > 0 %}
+                        {% set _ = vars_data.append({"id": v.id, "nombre": v.nombre_variante, "stock": v_stock, "precio_sugerido": v.precio_sugerido or p.precio_sugerido or 0}) %}
+                    {% endif %}
                 {% endfor %}
             {% endif %}
             <div class="col-6 col-md-4 col-xl-3 product-card-container" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}" data-imei="{{ p.imei|lower if p.imei else '' }}" data-imei2="{{ p.imei2|lower if p.imei2 else '' }}">
@@ -185,7 +195,14 @@
                         </div>
                         <div>
                             <h5 class="product-price mb-1">${{ p.precio_sugerido|cop }}</h5>
-                            <small class="product-stock"><i class="fa-solid fa-box me-1"></i>{{ total_stock }} en stock</small>
+                            <div class="d-flex justify-content-center align-items-center gap-1 flex-wrap">
+                                <small class="product-stock"><i class="fa-solid fa-box me-1"></i>{{ total_stock }} en stock</small>
+                                {% if not sucursal_actual and p.sede_nombre %}
+                                <span class="badge bg-light text-primary border" style="font-size: 0.7rem;">
+                                    <i class="fa-solid fa-location-dot me-1"></i>{{ p.sede_nombre }}
+                                </span>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -201,11 +218,17 @@
 
     <!-- Panel Derecho: Carrito -->
     <div class="col-lg-4">
-        <div class="card card-custom checkout-panel pos-cart p-4 position-sticky" style="top: 100px; height: 100%;">
+        <div class="card card-custom checkout-panel pos-cart p-3 p-xl-4 position-sticky" style="top: 100px; height: 100%;">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h5 class="fw-bold m-0 text-brand-black"><i class="fa-solid fa-cart-shopping text-brand-pink me-2"></i> Balance</h5>
                 <span class="badge rounded-pill bg-dark border border-secondary text-light px-3" id="total_items">0 items</span>
             </div>
+            
+            {% if combos_obsequio %}
+            <button type="button" class="btn btn-sm btn-outline-warning text-dark fw-bold rounded-pill w-100 mb-3 shadow-sm d-flex align-items-center justify-content-center gap-1" data-bs-toggle="modal" data-bs-target="#modalComboObsequio">
+                <i class="fa-solid fa-gifts text-warning"></i> Agregar Combo Obsequio
+            </button>
+            {% endif %}
             
             <div class="card-body p-0 overflow-auto mb-3" style="max-height: 40vh;" id="cartContainer">
                 <ul class="list-group list-group-flush" id="cart_body">
@@ -216,24 +239,24 @@
                 </ul>
             </div>
 
-            <div class="d-flex justify-content-between mb-2">
+            <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
                 <span class="checkout-label align-self-center">Subtotal:</span>
-                <span class="fw-bold fs-4 checkout-total-val" id="subtotal_amount">$0</span>
+                <span class="fw-bold checkout-total-val text-end text-nowrap" style="font-size: 1.15rem;" id="subtotal_amount">$0</span>
             </div>
 
             <div class="mb-2 text-danger" id="retoma_discount_row" style="display: none !important;">
-                <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
                     <span class="fw-bold align-self-center"><i class="fa-solid fa-recycle me-1"></i> Retomas (<span id="retomas_count">0</span>):</span>
-                    <span class="fw-bold fs-5" id="retoma_amount">-$0</span>
+                    <span class="fw-bold text-end text-nowrap" style="font-size: 1.05rem;" id="retoma_amount">-$0</span>
                 </div>
                 <div id="retomas_list_container" class="ps-2 ms-1 mb-2 rounded p-2 retoma-container-box" style="font-size: 0.85rem;">
                     <!-- Lista dinámica de retomas -->
                 </div>
             </div>
 
-            <div class="d-flex justify-content-between mb-4 border-top pt-2" style="border-color: rgba(226, 232, 240, 0.15) !important;">
-                <span class="checkout-total-label align-self-center">Total a Cobrar:</span>
-                <span class="fw-bolder fs-1 checkout-total-val price-display font-mono" id="total_amount">$0</span>
+            <div class="d-flex justify-content-between align-items-baseline mb-4 border-top pt-2 gap-2" style="border-color: rgba(226, 232, 240, 0.15) !important;">
+                <span class="checkout-total-label text-nowrap">Total a Cobrar:</span>
+                <span class="fw-bolder checkout-total-val price-display font-mono text-end text-nowrap" style="font-size: clamp(1.2rem, 1.5vw, 1.5rem); letter-spacing: -0.03em;" id="total_amount">$0</span>
             </div>
 
             <button type="button" class="btn pos-retoma-btn btn-sm rounded-pill fw-bold w-100 mb-4 shadow-sm" onclick="abrirModalRetoma()">
@@ -274,11 +297,11 @@
 
             <!-- Método de Pago -->
             <div class="mb-3">
-                <div class="d-flex align-items-center gap-3 mb-2">
-                    <label class="form-label checkout-label m-0">Método de Pago</label>
-                    <div class="form-check form-switch ms-auto">
-                        <input class="form-check-input" type="checkbox" id="toggle_pago_mixto" style="cursor: pointer; width: 3rem; height: 1.5rem;">
-                        <label class="form-check-label fw-bold small checkout-label" for="toggle_pago_mixto" style="cursor: pointer;">Dividir Pago</label>
+                <div class="d-flex align-items-center justify-content-between gap-1 mb-2">
+                    <label class="form-label checkout-label m-0 fw-bold small text-uppercase">Método de Pago</label>
+                    <div class="form-switch m-0 p-0 d-flex align-items-center gap-1" style="min-height: auto;">
+                        <input class="form-check-input m-0" type="checkbox" id="toggle_pago_mixto" role="switch" style="cursor: pointer; width: 2.1rem; height: 1.15rem; float: none;">
+                        <label class="form-check-label fw-bold text-nowrap m-0" for="toggle_pago_mixto" style="cursor: pointer; font-size: 0.72rem; color: #64748b;">Dividir Pago</label>
                     </div>
                 </div>
             </div>
@@ -289,17 +312,18 @@
                     <option value="efectivo">💵 Efectivo</option>
                     <option value="nequi">🟣 Nequi</option>
                     <option value="bancolombia">🏦 Bancolombia</option>
+                    <option value="davivienda">🏦 Davivienda</option>
                     <option value="daviplata">📲 Daviplata</option>
-                    <option value="bolt">⚡ Bolt (Datáfono)</option>
+                    <option value="bold">⚡ Bold (Datáfono)</option>
                     <option value="addi">🛒 Addi</option>
                     <option value="sistecredito">💳 Sistecrédito</option>
                     <option value="abono_tercero">🤝 Abono a Terceros / Proveedor</option>
                 </select>
 
-                <!-- Campos específicos para Abono a Terceros / Proveedor (Pago Único) -->
+                <!-- Campos de Comprobante Obligatorio (Todo método diferente a Efectivo) y Proveedor (Abono a Terceros) -->
                 <div id="campos_abono_tercero_unico" class="card border p-3 mb-3 rounded-3" style="display: none; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.3) !important;">
-                    <div class="fw-bold small mb-2 text-warning"><i class="fa-solid fa-handshake me-1"></i> Datos del Abono a Proveedor:</div>
-                    <div class="mb-2">
+                    <div id="titulo_comprobante_unico" class="fw-bold small mb-2 text-warning"><i class="fa-solid fa-camera me-1"></i> Comprobante de Pago Obligatorio:</div>
+                    <div id="div_proveedor_abono_unico" class="mb-2" style="display: none;">
                         <label class="form-label extra-small fw-bold checkout-label mb-1">Proveedor Destinatario <span class="text-danger">*</span></label>
                         <select id="abono_provider_id_unico" class="form-select form-select-sm pos-select">
                             <option value="" disabled selected>-- Seleccionar Proveedor Destinatario --</option>
@@ -309,19 +333,24 @@
                         </select>
                     </div>
                     <div>
-                        <label class="form-label extra-small fw-bold checkout-label mb-1">Comprobante / Imagen de Soporte <span class="text-danger">*</span></label>
+                        <label class="form-label extra-small fw-bold checkout-label mb-1">Imagen de Comprobante de Pago <span class="text-danger">*</span></label>
                         <input type="hidden" id="abono_comprobante_unico" value="">
                         
                         <div class="d-flex flex-column gap-2">
                             <div class="d-flex gap-2">
                                 <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
                                     <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
-                                    <span id="label_btn_upload_unico">Cargar Imagen Comprobante</span>
+                                    <span id="label_btn_upload_unico">Adjuntar Imagen Comprobante</span>
                                     <input type="file" id="file_comprobante_unico" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobante(this, 'abono_comprobante_unico', 'label_btn_upload_unico', 'preview_comprobante_unico')">
                                 </label>
                             </div>
-                            <div id="preview_comprobante_unico" class="small text-truncate text-success fw-bold" style="display: none;">
-                                <i class="fa-solid fa-circle-check me-1"></i> <span id="nombre_archivo_unico"></span>
+                            <div id="preview_comprobante_unico" class="small text-truncate text-success fw-bold d-flex align-items-center justify-content-between p-1 px-2 rounded border border-success bg-white mt-1 shadow-sm" style="display: none;">
+                                <div class="text-truncate me-2">
+                                    <i class="fa-solid fa-circle-check text-success me-1"></i> <span id="nombre_archivo_unico"></span>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 border-0 text-decoration-none" title="Quitar comprobante" onclick="limpiarComprobanteUnico()">
+                                    <i class="fa-solid fa-xmark fs-6"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -546,6 +575,58 @@
                 <button type="button" class="btn btn-success rounded-pill fw-bold px-4" onclick="confirmarVentaCelular()">
                     <i class="fa-solid fa-check me-1"></i> Confirmar Venta
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Seleccionar Combo de Obsequio -->
+<div class="modal fade" id="modalComboObsequio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-light border-bottom">
+                <h5 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-gifts me-2 text-warning"></i>Combos de Obsequios Disponibles
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">Selecciona un combo promocional para agregarlo automáticamente al carrito con precio <strong>$0</strong> como regalo de esta venta.</p>
+                <div class="d-flex flex-column gap-3">
+                    {% for c in combos_obsequio %}
+                    <div class="border rounded-3 p-3 bg-white shadow-sm">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-gift text-warning me-1"></i> {{ c.nombre }}</h6>
+                                {% if c.descripcion %}
+                                <small class="text-muted d-block">{{ c.descripcion }}</small>
+                                {% endif %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold" onclick="aplicarComboObsequio({{ c.id }})">
+                                <i class="fa-solid fa-plus me-1"></i> Aplicar
+                            </button>
+                        </div>
+                        <div class="bg-light p-2 rounded-2 small">
+                            <span class="fw-semibold text-muted d-block mb-1">Incluye:</span>
+                            <ul class="list-unstyled m-0 ps-1">
+                                {% for it in c.items %}
+                                <li><i class="fa-solid fa-circle-check text-success me-1"></i><strong>{{ it.cantidad }}x</strong> {{ it.producto.nombre if it.producto else 'N/D' }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fa-solid fa-gift fa-2x mb-2 text-secondary opacity-50"></i>
+                        <p class="small m-0">No hay combos de obsequio configurados o activos actualmente.</p>
+                        {% if current_user.rol == 'admin' %}
+                        <a href="{{ url_for('admin_bp.gift_combos') }}" class="btn btn-sm btn-outline-primary mt-2 rounded-pill">
+                            <i class="fa-solid fa-plus me-1"></i> Crear Combos en Administración
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
     </div>
@@ -783,8 +864,9 @@
         { value: 'efectivo',        label: '💵 Efectivo' },
         { value: 'nequi',           label: '🟣 Nequi' },
         { value: 'bancolombia',     label: '🏦 Bancolombia' },
+        { value: 'davivienda',      label: '🏦 Davivienda' },
         { value: 'daviplata',       label: '📲 Daviplata' },
-        { value: 'bolt',            label: '⚡ Bolt (Datáfono)' },
+        { value: 'bold',            label: '⚡ Bold (Datáfono)' },
         { value: 'addi',            label: '🛒 Addi' },
         { value: 'sistecredito',    label: '💳 Sistecrédito' },
         { value: 'abono_tercero',   label: '🤝 Abono a Terceros / Proveedor' }
@@ -792,9 +874,39 @@
 
     function toggleCamposAbonoTerceroUnico(valor) {
         const divAbono = document.getElementById('campos_abono_tercero_unico');
+        const divProv = document.getElementById('div_proveedor_abono_unico');
+        const titulo = document.getElementById('titulo_comprobante_unico');
         if (divAbono) {
-            divAbono.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+            divAbono.style.display = (valor !== 'efectivo') ? 'block' : 'none';
         }
+        if (divProv) {
+            divProv.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+        }
+        if (titulo) {
+            if (valor === 'abono_tercero') {
+                titulo.innerHTML = '<i class="fa-solid fa-handshake me-1"></i> Datos del Abono a Proveedor:';
+            } else {
+                titulo.innerHTML = '<i class="fa-solid fa-camera me-1"></i> Comprobante de Pago Obligatorio:';
+            }
+        }
+    }
+
+    function limpiarComprobanteUnico() {
+        const metodoEl = document.getElementById('metodo-pago');
+        if (metodoEl) metodoEl.value = 'efectivo';
+        const compHidden = document.getElementById('abono_comprobante_unico');
+        if (compHidden) compHidden.value = '';
+        const fileIn = document.getElementById('file_comprobante_unico');
+        if (fileIn) fileIn.value = '';
+        const lbl = document.getElementById('label_btn_upload_unico');
+        if (lbl) lbl.textContent = 'Adjuntar Imagen Comprobante';
+        const prev = document.getElementById('preview_comprobante_unico');
+        if (prev) prev.style.display = 'none';
+        const nombreArchivo = document.getElementById('nombre_archivo_unico');
+        if (nombreArchivo) nombreArchivo.textContent = '';
+        const provSel = document.getElementById('abono_provider_id_unico');
+        if (provSel) provSel.value = '';
+        toggleCamposAbonoTerceroUnico('efectivo');
     }
 
     async function subirImagenComprobante(fileInput, hiddenInputId, labelBtnId, previewId) {
@@ -868,7 +980,8 @@
     }
 
     function formatoCOP(valor) {
-        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor);
+        const num = Math.round(Number(valor) || 0);
+        return '$' + num.toLocaleString('es-CO');
     }
 
     document.getElementById('productSearch').addEventListener('keyup', function(e) {
@@ -994,8 +1107,70 @@
         renderCart();
     }
 
+    async function aplicarComboObsequio(comboId) {
+        try {
+            const resp = await fetch('/sales/api/gift-combos');
+            const data = await resp.json();
+            if (!data.success) {
+                alert('Error al consultar los combos de obsequio.');
+                return;
+            }
+            const combo = data.combos.find(c => c.id === comboId);
+            if (!combo) {
+                alert('Combo no encontrado.');
+                return;
+            }
+
+            // Validación atómica de stock en la sucursal actual para todos los ítems del combo
+            let faltantes = [];
+            for (const it of combo.items) {
+                if (it.stock_local < it.cantidad) {
+                    faltantes.push(`${it.nombre} (Disponible: ${it.stock_local}, Requerido: ${it.cantidad})`);
+                }
+            }
+
+            if (faltantes.length > 0) {
+                alert(`⚠️ Stock insuficiente en la sucursal para el combo '${combo.nombre}':\n- ` + faltantes.join('\n- '));
+                return;
+            }
+
+            // Si todos tienen stock, agregarlos al carrito marcados como obsequio ($0)
+            for (const it of combo.items) {
+                carrito.push({
+                    product_id: it.product_id,
+                    variant_id: null,
+                    nombre: it.nombre,
+                    sku: it.sku,
+                    precio_sugerido: it.precio_sugerido,
+                    precio_final: 0,
+                    cantidad: it.cantidad,
+                    max_stock: it.stock_local,
+                    es_obsequio: true,
+                    tipo_inventario: it.tipo_inventario,
+                    imei: it.imei,
+                    imei2: it.imei2,
+                    inventario: null
+                });
+            }
+
+            renderCart();
+
+            const modalEl = document.getElementById('modalComboObsequio');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+
+        } catch (err) {
+            console.error('Error aplicando combo:', err);
+            alert('Error inesperado al aplicar el combo de obsequios.');
+        }
+    }
+
     function removeCartItem(index) {
         carrito.splice(index, 1);
+        if (carrito.length === 0) {
+            limpiarComprobanteUnico();
+            resetPagosMixtos();
+        }
         renderCart();
     }
 
@@ -1061,14 +1236,14 @@
                         </button>
                     </div>
                 </div>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <div class="input-group input-group-sm flex-grow-1 me-2" style="max-width: 110px;">
-                        <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.75rem;">Cant</span>
-                        <input type="number" class="form-control pos-input text-center fw-bold border-0 px-1" value="${item.cantidad}" onchange="updateCartItem(${index}, this.value)">
+                <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
+                    <div class="input-group input-group-sm" style="width: 88px; flex-shrink: 0;">
+                        <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.72rem;">Cant</span>
+                        <input type="number" class="form-control pos-input text-center fw-bold border-0 px-1" style="font-size: 0.85rem;" value="${item.cantidad}" onchange="updateCartItem(${index}, this.value)">
                     </div>
-                    <div class="input-group input-group-sm flex-grow-1" style="max-width: 140px;">
+                    <div class="input-group input-group-sm flex-grow-1" style="min-width: 130px;">
                         <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.75rem;">$</span>
-                        <input type="text" inputmode="numeric" class="form-control pos-input text-end fw-bold border-0 px-2 text-brand-black format-price-ext" value="${Math.round(item.precio_final).toLocaleString('es-CO')}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
+                        <input type="text" inputmode="numeric" class="form-control pos-input text-end fw-bold border-0 px-2 text-brand-black format-price-ext" style="font-size: 0.86rem;" value="${Math.round(item.precio_final).toLocaleString('es-CO')}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
                     </div>
                 </div>
             `;
@@ -1235,34 +1410,51 @@
             ).join('');
 
             let abonoCamposHtml = '';
-            if (pago.metodo_pago === 'abono_tercero') {
-                let provOptions = LISTA_PROVEEDORES.map(pr => 
-                    `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
-                ).join('');
+            if (pago.metodo_pago !== 'efectivo') {
+                if (pago.metodo_pago === 'abono_tercero') {
+                    let provOptions = LISTA_PROVEEDORES.map(pr => 
+                        `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
+                    ).join('');
 
-                abonoCamposHtml = `
-                    <div class="p-2 mt-2 rounded border" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3) !important;">
-                        <div class="row g-2">
-                            <div class="col-sm-6">
-                                <label class="extra-small fw-bold checkout-label mb-1 d-block">Proveedor Destinatario *</label>
-                                <select class="form-select form-select-sm pos-select" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
-                                    <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
-                                    ${provOptions}
-                                </select>
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 rounded border" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3) !important;">
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold checkout-label mb-1 d-block">Proveedor Destinatario <span class="text-danger">*</span></label>
+                                    <select class="form-select form-select-sm pos-select" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
+                                        <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
+                                        ${provOptions}
+                                    </select>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold checkout-label mb-1 d-block">Imagen Comprobante <span class="text-danger">*</span></label>
+                                    <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                    <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                        <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                        <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen'}</span>
+                                        <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                    </label>
+                                    ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                                </div>
                             </div>
-                            <div class="col-sm-6">
-                                <label class="extra-small fw-bold checkout-label mb-1 d-block">Imagen Comprobante *</label>
+                        </div>
+                    `;
+                } else {
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 rounded border" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3) !important;">
+                            <div>
+                                <label class="extra-small fw-bold checkout-label mb-1 d-block"><i class="fa-solid fa-camera text-warning me-1"></i>Imagen Comprobante de Pago <span class="text-danger">*</span></label>
                                 <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
                                 <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
                                     <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
-                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Cargar Imagen'}</span>
+                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen Comprobante'}</span>
                                     <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
                                 </label>
                                 ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             }
 
             div.innerHTML = `
@@ -1292,15 +1484,97 @@
             if (document.getElementById('cliente_nombre')) document.getElementById('cliente_nombre').value = '';
             if (document.getElementById('cliente_documento')) document.getElementById('cliente_documento').value = '';
             if (document.getElementById('cliente_telefono')) document.getElementById('cliente_telefono').value = '';
+            limpiarComprobanteUnico();
             resetPagosMixtos();
             renderCart();
         }
     });
 
+    function validarPagosAntesDeCobrar() {
+        const esMixto = document.getElementById('toggle_pago_mixto').checked;
+        const granTotal = obtenerGranTotal();
+
+        if (granTotal <= 0) {
+            return { valido: true, pagosPayload: [{ metodo_pago: 'efectivo', monto: 0, provider_id: null, comprobante: null }] };
+        }
+
+        let pagosPayload = [];
+        if (esMixto) {
+            let sumaPagos = 0;
+            for (let i = 0; i < pagosMixtos.length; i++) {
+                const p = pagosMixtos[i];
+                const mObj = METODOS_DISPONIBLES.find(m => m.value === p.metodo_pago);
+                const mLabel = mObj ? mObj.label : p.metodo_pago;
+
+                if (!p.monto || p.monto <= 0) {
+                    alert(`⚠️ El pago #${i + 1} (${mLabel}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
+                    return { valido: false };
+                }
+                if (p.metodo_pago === 'abono_tercero' && !p.provider_id) {
+                    alert(`⚠️ El pago #${i + 1} (${mLabel}) requiere seleccionar obligatoriamente el Proveedor destinatario.`);
+                    return { valido: false };
+                }
+                if (p.metodo_pago !== 'efectivo' && (!p.comprobante || !p.comprobante.trim())) {
+                    alert(`⚠️ El pago #${i + 1} (${mLabel}) requiere adjuntar obligatoriamente la imagen del comprobante de pago antes de efectuar la venta.`);
+                    return { valido: false };
+                }
+                sumaPagos += p.monto;
+                pagosPayload.push({
+                    metodo_pago: p.metodo_pago,
+                    monto: Math.round(p.monto),
+                    provider_id: p.metodo_pago === 'abono_tercero' ? p.provider_id : null,
+                    comprobante: p.metodo_pago !== 'efectivo' ? p.comprobante.trim() : null
+                });
+            }
+            if (Math.round(sumaPagos) !== Math.round(granTotal)) {
+                const diff = Math.round(granTotal) - Math.round(sumaPagos);
+                alert(`⚠️ La suma de los pagos no coincide con el total de la venta. Falta: $${formatoCOP(Math.abs(diff)).replace('$','')}`);
+                return { valido: false };
+            }
+        } else {
+            const metodoPago = document.getElementById('metodo-pago').value;
+            const mObj = METODOS_DISPONIBLES.find(m => m.value === metodoPago);
+            const mLabel = mObj ? mObj.label : metodoPago;
+            let providerIdUnico = null;
+            let comprobanteUnico = null;
+
+            if (metodoPago !== 'efectivo') {
+                const compInput = document.getElementById('abono_comprobante_unico');
+                comprobanteUnico = compInput && compInput.value ? compInput.value.trim() : null;
+
+                if (metodoPago === 'abono_tercero') {
+                    const provSelect = document.getElementById('abono_provider_id_unico');
+                    providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
+                    if (!providerIdUnico) {
+                        alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
+                        return { valido: false };
+                    }
+                }
+
+                if (!comprobanteUnico) {
+                    alert(`⚠️ Para el método de pago "${mLabel}", es obligatorio adjuntar la imagen del comprobante de pago antes de efectuar la venta.`);
+                    return { valido: false };
+                }
+            }
+
+            pagosPayload.push({
+                metodo_pago: metodoPago,
+                monto: Math.round(granTotal),
+                provider_id: providerIdUnico,
+                comprobante: comprobanteUnico
+            });
+        }
+
+        return { valido: true, pagosPayload: pagosPayload };
+    }
+
     document.getElementById('btn_process_sale').addEventListener('click', async function() {
         if (carrito.length === 0) {
             return alert('El carrito está vacío.');
         }
+
+        const validacion = validarPagosAntesDeCobrar();
+        if (!validacion.valido) return;
 
         verificarClienteCelular();
     });
@@ -2022,63 +2296,9 @@ function eliminarRetomaActual() {
         const asesorSelect = document.getElementById('asesor-vendedor');
         const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
 
-        const esMixto = document.getElementById('toggle_pago_mixto').checked;
-        const granTotal = obtenerGranTotal();
-        let pagosPayload = [];
-
-        if (esMixto) {
-            let sumaPagos = 0;
-            for (let i = 0; i < pagosMixtos.length; i++) {
-                const p = pagosMixtos[i];
-                if (!p.monto || p.monto <= 0) {
-                    return alert(`El pago #${i + 1} (${p.metodo_pago}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
-                }
-                if (p.metodo_pago === 'abono_tercero') {
-                    if (!p.provider_id) {
-                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere seleccionar el Proveedor destinatario.`);
-                    }
-                    if (!p.comprobante || !p.comprobante.trim()) {
-                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere cargar la imagen del comprobante o soporte.`);
-                    }
-                }
-                sumaPagos += p.monto;
-                pagosPayload.push({
-                    metodo_pago: p.metodo_pago,
-                    monto: Math.round(p.monto),
-                    provider_id: p.metodo_pago === 'abono_tercero' ? p.provider_id : null,
-                    comprobante: p.metodo_pago === 'abono_tercero' ? p.comprobante : null
-                });
-            }
-            if (Math.round(sumaPagos) !== Math.round(granTotal)) {
-                const diff = Math.round(granTotal) - Math.round(sumaPagos);
-                return alert(`⚠️ La suma de los pagos no coincide con el total de la venta. Falta: $${formatoCOP(Math.abs(diff)).replace('$','')}`);
-            }
-        } else {
-            const metodoPago = document.getElementById('metodo-pago').value;
-            let providerIdUnico = null;
-            let comprobanteUnico = null;
-
-            if (metodoPago === 'abono_tercero') {
-                const provSelect = document.getElementById('abono_provider_id_unico');
-                const compInput = document.getElementById('abono_comprobante_unico');
-                providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
-                comprobanteUnico = compInput && compInput.value ? compInput.value.trim() : null;
-
-                if (!providerIdUnico) {
-                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
-                }
-                if (!comprobanteUnico) {
-                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes cargar la imagen del comprobante de la transacción.');
-                }
-            }
-
-            pagosPayload.push({
-                metodo_pago: metodoPago,
-                monto: Math.round(granTotal),
-                provider_id: providerIdUnico,
-                comprobante: comprobanteUnico
-            });
-        }
+        const validacion = validarPagosAntesDeCobrar();
+        if (!validacion.valido) return;
+        const pagosPayload = validacion.pagosPayload;
 
         const payload = {
             asesor_id: asesorId ? parseInt(asesorId) : null,
@@ -2143,6 +2363,7 @@ function eliminarRetomaActual() {
                 if (document.getElementById('cliente_telefono')) document.getElementById('cliente_telefono').value = '';
                 if (document.getElementById('cliente_email')) document.getElementById('cliente_email').value = '';
 
+                limpiarComprobanteUnico();
                 resetPagosMixtos();
                 renderCart();
 

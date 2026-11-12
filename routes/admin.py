@@ -1222,11 +1222,12 @@ def ventas_vendedores():
                         imei_item = d.producto.imei if (d.producto and d.producto.imei) else 'N/A'
                         
                         es_retoma = bool(d.producto and d.producto.retoma_origen)
+                        es_regalo = bool(getattr(d, 'es_obsequio', False) or precio_u == 0)
                         
                         # Comisión fija dividida equitativamente entre los asesores que abrieron caja
                         comision_item = Decimal('0.0')
                         comision_item_cuota = Decimal('0.0')
-                        if not es_retoma:
+                        if not es_retoma and not es_regalo:
                             tiene_items_inventario = True
                             comision_item = comision_fija_num * Decimal(str(cant))
                             comision_item_cuota = comision_item / Decimal(str(num_asesores_turno))
@@ -1240,6 +1241,7 @@ def ventas_vendedores():
                             'precio': precio_u,
                             'subtotal': subtot,
                             'es_retoma': es_retoma,
+                            'es_obsequio': es_regalo,
                             'comision_fija': comision_item_cuota if participa_turno else comision_item,
                             'comision_total_item': comision_item,
                             'num_asesores': num_asesores_turno
@@ -1315,9 +1317,10 @@ def ventas_vendedores():
                             # 3) Si el asesor consultado participó en alguno de los turnos
                             if asesor_id in involucrados_ids:
                                 precio_vta = Decimal(str(det.precio_venta_final or 0))
+                                costo_obsequios_vta = Decimal(str(getattr(v_mes, 'costo_total_obsequios', 0) or 0))
                                 costo_ret = Decimal(str(ret_item.valor_retoma or 0))
                                 arreglos_val = Decimal(str(ret_item.arreglos or 0))
-                                utilidad_neta = precio_vta - costo_ret - arreglos_val
+                                utilidad_neta = (precio_vta - costo_obsequios_vta) - costo_ret - arreglos_val
 
                                 if utilidad_neta > 0:
                                     bolsa_15 = utilidad_neta * Decimal('0.15')
@@ -1711,7 +1714,8 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
             for d in v.detalles:
                 cant = d.cantidad_vendida or 1
                 es_retoma = bool(d.producto and d.producto.retoma_origen)
-                if not es_retoma:
+                es_regalo = bool(getattr(d, 'es_obsequio', False) or (d.precio_venta_final or 0) == 0)
+                if not es_retoma and not es_regalo:
                     comision_item = comision_fija_num * Decimal(str(cant))
                     comision_inventario += comision_item / Decimal(str(num_asesores))
                     items_inventario_count += cant
@@ -1771,9 +1775,10 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
 
                 if asesor_id in involucrados_ids:
                     precio_vta = Decimal(str(det.precio_venta_final or 0))
+                    costo_obsequios_vta = Decimal(str(getattr(v_mes, 'costo_total_obsequios', 0) or 0))
                     costo_ret = Decimal(str(ret_item.valor_retoma or 0))
                     arreglos_val = Decimal(str(ret_item.arreglos or 0))
-                    utilidad_neta = precio_vta - costo_ret - arreglos_val
+                    utilidad_neta = (precio_vta - costo_obsequios_vta) - costo_ret - arreglos_val
 
                     if utilidad_neta > 0:
                         bolsa_15 = utilidad_neta * Decimal('0.15')
@@ -2200,5 +2205,112 @@ def auditoria():
         filtro_usuario=filtro_usuario,
         filtro_fecha=filtro_fecha
     )
+
+
+# ==============================================================================
+# GESTIÓN DE COMBOS DE OBSEQUIOS (EVENTOS Y PROMOCIONES)
+# ==============================================================================
+
+@admin_bp.route('/gift-combos', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def gift_combos():
+    from models import GiftCombo, GiftComboItem, Product
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+        product_ids = request.form.getlist('product_id[]')
+        cantidades = request.form.getlist('cantidad[]')
+
+        if not nombre:
+            flash("El nombre del combo es obligatorio.", "danger")
+            return redirect(url_for('admin_bp.gift_combos'))
+
+        combo = GiftCombo(nombre=nombre, descripcion=descripcion, activo=True)
+        db.session.add(combo)
+        db.session.flush()
+
+        for p_id, cant in zip(product_ids, cantidades):
+            if p_id and cant:
+                try:
+                    c_num = int(cant)
+                    if c_num > 0:
+                        it = GiftComboItem(combo_id=combo.id, product_id=int(p_id), cantidad=c_num)
+                        db.session.add(it)
+                except ValueError:
+                    pass
+
+        db.session.commit()
+        flash(f"Combo de obsequios '{nombre}' creado con éxito.", "success")
+        return redirect(url_for('admin_bp.gift_combos'))
+
+    combos = GiftCombo.query.order_by(GiftCombo.fecha_creacion.desc()).all()
+    productos = Product.query.filter(
+        Product.tipo_inventario.in_(['tienda', 'celulares'])
+    ).order_by(Product.nombre.asc()).all()
+
+    return render_template('admin/gift_combos.html', combos=combos, productos=productos)
+
+
+@admin_bp.route('/gift-combos/<int:id>/editar', methods=['POST'])
+@login_required
+@admin_required
+def editar_gift_combo(id):
+    from models import GiftCombo, GiftComboItem
+    combo = GiftCombo.query.get_or_404(id)
+    nombre = request.form.get('nombre', '').strip()
+    descripcion = request.form.get('descripcion', '').strip()
+    product_ids = request.form.getlist('product_id[]')
+    cantidades = request.form.getlist('cantidad[]')
+
+    if not nombre:
+        flash("El nombre del combo es obligatorio.", "danger")
+        return redirect(url_for('admin_bp.gift_combos'))
+
+    combo.nombre = nombre
+    combo.descripcion = descripcion
+
+    # Eliminar ítems anteriores y recrear
+    GiftComboItem.query.filter_by(combo_id=combo.id).delete()
+
+    for p_id, cant in zip(product_ids, cantidades):
+        if p_id and cant:
+            try:
+                c_num = int(cant)
+                if c_num > 0:
+                    it = GiftComboItem(combo_id=combo.id, product_id=int(p_id), cantidad=c_num)
+                    db.session.add(it)
+            except ValueError:
+                pass
+
+    db.session.commit()
+    flash(f"Combo '{nombre}' actualizado con éxito.", "success")
+    return redirect(url_for('admin_bp.gift_combos'))
+
+
+@admin_bp.route('/gift-combos/<int:id>/toggle', methods=['POST'])
+@login_required
+@admin_required
+def toggle_gift_combo(id):
+    from models import GiftCombo
+    combo = GiftCombo.query.get_or_404(id)
+    combo.activo = not combo.activo
+    db.session.commit()
+    estado = "activado" if combo.activo else "desactivado"
+    flash(f"Combo '{combo.nombre}' {estado} correctamente.", "info")
+    return redirect(url_for('admin_bp.gift_combos'))
+
+
+@admin_bp.route('/gift-combos/<int:id>/eliminar', methods=['POST'])
+@login_required
+@admin_required
+def eliminar_gift_combo(id):
+    from models import GiftCombo
+    combo = GiftCombo.query.get_or_404(id)
+    db.session.delete(combo)
+    db.session.commit()
+    flash(f"Combo '{combo.nombre}' eliminado correctamente.", "warning")
+    return redirect(url_for('admin_bp.gift_combos'))
+
 
 

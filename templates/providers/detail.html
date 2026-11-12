@@ -262,7 +262,16 @@
                                 <div class="fw-bold">{{ p.fecha_pago.strftime('%d/%m/%Y') }}</div>
                                 <div class="small text-muted">{{ p.fecha_pago.strftime('%I:%M %p') }}</div>
                             </td>
-                            <td class="text-start text-truncate" style="max-width: 150px;" title="{{ p.observacion }}">{{ p.observacion or '-' }}</td>
+                            <td class="text-start">
+                                <div class="text-truncate" style="max-width: 180px;" title="{{ p.observacion }}">{{ p.observacion or '-' }}</div>
+                                {% if p.comprobante %}
+                                <div class="mt-1">
+                                    <a href="/static/{{ p.comprobante }}" target="_blank" class="badge bg-warning bg-opacity-10 text-dark border border-warning text-decoration-none rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                                        <i class="fa-solid fa-image text-warning me-1"></i> Ver Comprobante
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </td>
                             <td class="text-center">
                                 <span class="badge bg-light text-dark border text-capitalize">
                                     <i class="fa-solid fa-building-columns text-success me-1"></i>{{ 'Efectivo Caja Mayor' if (p.metodo_pago == 'efectivo' or not p.metodo_pago) else p.metodo_pago }}

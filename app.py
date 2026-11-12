@@ -265,7 +265,22 @@ def create_app():
             "ALTER TABLE maneos ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
             "ALTER TABLE expenses ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
             "ALTER TABLE warranties ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
-            "ALTER TABLE retomas ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;"
+            "ALTER TABLE retomas ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
+            "ALTER TABLE asesores ADD COLUMN salario_base NUMERIC(14, 2) DEFAULT 0.0;",
+            "ALTER TABLE retomas ADD COLUMN asesor_retoma_id INTEGER REFERENCES asesores(id) ON DELETE SET NULL;",
+            "ALTER TABLE warranties ADD COLUMN asesor_id INTEGER REFERENCES asesores(id) ON DELETE SET NULL;",
+            "ALTER TABLE technical_services ADD COLUMN retoma_id INTEGER REFERENCES retomas(id) ON DELETE SET NULL;",
+            "ALTER TABLE technical_services ADD COLUMN asesor_id INTEGER REFERENCES asesores(id) ON DELETE SET NULL;",
+            "ALTER TABLE device_exchanges ADD COLUMN asesor_id INTEGER REFERENCES asesores(id) ON DELETE SET NULL;",
+            "ALTER TABLE sales ADD COLUMN shift_id INTEGER REFERENCES cash_shifts(id) ON DELETE SET NULL;",
+            "ALTER TABLE sales ADD COLUMN tiene_obsequio BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE sales ADD COLUMN costo_total_obsequios NUMERIC(12, 2) DEFAULT 0.0;",
+            "ALTER TABLE sales ADD COLUMN ingreso_neto_real NUMERIC(12, 2) DEFAULT 0.0;",
+            "ALTER TABLE sale_details ADD COLUMN es_obsequio BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE sale_details ADD COLUMN costo_unitario NUMERIC(12, 2) DEFAULT 0.0;",
+            "ALTER TABLE sale_payments ADD COLUMN provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;",
+            "ALTER TABLE sale_payments ADD COLUMN comprobante VARCHAR(255);",
+            "ALTER TABLE provider_payments ADD COLUMN comprobante VARCHAR(255);"
         ]
         for q in queries:
             try:

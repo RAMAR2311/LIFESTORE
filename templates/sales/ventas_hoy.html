@@ -75,15 +75,34 @@
                             {% if metodo == 'efectivo' %}
                                 <span class="badge bg-light text-success border border-success border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-money-bills me-1"></i> Efectivo</span>
                             {% else %}
-                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ metodo|capitalize }}</span>
+                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ venta.metodo_pago_display }}</span>
                             {% endif %}
                         {% else %}
                             <!-- Fallback retrocompatibilidad -->
-                            <span class="badge bg-light text-dark border rounded-pill px-3 py-2">{{ venta.metodo_pago|capitalize }}</span>
+                            <span class="badge bg-light text-dark border rounded-pill px-3 py-2">{{ venta.metodo_pago_display }}</span>
+                        {% endif %}
+                        {% if venta.pagos %}
+                            {% for p in venta.pagos %}
+                                {% if p.comprobante %}
+                                    <div class="mt-1">
+                                        <a href="/static/{{ p.comprobante }}" target="_blank" class="badge bg-warning bg-opacity-10 text-dark border border-warning text-decoration-none rounded-pill px-2 py-1" title="Ver imagen de comprobante de pago">
+                                            <i class="fa-solid fa-image text-warning me-1"></i> Ver Comprobante
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
                         {% endif %}
                     </td>
-                    <td class="text-end align-middle fw-bolder text-brand-black fs-5 pe-4">
-                        ${{ (venta.monto_total)|cop }}
+                    <td class="text-end align-middle pe-4">
+                        <div class="fw-bolder text-brand-black fs-5">${{ (venta.monto_total)|cop }}</div>
+                        {% if venta.tiene_obsequio %}
+                        <div class="mt-1 d-flex flex-column align-items-end">
+                            <span class="badge bg-warning bg-opacity-10 text-dark border border-warning rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                <i class="fa-solid fa-gift text-warning me-1"></i>Regalo: -${{ (venta.costo_total_obsequios or 0)|cop }}
+                            </span>
+                            <small class="text-muted" style="font-size: 0.72rem;">Neto: ${{ (venta.ingreso_neto_real or venta.monto_total)|cop }}</small>
+                        </div>
+                        {% endif %}
                     </td>
                     <td class="text-center align-middle pe-3">
                         <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=venta.id) }}" target="_blank" class="btn btn-pink btn-sm rounded-pill px-3 fw-bold shadow-sm">

@@ -338,6 +338,9 @@ class Sale(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     numero_factura = db.Column(db.String(50), nullable=True, index=True) # ej: "FAC-1", "SUR-102"
     shift_id = db.Column(db.Integer, db.ForeignKey('cash_shifts.id'), nullable=True, index=True)
+    tiene_obsequio = db.Column(db.Boolean, default=False, nullable=False)
+    costo_total_obsequios = db.Column(db.Numeric(12, 2), default=0.0, nullable=False)
+    ingreso_neto_real = db.Column(db.Numeric(12, 2), default=0.0, nullable=False)
     
     detalles = db.relationship('SaleDetail', backref='venta', lazy=True, cascade="all, delete-orphan")
     pagos = db.relationship('SalePayment', backref='venta', lazy=True, cascade="all, delete-orphan")
@@ -356,11 +359,27 @@ class Sale(db.Model):
         """Retorna un resumen legible del método de pago.
         Si es pago único, retorna el nombre del método.
         Si es mixto, retorna 'Pago Mixto' con desglose."""
+        nombres = {
+            'efectivo': 'Efectivo',
+            'nequi': 'Nequi',
+            'bancolombia': 'Bancolombia',
+            'davivienda': 'Davivienda',
+            'daviplata': 'Daviplata',
+            'bold': 'Bold',
+            'bolt': 'Bold',
+            'addi': 'Addi',
+            'sistecredito': 'Sistecrédito',
+            'sitecredito': 'Sistecrédito',
+            'abono_tercero': 'Abono a Terceros',
+            'tarjeta_credito': 'Tarjeta de Crédito'
+        }
         if not self.pagos:
             # Retrocompatibilidad con ventas antiguas que solo tienen metodo_pago
-            return self.metodo_pago.capitalize() if self.metodo_pago else 'Efectivo'
+            m = (self.metodo_pago or 'efectivo').lower()
+            return nombres.get(m, m.capitalize())
         if len(self.pagos) == 1:
-            return self.pagos[0].metodo_pago.capitalize()
+            m = (self.pagos[0].metodo_pago or 'efectivo').lower()
+            return nombres.get(m, m.capitalize())
         return 'Pago Mixto'
 
 class SalePayment(db.Model):
@@ -412,11 +431,42 @@ class SaleDetail(db.Model):
     precio_costo_manual = db.Column(db.Numeric(10, 2), nullable=True)
     ok_contabilidad = db.Column(db.Boolean, default=False, nullable=False)
     ok_inventario = db.Column(db.Boolean, default=False, nullable=False)
+    es_obsequio = db.Column(db.Boolean, default=False, nullable=False)
+    costo_unitario = db.Column(db.Numeric(12, 2), default=0.0, nullable=False)
 
     variante = db.relationship('ProductVariant', backref='ventas_rel', lazy=True)
 
     def __init__(self, **kwargs):
         super(SaleDetail, self).__init__(**kwargs)
+
+class GiftCombo(db.Model):
+    """Modelo para combos de obsequios/regalos promocionales para eventos."""
+    __tablename__ = 'gift_combos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(150), nullable=False)
+    descripcion = db.Column(db.String(255), nullable=True)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
+    fecha_creacion = db.Column(db.DateTime, default=obtener_hora_bogota)
+
+    items = db.relationship('GiftComboItem', backref='combo', lazy=True, cascade='all, delete-orphan')
+
+    def __init__(self, **kwargs):
+        super(GiftCombo, self).__init__(**kwargs)
+
+class GiftComboItem(db.Model):
+    """Detalle de productos y cantidades que componen un combo de regalos."""
+    __tablename__ = 'gift_combo_items'
+
+    id = db.Column(db.Integer, primary_key=True)
+    combo_id = db.Column(db.Integer, db.ForeignKey('gift_combos.id'), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
+    cantidad = db.Column(db.Integer, default=1, nullable=False)
+
+    producto = db.relationship('Product', backref='combo_items', lazy=True)
+
+    def __init__(self, **kwargs):
+        super(GiftComboItem, self).__init__(**kwargs)
 
 class StockAdjustment(db.Model):
     __tablename__ = 'stock_adjustments'
@@ -496,6 +546,9 @@ class ArqueoCaja(db.Model):
     diferencia = db.Column(db.Numeric(14, 2), nullable=True, default=0.0)
     observacion_diferencia = db.Column(db.Text, nullable=True)
     shift_id = db.Column(db.Integer, db.ForeignKey('cash_shifts.id'), nullable=True, index=True)
+    tiene_obsequio = db.Column(db.Boolean, default=False, nullable=False)
+    costo_total_obsequios = db.Column(db.Numeric(12, 2), default=0.0, nullable=False)
+    ingreso_neto_real = db.Column(db.Numeric(12, 2), default=0.0, nullable=False)
     closed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True) # Responsable específico de cierre y conteo
     fecha_creacion = db.Column(db.DateTime, default=obtener_hora_bogota)
 
@@ -758,6 +811,7 @@ class ProviderPayment(db.Model):
     monto_abonado = db.Column(db.Numeric(12, 2), nullable=False)
     metodo_pago = db.Column(db.String(50), nullable=False, default='efectivo')
     observacion = db.Column(db.String(255), nullable=True)
+    comprobante = db.Column(db.String(255), nullable=True)
     fecha_pago = db.Column(db.DateTime, default=obtener_hora_bogota)
 
     def __init__(self, **kwargs):

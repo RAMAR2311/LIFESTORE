@@ -497,7 +497,7 @@
                     ${{ detalle.precio_venta_final|cop }}
                 </td>
                 <td style="text-align: right; font-weight: 700; font-family: 'Roboto Mono', monospace;">
-                    {% if detalle.precio_venta_final == 0 %}
+                    {% if detalle.es_obsequio or detalle.precio_venta_final == 0 %}
                         <span style="color: #10B981;">OBSEQUIO</span>
                     {% else %}
                         ${{ (detalle.precio_venta_final * detalle.cantidad_vendida)|cop }}
@@ -541,8 +541,9 @@
                         {% if pago.metodo_pago == 'efectivo' %}<i class="fa-solid fa-money-bill-wave me-1 text-success"></i> Efectivo
                         {% elif pago.metodo_pago == 'nequi' %}<i class="fa-solid fa-mobile-screen me-1 text-purple"></i> Nequi
                         {% elif pago.metodo_pago == 'bancolombia' %}<i class="fa-solid fa-building-columns me-1 text-warning"></i> Bancolombia
+                        {% elif pago.metodo_pago == 'davivienda' %}<i class="fa-solid fa-building-columns me-1 text-danger"></i> Davivienda
                         {% elif pago.metodo_pago == 'daviplata' %}<i class="fa-solid fa-mobile-retro me-1 text-danger"></i> Daviplata
-                        {% elif pago.metodo_pago == 'bolt' %}<i class="fa-solid fa-bolt me-1 text-warning"></i> Bolt
+                        {% elif pago.metodo_pago in ['bold', 'bolt'] %}<i class="fa-solid fa-bolt me-1 text-warning"></i> Bold
                         {% elif pago.metodo_pago == 'addi' %}<i class="fa-solid fa-cart-shopping me-1 text-info"></i> Addi
                         {% elif pago.metodo_pago == 'sistecredito' %}<i class="fa-solid fa-id-card me-1 text-primary"></i> Sistecrédito
                         {% else %}{{ pago.metodo_pago }}

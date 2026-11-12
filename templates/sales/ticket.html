@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,18 +9,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
-            background-color: #FFFFFF; /* 100% White Canvas */
+            background-color: #FFFFFF;
+            /* 100% White Canvas */
             margin: 0;
             padding: 30px;
             display: flex;
             justify-content: center;
             font-family: 'Roboto Mono', monospace, sans-serif;
         }
-        
+
         .ticket {
             background-color: #FFFFFF;
             width: 100%;
-            max-width: 380px; /* Ancho de impresora térmica 80mm */
+            max-width: 380px;
+            /* Ancho de impresora térmica 80mm */
             padding: 25px 20px;
             border: 1px solid #E5E7EB;
             box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
@@ -68,9 +71,20 @@
             vertical-align: top;
         }
 
-        .col-qty { width: 15%; text-align: center; }
-        .col-prod { width: 55%; padding-right: 10px; }
-        .col-sub { width: 30%; text-align: right; }
+        .col-qty {
+            width: 15%;
+            text-align: center;
+        }
+
+        .col-prod {
+            width: 55%;
+            padding-right: 10px;
+        }
+
+        .col-sub {
+            width: 30%;
+            text-align: right;
+        }
 
         .totals {
             border-top: 2px dashed #1A1A1A;
@@ -124,27 +138,32 @@
                 size: 80mm auto;
                 margin: 0;
             }
-            html, body {
+
+            html,
+            body {
                 height: auto !important;
                 overflow: visible !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
-            body { 
-                background-color: #FFFFFF !important; 
-                padding: 0 !important; 
-                display: block !important; 
+
+            body {
+                background-color: #FFFFFF !important;
+                padding: 0 !important;
+                display: block !important;
                 color: #000000 !important;
             }
-            .ticket { 
-                box-shadow: none !important; 
-                max-width: 100% !important; 
-                padding: 0 !important; 
-                margin: 0 auto !important; 
-                width: 80mm !important; 
+
+            .ticket {
+                box-shadow: none !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 auto !important;
+                width: 80mm !important;
                 border: none !important;
                 color: #000000 !important;
             }
+
             * {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
@@ -152,131 +171,159 @@
                 box-shadow: none !important;
                 text-shadow: none !important;
             }
-            .btn-print { display: none !important; }
-            .d-print-none { display: none !important; }
-            .total-row { 
-                background-color: transparent !important; 
+
+            .btn-print {
+                display: none !important;
+            }
+
+            .d-print-none {
+                display: none !important;
+            }
+
+            .total-row {
+                background-color: transparent !important;
                 border-top: 1px dashed #000000 !important;
                 border-bottom: 1px dashed #000000 !important;
                 border-left: none !important;
                 border-right: none !important;
-                padding: 8px 0 !important; 
+                padding: 8px 0 !important;
                 border-radius: 0 !important;
             }
         }
     </style>
 </head>
+
 <body>
 
-<div class="ticket">
-    <div class="header">
-        <div style="margin-bottom: 8px; display: flex; justify-content: center; align-items: center;">
-            {% set sede = venta.branch %}
-            {% if sede and sede.logo_url %}
-                <img src="{{ sede.logo_url }}" alt="{{ sede.nombre_comercial or sede.nombre }}" style="max-height: 52px; max-width: 170px; width: auto; height: auto; object-fit: contain; filter: grayscale(100%) contrast(140%);">
-            {% else %}
-                <img src="{{ url_for('static', filename='img/lifestore_logo_print.png') }}" alt="LifeStore" style="max-height: 52px; max-width: 170px; width: auto; height: auto; object-fit: contain; filter: grayscale(100%) contrast(150%);">
-            {% endif %}
-        </div>
-        <div style="font-size: 1.1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px;">{{ (sede.nombre_comercial or sede.nombre or 'LIFESTORE')|upper }}</div>
-        <p style="font-size: 0.72rem; font-weight: 700; margin: 0 0 3px 0; letter-spacing: 0.15em; text-transform: uppercase;">VENTA DE CELULARES &amp; TECNOLOGÍA</p>
-        <p style="font-size: 0.78rem; font-weight: bold; margin: 0 0 3px 0; letter-spacing: 0.5px;">NIT: {{ (sede.nit if sede and sede.nit else '1013679035-0') }}</p>
-        {% if sede and sede.direccion %}
-            <p style="font-size: 0.74rem; margin: 0 0 2px 0; color: #333;">{{ sede.direccion }}</p>
-        {% endif %}
-        {% if sede and sede.telefono %}
-            <p style="font-size: 0.74rem; margin: 0 0 4px 0; color: #333;">Tel: {{ sede.telefono }}</p>
-        {% endif %}
-        {% if sede and sede.resolucion_dian %}
-            <p style="font-size: 0.68rem; margin: 2px 0 6px 0; font-style: italic; line-height: 1.2;">{{ sede.resolucion_dian }}</p>
-        {% endif %}
-        
-        <div style="border-top: 1px dashed #1A1A1A; padding: 6px 0; font-size: 0.78rem; line-height: 1.4; text-align: left;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                <span><strong>Folio/Ticket:</strong> #{{ venta.id }}</span>
-                <span><strong>Fecha:</strong> {{ venta.fecha_venta.strftime('%d/%m/%Y %H:%M') }}</span>
-            </div>
-            <div style="margin-bottom: 2px;">
-                <strong>Cajero:</strong> {{ venta.vendedor.nombre }}
-            </div>
-            {% if venta.turno and venta.turno.asesores_obj %}
-            <div style="margin-bottom: 2px;">
-                <strong>Asesores Turno:</strong> {{ venta.turno.asesores_obj|map(attribute='nombre')|join(', ') }}
-            </div>
-            {% elif venta.asesor %}
-            <div style="margin-bottom: 2px;">
-                <strong>Asesor de Venta:</strong> {{ venta.asesor.nombre }}
-            </div>
-            {% endif %}
-            <div>
-                <strong>Método de Pago:</strong> 
-                {% if venta.pagos|length > 1 %}
-                    PAGO DIVIDIDO
-                {% elif venta.pagos|length == 1 %}
-                    {{ venta.pagos[0].metodo_pago|upper }}
+    <div class="ticket">
+        <div class="header">
+            <div style="margin-bottom: 8px; display: flex; justify-content: center; align-items: center;">
+                {% set sede = venta.branch %}
+                {% if sede and sede.logo_url %}
+                <img src="{{ sede.logo_url }}" alt="{{ sede.nombre_comercial or sede.nombre }}"
+                    style="max-height: 52px; max-width: 170px; width: auto; height: auto; object-fit: contain; filter: grayscale(100%) contrast(140%);">
                 {% else %}
-                    {{ venta.metodo_pago|upper }}
+                <img src="{{ url_for('static', filename='img/lifestore_logo_print.png') }}" alt="LifeStore"
+                    style="max-height: 52px; max-width: 170px; width: auto; height: auto; object-fit: contain; filter: grayscale(100%) contrast(150%);">
                 {% endif %}
             </div>
+            <div
+                style="font-size: 1.1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px;">
+                {{ (sede.nombre_comercial or sede.nombre or 'LIFESTORE')|upper }}</div>
+            <p
+                style="font-size: 0.72rem; font-weight: 700; margin: 0 0 3px 0; letter-spacing: 0.15em; text-transform: uppercase;">
+                VENTA DE CELULARES &amp; TECNOLOGÍA</p>
+            <p style="font-size: 0.78rem; font-weight: bold; margin: 0 0 3px 0; letter-spacing: 0.5px;">NIT: {{
+                (sede.nit if sede and sede.nit else '1013679035-0') }}</p>
+            {% if sede and sede.direccion %}
+            <p style="font-size: 0.74rem; margin: 0 0 2px 0; color: #333;">{{ sede.direccion }}</p>
+            {% endif %}
+            {% if sede and sede.telefono %}
+            <p style="font-size: 0.74rem; margin: 0 0 4px 0; color: #333;">Tel: {{ sede.telefono }}</p>
+            {% endif %}
+            {% if sede and sede.resolucion_dian %}
+            <p style="font-size: 0.68rem; margin: 2px 0 6px 0; font-style: italic; line-height: 1.2;">{{
+                sede.resolucion_dian }}</p>
+            {% endif %}
+
+            <div
+                style="border-top: 1px dashed #1A1A1A; padding: 6px 0; font-size: 0.78rem; line-height: 1.4; text-align: left;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span><strong>Folio/Ticket:</strong> #{{ venta.id }}</span>
+                    <span><strong>Fecha:</strong> {{ venta.fecha_venta.strftime('%d/%m/%Y %H:%M') }}</span>
+                </div>
+                <div style="margin-bottom: 2px;">
+                    <strong>Cajero:</strong> {{ venta.vendedor.nombre }}
+                </div>
+                {% if venta.turno and venta.turno.asesores_obj %}
+                <div style="margin-bottom: 2px;">
+                    <strong>Asesores Turno:</strong> {{ venta.turno.asesores_obj|map(attribute='nombre')|join(', ') }}
+                </div>
+                {% elif venta.asesor %}
+                <div style="margin-bottom: 2px;">
+                    <strong>Asesor de Venta:</strong> {{ venta.asesor.nombre }}
+                </div>
+                {% endif %}
+                <div>
+                    <strong>Método de Pago:</strong>
+                    {% if venta.pagos|length > 1 %}
+                    PAGO DIVIDIDO
+                    {% else %}
+                    {{ venta.metodo_pago_display|upper }}
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if venta.cliente %}
+            <div
+                style="border-top: 1px dashed #1A1A1A; padding-top: 6px; margin-top: 4px; text-align: left; font-size: 0.78rem; line-height: 1.35;">
+                <p
+                    style="font-weight: bold; margin: 0 0 3px 0; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">
+                    Datos del Cliente:</p>
+                <div style="margin-bottom: 1px;"><strong>Nombre:</strong> {{ venta.cliente.nombre }}</div>
+                <div style="margin-bottom: 1px;"><strong>Documento:</strong> {{ venta.cliente.documento }}</div>
+                <div style="margin-bottom: 1px;"><strong>Teléfono:</strong> {{ venta.cliente.telefono }}</div>
+                {% if venta.cliente.email %}<div style="margin-bottom: 1px;"><strong>Correo:</strong> {{
+                    venta.cliente.email }}</div>{% endif %}
+                {% if venta.cliente.direccion %}<div><strong>Dirección:</strong> {{ venta.cliente.direccion }}</div>{%
+                endif %}
+            </div>
+            {% endif %}
         </div>
 
-        {% if venta.cliente %}
-        <div style="border-top: 1px dashed #1A1A1A; padding-top: 6px; margin-top: 4px; text-align: left; font-size: 0.78rem; line-height: 1.35;">
-            <p style="font-weight: bold; margin: 0 0 3px 0; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px;">Datos del Cliente:</p>
-            <div style="margin-bottom: 1px;"><strong>Nombre:</strong> {{ venta.cliente.nombre }}</div>
-            <div style="margin-bottom: 1px;"><strong>Documento:</strong> {{ venta.cliente.documento }}</div>
-            <div style="margin-bottom: 1px;"><strong>Teléfono:</strong> {{ venta.cliente.telefono }}</div>
-            {% if venta.cliente.email %}<div style="margin-bottom: 1px;"><strong>Correo:</strong> {{ venta.cliente.email }}</div>{% endif %}
-            {% if venta.cliente.direccion %}<div><strong>Dirección:</strong> {{ venta.cliente.direccion }}</div>{% endif %}
-        </div>
-        {% endif %}
-    </div>
-
-    <table class="table-items">
-        <thead>
-            <tr>
-                <th class="col-qty">CANT</th>
-                <th class="col-prod">CONCEPTO</th>
-                <th class="col-sub">IMPORTE</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for detalle in venta.detalles %}
-            <tr>
-                <td class="col-qty">{{ detalle.cantidad_vendida }}</td>
-                <!-- Cortar la longitud del título si es gigantesco para no descuadrar la ticketera -->
-                <td class="col-prod">
-                    {# 1. Determinar el producto asociado (directo o resuelto por IMEI en factura de proveedor o manual) #}
-                    {% set prod = detalle.producto %}
-                    {% if not prod and detalle.variante and detalle.variante.producto %}
+        <table class="table-items">
+            <thead>
+                <tr>
+                    <th class="col-qty">CANT</th>
+                    <th class="col-prod">CONCEPTO</th>
+                    <th class="col-sub">IMPORTE</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for detalle in venta.detalles %}
+                <tr>
+                    <td class="col-qty">{{ detalle.cantidad_vendida }}</td>
+                    <!-- Cortar la longitud del título si es gigantesco para no descuadrar la ticketera -->
+                    <td class="col-prod">
+                        {# 1. Determinar el producto asociado (directo o resuelto por IMEI en factura de proveedor o
+                        manual) #}
+                        {% set prod = detalle.producto %}
+                        {% if not prod and detalle.variante and detalle.variante.producto %}
                         {% set prod = detalle.variante.producto %}
-                    {% endif %}
-                    {% set prov_inv = (venta.provider_invoices[0] if venta.provider_invoices and venta.provider_invoices|length > 0 else None) %}
-                    {% if not prod and prov_inv %}
+                        {% endif %}
+                        {% set prov_inv = (venta.provider_invoices[0] if venta.provider_invoices and
+                        venta.provider_invoices|length > 0 else None) %}
+                        {% if not prod and prov_inv %}
                         {% set prod = prov_inv.producto_detectado %}
-                    {% endif %}
+                        {% endif %}
 
-                    {% if prod %}
-                        {# Limpiar prefijo 'Celular' si se trata de computadores, laptops, tablets, iPads, gafas, etc. #}
+                        {% if prod %}
+                        {# Limpiar prefijo 'Celular' si se trata de computadores, laptops, tablets, iPads, gafas, etc.
+                        #}
                         {% set prod_nombre = prod.nombre or 'Producto' %}
                         {% if prod_nombre.startswith('Celular ') %}
-                            {% set lower_name = prod_nombre|lower %}
-                            {% if 'macbook' in lower_name or 'laptop' in lower_name or 'computador' in lower_name or 'pc' in lower_name or 'ipad' in lower_name or 'tablet' in lower_name or 'gafas' in lower_name or 'smartwatch' in lower_name or 'reloj' in lower_name or 'playstation' in lower_name or 'nintendo' in lower_name or 'xbox' in lower_name %}
-                                {% set prod_nombre = prod_nombre[8:] %}
-                            {% endif %}
+                        {% set lower_name = prod_nombre|lower %}
+                        {% if 'macbook' in lower_name or 'laptop' in lower_name or 'computador' in lower_name or 'pc' in
+                        lower_name or 'ipad' in lower_name or 'tablet' in lower_name or 'gafas' in lower_name or
+                        'smartwatch' in lower_name or 'reloj' in lower_name or 'playstation' in lower_name or 'nintendo'
+                        in lower_name or 'xbox' in lower_name %}
+                        {% set prod_nombre = prod_nombre[8:] %}
+                        {% endif %}
                         {% endif %}
                         {{ prod_nombre[:45] }}{% if prod_nombre|length > 45 %}...{% endif %}
                         {% if detalle.variante %}
-                            <br><small style="font-size: 0.75rem;">{{ detalle.variante.nombre_variante }}</small>
+                        <br><small style="font-size: 0.75rem;">{{ detalle.variante.nombre_variante }}</small>
                         {% endif %}
-                        
+
                         <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
                             {% if prod.inventario %}
-                                <div style="font-weight: bold; text-transform: uppercase;">Inventario: {{ prod.inventario }}</div>
+                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: {{ prod.inventario }}
+                            </div>
                             {% elif prod.proveedor %}
-                                <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo ({{ prod.proveedor }})</div>
+                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo ({{
+                                prod.proveedor }})</div>
                             {% elif prod.tipo_inventario == 'externos' %}
-                                <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo</div>
+                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo</div>
                             {% endif %}
                             {% if prod.memoria %}Cap: {{ prod.memoria }} {% endif %}
                             {% if prod.bateria %}Bat: {{ prod.bateria }}% {% endif %}
@@ -285,126 +332,144 @@
                             {% if prod.imei %}IMEI 1: {{ prod.imei }}{% endif %}
                             {% if prod.imei2 %}| IMEI 2: {{ prod.imei2 }}{% endif %}
                         </div>
-                    {% elif detalle.nombre_manual %}
+                        {% elif detalle.nombre_manual %}
                         {{ detalle.nombre_manual[:50] }}{% if detalle.nombre_manual|length > 50 %}...{% endif %}
                         {% if prov_inv %}
-                            <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
-                                <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo {% if prov_inv.provider %}({{ prov_inv.provider.nombre }}){% endif %}</div>
-                                {% if prov_inv.numero_factura and 'IMEI' in prov_inv.numero_factura %}
-                                    <div>{{ prov_inv.numero_factura }}</div>
-                                {% endif %}
-                            </div>
+                        <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
+                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo {% if
+                                prov_inv.provider %}({{ prov_inv.provider.nombre }}){% endif %}</div>
+                            {% if prov_inv.numero_factura and 'IMEI' in prov_inv.numero_factura %}
+                            <div>{{ prov_inv.numero_factura }}</div>
+                            {% endif %}
+                        </div>
                         {% endif %}
-                    {% elif prov_inv %}
+                        {% elif prov_inv %}
                         {{ (prov_inv.numero_factura or prov_inv.descripcion or 'Equipo Externo')[:45] }}
                         <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
-                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo {% if prov_inv.provider %}({{ prov_inv.provider.nombre }}){% endif %}</div>
+                            <div style="font-weight: bold; text-transform: uppercase;">Inventario: Externo {% if
+                                prov_inv.provider %}({{ prov_inv.provider.nombre }}){% endif %}</div>
                         </div>
-                    {% else %}
+                        {% else %}
                         Artículo (ID: {{ detalle.product_id or 'S/N' }})
-                    {% endif %}
-                </td>
-                <td class="col-sub">
-                    {% if detalle.precio_venta_final == 0 %}
+                        {% endif %}
+                    </td>
+                    <td class="col-sub">
+                        {% if detalle.es_obsequio or detalle.precio_venta_final == 0 %}
                         OBSEQUIO
-                    {% else %}
+                        {% else %}
                         ${{ (detalle.precio_venta_final * detalle.cantidad_vendida)|cop }}
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
 
-    <div class="totals">
-        {% set ns = namespace(subtotal=venta.monto_total) %}
-        {% for retoma in venta.retomas_asociadas %}
-            {% set ns.subtotal = ns.subtotal + retoma.valor_retoma %}
-        {% endfor %}
-        
-        {% if venta.retomas_asociadas %}
-        <div style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 700; margin-bottom: 10px;">
-            <span>SUBTOTAL:</span>
-            <span>${{ ns.subtotal|cop }}</span>
-        </div>
-        
-        <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
-            <p style="font-weight: 700; font-size: 0.85rem; margin-bottom: 8px;">EQUIPOS EN RETOMA (DESCUENTO):</p>
+        <div class="totals">
+            {% set ns = namespace(subtotal=venta.monto_total) %}
             {% for retoma in venta.retomas_asociadas %}
-            <div style="font-size: 0.85rem; padding: 3px 0;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>{{ retoma.modelo }} (IMEI 1: {{ retoma.imei1 }}{% if retoma.imei2 %} | IMEI 2: {{ retoma.imei2 }}{% endif %})</span>
-                    <span style="font-weight: 700;">-${{ retoma.valor_retoma|cop }}</span>
+            {% set ns.subtotal = ns.subtotal + retoma.valor_retoma %}
+            {% endfor %}
+
+            {% if venta.retomas_asociadas %}
+            <div
+                style="display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 700; margin-bottom: 10px;">
+                <span>SUBTOTAL:</span>
+                <span>${{ ns.subtotal|cop }}</span>
+            </div>
+
+            <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #ccc;">
+                <p style="font-weight: 700; font-size: 0.85rem; margin-bottom: 8px;">EQUIPOS EN RETOMA (DESCUENTO):</p>
+                {% for retoma in venta.retomas_asociadas %}
+                <div style="font-size: 0.85rem; padding: 3px 0;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>{{ retoma.modelo }} (IMEI 1: {{ retoma.imei1 }}{% if retoma.imei2 %} | IMEI 2: {{
+                            retoma.imei2 }}{% endif %})</span>
+                        <span style="font-weight: 700;">-${{ retoma.valor_retoma|cop }}</span>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+            {% endif %}
 
-        <div class="total-row">
-            <span>TOTAL:</span>
-            <span>${{ (venta.monto_total)|cop }}</span>
-        </div>
-        
-        {% if venta.pagos|length > 1 %}
-        <!-- Desglose de pagos mixtos -->
-        <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
-            <p style="font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; text-align: center;">DESGLOSE DE PAGOS:</p>
-            {% for pago in venta.pagos %}
-            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0;">
-                <span style="text-transform: capitalize;">{{ pago.metodo_pago }}:</span>
-                <span style="font-weight: 700;">${{ (pago.monto)|cop }}</span>
+            <div class="total-row">
+                <span>TOTAL:</span>
+                <span>${{ (venta.monto_total)|cop }}</span>
             </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
 
-    <div class="footer">
-        <p style="font-size: 1rem; font-weight: bold; margin-bottom: 5px;">¡Gracias por tu compra!</p>
-        <p style="font-size: 0.72rem; line-height: 1.3; text-align: justify; margin: 10px 0; border-top: 1px dashed #1A1A1A; border-bottom: 1px dashed #1A1A1A; padding: 10px 0;">
-            <strong>Políticas de Garantía:</strong> Equipos nuevos: garantía de 1 año. Equipos de exhibición: garantía de 8 meses. La remoción, rotura o alteración del sticker de seguridad de la tienda en el equipo anula automáticamente la garantía. No cubre equipos con garantía vencida, reportados por operador, IMEI o serial alterado, daños por golpes, caídas, humedad, líquidos, polvo, manipulación indebida, software modificado, instalaciones o actualizaciones no autorizadas, equipos intervenidos por terceros, pantallas despegadas, manchas negras, líneas en pantalla, rayones o cualquier daño físico. Para hacer efectiva la garantía es obligatorio presentar la factura original. El tiempo de revisión y diagnóstico es de 2 a 3 días hábiles. Si la garantía procede, se reemplazará la pieza defectuosa; si el equipo no puede ser reparado, se realizará el cambio del mismo. El tiempo máximo de reparación es de hasta 15 días hábiles, de conformidad con la Ley 1480 de 2011.
-        </p>
-        <p style="font-size: 0.8rem; margin-top: 5px;">Soporte: contacto@lifestore.com</p>
-        <p style="font-size: 0.7rem; color: #666; margin-top: 10px; font-weight: bold;">Aliado tecnológico ZENIC S.A.S.</p>
-    </div>
-
-    <div style="display: flex; flex-direction: column; gap: 10px;" class="d-print-none">
-        <div style="display: flex; gap: 10px;">
-            <button class="btn-print" onclick="window.print()" style="flex: 1; margin-top: 20px;">
-                [ IMPRIMIR TICKET ]
-            </button>
-            {% if venta.cliente and venta.cliente.telefono %}
-                {% set phone = venta.cliente.telefono|replace(' ', '')|replace('*', '')|replace('-', '')|replace('+', '') %}
-                {% if not phone.startswith('57') and phone|length == 10 %}
-                    {% set phone = '57' ~ phone %}
-                {% endif %}
-                {% set mensaje = "Hola " ~ venta.cliente.nombre ~ "! Aquí tienes tu factura digital de LifeStore - Celulares: " ~ request.url %}
-                <a href="https://wa.me/{{ phone }}?text={{ mensaje|urlencode }}" 
-                   target="_blank" 
-                   class="btn-print btn-wa" 
-                   style="flex: 1; background-color: #25D366; border-color: #25D366; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; margin-top: 20px;">
-                    [ ENVIAR WHATSAPP ]
-                </a>
+            {% if venta.pagos|length > 1 %}
+            <!-- Desglose de pagos mixtos -->
+            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px dashed #ccc;">
+                <p style="font-weight: 700; font-size: 0.9rem; margin-bottom: 8px; text-align: center;">DESGLOSE DE
+                    PAGOS:</p>
+                {% for pago in venta.pagos %}
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0;">
+                    <span style="text-transform: capitalize;">{{ 'Bold' if pago.metodo_pago in ['bold', 'bolt'] else
+                        pago.metodo_pago }}:</span>
+                    <span style="font-weight: 700;">${{ (pago.monto)|cop }}</span>
+                </div>
+                {% endfor %}
+            </div>
             {% endif %}
         </div>
-        <a href="{{ url_for('sales_bp.caja_visual') }}" 
-           class="btn-print" 
-           style="background-color: #1A1A1A; border-color: #1A1A1A; color: #FFFFFF; text-decoration: none; text-align: center; display: block; margin-top: 5px; box-sizing: border-box;">
-            [ VOLVER A LA CAJA ]
-        </a>
-    </div>
-</div>
 
-<!-- Lógica de Auto-Impresión Reactiva -->
-<script>
-    // Evento silencioso que detona el pop-up de impresora nativo de Windows al renderizar
-    window.onload = function() {
-        setTimeout(() => {
-            window.print();
-        }, 700); // 700ms de retraso para asegurar carga asíncrona de tipografías de Google
-    };
-</script>
+        <div class="footer">
+            <p style="font-size: 1rem; font-weight: bold; margin-bottom: 5px;">¡Gracias por tu compra!</p>
+            <p
+                style="font-size: 0.72rem; line-height: 1.3; text-align: justify; margin: 10px 0; border-top: 1px dashed #1A1A1A; border-bottom: 1px dashed #1A1A1A; padding: 10px 0;">
+                <strong>Políticas de Garantía:</strong> Equipos nuevos: garantía de 1 año. Equipos de exhibición:
+                garantía de 8 meses. La remoción, rotura o alteración del sticker de seguridad de la tienda en el equipo
+                anula automáticamente la garantía. No cubre equipos con garantía vencida, reportados por operador, IMEI
+                o serial alterado, daños por golpes, caídas, humedad, líquidos, polvo, manipulación indebida, software
+                modificado, instalaciones o actualizaciones no autorizadas, equipos intervenidos por terceros, pantallas
+                despegadas, manchas negras, líneas en pantalla, rayones o cualquier daño físico. Para hacer efectiva la
+                garantía es obligatorio presentar la factura original. El tiempo de revisión y diagnóstico es de 2 a 3
+                días hábiles. Si la garantía procede, se reemplazará la pieza defectuosa; si el equipo no puede ser
+                reparado, se realizará el cambio del mismo. El tiempo máximo de reparación es de hasta 15 días hábiles,
+                de conformidad con la Ley 1480 de 2011.
+            </p>
+            <p style="font-size: 0.8rem; margin-top: 5px;">Soporte: contacto@lifestore.com</p>
+            <p style="font-size: 0.7rem; color: #666; margin-top: 10px; font-weight: bold;">Aliado tecnológico ZENIC
+                S.A.S.</p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;" class="d-print-none">
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-print" onclick="window.print()" style="flex: 1; margin-top: 20px;">
+                    [ IMPRIMIR TICKET ]
+                </button>
+                {% if venta.cliente and venta.cliente.telefono %}
+                {% set phone = venta.cliente.telefono|replace(' ', '')|replace('*', '')|replace('-', '')|replace('+',
+                '') %}
+                {% if not phone.startswith('57') and phone|length == 10 %}
+                {% set phone = '57' ~ phone %}
+                {% endif %}
+                {% set mensaje = "Hola " ~ venta.cliente.nombre ~ "! Aquí tienes tu factura digital de LifeStore -
+                Celulares: " ~ request.url %}
+                <a href="https://wa.me/{{ phone }}?text={{ mensaje|urlencode }}" target="_blank"
+                    class="btn-print btn-wa"
+                    style="flex: 1; background-color: #25D366; border-color: #25D366; text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; margin-top: 20px;">
+                    [ ENVIAR WHATSAPP ]
+                </a>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('sales_bp.caja_visual') }}" class="btn-print"
+                style="background-color: #1A1A1A; border-color: #1A1A1A; color: #FFFFFF; text-decoration: none; text-align: center; display: block; margin-top: 5px; box-sizing: border-box;">
+                [ VOLVER A LA CAJA ]
+            </a>
+        </div>
+    </div>
+
+    <!-- Lógica de Auto-Impresión Reactiva -->
+    <script>
+        // Evento silencioso que detona el pop-up de impresora nativo de Windows al renderizar
+        window.onload = function () {
+            setTimeout(() => {
+                window.print();
+            }, 700); // 700ms de retraso para asegurar carga asíncrona de tipografías de Google
+        };
+    </script>
 
 </body>
+
 </html>

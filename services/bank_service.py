@@ -18,7 +18,7 @@ def normalizar_codigo_metodo(metodo):
         return 'addi'
     elif 'sitecredito' in m or 'sistecrédito' in m or 'sistecredito' in m:
         return 'sitecredito'
-    elif 'tarjeta' in m or 'credito' in m or 'datafono' in m:
+    elif 'tarjeta' in m or 'credito' in m or 'datafono' in m or 'bold' in m or 'bolt' in m:
         return 'tarjeta_credito'
     elif 'efectivo' in m or 'cash' in m:
         return 'efectivo'

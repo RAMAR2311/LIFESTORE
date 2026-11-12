@@ -164,17 +164,18 @@
                     <option value="efectivo">💵 Efectivo</option>
                     <option value="nequi">🟣 Nequi</option>
                     <option value="bancolombia">🏦 Bancolombia</option>
+                    <option value="davivienda">🏦 Davivienda</option>
                     <option value="daviplata">📲 Daviplata</option>
-                    <option value="bolt">⚡ Bolt (Datáfono)</option>
+                    <option value="bold">⚡ Bold (Datáfono)</option>
                     <option value="addi">🛒 Addi</option>
                     <option value="sistecredito">💳 Sistecrédito</option>
                     <option value="abono_tercero">🤝 Abono a Terceros / Proveedor</option>
                 </select>
 
-                <!-- Campos específicos para Abono a Terceros / Proveedor (Pago Único) -->
+                <!-- Campos de Comprobante Obligatorio (Todo método diferente a Efectivo) y Proveedor (Abono a Terceros) -->
                 <div id="campos_abono_tercero_unico" class="card border-0 bg-warning bg-opacity-10 p-3 mb-3 rounded-3" style="display: none;">
-                    <div class="fw-bold text-dark small mb-2"><i class="fa-solid fa-handshake me-1 text-warning"></i> Datos del Abono a Proveedor:</div>
-                    <div class="mb-2">
+                    <div id="titulo_comprobante_unico" class="fw-bold text-dark small mb-2"><i class="fa-solid fa-camera me-1 text-warning"></i> Comprobante de Pago Obligatorio:</div>
+                    <div id="div_proveedor_abono_unico" class="mb-2" style="display: none;">
                         <label class="form-label extra-small fw-bold text-muted mb-1">Proveedor Destinatario <span class="text-danger">*</span></label>
                         <select id="abono_provider_id_unico" class="form-select form-select-sm border-0 shadow-sm bg-white">
                             <option value="" disabled selected>-- Seleccionar Proveedor Destinatario --</option>
@@ -184,8 +185,20 @@
                         </select>
                     </div>
                     <div>
-                        <label class="form-label extra-small fw-bold text-muted mb-1">Comprobante / Soporte Transacción <span class="text-danger">*</span></label>
-                        <input type="text" id="abono_comprobante_unico" class="form-control form-control-sm border-0 shadow-sm bg-white" placeholder="Ej: Transf. Nequi #849302 / Ref. Bancolombia">
+                        <label class="form-label extra-small fw-bold text-muted mb-1">Imagen de Comprobante de Pago <span class="text-danger">*</span></label>
+                        <input type="hidden" id="abono_comprobante_unico" value="">
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex gap-2">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_btn_upload_unico">Adjuntar Imagen Comprobante</span>
+                                    <input type="file" id="file_comprobante_unico" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobante(this, 'abono_comprobante_unico', 'label_btn_upload_unico', 'preview_comprobante_unico')">
+                                </label>
+                            </div>
+                            <div id="preview_comprobante_unico" class="small text-truncate text-success fw-bold" style="display: none;">
+                                <i class="fa-solid fa-circle-check me-1"></i> <span id="nombre_archivo_unico"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -625,8 +638,9 @@
         { value: 'efectivo',      label: '💵 Efectivo' },
         { value: 'nequi',         label: '🟣 Nequi' },
         { value: 'bancolombia',   label: '🏦 Bancolombia' },
+        { value: 'davivienda',    label: '🏦 Davivienda' },
         { value: 'daviplata',     label: '📲 Daviplata' },
-        { value: 'bolt',          label: '⚡ Bolt (Datáfono)' },
+        { value: 'bold',          label: '⚡ Bold (Datáfono)' },
         { value: 'addi',          label: '🛒 Addi' },
         { value: 'sistecredito',  label: '💳 Sistecrédito' },
         { value: 'abono_tercero', label: '🤝 Abono a Terceros / Proveedor' }
@@ -634,8 +648,103 @@
 
     function toggleCamposAbonoTerceroUnico(valor) {
         const divAbono = document.getElementById('campos_abono_tercero_unico');
+        const divProv = document.getElementById('div_proveedor_abono_unico');
+        const titulo = document.getElementById('titulo_comprobante_unico');
         if (divAbono) {
-            divAbono.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+            divAbono.style.display = (valor !== 'efectivo') ? 'block' : 'none';
+        }
+        if (divProv) {
+            divProv.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+        }
+        if (titulo) {
+            if (valor === 'abono_tercero') {
+                titulo.innerHTML = '<i class="fa-solid fa-handshake me-1 text-warning"></i> Datos del Abono a Proveedor:';
+            } else {
+                titulo.innerHTML = '<i class="fa-solid fa-camera me-1 text-warning"></i> Comprobante de Pago Obligatorio:';
+            }
+        }
+    }
+
+    function limpiarComprobanteUnico() {
+        const metodoEl = document.getElementById('metodo-pago');
+        if (metodoEl) metodoEl.value = 'efectivo';
+        const compHidden = document.getElementById('abono_comprobante_unico');
+        if (compHidden) compHidden.value = '';
+        const fileIn = document.getElementById('file_comprobante_unico');
+        if (fileIn) fileIn.value = '';
+        const lbl = document.getElementById('label_btn_upload_unico');
+        if (lbl) lbl.textContent = 'Adjuntar Imagen Comprobante';
+        const prev = document.getElementById('preview_comprobante_unico');
+        if (prev) prev.style.display = 'none';
+        const provSel = document.getElementById('abono_provider_id_unico');
+        if (provSel) provSel.value = '';
+        toggleCamposAbonoTerceroUnico('efectivo');
+    }
+
+    async function subirImagenComprobante(fileInput, hiddenInputId, labelBtnId, previewId) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(labelBtnId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+        const preview = document.getElementById(previewId);
+        const nombreArchivoSpan = document.getElementById('nombre_archivo_unico');
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo imagen...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf_token },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                if (hiddenInput) hiddenInput.value = data.relative_path || data.filename;
+                if (label) label.textContent = 'Comprobante Listo';
+                if (preview) preview.style.display = 'block';
+                if (nombreArchivoSpan) nombreArchivoSpan.textContent = file.name;
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Adjuntar Imagen Comprobante';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen del comprobante.');
+            if (label) label.textContent = 'Adjuntar Imagen Comprobante';
+        }
+    }
+
+    async function subirImagenComprobanteMixto(fileInput, index) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(`label_upload_mixto_${index}`);
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf_token },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                actualizarPagoParcial(index, 'comprobante', data.relative_path || data.filename);
+                renderizarPagosMixtos();
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Adjuntar Imagen';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen.');
+            if (label) label.textContent = 'Adjuntar Imagen';
         }
     }
 
@@ -778,29 +887,51 @@
             ).join('');
 
             let abonoCamposHtml = '';
-            if (pago.metodo_pago === 'abono_tercero') {
-                let provOptions = LISTA_PROVEEDORES.map(pr => 
-                    `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
-                ).join('');
+            if (pago.metodo_pago !== 'efectivo') {
+                if (pago.metodo_pago === 'abono_tercero') {
+                    let provOptions = LISTA_PROVEEDORES.map(pr => 
+                        `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
+                    ).join('');
 
-                abonoCamposHtml = `
-                    <div class="p-2 mt-2 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25">
-                        <div class="row g-2">
-                            <div class="col-sm-6">
-                                <label class="extra-small fw-bold text-muted mb-1 d-block">Proveedor Destinatario *</label>
-                                <select class="form-select form-select-sm border-0 shadow-sm" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
-                                    <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
-                                    ${provOptions}
-                                </select>
-                            </div>
-                            <div class="col-sm-6">
-                                <label class="extra-small fw-bold text-muted mb-1 d-block">Soporte / Comprobante *</label>
-                                <input type="text" class="form-control form-control-sm border-0 shadow-sm" placeholder="Ej: Transf. Nequi #849302" 
-                                       value="${pago.comprobante || ''}" oninput="actualizarPagoParcial(${index}, 'comprobante', this.value)">
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25">
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold text-muted mb-1 d-block">Proveedor Destinatario <span class="text-danger">*</span></label>
+                                    <select class="form-select form-select-sm border-0 shadow-sm" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
+                                        <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
+                                        ${provOptions}
+                                    </select>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold text-muted mb-1 d-block">Imagen Comprobante <span class="text-danger">*</span></label>
+                                    <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                    <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                        <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                        <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen'}</span>
+                                        <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                    </label>
+                                    ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else {
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25">
+                            <div>
+                                <label class="extra-small fw-bold text-muted mb-1 d-block"><i class="fa-solid fa-camera text-warning me-1"></i>Imagen Comprobante de Pago <span class="text-danger">*</span></label>
+                                <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen Comprobante'}</span>
+                                    <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                </label>
+                                ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
             }
 
             div.innerHTML = `
@@ -1399,23 +1530,24 @@
 
             for (let i = 0; i < pagosMixtos.length; i++) {
                 const p = pagosMixtos[i];
+                const mObj = METODOS_DISPONIBLES.find(m => m.value === p.metodo_pago);
+                const mLabel = mObj ? mObj.label : p.metodo_pago;
+
                 if (!p.monto || p.monto <= 0) {
-                    return alert(`El pago #${i + 1} (${p.metodo_pago}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
+                    return alert(`El pago #${i + 1} (${mLabel}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
                 }
-                if (p.metodo_pago === 'abono_tercero') {
-                    if (!p.provider_id) {
-                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere seleccionar el Proveedor destinatario.`);
-                    }
-                    if (!p.comprobante || !p.comprobante.trim()) {
-                        return alert(`El pago #${i + 1} (Abono a Terceros) requiere el número de comprobante o soporte.`);
-                    }
+                if (p.metodo_pago === 'abono_tercero' && !p.provider_id) {
+                    return alert(`El pago #${i + 1} (${mLabel}) requiere seleccionar el Proveedor destinatario.`);
+                }
+                if (p.metodo_pago !== 'efectivo' && (!p.comprobante || !p.comprobante.trim())) {
+                    return alert(`⚠️ El pago #${i + 1} (${mLabel}) requiere adjuntar obligatoriamente la imagen del comprobante de pago antes de efectuar la venta.`);
                 }
                 sumaPagos += p.monto;
                 pagosPayload.push({
                     metodo_pago: p.metodo_pago,
                     monto: Math.round(p.monto),
                     provider_id: p.metodo_pago === 'abono_tercero' ? p.provider_id : null,
-                    comprobante: p.metodo_pago === 'abono_tercero' ? p.comprobante : null
+                    comprobante: p.metodo_pago !== 'efectivo' ? p.comprobante.trim() : null
                 });
             }
 
@@ -1426,20 +1558,24 @@
             }
         } else {
             const metodoPago = document.getElementById('metodo-pago').value;
+            const mObj = METODOS_DISPONIBLES.find(m => m.value === metodoPago);
+            const mLabel = mObj ? mObj.label : metodoPago;
             let providerIdUnico = null;
             let comprobanteUnico = null;
 
-            if (metodoPago === 'abono_tercero') {
-                const provSelect = document.getElementById('abono_provider_id_unico');
+            if (metodoPago !== 'efectivo' && obtenerGranTotal() > 0) {
                 const compInput = document.getElementById('abono_comprobante_unico');
-                providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
                 comprobanteUnico = compInput && compInput.value ? compInput.value.trim() : null;
 
-                if (!providerIdUnico) {
-                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
+                if (metodoPago === 'abono_tercero') {
+                    const provSelect = document.getElementById('abono_provider_id_unico');
+                    providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
+                    if (!providerIdUnico) {
+                        return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
+                    }
                 }
                 if (!comprobanteUnico) {
-                    return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes ingresar el comprobante o soporte de la transacción.');
+                    return alert(`⚠️ Para el método de pago "${mLabel}", es obligatorio adjuntar la imagen del comprobante de pago antes de efectuar la venta.`);
                 }
             }
 
@@ -1519,6 +1655,7 @@
                 if (document.getElementById('cliente_email')) document.getElementById('cliente_email').value = '';
 
                 renderizarCarrito();
+                limpiarComprobanteUnico();
                 resetPagosMixtos();
 
                 alert(`✅ ¡Venta #${data.sale_id} Procesada! La factura se abrió en una nueva pestaña para su impresión.`);

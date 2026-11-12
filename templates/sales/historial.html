@@ -124,7 +124,7 @@
     </style>
 
     <!-- 1. Efectivo -->
-    <div class="col-6 col-lg-2 col-md-4 mb-3">
+    <div class="col-6 col-md-3 mb-3">
         <div class="finance-card h-100" style="--card-accent: #059669; --card-bg-subtle: #ecfdf5;" onclick="filtrarTabla('efectivo')">
             <div>
                 <div class="d-flex align-items-center justify-content-between mb-2">
@@ -138,9 +138,25 @@
             </button>
         </div>
     </div>
+
+    <!-- 2. Nequi -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #9333ea; --card-bg-subtle: #faf5ff;" onclick="filtrarTabla('nequi')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Nequi</span>
+                    <div class="icon-chip"><i class="fa-solid fa-mobile-screen-button"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_nequi)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
     
-    <!-- 2. Bancolombia -->
-    <div class="col-6 col-lg-2 col-md-4 mb-3">
+    <!-- 3. Bancolombia -->
+    <div class="col-6 col-md-3 mb-3">
         <div class="finance-card h-100" style="--card-accent: #ea580c; --card-bg-subtle: #fff7ed;" onclick="filtrarTabla('bancolombia')">
             <div>
                 <div class="d-flex align-items-center justify-content-between mb-2">
@@ -155,13 +171,29 @@
         </div>
     </div>
 
-    <!-- 3. Daviplata -->
-    <div class="col-6 col-lg-2 col-md-4 mb-3">
+    <!-- 4. Davivienda -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #dc2626; --card-bg-subtle: #fef2f2;" onclick="filtrarTabla('davivienda')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Davivienda</span>
+                    <div class="icon-chip"><i class="fa-solid fa-building-columns"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_davivienda)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 5. Daviplata -->
+    <div class="col-6 col-md-3 mb-3">
         <div class="finance-card h-100" style="--card-accent: #e11d48; --card-bg-subtle: #fff1f2;" onclick="filtrarTabla('daviplata')">
             <div>
                 <div class="d-flex align-items-center justify-content-between mb-2">
                     <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Daviplata</span>
-                    <div class="icon-chip"><i class="fa-solid fa-mobile-screen"></i></div>
+                    <div class="icon-chip"><i class="fa-solid fa-mobile-retro"></i></div>
                 </div>
                 <div class="amount-display">${{ (total_daviplata)|cop }}</div>
             </div>
@@ -171,15 +203,15 @@
         </div>
     </div>
 
-    <!-- 4. Tarjeta de Crédito -->
-    <div class="col-6 col-lg-2 col-md-4 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #0d9488; --card-bg-subtle: #f0fdfa;" onclick="filtrarTabla('tarjeta_credito')">
+    <!-- 6. Bold (Datáfono) -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #0d9488; --card-bg-subtle: #f0fdfa;" onclick="filtrarTabla('bold')">
             <div>
                 <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">T. Crédito</span>
-                    <div class="icon-chip"><i class="fa-solid fa-credit-card"></i></div>
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Bold (Datáfono)</span>
+                    <div class="icon-chip"><i class="fa-solid fa-bolt"></i></div>
                 </div>
-                <div class="amount-display">${{ (total_tarjeta_credito)|cop }}</div>
+                <div class="amount-display">${{ (total_bold)|cop }}</div>
             </div>
             <button class="btn-card-action d-print-none" type="button">
                 Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
@@ -187,8 +219,8 @@
         </div>
     </div>
 
-    <!-- 5. Addi -->
-    <div class="col-6 col-lg-2 col-md-4 mb-3">
+    <!-- 7. Addi -->
+    <div class="col-6 col-md-3 mb-3">
         <div class="finance-card h-100" style="--card-accent: #7c3aed; --card-bg-subtle: #f5f3ff;" onclick="filtrarTabla('addi')">
             <div>
                 <div class="d-flex align-items-center justify-content-between mb-2">
@@ -203,15 +235,15 @@
         </div>
     </div>
 
-    <!-- 6. Sistecredito -->
-    <div class="col-6 col-lg-2 col-md-4 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #2563eb; --card-bg-subtle: #eff6ff;" onclick="filtrarTabla('sitecredito')">
+    <!-- 8. Sistecrédito -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #2563eb; --card-bg-subtle: #eff6ff;" onclick="filtrarTabla('sistecredito')">
             <div>
                 <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Sistecredito</span>
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Sistecrédito</span>
                     <div class="icon-chip"><i class="fa-solid fa-id-card"></i></div>
                 </div>
-                <div class="amount-display">${{ (total_sitecredito)|cop }}</div>
+                <div class="amount-display">${{ (total_sistecredito)|cop }}</div>
             </div>
             <button class="btn-card-action d-print-none" type="button">
                 Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
@@ -321,7 +353,7 @@
                             {% if metodo == 'efectivo' %}
                                 <span class="badge bg-light text-success border border-success border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-money-bills me-1"></i> Efectivo</span>
                             {% else %}
-                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ metodo|capitalize }}</span>
+                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ venta.metodo_pago_display }}</span>
                             {% endif %}
                         {% else %}
                             {% if venta.metodo_pago == 'efectivo' %}
@@ -329,12 +361,31 @@
                             {% elif venta.metodo_pago == 'mixto' %}
                                 <span class="badge bg-light text-dark border border-warning border-opacity-50 rounded-pill px-3 py-2"><i class="fa-solid fa-arrows-split-up-and-left me-1" style="color: #fd7e14;"></i> Pago Mixto</span>
                             {% else %}
-                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ venta.metodo_pago|capitalize }}</span>
+                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ venta.metodo_pago_display }}</span>
                             {% endif %}
                         {% endif %}
+                        {% if venta.pagos %}
+                            {% for p in venta.pagos %}
+                                {% if p.comprobante %}
+                                    <div class="mt-1">
+                                        <a href="/static/{{ p.comprobante }}" target="_blank" class="badge bg-warning bg-opacity-10 text-dark border border-warning text-decoration-none rounded-pill px-2 py-1" title="Ver imagen de comprobante de pago">
+                                            <i class="fa-solid fa-image text-warning me-1"></i> Ver Comprobante
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
                     </td>
-                    <td class="text-end align-middle fw-bolder text-brand-black fs-5">
-                        ${{ (venta.monto_total)|cop }}
+                    <td class="text-end align-middle pe-2">
+                        <div class="fw-bolder text-brand-black fs-5">${{ (venta.monto_total)|cop }}</div>
+                        {% if venta.tiene_obsequio %}
+                        <div class="mt-1 d-flex flex-column align-items-end">
+                            <span class="badge bg-warning bg-opacity-10 text-dark border border-warning rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                <i class="fa-solid fa-gift text-warning me-1"></i>Regalo: -${{ (venta.costo_total_obsequios or 0)|cop }}
+                            </span>
+                            <small class="text-muted" style="font-size: 0.72rem;">Neto: ${{ (venta.ingreso_neto_real or venta.monto_total)|cop }}</small>
+                        </div>
+                        {% endif %}
                     </td>
                     <td class="text-center align-middle">
                         <div class="d-flex flex-column gap-2">
@@ -502,10 +553,12 @@
                                                                         <option value="efectivo" {% if pago.metodo_pago == 'efectivo' %}selected{% endif %}>Efectivo</option>
                                                                         <option value="nequi" {% if pago.metodo_pago == 'nequi' %}selected{% endif %}>Nequi</option>
                                                                         <option value="bancolombia" {% if pago.metodo_pago == 'bancolombia' %}selected{% endif %}>Bancolombia</option>
+                                                                        <option value="davivienda" {% if pago.metodo_pago == 'davivienda' %}selected{% endif %}>Davivienda</option>
                                                                         <option value="daviplata" {% if pago.metodo_pago == 'daviplata' %}selected{% endif %}>Daviplata</option>
-                                                                        <option value="tarjeta_credito" {% if pago.metodo_pago == 'tarjeta_credito' %}selected{% endif %}>T. Crédito</option>
+                                                                        <option value="bold" {% if pago.metodo_pago in ['bold', 'bolt', 'tarjeta_credito'] %}selected{% endif %}>Bold (Datáfono)</option>
                                                                         <option value="addi" {% if pago.metodo_pago == 'addi' %}selected{% endif %}>Addi</option>
-                                                                        <option value="sitecredito" {% if pago.metodo_pago == 'sitecredito' %}selected{% endif %}>Sitecredito</option>
+                                                                        <option value="sistecredito" {% if pago.metodo_pago in ['sistecredito', 'sitecredito'] %}selected{% endif %}>Sistecrédito</option>
+                                                                        <option value="abono_tercero" {% if pago.metodo_pago == 'abono_tercero' %}selected{% endif %}>Abono a Terceros</option>
                                                                     </select>
                                                                 </div>
                                                                 <div class="col-5">
@@ -529,10 +582,12 @@
                                                                         <option value="efectivo" {% if venta.metodo_pago == 'efectivo' %}selected{% endif %}>Efectivo</option>
                                                                         <option value="nequi" {% if venta.metodo_pago == 'nequi' %}selected{% endif %}>Nequi</option>
                                                                         <option value="bancolombia" {% if venta.metodo_pago == 'bancolombia' %}selected{% endif %}>Bancolombia</option>
+                                                                        <option value="davivienda" {% if venta.metodo_pago == 'davivienda' %}selected{% endif %}>Davivienda</option>
                                                                         <option value="daviplata" {% if venta.metodo_pago == 'daviplata' %}selected{% endif %}>Daviplata</option>
-                                                                        <option value="tarjeta_credito" {% if venta.metodo_pago == 'tarjeta_credito' %}selected{% endif %}>T. Crédito</option>
+                                                                        <option value="bold" {% if venta.metodo_pago in ['bold', 'bolt', 'tarjeta_credito'] %}selected{% endif %}>Bold (Datáfono)</option>
                                                                         <option value="addi" {% if venta.metodo_pago == 'addi' %}selected{% endif %}>Addi</option>
-                                                                        <option value="sitecredito" {% if venta.metodo_pago == 'sitecredito' %}selected{% endif %}>Sitecredito</option>
+                                                                        <option value="sistecredito" {% if venta.metodo_pago in ['sistecredito', 'sitecredito'] %}selected{% endif %}>Sistecrédito</option>
+                                                                        <option value="abono_tercero" {% if venta.metodo_pago == 'abono_tercero' %}selected{% endif %}>Abono a Terceros</option>
                                                                     </select>
                                                                 </div>
                                                                 <div class="col-5">
@@ -739,12 +794,17 @@
     function filtrarTabla(metodo) {
         const filas = document.querySelectorAll('tr.venta-row');
         let visibles = 0;
+        const equivalentes = {
+            'bold': ['bold', 'bolt', 'tarjeta_credito'],
+            'sistecredito': ['sistecredito', 'sitecredito']
+        };
+        const buscados = equivalentes[metodo] || [metodo];
         
         filas.forEach(fila => {
             const pagosStr = fila.getAttribute('data-pagos') || '';
             const metodosFila = pagosStr.split(',');
             
-            if (metodo === 'todos' || metodosFila.includes(metodo)) {
+            if (metodo === 'todos' || buscados.some(m => metodosFila.includes(m))) {
                 fila.style.display = '';
                 visibles++;
             } else {
@@ -819,10 +879,12 @@
                         <option value="efectivo">Efectivo</option>
                         <option value="nequi" selected>Nequi</option>
                         <option value="bancolombia">Bancolombia</option>
+                        <option value="davivienda">Davivienda</option>
                         <option value="daviplata">Daviplata</option>
-                        <option value="tarjeta_credito">T. Crédito</option>
+                        <option value="bold">Bold (Datáfono)</option>
                         <option value="addi">Addi</option>
-                        <option value="sitecredito">Sitecredito</option>
+                        <option value="sistecredito">Sistecrédito</option>
+                        <option value="abono_tercero">Abono a Terceros</option>
                     </select>
                 </div>
                 <div class="col-5">
