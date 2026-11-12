@@ -48,11 +48,6 @@ def cuarentena():
             if prod_previo:
                 r_item.es_reingreso = True
 
-        # Verificar si está activamente en taller
-        r_item.soporte_activo = (r_item.estado == 'en_soporte') or any(
-            s.estado in ['EN_REVISION', 'EN_REPARACION'] for s in r_item.servicios_tecnicos
-        )
-
     from models import Technician, Asesor
     tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
     asesores_disponibles = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()

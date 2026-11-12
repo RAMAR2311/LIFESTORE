@@ -105,7 +105,8 @@
                     <td class="text-center">
                         <button type="button" 
                                 class="btn btn-sm {% if r.ok_contabilidad %}btn-success text-white fw-bold{% else %}btn-outline-secondary text-muted{% endif %} rounded-pill px-2 py-1 shadow-sm"
-                                onclick="toggleOkContabilidad({{ r.id }}, this)"
+                                data-id="{{ r.id }}"
+                                onclick="toggleOkContabilidad(this.dataset.id, this)"
                                 title="Haz clic para cambiar estado de OK Contabilidad">
                             {% if r.ok_contabilidad %}
                                 <i class="fa-solid fa-circle-check me-1"></i> OK
@@ -117,7 +118,8 @@
                     <td class="text-center">
                         <button type="button" 
                                 class="btn btn-sm {% if r.ok_venta %}btn-success text-white fw-bold{% else %}btn-outline-secondary text-muted{% endif %} rounded-pill px-2 py-1 shadow-sm"
-                                onclick="toggleOkVenta({{ r.id }}, this)"
+                                data-id="{{ r.id }}"
+                                onclick="toggleOkVenta(this.dataset.id, this)"
                                 title="Haz clic para cambiar estado de OK Venta">
                             {% if r.ok_venta %}
                                 <i class="fa-solid fa-circle-check me-1"></i> OK
@@ -149,7 +151,8 @@
                             {% if r.estado != 'aprobado' and r.estado != 'en_soporte' and not r.soporte_activo %}
                             <button type="button"
                                     class="btn btn-sm btn-outline-warning text-dark py-1 px-2 rounded-2"
-                                    onclick="enviarRetomaIndividualASoporte({{ r.id }})"
+                                    data-id="{{ r.id }}"
+                                    onclick="enviarRetomaIndividualASoporte(this.dataset.id)"
                                     title="Enviar este equipo a Soporte Técnico">
                                 <i class="fa-solid fa-screwdriver-wrench"></i>
                             </button>
@@ -311,7 +314,7 @@
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label fw-bold">Arreglos / Soporte</label>
-                                                    <input type="text" id="retoma_arreglos_{{ r.id }}" name="arreglos" class="form-control bg-light format-price" value="{{ r.arreglos|int if r.arreglos else 0 }}" data-valor-base="{{ r.valor_retoma|int }}" oninput="updateTotalCosto({{ r.id }}, this.dataset.valorBase)">
+                                                    <input type="text" id="retoma_arreglos_{{ r.id }}" name="arreglos" class="form-control bg-light format-price" value="{{ r.arreglos|int if r.arreglos else 0 }}" data-id="{{ r.id }}" data-valor-base="{{ r.valor_retoma|int }}" oninput="updateTotalCosto(this.dataset.id, this.dataset.valorBase)">
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label fw-bold text-truncate" title="Costo Total">Costo Total</label>
@@ -324,18 +327,18 @@
                                                     <input type="text" name="bateria" class="form-control bg-light" value="{{ r.bateria or '' }}" placeholder="Ej: 100% o 90%">
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Precio Sugerido Venta</label>
-                                                    <input type="text" name="precio_sugerido" class="form-control bg-light format-price" value="{{ r.valor_retoma|int + 50000 }}" required>
+                                                    <label class="form-label fw-bold">Precio Sugerido Venta <span class="text-danger">*</span></label>
+                                                    <input type="text" name="precio_sugerido" class="form-control bg-light format-price" value="0" required>
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Precio Mínimo Permitido</label>
-                                                    <input type="text" name="precio_minimo" class="form-control bg-light format-price" value="{{ r.valor_retoma|int }}">
+                                                    <label class="form-label fw-bold">Precio Mínimo Permitido <span class="text-danger">*</span></label>
+                                                    <input type="text" name="precio_minimo" class="form-control bg-light format-price" value="0" required>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="modal-footer border-0 bg-light">
                                             <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                                            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold" onclick="cleanPrices(this.form)"><i class="fa-solid fa-check me-1"></i> Confirmar Ingreso</button>
+                                            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold" data-id="{{ r.id }}" onclick="return validarIngresoRetoma(this.form, this.dataset.id)"><i class="fa-solid fa-check me-1"></i> Confirmar Ingreso</button>
                                         </div>
                                     </form>
                                 </div>
@@ -642,13 +645,50 @@
     }
 
     function enviarRetomaIndividualASoporte(id) {
-        document.querySelectorAll('.retoma-checkbox').forEach(cb => cb.checked = false);
-        const targetCb = document.querySelector(`.retoma-checkbox[value="${id}"]`);
+        document.querySelectorAll('.check-retoma').forEach(cb => cb.checked = false);
+        const targetCb = document.querySelector(`.check-retoma[value="${id}"]`);
         if (targetCb) {
             targetCb.checked = true;
             actualizarSeleccionadosRetomas();
             abrirModalSoporteLoteRetomas();
         }
+    }
+
+    function validarIngresoRetoma(form, id) {
+        const sugeridoInput = form.querySelector('input[name="precio_sugerido"]');
+        const minimoInput = form.querySelector('input[name="precio_minimo"]');
+        const totalInput = document.getElementById(`retoma_costo_total_${id}`);
+
+        const parseNum = (val) => parseInt(String(val || '').replace(/[^\d]/g, ''), 10) || 0;
+        const sugerido = parseNum(sugeridoInput ? sugeridoInput.value : 0);
+        const minimo = parseNum(minimoInput ? minimoInput.value : 0);
+        const costoTotal = parseNum(totalInput ? totalInput.value : 0);
+
+        if (sugerido <= 0) {
+            alert('Debes ingresar un Precio Sugerido Venta mayor a $0.');
+            if (sugeridoInput) sugeridoInput.focus();
+            return false;
+        }
+        if (minimo <= 0) {
+            alert('Debes ingresar un Precio Mínimo Permitido mayor a $0.');
+            if (minimoInput) minimoInput.focus();
+            return false;
+        }
+        if (sugerido < costoTotal) {
+            alert(`El Precio Sugerido Venta ($${sugerido.toLocaleString('es-CO')}) no puede ser menor al Costo Total ($${costoTotal.toLocaleString('es-CO')}).`);
+            if (sugeridoInput) sugeridoInput.focus();
+            return false;
+        }
+        if (minimo < costoTotal) {
+            alert(`El Precio Mínimo Permitido ($${minimo.toLocaleString('es-CO')}) no puede ser menor al Costo Total ($${costoTotal.toLocaleString('es-CO')}).`);
+            if (minimoInput) minimoInput.focus();
+            return false;
+        }
+
+        if (typeof cleanPrices === 'function') {
+            cleanPrices(form);
+        }
+        return true;
     }
 </script>
 
