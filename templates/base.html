@@ -1587,20 +1587,29 @@
                         <span>Dashboard Principal</span>
                     </a>
 
-                    <!-- SECCIÓN: VENTAS -->
-                    <div class="sidebar-section-label">Ventas</div>
+                    <!-- SECCIÓN 1: VENTAS & CAJA -->
+                    <div class="sidebar-section-label">Módulo 1 · Ventas &amp; Clientes</div>
                     <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupCaja" aria-expanded="true">
-                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-cash-register"></i></div> Ventas</span>
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-cash-register"></i></div> Ventas &amp; Caja</span>
                         <i class="fa-solid fa-chevron-down chevron-arrow"></i>
                     </button>
                     <div class="collapse show" id="groupCaja">
                         <div class="sidebar-submenu">
+                            <div class="px-2 pt-1 pb-1 text-uppercase fw-bold text-muted" style="font-size: 0.64rem; letter-spacing: 0.06em;">Facturación y Clientes</div>
                             <a class="sidebar-sublink" href="/sales/caja_visual">
                                 <i class="fa-solid fa-store me-2" style="width: 16px;"></i> Punto de Pago
                             </a>
                             <a class="sidebar-sublink" href="/sales/catalogo">
                                 <i class="fa-solid fa-book-open me-2" style="width: 16px;"></i> Catálogo Celulares
                             </a>
+                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.historial_ventas') }}">
+                                <i class="fa-solid fa-clock-rotate-left me-2" style="width: 16px;"></i> Historial de Ventas
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.clientes') }}">
+                                <i class="fa-solid fa-address-book me-2" style="width: 16px;"></i> Directorio Clientes
+                            </a>
+
+                            <div class="px-2 pt-2 pb-1 text-uppercase fw-bold text-muted border-top mt-1" style="font-size: 0.64rem; letter-spacing: 0.06em; border-color: rgba(148,163,184,0.18) !important;">Turnos y Arqueos</div>
                             <a class="sidebar-sublink" href="{{ url_for('arqueo_bp.abrir_turno') }}">
                                 <i class="fa-solid fa-key me-2" style="width: 16px;"></i> Abrir Turno Caja
                             </a>
@@ -1613,23 +1622,8 @@
                             <a class="sidebar-sublink" href="{{ url_for('arqueo_bp.log_sobrantes') }}">
                                 <i class="fa-solid fa-scale-unbalanced-flip me-2" style="width: 16px;"></i> Log de Sobrantes
                             </a>
-                        </div>
-                    </div>
 
-                    <!-- SECCIÓN: COMPRAS -->
-                    <div class="sidebar-section-label">Compras</div>
-                    <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupOperaciones" aria-expanded="false">
-                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-cart-flatbed"></i></div> Compras</span>
-                        <i class="fa-solid fa-chevron-down chevron-arrow"></i>
-                    </button>
-                    <div class="collapse" id="groupOperaciones">
-                        <div class="sidebar-submenu">
-                            <a class="sidebar-sublink" href="{{ url_for('purchases_bp.index') }}">
-                                <i class="fa-solid fa-file-circle-plus me-2" style="width: 16px;"></i> Compras (Ingresos)
-                            </a>
-                            <a class="sidebar-sublink" href="{{ url_for('providers_bp.list_providers') }}">
-                                <i class="fa-solid fa-truck-fast me-2" style="width: 16px;"></i> Directorio Proveedores
-                            </a>
+                            <div class="px-2 pt-2 pb-1 text-uppercase fw-bold text-muted border-top mt-1" style="font-size: 0.64rem; letter-spacing: 0.06em; border-color: rgba(148,163,184,0.18) !important;">Post-Venta y Servicio</div>
                             <a class="sidebar-sublink" href="{{ url_for('warranties_bp.index') }}">
                                 <i class="fa-solid fa-shield-halved me-2" style="width: 16px;"></i> Garantías Clientes
                             </a>
@@ -1639,24 +1633,18 @@
                                     <span class="badge bg-warning text-dark rounded-pill">{{ pending_support_count }}</span>
                                 {% endif %}
                             </a>
-                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.clientes') }}">
-                                <i class="fa-solid fa-address-book me-2" style="width: 16px;"></i> Directorio Clientes
-                            </a>
-                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.historial_ventas') }}">
-                                <i class="fa-solid fa-clock-rotate-left me-2" style="width: 16px;"></i> Historial de Ventas
-                            </a>
                         </div>
                     </div>
 
-                    <!-- SECCIÓN: ADMINISTRATIVO (INVENTARIO + EQUIPO & FINANZAS) -->
-                    <div class="sidebar-section-label">Administrativo</div>
-                    <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupAdministrativo" aria-expanded="false">
-                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-boxes-stacked"></i></div> Administrativo</span>
+                    <!-- SECCIÓN 2: INVENTARIO & COMPRAS -->
+                    <div class="sidebar-section-label">Módulo 2 · Inventario &amp; Logística</div>
+                    <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupOperaciones" aria-expanded="false">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-boxes-stacked"></i></div> Inventario &amp; Compras</span>
                         <i class="fa-solid fa-chevron-down chevron-arrow"></i>
                     </button>
-                    <div class="collapse" id="groupAdministrativo">
+                    <div class="collapse" id="groupOperaciones">
                         <div class="sidebar-submenu">
-                            <!-- Inventario & Stock -->
+                            <div class="px-2 pt-1 pb-1 text-uppercase fw-bold text-muted" style="font-size: 0.64rem; letter-spacing: 0.06em;">Stock Disponible</div>
                             <a class="sidebar-sublink" href="{{ url_for('celulares_bp.inventario') }}">
                                 <i class="fa-solid fa-mobile-screen-button me-2" style="width: 16px;"></i> Inventario Celulares
                             </a>
@@ -1672,8 +1660,36 @@
                             <a class="sidebar-sublink" href="{{ url_for('retomas_bp.cuarentena') }}">
                                 <i class="fa-solid fa-recycle me-2" style="width: 16px;"></i> Retomas
                             </a>
+
+                            <div class="px-2 pt-2 pb-1 text-uppercase fw-bold text-muted border-top mt-1" style="font-size: 0.64rem; letter-spacing: 0.06em; border-color: rgba(148,163,184,0.18) !important;">Compras y Proveedores</div>
+                            <a class="sidebar-sublink" href="{{ url_for('purchases_bp.index') }}">
+                                <i class="fa-solid fa-file-circle-plus me-2" style="width: 16px;"></i> Compras (Ingresos)
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('providers_bp.list_providers') }}">
+                                <i class="fa-solid fa-truck-fast me-2" style="width: 16px;"></i> Directorio Proveedores
+                            </a>
+
+                            <div class="px-2 pt-2 pb-1 text-uppercase fw-bold text-muted border-top mt-1" style="font-size: 0.64rem; letter-spacing: 0.06em; border-color: rgba(148,163,184,0.18) !important;">Movimientos y Control</div>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
+                                <span><i class="fa-solid fa-truck-moving me-2" style="width: 16px;"></i> Traslados de Stock</span>
+                                {% if pending_transfers_count > 0 %}
+                                    <span class="badge bg-danger rounded-pill">{{ pending_transfers_count }}</span>
+                                {% endif %}
+                            </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('exchanges_bp.index') }}">
+                                <span><i class="fa-solid fa-arrow-right-arrow-left me-2" style="width: 16px;"></i> Cambios Celulares</span>
+                                {% if pending_exchanges_count > 0 %}
+                                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_exchanges_count }}</span>
+                                {% endif %}
+                            </a>
+                            <a class="sidebar-sublink" href="/admin/maneos">
+                                <i class="fa-solid fa-handshake me-2" style="width: 16px;"></i> Maneos
+                            </a>
                             <a class="sidebar-sublink" href="{{ url_for('celulares_bp.trazabilidad') }}">
                                 <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad IMEI
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('transfers_bp.trazabilidad') }}">
+                                <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad / Kardex
                             </a>
                             <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('celulares_bp.alertas_estancados') }}">
                                 <span><i class="fa-solid fa-triangle-exclamation me-2 text-warning" style="width: 16px;"></i> Alertas de Equipos</span>
@@ -1684,69 +1700,49 @@
                             <a class="sidebar-sublink" href="{{ url_for('admin_bp.gift_combos') }}">
                                 <i class="fa-solid fa-gifts me-2 text-warning" style="width: 16px;"></i> Combos de Obsequios
                             </a>
+                        </div>
+                    </div>
 
-                            <!-- Desplegable Interno: Gestión de Equipo & Asesores -->
-                            <button class="sidebar-nested-accordion-btn my-1" type="button" data-bs-toggle="collapse" data-bs-target="#subgroupEquipoUsuarios" aria-expanded="false">
-                                <span class="d-flex align-items-center">
-                                    <i class="fa-solid fa-users-gear me-2" style="width: 16px; color: var(--brand-titanium);"></i> Equipo &amp; Asesores
-                                    {% if pending_vales_count > 0 %}
-                                        <span class="badge bg-warning text-dark rounded-pill ms-2" style="font-size: 0.65rem;">{{ pending_vales_count }}</span>
-                                    {% endif %}
-                                </span>
-                                <i class="fa-solid fa-chevron-down nested-chevron"></i>
-                            </button>
-                            <div class="collapse" id="subgroupEquipoUsuarios">
-                                <div class="sidebar-nested-submenu">
-                                    <a class="sidebar-sublink" href="/admin/vendedores">
-                                        <i class="fa-solid fa-user-shield me-2" style="width: 16px;"></i> Perfiles &amp; Usuarios
-                                    </a>
-                                    <a class="sidebar-sublink" href="{{ url_for('admin_bp.sucursales') }}">
-                                        <i class="fa-solid fa-code-branch me-2" style="width: 16px;"></i> Sucursales &amp; Bodegas
-                                    </a>
-                                    <a class="sidebar-sublink" href="{{ url_for('admin_bp.asesores') }}">
-                                        <i class="fa-solid fa-user-tie me-2" style="width: 16px;"></i> Asesores de Venta
-                                    </a>
-                                    <a class="sidebar-sublink" href="{{ url_for('admin_bp.nomina') }}">
-                                        <i class="fa-solid fa-money-check-dollar me-2 text-success" style="width: 16px;"></i> Nómina Asesores
-                                    </a>
-                                    <a class="sidebar-sublink" href="{{ url_for('admin_bp.ventas_vendedores') }}">
-                                        <i class="fa-solid fa-chart-line me-2" style="width: 16px;"></i> Rendimiento Asesores
-                                    </a>
-                                    <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('vales_bp.index') }}">
-                                        <span><i class="fa-solid fa-hand-holding-dollar me-2" style="width: 16px;"></i> Vales</span>
-                                        {% if pending_vales_count > 0 %}
-                                            <span class="badge bg-warning text-dark rounded-pill">{{ pending_vales_count }}</span>
-                                        {% endif %}
-                                    </a>
-                                </div>
-                            </div>
-
-                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
-                                <span><i class="fa-solid fa-truck-moving me-2" style="width: 16px;"></i> Traslados de Stock</span>
-                                {% if pending_transfers_count > 0 %}
-                                    <span class="badge bg-danger rounded-pill">{{ pending_transfers_count }}</span>
+                    <!-- SECCIÓN 3: ADMINISTRACIÓN & EQUIPO -->
+                    <div class="sidebar-section-label">Módulo 3 · Administración</div>
+                    <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupAdministrativo" aria-expanded="false">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-users-gear"></i></div> Administración &amp; Equipo</span>
+                        <i class="fa-solid fa-chevron-down chevron-arrow"></i>
+                    </button>
+                    <div class="collapse" id="groupAdministrativo">
+                        <div class="sidebar-submenu">
+                            <div class="px-2 pt-1 pb-1 text-uppercase fw-bold text-muted" style="font-size: 0.64rem; letter-spacing: 0.06em;">Equipo y Sedes</div>
+                            <a class="sidebar-sublink" href="/admin/vendedores">
+                                <i class="fa-solid fa-user-shield me-2" style="width: 16px;"></i> Perfiles &amp; Usuarios
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('admin_bp.sucursales') }}">
+                                <i class="fa-solid fa-code-branch me-2" style="width: 16px;"></i> Sucursales &amp; Bodegas
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('admin_bp.asesores') }}">
+                                <i class="fa-solid fa-user-tie me-2" style="width: 16px;"></i> Asesores de Venta
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('admin_bp.nomina') }}">
+                                <i class="fa-solid fa-money-check-dollar me-2 text-success" style="width: 16px;"></i> Nómina Asesores
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('admin_bp.ventas_vendedores') }}">
+                                <i class="fa-solid fa-chart-line me-2" style="width: 16px;"></i> Rendimiento Asesores
+                            </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('vales_bp.index') }}">
+                                <span><i class="fa-solid fa-hand-holding-dollar me-2" style="width: 16px;"></i> Vales</span>
+                                {% if pending_vales_count > 0 %}
+                                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_vales_count }}</span>
                                 {% endif %}
                             </a>
-                            <a class="sidebar-sublink" href="{{ url_for('transfers_bp.trazabilidad') }}">
-                                <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad / Kardex
+
+                            <div class="px-2 pt-2 pb-1 text-uppercase fw-bold text-muted border-top mt-1" style="font-size: 0.64rem; letter-spacing: 0.06em; border-color: rgba(148,163,184,0.18) !important;">Finanzas y Auditoría</div>
+                            <a class="sidebar-sublink" href="/gastos">
+                                <i class="fa-solid fa-money-bill-transfer me-2" style="width: 16px;"></i> Control de Gastos
                             </a>
                             <a class="sidebar-sublink" href="{{ url_for('admin_bp.aprobaciones') }}">
                                 <i class="fa-solid fa-tags me-2" style="width: 16px;"></i> Aprobaciones Especiales
                             </a>
                             <a class="sidebar-sublink" href="{{ url_for('admin_bp.auditoria') }}">
                                 <i class="fa-solid fa-fingerprint me-2 text-primary" style="width: 16px;"></i> Bitácora de Auditoría
-                            </a>
-                            <a class="sidebar-sublink" href="/gastos">
-                                <i class="fa-solid fa-money-bill-transfer me-2" style="width: 16px;"></i> Control de Gastos
-                            </a>
-                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('exchanges_bp.index') }}">
-                                <span><i class="fa-solid fa-arrow-right-arrow-left me-2" style="width: 16px;"></i> Cambios Celulares</span>
-                                {% if pending_exchanges_count > 0 %}
-                                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_exchanges_count }}</span>
-                                {% endif %}
-                            </a>
-                            <a class="sidebar-sublink" href="/admin/maneos">
-                                <i class="fa-solid fa-handshake me-2" style="width: 16px;"></i> Maneos
                             </a>
                         </div>
                     </div>
