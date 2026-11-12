@@ -1070,12 +1070,12 @@ function abrirModalSoporteLote() {
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="col-md-5">
                         <label class="form-label small fw-bold text-dark">Referencia / Modelo *</label>
-                        <input type="text" name="modelo_celular" list="listaRefsImg" class="form-control form-control-sm" placeholder="Ej: iPhone 15 Pro Max" required autocomplete="off">
-                        <datalist id="listaRefsImg">
+                        <select name="modelo_celular" class="form-select form-select-sm" required>
+                            <option value="">-- Seleccionar Referencia --</option>
                             {% for ref in referencias_disponibles %}
-                            <option value="{{ ref }}">
+                            <option value="{{ ref }}">{{ ref }}</option>
                             {% endfor %}
-                        </datalist>
+                        </select>
                     </div>
                     <div class="col-md-5">
                         <label class="form-label small fw-bold text-dark">Imagen (JPG, PNG, WEBP) *</label>
