@@ -721,32 +721,32 @@
             </div>
         </div>
 
-        <!-- 4. Tarjeta: Alertas de Stock Crítico -->
+        <!-- 4. Tarjeta: Alertas de Equipos Estancados -->
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="card-silver-tech h-100 p-4">
                 <div>
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <div class="stat-icon-wrapper" style="color: #EF4444; border-color: rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.1);">
-                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <i class="fa-solid fa-clock-rotate-left"></i>
                         </div>
                         <span class="card-status-badge" style="background: rgba(239, 68, 68, 0.12); color: #EF4444; border-color: rgba(239, 68, 68, 0.3);">
-                            ATENCIÓN
+                            ROTACIÓN
                         </span>
                     </div>
                     <div class="card-cat-title">
-                        Alertas de Stock
+                        Equipos Estancados
                     </div>
                     <h2 class="fw-bold font-mono my-2 text-danger" style="font-size: 1.85rem; letter-spacing: -0.02em;">
-                        {{ productos_bajo_stock }} <span style="font-size: 1rem; font-weight: 500; color: #EF4444;">críticos</span>
+                        {{ equipos_estancados_count }} <span style="font-size: 1rem; font-weight: 500; color: #EF4444;">en alerta</span>
                     </h2>
                     <p class="card-subtext mb-0">
-                        Existencias reducidas (&le; 10 unidades).
+                        Celulares con más de {{ meses_alerta_estancados or 3 }} meses sin venderse.
                     </p>
                 </div>
                 <div class="card-divider">
-                    <a href="/inventory" class="btn-stat-outline w-100 text-danger" style="border-color: rgba(239, 68, 68, 0.3) !important;">
-                        <i class="fa-solid fa-boxes-packing" style="font-size: 0.75rem;"></i>
-                        <span>Reponer Existencias</span>
+                    <a href="{{ url_for('celulares_bp.alertas_estancados') }}" class="btn-stat-outline w-100 text-danger" style="border-color: rgba(239, 68, 68, 0.3) !important;">
+                        <i class="fa-solid fa-triangle-exclamation" style="font-size: 0.75rem;"></i>
+                        <span>Gestionar Alertas</span>
                     </a>
                 </div>
             </div>

@@ -343,6 +343,30 @@ def dashboard():
         maneos_activos = Maneo.query.filter_by(estado='PENDIENTE').count()
         garantias_pendientes = Warranty.query.filter_by(resolution='Pendiente').count()
 
+    # Equipos Estancados (> meses configurados sin venderse)
+    from models import SystemSetting
+    try:
+        meses_alerta_estancados = int(SystemSetting.get_value('meses_alerta_estancados', '3'))
+    except Exception:
+        meses_alerta_estancados = 3
+    fecha_corte_estancados = hoy - timedelta(days=int(meses_alerta_estancados * 30.4375))
+
+    if active_branch_id:
+        equipos_estancados_count = db.session.query(func.count(func.distinct(Product.id))).join(
+            BranchStock, BranchStock.product_id == Product.id
+        ).filter(
+            Product.tipo_inventario == 'celulares',
+            BranchStock.branch_id == active_branch_id,
+            BranchStock.cantidad > 0,
+            Product.fecha_creacion <= fecha_corte_estancados
+        ).scalar() or 0
+    else:
+        equipos_estancados_count = Product.query.filter(
+            Product.tipo_inventario == 'celulares',
+            Product.cantidad_stock > 0,
+            Product.fecha_creacion <= fecha_corte_estancados
+        ).count()
+
     proveedores_activos = Provider.query.count()
     aprobaciones_pendientes = PriceApproval.query.filter_by(estado='pendiente').count()
 
@@ -470,6 +494,8 @@ def dashboard():
     return render_template('admin/dashboard.html', 
                            total_productos=total_productos,
                            productos_bajo_stock=productos_bajo_stock,
+                           equipos_estancados_count=equipos_estancados_count,
+                           meses_alerta_estancados=meses_alerta_estancados,
                            total_ventas=total_ventas,
                            conteo_ventas=conteo_ventas,
                            saldo_bancos_total=saldo_bancos_total,
