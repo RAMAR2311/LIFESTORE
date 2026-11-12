@@ -398,7 +398,7 @@
                                                     </div>
                                                     <div class="col-md-6">
                                                         <label class="form-label fw-bold small text-muted">Persona / Aliado que recibe *</label>
-                                                        <select name="partner_id" id="partner_select_{{ c.id }}" class="form-select form-select-sm" onchange="toggleNuevoAliado({{ c.id }}, this.value)">
+                                                        <select name="partner_id" id="partner_select_{{ c.id }}" data-id="{{ c.id }}" class="form-select form-select-sm" onchange="toggleNuevoAliado(this.dataset.id, this.value)">
                                                             <option value="">-- Seleccionar Aliado --</option>
                                                             {% for part in partners_disponibles %}
                                                             <option value="{{ part.id }}">{{ part.nombre }} {% if part.contacto %}({{ part.contacto }}){% endif %}</option>
