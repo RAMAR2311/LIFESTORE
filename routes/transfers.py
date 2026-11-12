@@ -402,7 +402,7 @@ def trazabilidad():
     Centro de Historial y Trazabilidad Avanzada (Kardex Multisucursal con Filtros de Rango).
     Exclusivo para roles admin y bodega (o vendedor con permiso de lectura local).
     """
-    if current_user.rol not in ['admin', 'bodega', 'vendedor_bodega']:
+    if current_user.rol not in ['admin', 'bodega', 'vendedor_bodega', 'coordinador']:
         flash('Acceso restringido a administradores y personal de bodega.', 'warning')
         return redirect(url_for('sales_bp.index'))
 

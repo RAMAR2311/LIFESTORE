@@ -733,8 +733,9 @@ def editar_precios_masivo():
 
 @celulares_bp.route('/clientes')
 @login_required
-@admin_required
 def clientes():
+    if current_user.rol not in ['admin', 'coordinador']:
+        abort(403)
     from models import SaleClient
     # Subconsulta para obtener el ID de registro más reciente para cada documento único
     subquery = db.session.query(
@@ -750,8 +751,9 @@ def clientes():
 
 @celulares_bp.route('/clientes/detalle/<documento>')
 @login_required
-@admin_required
 def detalle_cliente(documento):
+    if current_user.rol not in ['admin', 'coordinador']:
+        abort(403)
     from models import SaleClient
     # Obtener todas las compras asociadas a este documento
     registros = SaleClient.query.filter_by(documento=documento).order_by(SaleClient.id.desc()).all()

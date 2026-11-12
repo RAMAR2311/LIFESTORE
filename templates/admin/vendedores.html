@@ -42,6 +42,7 @@
                     <select name="rol" class="form-select bg-light border-0 py-2" required>
                         <option value="" disabled selected>Selecciona un perfil...</option>
                         <option value="admin">Administrador del Sistema</option>
+                        <option value="coordinador">Coordinador de Operaciones</option>
                         <option value="vendedor">Vendedor (Cajas/Tienda)</option>
                         <option value="bodega">Encargado de Bodega</option>
                         <option value="vendedor_bodega">Vendedor de Bodega</option>
@@ -109,6 +110,8 @@
                                     <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2">Encargado Bodega</span>
                                 {% elif vendedor.rol == 'vendedor_bodega' %}
                                     <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2">Vendedor Bodega</span>
+                                {% elif vendedor.rol == 'coordinador' %}
+                                    <span class="badge rounded-pill px-2" style="color: #6366f1 !important; border: 1px solid #6366f1 !important; background-color: rgba(99, 102, 241, 0.1) !important;">Coordinador</span>
                                 {% elif vendedor.rol == 'admin' %}
                                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2">Administrador</span>
                                 {% else %}
@@ -120,7 +123,7 @@
                                     <span class="badge bg-light text-dark border rounded-pill px-2 py-1">
                                         <i class="fa-solid fa-location-dot text-primary me-1"></i>{{ vendedor.branch.nombre }}
                                     </span>
-                                {% elif vendedor.rol == 'admin' %}
+                                {% elif vendedor.rol in ['admin', 'coordinador'] %}
                                     <span class="badge bg-dark text-white rounded-pill px-2 py-1">Global / Todas</span>
                                 {% else %}
                                     <span class="badge bg-secondary bg-opacity-10 text-muted border rounded-pill px-2 py-1">Sin Asignar</span>
@@ -168,6 +171,7 @@
                                                 <label class="form-label text-brand-black fw-semibold small">Asignar Rol / Perfil</label>
                                                 <select name="rol" class="form-select bg-light border-0 py-2" required>
                                                     <option value="admin" {% if vendedor.rol == 'admin' %}selected{% endif %}>Administrador del Sistema</option>
+                                                    <option value="coordinador" {% if vendedor.rol == 'coordinador' %}selected{% endif %}>Coordinador de Operaciones</option>
                                                     <option value="vendedor" {% if vendedor.rol == 'vendedor' %}selected{% endif %}>Vendedor (Cajas/Tienda)</option>
                                                     <option value="bodega" {% if vendedor.rol == 'bodega' %}selected{% endif %}>Encargado de Bodega</option>
                                                     <option value="vendedor_bodega" {% if vendedor.rol == 'vendedor_bodega' %}selected{% endif %}>Vendedor de Bodega</option>

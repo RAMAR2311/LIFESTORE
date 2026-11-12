@@ -10,6 +10,10 @@ bancos_bp = Blueprint('bancos_bp', __name__)
 @bancos_bp.route('/', methods=['GET'])
 @login_required
 def index():
+    if current_user.rol == 'coordinador':
+        flash('Tu perfil no tiene acceso al módulo de Bancos.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
     """Pantalla principal del módulo de Bancos: saldo por cada método de pago e historial de movimientos."""
     cuentas = BankAccount.query.filter_by(activo=True).order_by(BankAccount.id.asc()).all()
 

@@ -105,7 +105,7 @@ def index():
 @login_required
 def crear_tecnico():
     """Crear o registrar un técnico / taller externo."""
-    if current_user.rol not in ['admin', 'bodega', 'vendedor', 'vendedor_bodega']:
+    if current_user.rol not in ['admin', 'bodega', 'vendedor', 'vendedor_bodega', 'coordinador']:
         flash('No tienes permisos para crear técnicos.', 'danger')
         return redirect(url_for('support_bp.index'))
 

@@ -51,7 +51,9 @@
                     <th width="120" class="ps-4 fw-bold">SKU</th>
                     <th class="fw-bold">PRODUCTO</th>
                     <th width="150" class="text-center fw-bold">STOCK</th>
+                    {% if current_user.rol != 'coordinador' %}
                     <th width="150" class="text-end fw-bold">PRECIO COSTO</th>
+                    {% endif %}
                     <th width="150" class="text-end fw-bold">PRECIO MÍNIMO</th>
                     <th width="150" class="text-end pe-4 fw-bold">PRECIO SUGERIDO</th>
                     <th width="220" class="text-center fw-bold">ACCIONES</th>
@@ -100,6 +102,7 @@
                             {% endif %}
                         {% endif %}
                     </td>
+                    {% if current_user.rol != 'coordinador' %}
                     <td class="text-end fw-bold" style="color: var(--brand-pink);">
                         {% if p.rango_costos %}
                             {% if p.rango_costos is number %}
@@ -114,6 +117,7 @@
                             ${{ (p.precio_costo)|cop }}
                         {% endif %}
                     </td>
+                    {% endif %}
                     <td class="text-end text-muted fw-bold">
                         {% if p.rango_minimos %}
                             {% if p.rango_minimos is number %}
@@ -174,8 +178,10 @@
                                     <tr>
                                         <th class="ps-3"><i class="fa-solid fa-arrow-turn-down me-2 text-black-50"></i>Subcategoría (Variante)</th>
                                         <th class="text-center">Stock Físico</th>
+                                        {% if current_user.rol != 'coordinador' %}
                                         <th class="text-end">Costo Unitario</th>
                                         <th class="text-end text-success">Valor Invertido (Costo)</th>
+                                        {% endif %}
                                         <th class="text-end">Sugerido</th>
                                         <th class="text-center" width="100">Trasladar</th>
                                     </tr>
@@ -191,8 +197,10 @@
                                                 <span class="badge bg-secondary rounded-pill text-white">{{ v.cantidad_stock }}</span>
                                             {% endif %}
                                         </td>
+                                        {% if current_user.rol != 'coordinador' %}
                                         <td class="text-end text-muted">${{ (v.precio_costo or p.precio_costo)|cop }}</td>
                                         <td class="text-end fw-bold text-success">${{ ((v.precio_costo or p.precio_costo) * v.cantidad_stock)|cop }}</td>
+                                        {% endif %}
                                         <td class="text-end text-muted">${{ (v.precio_sugerido or p.precio_sugerido)|cop }}</td>
                                         <td class="text-center">
                                             <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id, variant_id=v.id) }}" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.75rem;" title="Trasladar esta variante">

@@ -1522,7 +1522,7 @@
                             {% else %}
                                 <i class="fa-solid fa-location-dot text-primary"></i>
                             {% endif %}
-                            <span style="color: #0f172a !important; font-weight: 700;">{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
+                            <span style="color: #0f172a !important; font-weight: 700;">{{ current_user.branch.nombre if current_user.branch else ('Todas las Sedes (Global)' if current_user.rol == 'coordinador' else 'Sede Principal') }}</span>
                         </span>
                     </div>
                     {% endif %}
@@ -1761,6 +1761,97 @@
                         <span class="fw-bold">ZENIC Asistente</span>
                         <span class="ms-auto sidebar-ai-pill">IA</span>
                     </a>
+
+                {% elif current_user.rol == 'coordinador' %}
+                    <!-- SECCIÓN: VENTAS (COORDINADOR) -->
+                    <div class="sidebar-section-label">Ventas</div>
+                    <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupCajaCoord" aria-expanded="true">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-cash-register"></i></div> Ventas</span>
+                        <i class="fa-solid fa-chevron-down chevron-arrow"></i>
+                    </button>
+                    <div class="collapse show" id="groupCajaCoord">
+                        <div class="sidebar-submenu">
+                            <a class="sidebar-sublink" href="/sales/catalogo">
+                                <i class="fa-solid fa-book-open me-2" style="width: 16px;"></i> Catálogo Celulares
+                            </a>
+                            <a class="sidebar-sublink" href="/arqueo/nuevo">
+                                <i class="fa-solid fa-calculator me-2" style="width: 16px;"></i> Arqueo &amp; Cierre
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('arqueo_bp.log_sobrantes') }}">
+                                <i class="fa-solid fa-scale-unbalanced-flip me-2" style="width: 16px;"></i> Log de Sobrantes
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN: COMPRAS & POSTVENTA (COORDINADOR) -->
+                    <div class="sidebar-section-label">Compras &amp; Clientes</div>
+                    <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupOperacionesCoord" aria-expanded="true">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-cart-flatbed"></i></div> Compras</span>
+                        <i class="fa-solid fa-chevron-down chevron-arrow"></i>
+                    </button>
+                    <div class="collapse show" id="groupOperacionesCoord">
+                        <div class="sidebar-submenu">
+                            <a class="sidebar-sublink" href="{{ url_for('warranties_bp.index') }}">
+                                <i class="fa-solid fa-shield-halved me-2" style="width: 16px;"></i> Garantías Clientes
+                            </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('support_bp.index') }}">
+                                <span><i class="fa-solid fa-screwdriver-wrench me-2" style="width: 16px;"></i> Soporte Técnico</span>
+                                {% if pending_support_count > 0 %}
+                                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_support_count }}</span>
+                                {% endif %}
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.clientes') }}">
+                                <i class="fa-solid fa-address-book me-2" style="width: 16px;"></i> Directorio Clientes
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.historial_ventas') }}">
+                                <i class="fa-solid fa-clock-rotate-left me-2" style="width: 16px;"></i> Historial de Ventas
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN: ADMINISTRATIVO (COORDINADOR) -->
+                    <div class="sidebar-section-label">Administrativo</div>
+                    <button class="sidebar-accordion-btn" type="button" data-bs-toggle="collapse" data-bs-target="#groupAdminCoord" aria-expanded="true">
+                        <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-boxes-stacked"></i></div> Administrativo</span>
+                        <i class="fa-solid fa-chevron-down chevron-arrow"></i>
+                    </button>
+                    <div class="collapse show" id="groupAdminCoord">
+                        <div class="sidebar-submenu">
+                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.inventario') }}">
+                                <i class="fa-solid fa-mobile-screen-button me-2" style="width: 16px;"></i> Inventario Celulares
+                            </a>
+                            <a class="sidebar-sublink" href="/inventory">
+                                <i class="fa-solid fa-box-open me-2" style="width: 16px;"></i> Inventario Accesorios
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('externos_bp.inventario') }}">
+                                <i class="fa-solid fa-truck-ramp-box me-2" style="width: 16px;"></i> Celulares Externos
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('externos_bp.inventario_accesorios') }}">
+                                <i class="fa-solid fa-headphones-simple me-2" style="width: 16px;"></i> Accesorios Externos
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('celulares_bp.trazabilidad') }}">
+                                <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad IMEI
+                            </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('transfers_bp.index') }}">
+                                <span><i class="fa-solid fa-truck-moving me-2" style="width: 16px;"></i> Traslados de Stock</span>
+                                {% if pending_transfers_count > 0 %}
+                                    <span class="badge bg-danger rounded-pill">{{ pending_transfers_count }}</span>
+                                {% endif %}
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('transfers_bp.trazabilidad') }}">
+                                <i class="fa-solid fa-timeline me-2" style="width: 16px;"></i> Trazabilidad / Kardex
+                            </a>
+                            <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('exchanges_bp.index') }}">
+                                <span><i class="fa-solid fa-arrow-right-arrow-left me-2" style="width: 16px;"></i> Cambios Celulares</span>
+                                {% if pending_exchanges_count > 0 %}
+                                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_exchanges_count }}</span>
+                                {% endif %}
+                            </a>
+                            <a class="sidebar-sublink" href="/admin/maneos">
+                                <i class="fa-solid fa-handshake me-2" style="width: 16px;"></i> Maneos
+                            </a>
+                        </div>
+                    </div>
 
                 {% elif current_user.rol == 'vendedor' %}
                     <!-- SECCIÓN: CAJERO / VENDEDOR -->

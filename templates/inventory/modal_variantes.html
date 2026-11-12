@@ -24,6 +24,7 @@
                                 </div>
                             </div>
                             <div class="row g-2 mb-3">
+                                {% if current_user.rol != 'coordinador' %}
                                 <div class="col-md-4">
                                     <label class="form-label small text-muted mb-1 fw-bold">P. Costo (Opcional)</label>
                                     <div class="input-group input-group-sm">
@@ -31,6 +32,7 @@
                                         <input type="number" step="1" name="precio_costo" class="form-control border-start-0 ps-0" placeholder="{{ "%.0f"|format(p.precio_costo) }}">
                                     </div>
                                 </div>
+                                {% endif %}
                                 <div class="col-md-4">
                                     <label class="form-label small text-muted mb-1 fw-bold">P. Mínimo (Opcional)</label>
                                     <div class="input-group input-group-sm">
@@ -85,6 +87,7 @@
                                 </div>
 
                                 <div class="row g-2 align-items-end pe-4"> 
+                                    {% if current_user.rol != 'coordinador' %}
                                     <div class="col-4">
                                         <label class="form-label text-muted mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">COSTO REAL</label>
                                         <div class="input-group input-group-sm">
@@ -92,6 +95,9 @@
                                             <input type="number" step="1" name="precio_costo[]" class="form-control border-start-0 ps-0 text-secondary" value="{{ "%.0f"|format(v.precio_costo|float) if v.precio_costo else "%.0f"|format(p.precio_costo|float) }}">
                                         </div>
                                     </div>
+                                    {% else %}
+                                    <input type="hidden" name="precio_costo[]" value="{{ "%.0f"|format(v.precio_costo|float) if v.precio_costo else "%.0f"|format(p.precio_costo|float) }}">
+                                    {% endif %}
                                     <div class="col-4">
                                         <label class="form-label text-muted mb-1" style="font-size: 0.65rem; letter-spacing: 0.5px;">P. MÍNIMO DEV.</label>
                                         <div class="input-group input-group-sm">

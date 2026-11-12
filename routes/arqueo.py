@@ -37,6 +37,10 @@ def abrir_turno():
     """Apertura de turno de caja por sucursal.
     Aplica ÚNICAMENTE a sucursales de tipo 'tienda'.
     Las sucursales con tipo 'bodega' quedan completamente exentas."""
+    if current_user.rol == 'coordinador':
+        flash('Tu perfil de Coordinador no tiene permiso para abrir turnos de caja.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
     branch_id = request.args.get('branch_id', type=int) or get_current_branch_id()
     sucursal = Branch.query.get_or_404(branch_id)
 

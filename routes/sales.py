@@ -18,6 +18,10 @@ def obtener_turno_sucursal(branch_id):
 @sales_bp.route('/nueva', methods=['GET', 'POST'])
 @login_required # Importante: Te bloqueará el acceso si no hay current_user logeado (Flask-Login)
 def procesar_venta():
+    if current_user.rol == 'coordinador':
+        flash('Tu perfil de Coordinador no tiene acceso al Punto de Pago.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
     if request.method == 'GET':
         # Validar turno de caja abierto ÚNICAMENTE si la sucursal es de tipo 'tienda'
         # Las sucursales con tipo == 'bodega' quedan completamente exentas
@@ -725,11 +729,12 @@ def imprimir_factura(sale_id):
     venta = Sale.query.get_or_404(sale_id)
     return render_template('sales/factura_impresion.html', venta=venta)
 
-# Endpoint Historial de Ventas (Administradores)
+# Endpoint Historial de Ventas (Administradores y Coordinadores)
 @sales_bp.route('/historial', methods=['GET'])
 @login_required
-@admin_required
 def historial():
+    if current_user.rol not in ['admin', 'coordinador']:
+        abort(403)
     # Calcular el valor exacto de 'HOY' en Bogotá
     page = request.args.get('page', 1, type=int)
     hoy_bogota = obtener_hora_bogota().strftime('%Y-%m-%d')
@@ -1286,6 +1291,10 @@ def catalogo():
 @sales_bp.route('/caja_visual', methods=['GET'])
 @login_required
 def caja_visual():
+    if current_user.rol == 'coordinador':
+        flash('Tu perfil de Coordinador no tiene acceso al Punto de Pago.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
     from models import obtener_hora_bogota
     hoy_bogota = obtener_hora_bogota()
     

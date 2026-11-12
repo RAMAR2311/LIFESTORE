@@ -105,7 +105,7 @@ def vendedores():
         
         # Validar branch
         branch_obj = Branch.query.get(branch_id) if branch_id else None
-        sucursal_nombre = branch_obj.nombre if branch_obj else ('GLOBAL' if rol == 'admin' else 'PRINCIPAL')
+        sucursal_nombre = branch_obj.nombre if branch_obj else ('GLOBAL' if rol in ['admin', 'coordinador'] else 'PRINCIPAL')
         
         # Se previene registrar vendedores con un mismo email para preservar la unicidad de las credenciales de acceso
         if User.query.filter_by(email=email).first():
@@ -195,7 +195,7 @@ def editar_vendedor(id):
                     flash("No puedes desasignar la sucursal de un Vendedor o Bodeguero.", "danger")
                     return redirect(url_for('admin_bp.vendedores'))
                 usuario.branch_id = None
-                usuario.sucursal = 'GLOBAL' if usuario.rol == 'admin' else 'PRINCIPAL'
+                usuario.sucursal = 'GLOBAL' if usuario.rol in ['admin', 'coordinador'] else 'PRINCIPAL'
             else:
                 b_id = int(branch_id_raw)
                 b_obj = Branch.query.get(b_id)

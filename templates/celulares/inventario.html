@@ -80,12 +80,14 @@
             <div class="text-muted small fw-bold">EN MANEO (PRESTADOS)</div>
         </div>
     </div>
+    {% if current_user.rol != 'coordinador' %}
     <div class="col-md-3 col-6">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #ffffff, #fff5f5);">
             <div class="fs-1 fw-bold text-danger">${{ costo_total|cop }}</div>
             <div class="text-muted small fw-bold">COSTO TOTAL MERCANCÍA</div>
         </div>
     </div>
+    {% endif %}
     <div class="col-md-3 col-6">
         <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #ffffff, #f0fff4);">
             <div class="fs-1 fw-bold text-success">${{ ventas_estimadas|cop }}</div>
@@ -228,7 +230,9 @@
                     {% else %}
                         <th class="py-2 fw-bold">FECHA INGRESO</th>
                     {% endif %}
+                    {% if current_user.rol != 'coordinador' %}
                     <th class="py-2 fw-bold">COSTO</th>
+                    {% endif %}
                     <th class="py-2 fw-bold">MINIMO</th>
                     <th class="py-2 fw-bold">SUGERIDO</th>
                     <th class="pe-3 py-2 text-center fw-bold">ACCIONES</th>
@@ -286,7 +290,9 @@
                         {% endif %}
                     </td>
                     
+                    {% if current_user.rol != 'coordinador' %}
                     <td class="text-brand-black fw-bold">${{ c.precio_costo|cop }}</td>
+                    {% endif %}
                     <td class="text-muted fw-bold">${{ c.precio_minimo|cop }}</td>
                     <td class="text-brand-black fw-bolder">${{ c.precio_sugerido|cop }}</td>
                     
@@ -367,7 +373,7 @@
                                                 <div class="p-3 rounded-3 bg-light border mb-3 small">
                                                     <div class="fw-bold fs-6 text-dark">{{ c.marca }} {{ c.modelo_celular or c.nombre }}</div>
                                                     <div class="font-monospace text-muted mt-1">IMEI: {{ c.imei }}</div>
-                                                    <div class="text-muted">Color: {{ c.color or 'N/A' }} | Costo Ref: ${{ c.precio_costo|cop }}</div>
+                                                    <div class="text-muted">Color: {{ c.color or 'N/A' }}{% if current_user.rol != 'coordinador' %} | Costo Ref: ${{ c.precio_costo|cop }}{% endif %}</div>
                                                 </div>
 
                                                 <!-- Selector de Aliado Existente y Asesor -->
@@ -674,6 +680,7 @@
                             </div>
                         </div>
 
+                        {% if current_user.rol != 'coordinador' %}
                         <!-- Precio Costo -->
                         <div class="mb-1">
                             <div class="form-check form-switch mb-1">
@@ -685,6 +692,7 @@
                                 <input type="number" step="1000" name="nuevo_precio_costo" id="nuevo_precio_costo" class="form-control" placeholder="0" disabled>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="modal-footer border-top py-2">

@@ -226,6 +226,9 @@ def create_app():
         if current_user.rol == 'bodega':
             return redirect(url_for('inventory_bp.index'))
 
+        if current_user.rol == 'coordinador':
+            return redirect(url_for('celulares_bp.inventario'))
+
         # Por defecto, Vendedores van directo a Caja Visual
         return redirect(url_for('sales_bp.caja_visual'))
 

@@ -7,7 +7,7 @@ warranties_bp = Blueprint('warranties_bp', __name__)
 @warranties_bp.route('/')
 @login_required
 def index():
-    if current_user.rol not in ['admin', 'vendedor', 'bodega']:
+    if current_user.rol not in ['admin', 'vendedor', 'bodega', 'coordinador']:
         flash('Acceso denegado.', 'danger')
         return redirect(url_for('index'))
     

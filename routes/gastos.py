@@ -10,6 +10,10 @@ gastos_bp = Blueprint('gastos_bp', __name__)
 @gastos_bp.route('/', methods=['GET', 'POST'])
 @login_required
 def index():
+    if current_user.rol == 'coordinador':
+        flash('Tu perfil no tiene acceso a Control de Gastos.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
     if request.method == 'POST':
         tipo_gasto = request.form.get('tipo_gasto')
         
