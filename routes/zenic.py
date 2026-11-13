@@ -1038,7 +1038,7 @@ def _w_registrar_venta(args: dict) -> dict:
     fecha_venta = datetime.combine(fecha, obtener_hora_bogota().time())
 
     branch_obj = Branch.query.filter(Branch.nombre.ilike(sucursal)).first()
-    turno_abierto = CashShift.query.filter_by(user_id=current_user.id, estado='ABIERTO').first()
+    turno_abierto = CashShift.query.filter_by(opened_by_id=current_user.id, estado='ABIERTA').first()
 
     venta = Sale(
         vendedor_id=current_user.id,
