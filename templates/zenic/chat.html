@@ -967,9 +967,8 @@
     editarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
-    } else {
-      detenerStream();
     }
+    detenerStream();
   });
 
   editVoiceBtn.addEventListener('click', () => {
@@ -982,6 +981,7 @@
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     }
+    detenerStream();
   });
 
   sendVoiceBtn.addEventListener('click', () => {
@@ -994,7 +994,10 @@
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     }
+    detenerStream();
   });
+
+  window.addEventListener('beforeunload', detenerStream);
 
   // ── Respuesta por Voz (OpenAI TTS → /zenic/voz) ──
   const VOICE_PREF_KEY = 'zenic_voz_activa';
@@ -1175,9 +1178,8 @@
     editarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
-    } else {
-      detenerStream();
     }
+    detenerStream();
   });
 
   editVoiceBtn.addEventListener('click', () => {
@@ -1190,6 +1192,7 @@
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     }
+    detenerStream();
   });
 
   sendVoiceBtn.addEventListener('click', () => {
@@ -1202,7 +1205,10 @@
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     }
+    detenerStream();
   });
+
+  window.addEventListener('beforeunload', detenerStream);
 
   // ── Respuesta por Voz (OpenAI TTS → /zenic/voz) ──
   const VOICE_PREF_KEY = 'zenic_voz_activa';
