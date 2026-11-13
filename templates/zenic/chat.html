@@ -871,8 +871,12 @@
         if (e.data && e.data.size > 0) audioChunks.push(e.data);
       };
 
+      let yaProcesado = false;
       mediaRecorder.onstop = async () => {
+        if (yaProcesado) return;
+        yaProcesado = true;
         const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        audioChunks = [];
         detenerStream();
         if (!enviarAlParar || blob.size === 0) return;
 
@@ -912,6 +916,8 @@
       voiceSeconds = 0;
       voiceTimer.textContent = '0:00';
       voiceBar.style.display = 'flex';
+      sendVoiceBtn.disabled = false;
+      cancelVoiceBtn.disabled = false;
       micBtn.disabled = true;
       voiceInterval = setInterval(() => {
         voiceSeconds++;
@@ -930,6 +936,8 @@
   });
 
   cancelVoiceBtn.addEventListener('click', () => {
+    cancelVoiceBtn.disabled = true;
+    sendVoiceBtn.disabled = true;
     enviarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
@@ -939,6 +947,9 @@
   });
 
   sendVoiceBtn.addEventListener('click', () => {
+    if (sendVoiceBtn.disabled) return;
+    sendVoiceBtn.disabled = true;
+    cancelVoiceBtn.disabled = true;
     enviarAlParar = true;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
@@ -994,8 +1005,12 @@
         if (e.data && e.data.size > 0) audioChunks.push(e.data);
       };
 
+      let yaProcesado = false;
       mediaRecorder.onstop = async () => {
+        if (yaProcesado) return;
+        yaProcesado = true;
         const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        audioChunks = [];
         detenerStream();
         if (!enviarAlParar || blob.size === 0) return;
 
@@ -1035,6 +1050,8 @@
       voiceSeconds = 0;
       voiceTimer.textContent = '0:00';
       voiceBar.style.display = 'flex';
+      sendVoiceBtn.disabled = false;
+      cancelVoiceBtn.disabled = false;
       micBtn.disabled = true;
       voiceInterval = setInterval(() => {
         voiceSeconds++;
@@ -1053,6 +1070,8 @@
   });
 
   cancelVoiceBtn.addEventListener('click', () => {
+    cancelVoiceBtn.disabled = true;
+    sendVoiceBtn.disabled = true;
     enviarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
@@ -1062,6 +1081,9 @@
   });
 
   sendVoiceBtn.addEventListener('click', () => {
+    if (sendVoiceBtn.disabled) return;
+    sendVoiceBtn.disabled = true;
+    cancelVoiceBtn.disabled = true;
     enviarAlParar = true;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
