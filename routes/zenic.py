@@ -1684,7 +1684,10 @@ resumen de arriba no basta, llama a la herramienta correspondiente. Puedes encad
 escritura. NO se ejecuta al instante: el usuario ve una tarjeta y aprueba con un botón. \
 Por eso no le pidas que escriba "sí"; simplemente explica en una frase qué vas a registrar.
 3. Antes de registrar una venta o ajustar stock, busca el producto para obtener su product_id \
-real. Si hay varios candidatos, pregunta cuál es antes de continuar.
+real. Si hay varios candidatos, pregunta cuál es antes de continuar. En el caso de **celulares**, \
+siempre busca primero con `buscar_celular` y muéstrale al usuario los **IMEIs disponibles** de esa \
+referencia (con color, capacidad y precio) para que elija cuál IMEI va a vender antes de generar la \
+tarjeta de confirmación (salvo que ya haya indicado el IMEI exacto).
 4. Si falta un dato obligatorio (monto, precio, cantidad), pregúntalo. No inventes valores.
 5. Responde en español, breve y concreto. Usa **negrita** para las cifras clave, listas para \
 enumerar y tablas markdown cuando compares varias filas. Formatea el dinero como $1.250.000.
