@@ -756,13 +756,13 @@ def _t_consultar_soporte(args: dict) -> dict:
 def _t_consultar_sucursales(args: dict) -> dict:
     """Consulta sedes activas, turnos de caja abiertos y resumen de stock por sede."""
     sedes = Branch.query.filter_by(activa=True).order_by(Branch.nombre.asc()).all()
-    turnos_abiertos = CashShift.query.filter_by(estado='ABIERTO').all()
+    turnos_abiertos = CashShift.query.filter_by(estado='ABIERTA').all()
     turnos_por_sede = {}
     for t in turnos_abiertos:
         turnos_por_sede.setdefault(t.branch_id, []).append({
             'id': t.id,
-            'usuario': t.user.nombre if getattr(t, 'user', None) else f'Usuario #{t.user_id}',
-            'monto_inicial': _cop(t.monto_inicial),
+            'usuario_id': t.opened_by_id,
+            'base_inicial': _cop(t.base_inicial_efectivo),
             'fecha_apertura': t.fecha_apertura.strftime('%Y-%m-%d %H:%M') if t.fecha_apertura else None,
         })
 

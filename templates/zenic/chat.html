@@ -455,6 +455,7 @@
     try {
       const guardado = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       if (Array.isArray(guardado) && guardado.length > 0) {
+        chat.querySelectorAll('.bubble-wrap').forEach(b => b.remove());
         historial = guardado;
         if (welcome) welcome.style.display = 'none';
         guardado.forEach(t => {
