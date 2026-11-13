@@ -418,6 +418,7 @@
       </div>
       <div class="d-flex align-items-center gap-2">
         <button type="button" id="cancelVoiceBtn" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Cancelar</button>
+        <button type="button" id="editVoiceBtn" class="btn btn-sm btn-outline-dark rounded-pill px-3" title="Transcribir para editar antes de enviar"><i class="fa-solid fa-pen me-1"></i>Editar</button>
         <button type="button" id="sendVoiceBtn" class="btn btn-sm btn-danger rounded-pill px-3 fw-semibold"><i class="fa-solid fa-paper-plane me-1"></i>Enviar audio</button>
       </div>
     </div>
@@ -610,6 +611,15 @@
     if (!esUser && (extra.tokens || (extra.herramientas || []).length)) {
       const footer = document.createElement('div');
       footer.className = 'bubble-footer';
+      if (rol === 'assistant' && texto) {
+        const btnEscuchar = document.createElement('button');
+        btnEscuchar.type = 'button';
+        btnEscuchar.className = 'btn btn-link btn-sm p-0 text-muted border-0';
+        btnEscuchar.title = 'Escuchar respuesta';
+        btnEscuchar.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+        btnEscuchar.addEventListener('click', () => reproducirVoz(texto));
+        footer.appendChild(btnEscuchar);
+      }
       (extra.herramientas || []).forEach(h => {
         const chip = document.createElement('span');
         chip.className = 'tool-chip';
@@ -836,6 +846,7 @@
   const voiceBar       = document.getElementById('voiceBar');
   const voiceTimer     = document.getElementById('voiceTimer');
   const cancelVoiceBtn = document.getElementById('cancelVoiceBtn');
+  const editVoiceBtn   = document.getElementById('editVoiceBtn');
   const sendVoiceBtn   = document.getElementById('sendVoiceBtn');
 
   let mediaRecorder = null;
@@ -844,6 +855,7 @@
   let voiceSeconds  = 0;
   let audioStream   = null;
   let enviarAlParar = false;
+  let editarAlParar = false;
 
   function detenerStream() {
     if (audioStream) {
@@ -908,7 +920,13 @@
 
           setEnviando(false);
           input.value = datos.texto;
-          await enviar();
+          input.style.height = 'auto';
+          input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+          if (editarAlParar) {
+            input.focus();
+          } else {
+            await enviar();
+          }
         } catch (err) {
           typing.remove();
           setEnviando(false);
@@ -921,7 +939,9 @@
       voiceTimer.textContent = '0:00';
       voiceBar.style.display = 'flex';
       sendVoiceBtn.disabled = false;
+      editVoiceBtn.disabled = false;
       cancelVoiceBtn.disabled = false;
+      editarAlParar = false;
       micBtn.disabled = true;
       voiceInterval = setInterval(() => {
         voiceSeconds++;
@@ -941,8 +961,10 @@
 
   cancelVoiceBtn.addEventListener('click', () => {
     cancelVoiceBtn.disabled = true;
+    editVoiceBtn.disabled = true;
     sendVoiceBtn.disabled = true;
     enviarAlParar = false;
+    editarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     } else {
@@ -950,11 +972,25 @@
     }
   });
 
-  sendVoiceBtn.addEventListener('click', () => {
-    if (sendVoiceBtn.disabled) return;
+  editVoiceBtn.addEventListener('click', () => {
+    if (editVoiceBtn.disabled) return;
+    editVoiceBtn.disabled = true;
     sendVoiceBtn.disabled = true;
     cancelVoiceBtn.disabled = true;
     enviarAlParar = true;
+    editarAlParar = true;
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  });
+
+  sendVoiceBtn.addEventListener('click', () => {
+    if (sendVoiceBtn.disabled) return;
+    sendVoiceBtn.disabled = true;
+    editVoiceBtn.disabled = true;
+    cancelVoiceBtn.disabled = true;
+    enviarAlParar = true;
+    editarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     }
@@ -1018,6 +1054,7 @@
   const voiceBar       = document.getElementById('voiceBar');
   const voiceTimer     = document.getElementById('voiceTimer');
   const cancelVoiceBtn = document.getElementById('cancelVoiceBtn');
+  const editVoiceBtn   = document.getElementById('editVoiceBtn');
   const sendVoiceBtn   = document.getElementById('sendVoiceBtn');
 
   let mediaRecorder = null;
@@ -1026,6 +1063,7 @@
   let voiceSeconds  = 0;
   let audioStream   = null;
   let enviarAlParar = false;
+  let editarAlParar = false;
 
   function detenerStream() {
     if (audioStream) {
@@ -1090,7 +1128,13 @@
 
           setEnviando(false);
           input.value = datos.texto;
-          await enviar();
+          input.style.height = 'auto';
+          input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+          if (editarAlParar) {
+            input.focus();
+          } else {
+            await enviar();
+          }
         } catch (err) {
           typing.remove();
           setEnviando(false);
@@ -1103,7 +1147,9 @@
       voiceTimer.textContent = '0:00';
       voiceBar.style.display = 'flex';
       sendVoiceBtn.disabled = false;
+      editVoiceBtn.disabled = false;
       cancelVoiceBtn.disabled = false;
+      editarAlParar = false;
       micBtn.disabled = true;
       voiceInterval = setInterval(() => {
         voiceSeconds++;
@@ -1123,8 +1169,10 @@
 
   cancelVoiceBtn.addEventListener('click', () => {
     cancelVoiceBtn.disabled = true;
+    editVoiceBtn.disabled = true;
     sendVoiceBtn.disabled = true;
     enviarAlParar = false;
+    editarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     } else {
@@ -1132,11 +1180,25 @@
     }
   });
 
-  sendVoiceBtn.addEventListener('click', () => {
-    if (sendVoiceBtn.disabled) return;
+  editVoiceBtn.addEventListener('click', () => {
+    if (editVoiceBtn.disabled) return;
+    editVoiceBtn.disabled = true;
     sendVoiceBtn.disabled = true;
     cancelVoiceBtn.disabled = true;
     enviarAlParar = true;
+    editarAlParar = true;
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  });
+
+  sendVoiceBtn.addEventListener('click', () => {
+    if (sendVoiceBtn.disabled) return;
+    sendVoiceBtn.disabled = true;
+    editVoiceBtn.disabled = true;
+    cancelVoiceBtn.disabled = true;
+    enviarAlParar = true;
+    editarAlParar = false;
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
     }

@@ -28,6 +28,7 @@ from models import (
     Retoma, ArqueoCaja, Expense, Cliente, Provider, ProviderInvoice,
     Warranty, Maneo, PriceApproval, Asesor, User, StockAdjustment,
     TechnicalService, Technician, Branch, BranchStock, CashShift,
+    Vale, BankAccount,
     obtener_hora_bogota
 )
 
@@ -186,9 +187,16 @@ def _t_buscar_producto(args: dict) -> dict:
     termino = (args.get('termino') or '').strip()
     solo_disponibles = bool(args.get('solo_disponibles', False))
 
-    candidatos = Product.query.filter(
+    q = Product.query.filter(
         Product.tipo_inventario.in_(['tienda', 'bodega', 'externos'])
-    ).all()
+    )
+    palabras = [p for p in _normalizar(termino).split() if len(p) >= 2]
+    if palabras:
+        q = q.filter(db.and_(*[
+            or_(Product.nombre.ilike(f'%{w}%'), Product.sku.ilike(f'%{w}%'))
+            for w in palabras[:4]
+        ]))
+    candidatos = q.limit(150).all()
 
     resultados = []
     for p in candidatos:
@@ -246,9 +254,21 @@ def _t_buscar_celular(args: dict) -> dict:
     q = Product.query.filter_by(tipo_inventario='celulares')
     if solo_disponibles:
         q = q.filter(Product.cantidad_stock > 0)
+    palabras = [p for p in _normalizar(termino).split() if len(p) >= 2]
+    if palabras:
+        q = q.filter(db.and_(*[
+            or_(
+                Product.imei.ilike(f'%{w}%'),
+                Product.imei2.ilike(f'%{w}%'),
+                Product.marca.ilike(f'%{w}%'),
+                Product.modelo_celular.ilike(f'%{w}%'),
+                Product.nombre.ilike(f'%{w}%'),
+            )
+            for w in palabras[:4]
+        ]))
 
     celulares = []
-    for c in q.all():
+    for c in q.limit(150).all():
         if not _coincide(termino, c.imei, c.imei2, c.marca, c.modelo_celular, c.nombre):
             continue
         if len(celulares) >= 30:
@@ -759,6 +779,52 @@ def _t_consultar_sucursales(args: dict) -> dict:
     return {'total_sedes': len(resultado), 'sedes': resultado}
 
 
+def _t_consultar_vales(args: dict) -> dict:
+    """Consulta vales / adelantos a empleados o asesores."""
+    estado = (args.get('estado') or '').strip().upper()
+    q = Vale.query.order_by(Vale.id.desc())
+    if estado:
+        q = q.filter(Vale.estado == estado)
+    vales = q.limit(30).all()
+    total = sum(float(v.monto or 0) for v in vales)
+    return {
+        'total_encontrados': len(vales),
+        'monto_total': _cop(total),
+        'vales': [
+            {
+                'id': v.id,
+                'beneficiario': getattr(v, 'beneficiario', None) or getattr(v, 'nombre', 'N/D'),
+                'monto': _cop(v.monto),
+                'estado': getattr(v, 'estado', 'N/D'),
+                'motivo': getattr(v, 'motivo', None) or getattr(v, 'descripcion', ''),
+                'fecha': v.fecha.strftime('%Y-%m-%d') if getattr(v, 'fecha', None) else None,
+            }
+            for v in vales
+        ],
+    }
+
+
+def _t_consultar_bancos(args: dict) -> dict:
+    """Consulta cuentas bancarias registradas y sus saldos actuales."""
+    cuentas = BankAccount.query.order_by(BankAccount.nombre.asc()).all()
+    total_saldos = sum(float(getattr(c, 'saldo_actual', 0) or 0) for c in cuentas)
+    return {
+        'total_cuentas': len(cuentas),
+        'saldo_total': _cop(total_saldos),
+        'cuentas': [
+            {
+                'id': c.id,
+                'nombre': c.nombre,
+                'tipo': getattr(c, 'tipo', None),
+                'numero': getattr(c, 'numero_cuenta', None),
+                'saldo_actual': _cop(getattr(c, 'saldo_actual', 0)),
+                'activa': bool(getattr(c, 'activa', True)),
+            }
+            for c in cuentas
+        ],
+    }
+
+
 HERRAMIENTAS_LECTURA = {
     'buscar_producto': _t_buscar_producto,
     'buscar_celular': _t_buscar_celular,
@@ -776,6 +842,8 @@ HERRAMIENTAS_LECTURA = {
     'consultar_maneos': _t_consultar_maneos,
     'consultar_soporte': _t_consultar_soporte,
     'consultar_sucursales': _t_consultar_sucursales,
+    'consultar_vales': _t_consultar_vales,
+    'consultar_bancos': _t_consultar_bancos,
 }
 
 
@@ -969,6 +1037,9 @@ def _w_registrar_venta(args: dict) -> dict:
     fecha = _parse_fecha(args.get('fecha'), obtener_hora_bogota().date())
     fecha_venta = datetime.combine(fecha, obtener_hora_bogota().time())
 
+    branch_obj = Branch.query.filter(Branch.nombre.ilike(sucursal)).first()
+    turno_abierto = CashShift.query.filter_by(user_id=current_user.id, estado='ABIERTO').first()
+
     venta = Sale(
         vendedor_id=current_user.id,
         monto_total=Decimal('0.00'),
@@ -977,6 +1048,10 @@ def _w_registrar_venta(args: dict) -> dict:
         tipo_venta='general',
         sucursal=sucursal,
     )
+    if branch_obj and hasattr(venta, 'branch_id'):
+        venta.branch_id = branch_obj.id
+    if turno_abierto and hasattr(venta, 'cash_shift_id'):
+        venta.cash_shift_id = turno_abierto.id
     db.session.add(venta)
     db.session.flush()
 
@@ -1025,6 +1100,10 @@ def _w_registrar_venta(args: dict) -> dict:
             objetivo.cantidad_stock -= cantidad
             if variante:
                 producto.cantidad_stock = max(0, producto.cantidad_stock - cantidad)
+            if branch_obj:
+                bs = BranchStock.query.filter_by(branch_id=branch_obj.id, product_id=producto.id).first()
+                if bs:
+                    bs.cantidad = max(0, (bs.cantidad or 0) - cantidad)
 
             db.session.add(StockAdjustment(
                 product_id=producto.id,
@@ -1424,6 +1503,10 @@ ESQUEMAS = [
         'limite': {'type': 'integer'},
     }),
     _fn('consultar_sucursales', 'Consulta las sedes activas, unidades en stock por sede y turnos de caja abiertos.', {}),
+    _fn('consultar_vales', 'Consulta vales o adelantos registrados.', {
+        'estado': {'type': 'string', 'description': 'Ej: PENDIENTE, DESCONTADO, PAGADO'},
+    }),
+    _fn('consultar_bancos', 'Consulta las cuentas bancarias registradas y sus saldos actuales.', {}),
     # ── Consulta ───────────────────────────────────────────────────────────
     _fn('buscar_producto',
         "Busca accesorios y productos de tienda/bodega por nombre o SKU. Devuelve product_id, "
@@ -1974,18 +2057,27 @@ def transcribir():
     content_type = audio_file.content_type or 'audio/webm'
 
     try:
-        transcripcion = client.audio.transcriptions.create(
-            model='whisper-1',
-            file=(filename, audio_bytes, content_type),
-            language='es',
-            temperature=0.0,
-            prompt=(
-                'LifeStore, tienda de celulares y accesorios en Colombia. '
-                'Términos comunes: retoma, arqueo, maneo, soporte técnico, bodega, '
-                'nequi, bancolombia, daviplata, transferencia, efectivo, tarjeta, '
-                'iPhone, Samsung, Xiaomi, Motorola, IMEI, pesos.'
-            ),
+        prompt_es = (
+            'LifeStore, tienda de celulares y accesorios en Colombia. '
+            'Términos comunes: retoma, arqueo, maneo, soporte técnico, bodega, '
+            'nequi, bancolombia, daviplata, davivienda, transferencia, efectivo, tarjeta, '
+            'iPhone, Samsung, Xiaomi, Motorola, IMEI, pesos.'
         )
+        try:
+            transcripcion = client.audio.transcriptions.create(
+                model='gpt-4o-mini-transcribe',
+                file=(filename, audio_bytes, content_type),
+                language='es',
+                prompt=prompt_es,
+            )
+        except Exception:
+            transcripcion = client.audio.transcriptions.create(
+                model='whisper-1',
+                file=(filename, audio_bytes, content_type),
+                language='es',
+                temperature=0.0,
+                prompt=prompt_es,
+            )
         texto = (getattr(transcripcion, 'text', '') or '').strip()
         if not texto:
             return jsonify({'error': 'No se detectó voz en el audio.'}), 400
