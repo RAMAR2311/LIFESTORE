@@ -354,6 +354,9 @@
     </div>
     <div class="zenic-header-actions">
       <div class="zenic-badge">IA Activa</div>
+      <button class="btn-clear-chat" id="voiceToggleBtn" onclick="toggleVoz()" title="Activar/desactivar respuesta por voz" style="margin-right: 6px;">
+        <i class="fa-solid fa-volume-xmark"></i> Voz OFF
+      </button>
       <button class="btn-clear-chat" onclick="limpiarChat()" title="Limpiar conversación">
         <i class="fa-solid fa-trash-can me-1"></i>Limpiar
       </button>
@@ -812,6 +815,7 @@
       if (datos.respuesta) {
         historial.push({ role: 'assistant', content: datos.respuesta });
         guardarHistorial();
+        if (vozActiva) reproducirVoz(datos.respuesta);
       }
 
       if (datos.accion_pendiente) {
@@ -956,6 +960,54 @@
     }
   });
 
+  // ── Respuesta por Voz (OpenAI TTS → /zenic/voz) ──
+  const VOICE_PREF_KEY = 'zenic_voz_activa';
+  let vozActiva = localStorage.getItem(VOICE_PREF_KEY) === '1';
+  let audioActual = null;
+
+  function actualizarBotonVoz() {
+    const btn = document.getElementById('voiceToggleBtn');
+    if (!btn) return;
+    if (vozActiva) {
+      btn.innerHTML = '<i class="fa-solid fa-volume-high text-success"></i> Voz ON';
+      btn.style.borderColor = '#198754';
+    } else {
+      btn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i> Voz OFF';
+      btn.style.borderColor = '';
+    }
+  }
+
+  function toggleVoz() {
+    vozActiva = !vozActiva;
+    try { localStorage.setItem(VOICE_PREF_KEY, vozActiva ? '1' : '0'); } catch (e) {}
+    if (!vozActiva && audioActual) {
+      audioActual.pause();
+      audioActual = null;
+    }
+    actualizarBotonVoz();
+  }
+
+  async function reproducirVoz(texto) {
+    try {
+      if (audioActual) {
+        audioActual.pause();
+        audioActual = null;
+      }
+      const resp = await fetch('/zenic/voz', {
+        method: 'POST',
+        headers: cabeceras(),
+        body: JSON.stringify({ texto })
+      });
+      if (!resp.ok) return;
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      audioActual = new Audio(url);
+      audioActual.onended = () => URL.revokeObjectURL(url);
+      audioActual.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  actualizarBotonVoz();
   restaurarHistorial();
   input.focus();
     }
@@ -1090,6 +1142,54 @@
     }
   });
 
+  // ── Respuesta por Voz (OpenAI TTS → /zenic/voz) ──
+  const VOICE_PREF_KEY = 'zenic_voz_activa';
+  let vozActiva = localStorage.getItem(VOICE_PREF_KEY) === '1';
+  let audioActual = null;
+
+  function actualizarBotonVoz() {
+    const btn = document.getElementById('voiceToggleBtn');
+    if (!btn) return;
+    if (vozActiva) {
+      btn.innerHTML = '<i class="fa-solid fa-volume-high text-success"></i> Voz ON';
+      btn.style.borderColor = '#198754';
+    } else {
+      btn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i> Voz OFF';
+      btn.style.borderColor = '';
+    }
+  }
+
+  function toggleVoz() {
+    vozActiva = !vozActiva;
+    try { localStorage.setItem(VOICE_PREF_KEY, vozActiva ? '1' : '0'); } catch (e) {}
+    if (!vozActiva && audioActual) {
+      audioActual.pause();
+      audioActual = null;
+    }
+    actualizarBotonVoz();
+  }
+
+  async function reproducirVoz(texto) {
+    try {
+      if (audioActual) {
+        audioActual.pause();
+        audioActual = null;
+      }
+      const resp = await fetch('/zenic/voz', {
+        method: 'POST',
+        headers: cabeceras(),
+        body: JSON.stringify({ texto })
+      });
+      if (!resp.ok) return;
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      audioActual = new Audio(url);
+      audioActual.onended = () => URL.revokeObjectURL(url);
+      audioActual.play().catch(() => {});
+    } catch (e) {}
+  }
+
+  actualizarBotonVoz();
   restaurarHistorial();
   input.focus();
 </script>

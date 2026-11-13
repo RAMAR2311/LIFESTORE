@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from flask import (
-    Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
+    Blueprint, render_template, request, jsonify, session, redirect, url_for, flash, Response
 )
 from flask_login import login_required, current_user
 from sqlalchemy import or_
@@ -1988,3 +1988,33 @@ def transcribir():
         return jsonify({'texto': texto})
     except Exception as exc:
         return jsonify({'error': f'Error transcribiendo el audio: {exc}'}), 500
+
+
+@zenic_bp.route('/voz', methods=['POST'])
+@login_required
+@admin_required
+def voz():
+    """Convierte la respuesta de ZENIC a audio MP3 usando OpenAI TTS."""
+    import re
+    data = request.get_json(silent=True) or {}
+    texto = (data.get('texto') or '').strip()
+    if not texto:
+        return jsonify({'error': 'Falta el texto para generar el audio.'}), 400
+
+    # Limpiar markdown básico para una lectura natural
+    texto_limpio = re.sub(r'[*_`#>\[\]]+', ' ', texto)
+    texto_limpio = re.sub(r'\s+', ' ', texto_limpio).strip()[:4000]
+
+    client, error = _cliente_openai()
+    if error:
+        return jsonify({'error': error}), 500
+
+    try:
+        audio_resp = client.audio.speech.create(
+            model='tts-1',
+            voice='nova',
+            input=texto_limpio,
+        )
+        return Response(audio_resp.content, mimetype='audio/mpeg')
+    except Exception as exc:
+        return jsonify({'error': f'Error generando audio: {exc}'}), 500
