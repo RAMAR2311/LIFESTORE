@@ -206,173 +206,11 @@
                                 </button>
                             </form>
                         </div>
-
-                        <!-- Modal Editar Retoma -->
-                        <div class="modal fade text-start text-wrap" id="modalEditarRetoma{{ r.id }}" tabindex="-1" aria-hidden="true" style="white-space: normal;">
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content border-0 shadow-lg">
-                                    <div class="modal-header bg-warning text-dark border-0">
-                                        <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i> Editar Retoma</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <form action="{{ url_for('retomas_bp.editar_retoma', id=r.id) }}" method="POST">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                        <div class="modal-body p-4">
-                                            <div class="row g-3 mb-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold">Marca</label>
-                                                    <input type="text" name="marca" class="form-control bg-light" value="{{ r.marca or '' }}" placeholder="Ej: Apple, Samsung">
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold">Modelo / Referencia <span class="text-danger">*</span></label>
-                                                    <input type="text" name="modelo" class="form-control bg-light" value="{{ r.modelo }}" required>
-                                                </div>
-                                            </div>
-                                            <div class="row g-3 mb-3">
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Capacidad</label>
-                                                    <input type="text" name="memoria" class="form-control bg-light" value="{{ r.memoria or '' }}" placeholder="Ej: 128GB">
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Color</label>
-                                                    <input type="text" name="color" class="form-control bg-light" value="{{ r.color or '' }}" placeholder="Ej: Negro">
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Batería (%)</label>
-                                                    <input type="text" name="bateria" class="form-control bg-light" value="{{ r.bateria or '' }}" placeholder="Ej: 85%">
-                                                </div>
-                                            </div>
-                                            <div class="row g-3 mb-3">
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold">IMEI 1 <span class="text-danger">*</span></label>
-                                                    <input type="text" name="imei1" class="form-control bg-light" value="{{ r.imei1 }}" required>
-                                                </div>
-                                                <div class="col-md-6">
-                                                    <label class="form-label fw-bold">IMEI 2 (Opcional)</label>
-                                                    <input type="text" name="imei2" class="form-control bg-light" value="{{ r.imei2 or '' }}">
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label fw-bold">Valor de Retoma ($)</label>
-                                                <input type="number" name="valor_retoma" class="form-control bg-light fw-bold text-success" value="{{ r.valor_retoma|int }}" required>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label class="form-label fw-bold">Observaciones / Estado del Equipo</label>
-                                                <textarea name="observaciones" class="form-control bg-light" rows="2">{{ r.observaciones or '' }}</textarea>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer bg-light border-0">
-                                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                                            <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm">Guardar Cambios</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-
-                        {% if r.estado != 'aprobado' %}
-                        <!-- Modal Aprobar/Pasar al Inventario -->
-                        <div class="modal fade text-start text-wrap" id="modalAprobar{{ r.id }}" tabindex="-1" aria-hidden="true" style="white-space: normal;">
-                            <div class="modal-dialog modal-dialog-centered">
-                                <div class="modal-content border-0 shadow-lg">
-                                    <div class="modal-header bg-primary text-white border-0">
-                                        <h5 class="modal-title fw-bold"><i class="fa-solid fa-boxes-packing me-2"></i> Ingresar al Inventario</h5>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                                    </div>
-                                    <form action="{{ url_for('retomas_bp.aprobar_retoma', id=r.id) }}" method="POST">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                        <div class="modal-body p-4">
-                                            <div class="alert alert-info border-0 small py-2 mb-4">
-                                                Al confirmar, este equipo se convertirá en un producto disponible para la venta en el módulo de celulares.
-                                            </div>
-                                            <div class="row g-3 mb-3">
-                                                <div class="col-md-7">
-                                                    <label class="form-label fw-bold">Nombre Definitivo (Visible en Venta) <span class="text-danger">*</span></label>
-                                                    {% set clean_m = (r.marca or '').strip() %}
-                                                    {% set clean_mod = (r.modelo or '').strip() %}
-                                                    {% set default_name = clean_mod if (clean_m and clean_m.lower() in clean_mod.lower()) else ((clean_m + ' ' + clean_mod).strip() if clean_m else clean_mod) %}
-                                                    <input type="text" name="nombre_definitivo" class="form-control bg-light" value="{{ default_name }}" required>
-                                                </div>
-                                                <div class="col-md-5">
-                                                    <label class="form-label fw-bold">Inventario / Ubicación <span class="text-danger">*</span></label>
-                                                    <input type="text" name="inventario" class="form-control bg-light" value="PRINCIPAL" placeholder="Ej: PRINCIPAL, VITRINA, BODEGA" required>
-                                                </div>
-                                            </div>
-                                            {% if r.arreglos and r.arreglos > 0 %}
-                                            <div class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center gap-2 small rounded-3 border-0 bg-warning bg-opacity-10 text-dark">
-                                                <i class="fa-solid fa-screwdriver-wrench text-warning fs-5"></i>
-                                                <div>
-                                                    <strong>Costo de Soporte Técnico Cargado:</strong>
-                                                    Se importaron automáticamente <strong>${{ r.arreglos|cop }}</strong> del taller a este campo de arreglos.
-                                                </div>
-                                            </div>
-                                            {% endif %}
-                                            <div id="retoma_error_{{ r.id }}" class="alert alert-danger d-none py-2 px-3 small mb-3 rounded-3" role="alert"></div>
-                                            <div class="row g-3 mb-3">
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold text-truncate" title="Costo de Retoma">Costo de Retoma</label>
-                                                    <input type="text" class="form-control bg-light" value="${{ r.valor_retoma|cop }}" readonly>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Arreglos / Soporte</label>
-                                                    <input type="text" id="retoma_arreglos_{{ r.id }}" name="arreglos" class="form-control bg-light format-price" value="{{ r.arreglos|int if r.arreglos else 0 }}" data-id="{{ r.id }}" data-valor-base="{{ r.valor_retoma|int }}" oninput="updateTotalCosto(this.dataset.id, this.dataset.valorBase)">
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold text-truncate" title="Costo Total">Costo Total</label>
-                                                    <input type="text" id="retoma_costo_total_{{ r.id }}" class="form-control bg-light fw-bold text-success" value="${{ ((r.valor_retoma or 0) + (r.arreglos or 0))|cop }}" readonly>
-                                                </div>
-                                            </div>
-                                            <div class="row g-3">
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Batería (%)</label>
-                                                    <input type="text" name="bateria" class="form-control bg-light" value="{{ r.bateria or '' }}" placeholder="Ej: 100% o 90%">
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Precio Sugerido Venta <span class="text-danger">*</span></label>
-                                                    <input type="text" name="precio_sugerido" class="form-control bg-light format-price" value="0" required>
-                                                </div>
-                                                <div class="col-md-4">
-                                                    <label class="form-label fw-bold">Precio Mínimo Permitido <span class="text-danger">*</span></label>
-                                                    <input type="text" name="precio_minimo" class="form-control bg-light format-price" value="0" required>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="modal-footer border-0 bg-light">
-                                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
-                                            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold" data-id="{{ r.id }}" onclick="return validarIngresoRetoma(this.form, this.dataset.id)"><i class="fa-solid fa-check me-1"></i> Confirmar Ingreso</button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
-
-                        <!-- Modal Observación (visible para todos los estados) -->
-                        {% if r.observaciones %}
-                        <div class="modal fade text-start text-wrap" id="modalObs{{ r.id }}" tabindex="-1" aria-hidden="true" style="white-space: normal;">
-                            <div class="modal-dialog modal-dialog-centered modal-sm">
-                                <div class="modal-content border-0 shadow-lg">
-                                    <div class="modal-header bg-dark text-white border-0 py-2">
-                                        <h6 class="modal-title fw-bold"><i class="fa-solid fa-comment-dots me-2"></i>Observación</h6>
-                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body p-3">
-                                        <p class="mb-1 small text-muted"><strong>{{ (r.marca or '') }} {{ r.modelo }}</strong> · {{ r.imei1 }}</p>
-                                        <hr class="my-2">
-                                        <p class="mb-0" style="white-space: pre-wrap;">{{ r.observaciones }}</p>
-                                    </div>
-                                    <div class="modal-footer border-0 py-2">
-                                        <button class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Cerrar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="11" class="text-center py-4 text-muted">
+                    <td colspan="14" class="text-center py-4 text-muted">
                         <i class="fa-solid fa-folder-open fs-3 mb-2 opacity-50"></i>
                         <p class="mb-0">No hay retomas registradas para este rango de fechas.</p>
                     </td>
@@ -382,6 +220,171 @@
         </table>
     </div>
 </div>
+
+<!-- Modales de cada retoma fuera de la tabla para compatibilidad total en PWA / móvil -->
+{% for r in retomas %}
+<!-- Modal Editar Retoma -->
+<div class="modal fade text-start text-wrap" id="modalEditarRetoma{{ r.id }}" tabindex="-1" aria-hidden="true" style="white-space: normal;">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i> Editar Retoma</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('retomas_bp.editar_retoma', id=r.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-body p-4">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Marca</label>
+                            <input type="text" name="marca" class="form-control bg-light" value="{{ r.marca or '' }}" placeholder="Ej: Apple, Samsung">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Modelo / Referencia <span class="text-danger">*</span></label>
+                            <input type="text" name="modelo" class="form-control bg-light" value="{{ r.modelo }}" required>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Capacidad</label>
+                            <input type="text" name="memoria" class="form-control bg-light" value="{{ r.memoria or '' }}" placeholder="Ej: 128GB">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Color</label>
+                            <input type="text" name="color" class="form-control bg-light" value="{{ r.color or '' }}" placeholder="Ej: Negro">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Batería (%)</label>
+                            <input type="text" name="bateria" class="form-control bg-light" value="{{ r.bateria or '' }}" placeholder="Ej: 85%">
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">IMEI 1 <span class="text-danger">*</span></label>
+                            <input type="text" name="imei1" class="form-control bg-light" value="{{ r.imei1 }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">IMEI 2 (Opcional)</label>
+                            <input type="text" name="imei2" class="form-control bg-light" value="{{ r.imei2 or '' }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Valor de Retoma ($)</label>
+                        <input type="number" name="valor_retoma" class="form-control bg-light fw-bold text-success" value="{{ r.valor_retoma|int }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observaciones / Estado del Equipo</label>
+                        <textarea name="observaciones" class="form-control bg-light" rows="2">{{ r.observaciones or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if r.estado != 'aprobado' %}
+<!-- Modal Aprobar/Pasar al Inventario -->
+<div class="modal fade text-start text-wrap" id="modalAprobar{{ r.id }}" tabindex="-1" aria-hidden="true" style="white-space: normal;">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-boxes-packing me-2"></i> Ingresar al Inventario</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('retomas_bp.aprobar_retoma', id=r.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 small py-2 mb-4">
+                        Al confirmar, este equipo se convertirá en un producto disponible para la venta en el módulo de celulares.
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold">Nombre Definitivo (Visible en Venta) <span class="text-danger">*</span></label>
+                            {% set clean_m = (r.marca or '').strip() %}
+                            {% set clean_mod = (r.modelo or '').strip() %}
+                            {% set default_name = clean_mod if (clean_m and clean_m.lower() in clean_mod.lower()) else ((clean_m + ' ' + clean_mod).strip() if clean_m else clean_mod) %}
+                            <input type="text" name="nombre_definitivo" class="form-control bg-light" value="{{ default_name }}" required>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold">Inventario / Ubicación <span class="text-danger">*</span></label>
+                            <input type="text" name="inventario" class="form-control bg-light" value="PRINCIPAL" placeholder="Ej: PRINCIPAL, VITRINA, BODEGA" required>
+                        </div>
+                    </div>
+                    {% if r.arreglos and r.arreglos > 0 %}
+                    <div class="alert alert-warning py-2 px-3 mb-3 d-flex align-items-center gap-2 small rounded-3 border-0 bg-warning bg-opacity-10 text-dark">
+                        <i class="fa-solid fa-screwdriver-wrench text-warning fs-5"></i>
+                        <div>
+                            <strong>Costo de Soporte Técnico Cargado:</strong>
+                            Se importaron automáticamente <strong>${{ r.arreglos|cop }}</strong> del taller a este campo de arreglos.
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div id="retoma_error_{{ r.id }}" class="alert alert-danger d-none py-2 px-3 small mb-3 rounded-3" role="alert"></div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-truncate" title="Costo de Retoma">Costo de Retoma</label>
+                            <input type="text" class="form-control bg-light" value="${{ r.valor_retoma|cop }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Arreglos / Soporte</label>
+                            <input type="text" id="retoma_arreglos_{{ r.id }}" name="arreglos" class="form-control bg-light format-price" value="{{ r.arreglos|int if r.arreglos else 0 }}" data-id="{{ r.id }}" data-valor-base="{{ r.valor_retoma|int }}" oninput="updateTotalCosto(this.dataset.id, this.dataset.valorBase)">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-truncate" title="Costo Total">Costo Total</label>
+                            <input type="text" id="retoma_costo_total_{{ r.id }}" class="form-control bg-light fw-bold text-success" value="${{ ((r.valor_retoma or 0) + (r.arreglos or 0))|cop }}" readonly>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Batería (%)</label>
+                            <input type="text" name="bateria" class="form-control bg-light" value="{{ r.bateria or '' }}" placeholder="Ej: 100% o 90%">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Precio Sugerido Venta <span class="text-danger">*</span></label>
+                            <input type="text" name="precio_sugerido" class="form-control bg-light format-price" value="0" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Precio Mínimo Permitido <span class="text-danger">*</span></label>
+                            <input type="text" name="precio_minimo" class="form-control bg-light format-price" value="0" required>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold" data-id="{{ r.id }}" onclick="return validarIngresoRetoma(this.form, this.dataset.id)"><i class="fa-solid fa-check me-1"></i> Confirmar Ingreso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal Observación (visible para todos los estados) -->
+{% if r.observaciones %}
+<div class="modal fade text-start text-wrap" id="modalObs{{ r.id }}" tabindex="-1" aria-hidden="true" style="white-space: normal;">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white border-0 py-2">
+                <h6 class="modal-title fw-bold"><i class="fa-solid fa-comment-dots me-2"></i>Observación</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <p class="mb-1 small text-muted"><strong>{{ (r.marca or '') }} {{ r.modelo }}</strong> · {{ r.imei1 }}</p>
+                <hr class="my-2">
+                <p class="mb-0" style="white-space: pre-wrap;">{{ r.observaciones }}</p>
+            </div>
+            <div class="modal-footer border-0 py-2">
+                <button class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
 
 <!-- Paginación -->
 {% if paginacion.pages > 1 %}
@@ -434,6 +437,11 @@
     });
 
     document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.modal').forEach(modalEl => {
+            if (modalEl.parentElement !== document.body) {
+                document.body.appendChild(modalEl);
+            }
+        });
         document.querySelectorAll('.format-price').forEach(input => {
             if (input.value) {
                 let value = input.value.replace(/\D/g, '');
