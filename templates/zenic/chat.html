@@ -755,7 +755,7 @@
 
   // ── Utilidades ────────────────────────────────
   function scrollAbajo() {
-    requestAnimationFrame(() => chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' }));
+    requestAnimationFrame(() => { chat.scrollTop = chat.scrollHeight; });
   }
 
   function setEnviando(estado) {

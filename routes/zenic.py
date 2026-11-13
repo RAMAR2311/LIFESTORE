@@ -1687,7 +1687,10 @@ Por eso no le pidas que escriba "sí"; simplemente explica en una frase qué vas
 real. Si hay varios candidatos, pregunta cuál es antes de continuar. En el caso de **celulares**, \
 siempre busca primero con `buscar_celular` y muéstrale al usuario los **IMEIs disponibles** de esa \
 referencia (con color, capacidad y precio) para que elija cuál IMEI va a vender antes de generar la \
-tarjeta de confirmación (salvo que ya haya indicado el IMEI exacto).
+tarjeta de confirmación (salvo que ya haya indicado el IMEI exacto). Si el usuario dicta un IMEI, \
+documento o teléfono con puntos o espacios (ej. `40.64` o `1.014.304.358`), quita los puntos y \
+espacios para interpretarlo como dígitos (`4064`, `1014304358`). Si dice "da vivienda" o \
+"davivienda", usa `transferencia`.
 4. Si falta un dato obligatorio (monto, precio, cantidad), pregúntalo. No inventes valores.
 5. Responde en español, breve y concreto. Usa **negrita** para las cifras clave, listas para \
 enumerar y tablas markdown cuando compares varias filas. Formatea el dinero como $1.250.000.
@@ -1975,6 +1978,7 @@ def transcribir():
             model='whisper-1',
             file=(filename, audio_bytes, content_type),
             language='es',
+            temperature=0.0,
             prompt=(
                 'LifeStore, tienda de celulares y accesorios en Colombia. '
                 'Términos comunes: retoma, arqueo, maneo, soporte técnico, bodega, '
