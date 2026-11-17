@@ -51,21 +51,35 @@
                             <span id="asesores_count">0</span> seleccionados
                         </span>
                     </div>
-                    <div class="border rounded-3 p-3 bg-light" style="max-height: 250px; overflow-y: auto;">
+                    <div class="border rounded-3 p-3 bg-light" style="max-height: 320px; overflow-y: auto;">
                         {% if asesores %}
                         <div class="row g-2">
                             {% for a in asesores %}
                             <div class="col-md-6">
-                                <div class="form-check p-2 bg-white rounded border d-flex align-items-center h-100 shadow-sm-hover cursor-pointer" onclick="toggleCheckbox('asesor_{{ a.id }}')">
-                                    <input class="form-check-input ms-1 me-2 asesor-check" 
-                                           type="checkbox" 
-                                           name="asesores_ids" 
-                                           value="{{ a.id }}" 
-                                           id="asesor_{{ a.id }}"
-                                           onclick="event.stopPropagation(); updateCount();">
-                                    <label class="form-check-label fw-semibold text-dark w-100 cursor-pointer" for="asesor_{{ a.id }}" onclick="event.stopPropagation();">
-                                        <span class="badge bg-dark font-monospace me-1">{{ a.codigo or ('ASE-%03d' % a.id) }}</span> {{ a.nombre }}
-                                    </label>
+                                <div class="p-2 bg-white rounded border h-100 shadow-sm-hover">
+                                    <div class="form-check d-flex align-items-center cursor-pointer" onclick="toggleCheckbox('asesor_{{ a.id }}')">
+                                        <input class="form-check-input ms-1 me-2 asesor-check" 
+                                               type="checkbox" 
+                                               name="asesores_ids" 
+                                               value="{{ a.id }}" 
+                                               id="asesor_{{ a.id }}"
+                                               data-asesor-id="{{ a.id }}"
+                                               onclick="event.stopPropagation(); updateCount();">
+                                        <label class="form-check-label fw-semibold text-dark w-100 cursor-pointer" for="asesor_{{ a.id }}" onclick="event.stopPropagation();">
+                                            <i class="fa-solid fa-user-Check text-primary me-1"></i> {{ a.nombre }}
+                                        </label>
+                                    </div>
+                                    <div id="box_codigo_{{ a.id }}" class="mt-2 d-none">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-dark text-warning border-0"><i class="fa-solid fa-key"></i></span>
+                                            <input type="password"
+                                                   name="codigo_asesor_{{ a.id }}"
+                                                   id="codigo_asesor_{{ a.id }}"
+                                                   class="form-control"
+                                                   placeholder="Código personal de {{ a.nombre }}"
+                                                   autocomplete="off">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             {% endfor %}
@@ -74,7 +88,7 @@
                         <p class="text-muted small m-0 text-center py-3">No hay asesores comerciales registrados en el sistema.</p>
                         {% endif %}
                     </div>
-                    <div class="form-text small text-muted">Selecciona los asesores que estarán atendiendo y generando ventas durante este turno.</div>
+                    <div class="form-text small text-muted">Selecciona cada asesor en turno e ingresa su código personal para confirmar su presencia.</div>
                 </div>
 
                 <!-- Notas Opcionales de Apertura -->
@@ -87,9 +101,15 @@
                     <button type="submit" class="btn btn-dark py-3 rounded-pill fw-bold fs-5 shadow">
                         <i class="fa-solid fa-key me-2 text-warning"></i> Confirmar y Abrir Turno
                     </button>
+                    {% if current_user.rol == 'admin' %}
                     <a href="/admin/dashboard" class="btn btn-link text-muted text-decoration-none small text-center mt-2">
                         Cancelar y volver al panel
                     </a>
+                    {% else %}
+                    <a href="{{ url_for('auth_bp.logout') }}" class="btn btn-link text-danger text-decoration-none small text-center mt-2">
+                        <i class="fa-solid fa-right-from-bracket me-1"></i> Cerrar sesión
+                    </a>
+                    {% endif %}
                 </div>
             </form>
         </div>
@@ -105,9 +125,26 @@ function toggleCheckbox(id) {
     }
 }
 function updateCount() {
-    const checks = document.querySelectorAll('.asesor-check:checked');
+    const allChecks = document.querySelectorAll('.asesor-check');
+    let selectedCount = 0;
+    allChecks.forEach(cb => {
+        const aId = cb.getAttribute('data-asesor-id');
+        const box = document.getElementById('box_codigo_' + aId);
+        const inp = document.getElementById('codigo_asesor_' + aId);
+        if (cb.checked) {
+            selectedCount++;
+            if (box) box.classList.remove('d-none');
+            if (inp) inp.required = true;
+        } else {
+            if (box) box.classList.add('d-none');
+            if (inp) {
+                inp.required = false;
+                inp.value = '';
+            }
+        }
+    });
     const badge = document.getElementById('asesores_count');
-    if (badge) badge.textContent = checks.length;
+    if (badge) badge.textContent = selectedCount;
 }
 </script>
 {% endblock %}

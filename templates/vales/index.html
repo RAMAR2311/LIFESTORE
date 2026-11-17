@@ -75,7 +75,7 @@
                 </div>
             </div>
             <hr class="my-3">
-            <form method="POST" action="{{ url_for('vales_bp.solicitar') }}" enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('vales_bp.solicitar') }}" enctype="multipart/form-data" id="formSolicitarVale" autocomplete="off">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                 <div class="mb-3">
@@ -83,9 +83,17 @@
                     <select name="asesor_id" class="form-select bg-light" required>
                         <option value="" disabled selected>-- Seleccionar Asesor --</option>
                         {% for asesor in asesores_activos %}
-                            <option value="{{ asesor.id }}">[{{ asesor.codigo or ('ASE-%03d' % asesor.id) }}] {{ asesor.nombre }}</option>
+                            <option value="{{ asesor.id }}">{{ asesor.nombre }}</option>
                         {% endfor %}
                     </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-brand-black">Código Personal del Asesor <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark text-warning border-0"><i class="fa-solid fa-key"></i></span>
+                        <input type="password" name="codigo_asesor" class="form-control bg-light" placeholder="Ingresa el código del asesor" required autocomplete="new-password">
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -97,19 +105,13 @@
                     </div>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold text-brand-black">Adjuntar Comprobante / Soporte</label>
-                    <input type="file" name="comprobante" class="form-control bg-light" accept="image/*,application/pdf">
-                    <small class="text-muted extra-small">Foto o PDF del recibo/consignación (Opcional).</small>
-                </div>
-
                 <div class="mb-4">
                     <label class="form-label fw-bold text-brand-black">Motivo / Observación <span class="text-muted fw-normal small">(Opcional)</span></label>
                     <textarea name="concepto" class="form-control bg-light" rows="3" placeholder="Ej: Vale para almuerzo, transporte o adelanto personal..."></textarea>
                 </div>
 
                 <div class="d-grid">
-                    <button type="submit" class="btn btn-primary py-3 rounded-pill fw-bold shadow-sm">
+                    <button type="submit" id="btnSubmitVale" class="btn btn-primary py-3 rounded-pill fw-bold shadow-sm">
                         <i class="fa-solid fa-paper-plane me-2"></i> Enviar Solicitud de Vale
                     </button>
                 </div>
@@ -244,10 +246,12 @@
                                     <a href="{{ url_for('static', filename=v.comprobante) }}" target="_blank" class="btn btn-sm btn-outline-info rounded-pill px-2 py-1 shadow-sm" title="Ver Comprobante">
                                         <i class="fa-solid fa-paperclip me-1"></i> Soporte
                                     </a>
-                                {% else %}
+                                {% elif current_user.rol == 'admin' %}
                                     <button type="button" class="btn btn-sm btn-light border text-muted rounded-pill px-2 py-1" data-bs-toggle="modal" data-bs-target="#modalAdjuntarVale{{ v.id }}" title="Adjuntar soporte/comprobante">
                                         <i class="fa-solid fa-cloud-arrow-up me-1 text-primary"></i> Subir
                                     </button>
+                                {% else %}
+                                    <span class="text-muted extra-small">Sin soporte</span>
                                 {% endif %}
 
                                 <!-- Modal Adjuntar Comprobante a Vale {{ v.id }} -->
@@ -264,7 +268,7 @@
                                                 </div>
                                                 <div class="modal-body py-3">
                                                     <p class="small text-muted mb-2">Selecciona la imagen o archivo PDF con el comprobante de este vale:</p>
-                                                    <input type="file" name="comprobante" class="form-control form-control-sm" accept="image/*,application/pdf" required>
+                                                    <input type="file" name="comprobante" class="form-control form-control-sm compress-image-input" accept="image/*,application/pdf" required>
                                                 </div>
                                                 <div class="modal-footer border-0 pt-0">
                                                     <button type="button" class="btn btn-sm btn-light rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
@@ -308,7 +312,7 @@
                                 <div class="modal fade text-start" id="modalAprobarVale{{ v.id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content border-0 shadow-lg rounded-4">
-                                            <form method="POST" action="{{ url_for('vales_bp.aprobar', id=v.id) }}">
+                                            <form method="POST" action="{{ url_for('vales_bp.aprobar', id=v.id) }}" enctype="multipart/form-data">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <div class="modal-header bg-success text-white border-0">
                                                     <h5 class="modal-title fw-bold">
@@ -330,6 +334,11 @@
                                                             <span class="text-muted small">Solicitado desde:</span>
                                                             <span class="small fw-semibold">{{ v.branch.nombre if v.branch else 'Principal' }} ({{ v.solicitado_por.nombre if v.solicitado_por else '' }})</span>
                                                         </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Adjuntar Soporte / Comprobante del Vale</label>
+                                                        <input type="file" name="comprobante" class="form-control form-control-sm bg-light compress-image-input" accept="image/*,application/pdf">
+                                                        <small class="text-muted extra-small">Foto o PDF del comprobante de entrega/transferencia (se optimiza automáticamente).</small>
                                                     </div>
                                                     <div class="mb-0">
                                                         <label class="form-label fw-bold small">Nota de Autorización / Trazabilidad (Opcional)</label>
@@ -428,9 +437,16 @@
                         <select name="asesor_id" class="form-select bg-light" required>
                             <option value="" disabled selected>-- Seleccionar Asesor --</option>
                             {% for asesor in asesores_activos %}
-                                <option value="{{ asesor.id }}">[{{ asesor.codigo or ('ASE-%03d' % asesor.id) }}] {{ asesor.nombre }}</option>
+                                <option value="{{ asesor.id }}">{{ asesor.nombre }}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Código Personal del Asesor <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark text-warning border-0"><i class="fa-solid fa-key"></i></span>
+                            <input type="password" name="codigo_asesor" class="form-control bg-light" placeholder="Ingresa el código del asesor" required autocomplete="new-password">
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Cantidad a Solicitar ($) <span class="text-danger">*</span></label>
@@ -439,11 +455,6 @@
                             <input type="text" name="monto" class="form-control bg-light fw-bold fs-5 price-display"
                                    placeholder="Ej: 50,000" oninput="formatInputCOP(this)" required autocomplete="off">
                         </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Adjuntar Comprobante / Soporte</label>
-                        <input type="file" name="comprobante" class="form-control bg-light" accept="image/*,application/pdf">
-                        <small class="text-muted extra-small">Foto o PDF del comprobante de soporte (Opcional).</small>
                     </div>
                     <div class="mb-0">
                         <label class="form-label fw-bold">Motivo / Observación (Opcional)</label>
@@ -461,4 +472,134 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+function limpiarComprobanteVale() {
+    const input = document.getElementById('inputComprobanteVale');
+    const box = document.getElementById('previewComprobanteBox');
+    const img = document.getElementById('previewComprobanteImg');
+    const info = document.getElementById('previewComprobanteInfo');
+    if (input) input.value = '';
+    if (box) box.classList.add('d-none');
+    if (img) {
+        img.src = '';
+        img.style.display = 'none';
+    }
+    if (info) info.textContent = '';
+}
+
+function comprimirImagenArchivo(file, maxDim = 1280, quality = 0.75) {
+    return new Promise((resolve) => {
+        if (!file || !file.type.startsWith('image/')) {
+            return resolve(file);
+        }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                let w = img.width;
+                let h = img.height;
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) {
+                        h = Math.round((h * maxDim) / w);
+                        w = maxDim;
+                    } else {
+                        w = Math.round((w * maxDim) / h);
+                        h = maxDim;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                canvas.toBlob(function(blob) {
+                    if (!blob) return resolve(file);
+                    const baseName = file.name.replace(/\.[^/.]+$/, '');
+                    const compressed = new File([blob], baseName + '.jpg', {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    resolve(compressed);
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = () => resolve(file);
+            img.src = e.target.result;
+        };
+        reader.onerror = () => resolve(file);
+        reader.readAsDataURL(file);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Asegurar que los modales de la tabla funcionen bien en PWA / móvil
+    document.querySelectorAll('.modal').forEach(modalEl => {
+        if (modalEl.parentElement !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+    });
+
+    // Limpiar formulario e imagen al cargar o volver atrás en PWA
+    const formVale = document.getElementById('formSolicitarVale');
+    if (formVale) {
+        formVale.reset();
+        limpiarComprobanteVale();
+        formVale.addEventListener('submit', function() {
+            const btn = document.getElementById('btnSubmitVale');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Enviando Solicitud...';
+            }
+        });
+    }
+
+    document.querySelectorAll('.compress-image-input').forEach(inputEl => {
+        inputEl.addEventListener('change', async function() {
+            const file = this.files && this.files[0];
+            if (!file) {
+                if (this.id === 'inputComprobanteVale') limpiarComprobanteVale();
+                return;
+            }
+            if (file.type.startsWith('image/')) {
+                const compressed = await comprimirImagenArchivo(file);
+                try {
+                    const dt = new DataTransfer();
+                    dt.items.add(compressed);
+                    this.files = dt.files;
+                } catch (e) {}
+
+                if (this.id === 'inputComprobanteVale') {
+                    const box = document.getElementById('previewComprobanteBox');
+                    const img = document.getElementById('previewComprobanteImg');
+                    const info = document.getElementById('previewComprobanteInfo');
+                    if (box) box.classList.remove('d-none');
+                    if (img) {
+                        img.src = URL.createObjectURL(compressed);
+                        img.style.display = 'block';
+                    }
+                    if (info) {
+                        const kb = Math.max(1, Math.round(compressed.size / 1024));
+                        info.textContent = `${compressed.name} (${kb} KB listo)`;
+                    }
+                }
+            } else if (this.id === 'inputComprobanteVale') {
+                const box = document.getElementById('previewComprobanteBox');
+                const img = document.getElementById('previewComprobanteImg');
+                const info = document.getElementById('previewComprobanteInfo');
+                if (box) box.classList.remove('d-none');
+                if (img) img.style.display = 'none';
+                if (info) info.textContent = file.name;
+            }
+        });
+    });
+});
+
+window.addEventListener('pageshow', function() {
+    const formVale = document.getElementById('formSolicitarVale');
+    if (formVale) {
+        formVale.reset();
+        limpiarComprobanteVale();
+    }
+});
+</script>
 {% endblock %}

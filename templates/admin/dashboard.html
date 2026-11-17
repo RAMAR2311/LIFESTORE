@@ -1119,24 +1119,37 @@
         </div>
     </div>
 
-    {% if not active_branch_obj and comparativa_sucursales %}
-    <!-- ─── Resumen Comparativo por Sucursal (Vista Consolidada Global) ─── -->
+    {% if (not active_branch_obj and comparativa_sucursales) or comparativa_canales %}
+    <!-- ─── Resumen Comparativo por Sucursal / Canal de Venta ─── -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card card-custom border-0 shadow-sm rounded-4 overflow-hidden">
-                <div class="p-4 d-flex justify-content-between align-items-center border-bottom bg-light">
+                <div class="p-4 d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom bg-light">
                     <div>
-                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-1 mb-1">
+                        <span id="badgeComparativaModo" class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-1 mb-1">
                             <i class="fa-solid fa-code-compare me-1"></i> MULTI-SEDE
                         </span>
-                        <h5 class="fw-bold m-0 text-dark">Rendimiento Comparativo por Sucursal</h5>
-                        <p class="text-muted small m-0">Ventas, transacciones y gastos por sede física en el período actual.</p>
+                        <h5 id="tituloComparativaCard" class="fw-bold m-0 text-dark">
+                            {{ 'Rendimiento Comparativo por Sucursal' if (not active_branch_obj and comparativa_sucursales) else 'Rendimiento por Canal de Venta' }}
+                        </h5>
+                        <p id="subtituloComparativaCard" class="text-muted small m-0">
+                            {{ 'Ventas, transacciones y gastos por sede física en el período actual.' if (not active_branch_obj and comparativa_sucursales) else 'Número de ventas y total recaudado por cada canal de venta en el período actual.' }}
+                        </p>
                     </div>
-                    <a href="{{ url_for('admin_bp.sucursales') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
-                        <i class="fa-solid fa-store me-1"></i> Ver Sucursales
-                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                        {% if not active_branch_obj and comparativa_sucursales %}
+                        <button type="button" id="btnVerPorCanal" class="btn btn-sm btn-dark rounded-pill px-3 fw-bold shadow-sm" onclick="mostrarVistaComparativa('canales')">
+                            <i class="fa-solid fa-chart-pie me-1 text-warning"></i> Ver por Canal de Venta
+                        </button>
+                        <button type="button" id="btnVolverSucursal" class="btn btn-sm btn-outline-dark rounded-pill px-3 fw-bold shadow-sm d-none" onclick="mostrarVistaComparativa('sucursales')">
+                            <i class="fa-solid fa-arrow-left me-1 text-primary"></i> Volver a Rendimiento por Sede
+                        </button>
+                        {% endif %}
+                    </div>
                 </div>
-                <div class="table-responsive p-0">
+
+                {% if not active_branch_obj and comparativa_sucursales %}
+                <div id="vistaTablaSucursales" class="table-responsive p-0">
                     <table class="table table-hover align-middle m-0">
                         <thead class="bg-light">
                             <tr>
@@ -1173,9 +1186,86 @@
                         </tbody>
                     </table>
                 </div>
+                {% endif %}
+
+                <div id="vistaTablaCanales" class="table-responsive p-0 {{ 'd-none' if (not active_branch_obj and comparativa_sucursales) else '' }}">
+                    <table class="table table-hover align-middle m-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">CANAL DE VENTA</th>
+                                <th class="text-center">NÚMERO DE VENTAS (#)</th>
+                                <th class="text-center">PARTICIPACIÓN</th>
+                                <th class="text-end pe-4">TOTAL VENTAS POR CANAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ns = namespace(total_cnt=0, total_monto=0.0) %}
+                            {% for cc in comparativa_canales %}
+                                {% set ns.total_cnt = ns.total_cnt + cc.conteo_ventas %}
+                                {% set ns.total_monto = ns.total_monto + cc.ventas_total %}
+                            {% endfor %}
+                            {% for cc in comparativa_canales %}
+                            {% set pct = ((cc.ventas_total / ns.total_monto) * 100) if ns.total_monto > 0 else 0 %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-dark">
+                                    <span class="badge bg-{{ cc.color }} bg-opacity-10 text-{{ 'dark' if cc.color == 'warning' else cc.color }} border border-{{ cc.color }} rounded-pill px-2 py-1 me-2">
+                                        <i class="fa-solid {{ cc.icono }}"></i>
+                                    </span>
+                                    {{ cc.canal }}
+                                </td>
+                                <td class="text-center fw-bold fs-6">{{ cc.conteo_ventas }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border rounded-pill px-3 py-1 fw-semibold">
+                                        {{ '%.1f'|format(pct) }}%
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4 fw-bolder text-success fs-6">${{ cc.ventas_total | cop }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="bg-light border-top">
+                            <tr>
+                                <td class="ps-4 fw-bolder text-dark">TOTAL CONSOLIDADO</td>
+                                <td class="text-center fw-bolder text-dark">{{ ns.total_cnt }}</td>
+                                <td class="text-center"><span class="badge bg-dark text-white rounded-pill px-3 py-1">100%</span></td>
+                                <td class="text-end pe-4 fw-bolder text-primary fs-5">${{ ns.total_monto | cop }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
+    <script>
+    function mostrarVistaComparativa(modo) {
+        const tablaSuc = document.getElementById('vistaTablaSucursales');
+        const tablaCan = document.getElementById('vistaTablaCanales');
+        const btnCanal = document.getElementById('btnVerPorCanal');
+        const btnVolver = document.getElementById('btnVolverSucursal');
+        const titulo = document.getElementById('tituloComparativaCard');
+        const subtitulo = document.getElementById('subtituloComparativaCard');
+        const badge = document.getElementById('badgeComparativaModo');
+        if (!tablaSuc || !tablaCan) return;
+
+        if (modo === 'sucursales') {
+            tablaCan.classList.add('d-none');
+            tablaSuc.classList.remove('d-none');
+            if (btnCanal) btnCanal.classList.remove('d-none');
+            if (btnVolver) btnVolver.classList.add('d-none');
+            if (titulo) titulo.textContent = 'Rendimiento Comparativo por Sucursal';
+            if (subtitulo) subtitulo.textContent = 'Ventas, transacciones y gastos por sede física en el período actual.';
+            if (badge) badge.innerHTML = '<i class="fa-solid fa-code-compare me-1"></i> MULTI-SEDE';
+        } else {
+            tablaSuc.classList.add('d-none');
+            tablaCan.classList.remove('d-none');
+            if (btnCanal) btnCanal.classList.add('d-none');
+            if (btnVolver) btnVolver.classList.remove('d-none');
+            if (titulo) titulo.textContent = 'Rendimiento Comparativo por Canal de Venta';
+            if (subtitulo) subtitulo.textContent = 'Número de ventas y total recaudado por cada canal de venta en el período actual.';
+            if (badge) badge.innerHTML = '<i class="fa-solid fa-bullhorn me-1"></i> CANALES DE VENTA';
+        }
+    }
+    </script>
     {% endif %}
 
 </div>

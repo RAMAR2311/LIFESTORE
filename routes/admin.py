@@ -500,6 +500,39 @@ def dashboard():
                 'gastos_total': float(g_sum)
             })
 
+    # 5b. Resumen comparativo por Canal de Venta en el período actual
+    canales_base = [
+        ('Punto físico', 'fa-store', 'primary'),
+        ('Redes sociales', 'fa-hashtag', 'info'),
+        ('Referido', 'fa-user-group', 'warning'),
+        ('Cliente Recurrente', 'fa-repeat', 'success'),
+    ]
+    comparativa_canales = []
+    for nombre_canal, icono_canal, color_canal in canales_base:
+        q_canal_sum = db.session.query(func.sum(Sale.monto_total)).filter(
+            Sale.canal_venta == nombre_canal,
+            Sale.fecha_venta >= inicio_periodo,
+            Sale.fecha_venta < fin_periodo
+        )
+        q_canal_cnt = Sale.query.filter(
+            Sale.canal_venta == nombre_canal,
+            Sale.fecha_venta >= inicio_periodo,
+            Sale.fecha_venta < fin_periodo
+        )
+        if active_branch_id:
+            q_canal_sum = q_canal_sum.filter(Sale.branch_id == active_branch_id)
+            q_canal_cnt = q_canal_cnt.filter(Sale.branch_id == active_branch_id)
+
+        c_sum = float(q_canal_sum.scalar() or 0.0)
+        c_cnt = q_canal_cnt.count()
+        comparativa_canales.append({
+            'canal': nombre_canal,
+            'icono': icono_canal,
+            'color': color_canal,
+            'conteo_ventas': c_cnt,
+            'ventas_total': c_sum,
+        })
+
     # 6. Alertas de Horario en Puntos de Venta (Aperturas > 9:30 AM o Cierres > 7:30 PM)
     from models import CashShift, Asesor
     turnos_alertas_q = CashShift.query.filter(
@@ -529,6 +562,7 @@ def dashboard():
                            aprobaciones_pendientes=aprobaciones_pendientes,
                            active_branch_obj=active_branch_obj,
                            comparativa_sucursales=comparativa_sucursales,
+                           comparativa_canales=comparativa_canales,
                            traslados_pendientes_count=traslados_pendientes_count,
                            enviados_hoy_tiendas=enviados_hoy_tiendas,
                            retornos_hoy_bodega=retornos_hoy_bodega,

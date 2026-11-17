@@ -64,8 +64,24 @@ def abrir_turno():
         except Exception:
             base_inicial = Decimal('0')
 
-        asesores_ids = request.form.getlist('asesores_ids')
+        asesores_ids = [x for x in request.form.getlist('asesores_ids') if str(x).isdigit()]
         notas = request.form.get('notas_apertura', '').strip()
+
+        if not asesores_ids:
+            flash("Debes seleccionar al menos un asesor en turno e ingresar su código personal.", "danger")
+            asesores_activos = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
+            return render_template('arqueo/abrir_turno.html', sucursal=sucursal, asesores=asesores_activos)
+
+        for a_id_str in asesores_ids:
+            asesor_obj = Asesor.query.get(int(a_id_str))
+            if not asesor_obj:
+                continue
+            codigo_ingresado = (request.form.get(f'codigo_asesor_{asesor_obj.id}') or '').strip().upper()
+            codigo_esperado = (asesor_obj.codigo or f"ASE-{asesor_obj.id:03d}").strip().upper()
+            if not codigo_ingresado or codigo_ingresado != codigo_esperado:
+                flash(f"El código personal ingresado para el asesor '{asesor_obj.nombre}' es incorrecto.", "danger")
+                asesores_activos = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
+                return render_template('arqueo/abrir_turno.html', sucursal=sucursal, asesores=asesores_activos)
 
         ahora_apertura = obtener_hora_bogota()
         apertura_tardia = False

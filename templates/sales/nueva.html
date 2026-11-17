@@ -152,13 +152,16 @@
                 <label class="form-label fw-bold text-brand-black small text-uppercase">
                     Canal de Venta <span class="text-danger fw-bold">*</span>
                 </label>
-                <select id="canal_venta" class="form-select bg-light border-0 shadow-sm mt-1" required>
+                <select id="canal_venta" class="form-select bg-light border-0 shadow-sm mt-1" onchange="limpiarErrorCanalVenta()" required>
                     <option value="" disabled selected>-- Selecciona Canal de Venta (Obligatorio) --</option>
                     <option value="Punto físico">🏬 Punto físico</option>
                     <option value="Redes sociales">📱 Redes sociales</option>
                     <option value="Referido">👥 Referido</option>
                     <option value="Cliente Recurrente">🔁 Cliente Recurrente</option>
                 </select>
+                <div id="canal_venta_error" class="alert alert-danger d-none py-2 px-3 small mt-2 mb-0 rounded-3 border-0 shadow-sm" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> El campo <strong>Canal de Venta</strong> es obligatorio. Selecciona Punto físico, Redes sociales, Referido o Cliente Recurrente.
+                </div>
             </div>
 
             <!-- Toggle: Pago Único vs Pago Dividido -->
@@ -1531,16 +1534,35 @@
         procesarPago(datosCliente);
     }
 
+    function validarCanalVenta() {
+        const canalVentaSelect = document.getElementById('canal_venta');
+        const errBox = document.getElementById('canal_venta_error');
+        const val = canalVentaSelect ? canalVentaSelect.value : '';
+        if (!val) {
+            if (errBox) errBox.classList.remove('d-none');
+            if (canalVentaSelect) {
+                canalVentaSelect.classList.add('border-danger');
+                canalVentaSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                canalVentaSelect.focus();
+            }
+            return false;
+        }
+        limpiarErrorCanalVenta();
+        return true;
+    }
+
+    function limpiarErrorCanalVenta() {
+        const canalVentaSelect = document.getElementById('canal_venta');
+        const errBox = document.getElementById('canal_venta_error');
+        if (errBox) errBox.classList.add('d-none');
+        if (canalVentaSelect) canalVentaSelect.classList.remove('border-danger');
+    }
+
     // Evento Transaccional JSON de Salida
     async function procesarPago(datosCliente = null) {
         const canalVentaSelect = document.getElementById('canal_venta');
         const canalVentaVal = canalVentaSelect ? canalVentaSelect.value : '';
-        if (!canalVentaVal) {
-            alert('⚠️ El campo "Canal de Venta" es obligatorio. Debe seleccionar: Punto físico, Redes sociales, Referido o Cliente Recurrente.');
-            if (canalVentaSelect) {
-                canalVentaSelect.focus();
-                canalVentaSelect.classList.add('border-danger');
-            }
+        if (!validarCanalVenta()) {
             return;
         }
 

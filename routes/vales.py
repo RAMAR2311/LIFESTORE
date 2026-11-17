@@ -127,6 +127,12 @@ def solicitar():
         flash('El asesor seleccionado no existe o no se encuentra activo.', 'danger')
         return redirect(url_for('vales_bp.index'))
 
+    codigo_ingresado = (request.form.get('codigo_asesor') or '').strip().upper()
+    codigo_esperado = (asesor.codigo or f"ASE-{asesor.id:03d}").strip().upper()
+    if not codigo_ingresado or codigo_ingresado != codigo_esperado:
+        flash(f"El código personal ingresado para el asesor '{asesor.nombre}' es incorrecto.", 'danger')
+        return redirect(url_for('vales_bp.index'))
+
     try:
         monto_clean = str(monto_raw).replace('$', '').replace('.', '').replace(',', '').strip()
         monto = Decimal(monto_clean)
@@ -197,11 +203,28 @@ def aprobar(id):
 
     observacion = request.form.get('observacion_resolucion', '').strip()
 
+    comprobante_rel = None
+    if 'comprobante' in request.files:
+        file = request.files['comprobante']
+        if file and file.filename:
+            allowed_exts = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
+            ext = os.path.splitext(file.filename)[1].lower()
+            if ext in allowed_exts:
+                upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'vales')
+                os.makedirs(upload_folder, exist_ok=True)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                clean_name = secure_filename(file.filename)
+                fname = f"vale_{timestamp}_{clean_name}"
+                file.save(os.path.join(upload_folder, fname))
+                comprobante_rel = f"uploads/vales/{fname}"
+
     try:
         vale.estado = 'APROBADO'
         vale.resuelto_por_id = current_user.id
         vale.observacion_resolucion = observacion or 'Vale autorizado por administración.'
         vale.fecha_resolucion = obtener_hora_bogota()
+        if comprobante_rel:
+            vale.comprobante = comprobante_rel
 
         AuditLog.registrar(
             action='APROBACION_VALE',

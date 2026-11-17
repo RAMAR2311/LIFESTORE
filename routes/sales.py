@@ -345,6 +345,34 @@ def procesar_venta():
                     )
                     db.session.add(ajuste)
                 else:
+                    # Si el producto tiene variantes con stock en esta sede o existe homónimo en la sede (ej. combos de obsequio)
+                    if branch_stock.cantidad < cantidad_vendida:
+                        bs_var = BranchStock.query.filter(
+                            BranchStock.branch_id == target_item_branch_id,
+                            BranchStock.product_id == producto.id,
+                            BranchStock.variant_id.isnot(None),
+                            BranchStock.cantidad >= cantidad_vendida
+                        ).first()
+                        if bs_var:
+                            branch_stock = bs_var
+                            var_obj = ProductVariant.query.get(bs_var.variant_id)
+                            if var_obj and var_obj.cantidad_stock >= cantidad_vendida:
+                                var_obj.cantidad_stock -= cantidad_vendida
+                        else:
+                            from sqlalchemy import func as sql_func
+                            homonimo_bs = db.session.query(BranchStock).join(
+                                Product, BranchStock.product_id == Product.id
+                            ).filter(
+                                BranchStock.branch_id == target_item_branch_id,
+                                sql_func.lower(sql_func.trim(Product.nombre)) == sql_func.lower(sql_func.trim(producto.nombre)),
+                                BranchStock.cantidad >= cantidad_vendida
+                            ).first()
+                            if homonimo_bs:
+                                producto = Product.query.get(homonimo_bs.product_id) or producto
+                                branch_stock = homonimo_bs
+                            elif producto.cantidad_stock >= cantidad_vendida:
+                                branch_stock.cantidad = producto.cantidad_stock
+
                     if branch_stock.cantidad < cantidad_vendida:
                         raise ValueError(
                             f"Stock insuficiente en la sucursal '{target_item_branch_nombre}' para '{producto.nombre}'. "
@@ -1434,8 +1462,18 @@ def api_gift_combos():
                 continue
             stock_local = 0
             if active_b_id:
-                bs = BranchStock.query.filter_by(branch_id=int(active_b_id), product_id=p.id, variant_id=None).first()
-                stock_local = bs.cantidad if bs else 0
+                from sqlalchemy import func as sql_func
+                stock_local = int(db.session.query(sql_func.coalesce(sql_func.sum(BranchStock.cantidad), 0)).filter(
+                    BranchStock.branch_id == int(active_b_id),
+                    BranchStock.product_id == p.id
+                ).scalar() or 0)
+                if stock_local < it.cantidad:
+                    stock_local = int(db.session.query(sql_func.coalesce(sql_func.sum(BranchStock.cantidad), 0)).join(
+                        Product, BranchStock.product_id == Product.id
+                    ).filter(
+                        BranchStock.branch_id == int(active_b_id),
+                        sql_func.lower(sql_func.trim(Product.nombre)) == sql_func.lower(sql_func.trim(p.nombre))
+                    ).scalar() or 0)
             else:
                 stock_local = p.total_stock
 

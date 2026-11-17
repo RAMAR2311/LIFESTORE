@@ -237,6 +237,31 @@ def create_app():
             'equipos_estancados_count': equipos_estancados_count
         }
 
+    @app.before_request
+    def enforce_open_shift_for_vendedor():
+        from flask import request, flash
+        if not current_user.is_authenticated or current_user.rol != 'vendedor':
+            return None
+        endpoint = request.endpoint or ''
+        if (
+            endpoint in ('arqueo_bp.abrir_turno', 'auth_bp.logout', 'auth_bp.login', 'static', 'service_worker', 'manifest')
+            or request.path.startswith('/static/')
+        ):
+            return None
+        from models import CashShift
+        branch_id = current_user.branch_id
+        if not branch_id:
+            b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            branch_id = b_def.id if b_def else None
+        if branch_id:
+            sucursal = Branch.query.get(branch_id)
+            if sucursal and sucursal.tipo != 'bodega':
+                turno_abierto = CashShift.query.filter_by(branch_id=branch_id, estado='ABIERTA').first()
+                if not turno_abierto:
+                    flash('Debes realizar la apertura de turno de caja antes de ingresar al sistema.', 'warning')
+                    return redirect(url_for('arqueo_bp.abrir_turno'))
+        return None
+
     @app.route('/')
     def index():
         # Redirección de sesión y rol de usuario
