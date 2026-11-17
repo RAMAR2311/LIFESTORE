@@ -241,7 +241,12 @@
                 </div>
                 {% elif venta.asesor %}
                 <div style="margin-bottom: 2px;">
-                    <strong>Asesor de Venta:</strong> {{ venta.asesor.nombre }}
+                    <strong>Asesor de Venta:</strong> {{ venta.asesor.nombre }} {% if venta.asesor.codigo %}({{ venta.asesor.codigo }}){% endif %}
+                </div>
+                {% endif %}
+                {% if venta.canal_venta %}
+                <div style="margin-bottom: 2px;">
+                    <strong>Canal de Venta:</strong> {{ venta.canal_venta }}
                 </div>
                 {% endif %}
                 <div>

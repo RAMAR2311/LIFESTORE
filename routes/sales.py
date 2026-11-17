@@ -49,6 +49,14 @@ def procesar_venta():
     asesor_id = data.get('asesor_id')
     provider_id = data.get('provider_id')
     
+    # Validación obligatoria de Canal de Venta
+    canal_venta = (data.get('canal_venta') or '').strip()
+    opciones_validas_canal = ['Punto físico', 'Redes sociales', 'Referido', 'Cliente Recurrente']
+    if not canal_venta or canal_venta not in opciones_validas_canal:
+        return jsonify({
+            'error': "El campo 'Canal de Venta' es obligatorio. Debe seleccionar una de las 4 opciones requeridas: Punto físico, Redes sociales, Referido o Cliente Recurrente."
+        }), 400
+
     if not items:
         return jsonify({'error': 'No se enviaron productos para la venta'}), 400
 
@@ -206,7 +214,8 @@ def procesar_venta():
             sucursal=sale_branch_nombre,
             branch_id=sale_branch_id,
             numero_factura=numero_factura_generado,
-            shift_id=turno_activo.id if turno_activo else None
+            shift_id=turno_activo.id if turno_activo else None,
+            canal_venta=canal_venta
         )
         db.session.add(nueva_venta)
         db.session.flush()
@@ -274,6 +283,10 @@ def procesar_venta():
                 
                 if not producto:
                     raise ValueError(f"El producto con ID {product_id} no existe.")
+
+                # Restricción de categoría: Bloqueo de celulares como obsequio
+                if es_obsequio and producto.tipo_inventario == 'celulares':
+                    raise ValueError("Restricción de seguridad: Los equipos celulares no pueden entregarse como obsequio.")
 
                 # Bloqueo y validación de stock local en BranchStock
                 target_item_branch_id = sale_branch_id
@@ -885,7 +898,8 @@ def exportar_excel():
         ticket_str = f"#{v.id:05d}"
         fecha_str = v.fecha_venta.strftime('%Y-%m-%d %H:%M') if v.fecha_venta else ''
         vendedor_str = v.vendedor.nombre if v.vendedor else 'N/A'
-        asesor_str = v.asesor.nombre if v.asesor else 'N/A'
+        asesor_str = f"{v.asesor.nombre} ({v.asesor.codigo})" if (v.asesor and v.asesor.codigo) else (v.asesor.nombre if v.asesor else 'N/A')
+        canal_str = v.canal_venta or 'N/D'
         sucursal_str = v.sucursal or 'PRINCIPAL'
         metodo_pago_str = v.metodo_pago_display
         retomas_valor_total = sum(Decimal(str(r.valor_retoma or 0)) for r in v.retomas_asociadas)
@@ -902,6 +916,7 @@ def exportar_excel():
             filas.append({
                 'Ticket': ticket_str,
                 'Fecha': fecha_str,
+                'Canal de Venta': canal_str,
                 'Vendedor': vendedor_str,
                 'Asesor': asesor_str,
                 'Sucursal': sucursal_str,
@@ -962,6 +977,7 @@ def exportar_excel():
             filas.append({
                 'Ticket': ticket_str,
                 'Fecha': fecha_str,
+                'Canal de Venta': canal_str,
                 'Vendedor': vendedor_str,
                 'Asesor': asesor_str,
                 'Sucursal': sucursal_str,
@@ -1054,6 +1070,14 @@ def ventas_hoy():
 @login_required
 @admin_required
 def eliminar_venta(sale_id):
+    # Validación estricta de Token Secreto de Administrador para anulación de ventas
+    token_esperado = os.environ.get('DELETE_TOKEN', '1234').strip()
+    token_recibido = request.form.get('token_secreto', '').strip()
+
+    if not token_recibido or token_recibido != token_esperado:
+        flash('⚠️ Token secreto / código de confirmación incorrecto o no suministrado. Anulación de venta rechazada por seguridad.', 'danger')
+        return redirect(url_for('sales_bp.historial'))
+
     venta = Sale.query.get_or_404(sale_id)
     
     try:

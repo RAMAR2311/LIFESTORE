@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
+import os
+from werkzeug.utils import secure_filename
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, current_app
 from flask_login import login_required, current_user
 from models import db, Vale, Asesor, Branch, User, AuditLog, obtener_hora_bogota
 from decorators import admin_required
@@ -136,6 +138,22 @@ def solicitar():
 
     branch_id = get_active_branch_for_user()
 
+    # Manejar comprobante adjunto si se suministra
+    comprobante_rel = None
+    if 'comprobante' in request.files:
+        file = request.files['comprobante']
+        if file and file.filename:
+            allowed_exts = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
+            ext = os.path.splitext(file.filename)[1].lower()
+            if ext in allowed_exts:
+                upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'vales')
+                os.makedirs(upload_folder, exist_ok=True)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+                clean_name = secure_filename(file.filename)
+                fname = f"vale_{timestamp}_{clean_name}"
+                file.save(os.path.join(upload_folder, fname))
+                comprobante_rel = f"uploads/vales/{fname}"
+
     try:
         nuevo_vale = Vale(
             asesor_id=asesor.id,
@@ -143,6 +161,7 @@ def solicitar():
             branch_id=branch_id,
             monto=monto,
             concepto=concepto or None,
+            comprobante=comprobante_rel,
             estado='PENDIENTE',
             fecha_solicitud=obtener_hora_bogota()
         )
@@ -232,5 +251,51 @@ def rechazar(id):
     except Exception as e:
         db.session.rollback()
         flash(f'Error al rechazar el vale: {str(e)}', 'danger')
+
+    return redirect(url_for('vales_bp.index'))
+
+
+@vales_bp.route('/<int:id>/adjuntar_comprobante', methods=['POST'])
+@login_required
+def adjuntar_comprobante(id):
+    """Permite adjuntar o actualizar el soporte/comprobante de pago del vale."""
+    vale = Vale.query.get_or_404(id)
+    if 'comprobante' not in request.files:
+        flash('No seleccionaste ningún archivo para adjuntar.', 'warning')
+        return redirect(url_for('vales_bp.index'))
+
+    file = request.files['comprobante']
+    if not file or not file.filename:
+        flash('Archivo no válido.', 'danger')
+        return redirect(url_for('vales_bp.index'))
+
+    allowed_exts = {'.png', '.jpg', '.jpeg', '.webp', '.pdf'}
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in allowed_exts:
+        flash('Formato no permitido. Solo imágenes (.jpg, .jpeg, .png, .webp) o documentos PDF.', 'danger')
+        return redirect(url_for('vales_bp.index'))
+
+    try:
+        upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'vales')
+        os.makedirs(upload_folder, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        clean_name = secure_filename(file.filename)
+        fname = f"vale_{timestamp}_{clean_name}"
+        file.save(os.path.join(upload_folder, fname))
+
+        vale.comprobante = f"uploads/vales/{fname}"
+        db.session.commit()
+
+        AuditLog.registrar(
+            action='ADJUNTAR_COMPROBANTE_VALE',
+            user_id=current_user.id,
+            motivo=f"Adjuntado soporte/comprobante para el vale #VAL-{vale.id:04d}",
+            target_id=vale.id,
+            target_type='VALE'
+        )
+        flash(f'Comprobante de soporte adjuntado exitosamente al vale #VAL-{vale.id:04d}.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al adjuntar el comprobante: {str(e)}', 'danger')
 
     return redirect(url_for('vales_bp.index'))

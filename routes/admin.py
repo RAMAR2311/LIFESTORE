@@ -97,6 +97,7 @@ def vendedores():
         password = request.form.get('password')
         rol = request.form.get('rol', 'vendedor')
         branch_id = request.form.get('branch_id', type=int)
+        codigo_asesor = request.form.get('codigo_asesor', '').strip().upper()
         
         # Validar obligatoriedad de branch_id para roles operativos (vendedor / bodega)
         if rol in ['vendedor', 'bodega'] and not branch_id:
@@ -110,6 +111,8 @@ def vendedores():
         # Se previene registrar vendedores con un mismo email para preservar la unicidad de las credenciales de acceso
         if User.query.filter_by(email=email).first():
             flash('Acción Denegada: Ese correo ya le pertenece a otro usuario.', 'danger')
+        elif codigo_asesor and User.query.filter_by(codigo_asesor=codigo_asesor).first():
+            flash(f"Acción Denegada: El código de asesor '{codigo_asesor}' ya está en uso.", 'danger')
         else:
             try:
                 # Se aplica un hash a la contraseña para evitar guardar texto plano, previniendo exposición en caso de brechas
@@ -120,7 +123,8 @@ def vendedores():
                     password_hash=generate_password_hash(password),
                     rol=rol,
                     sucursal=sucursal_nombre,
-                    branch_id=branch_id
+                    branch_id=branch_id,
+                    codigo_asesor=codigo_asesor or None
                 )
                 db.session.add(nuevo_usuario)
                 db.session.commit()
@@ -141,6 +145,14 @@ def vendedores():
 @login_required
 @admin_required
 def eliminar_vendedor(id):
+    # Validación estricta de Token Secreto de Administrador para eliminación de cuentas
+    token_esperado = os.environ.get('DELETE_TOKEN', '1234').strip()
+    token_recibido = request.form.get('token_secreto', '').strip()
+
+    if not token_recibido or token_recibido != token_esperado:
+        flash('⚠️ Token secreto / código de confirmación incorrecto o no suministrado. Eliminación de cuenta rechazada por seguridad.', 'danger')
+        return redirect(url_for('admin_bp.vendedores'))
+
     usuario = User.query.get_or_404(id)
     if usuario.id == current_user.id:
         flash("No puedes eliminar tu propia cuenta.", "danger")
@@ -169,10 +181,17 @@ def editar_vendedor(id):
     rol = request.form.get('rol')
     password = request.form.get('password')
     branch_id_raw = request.form.get('branch_id')
+    codigo_asesor = request.form.get('codigo_asesor', '').strip().upper()
     
     if usuario.id == current_user.id and rol and rol != 'admin':
         flash("No puedes quitarte tus propios permisos de administrador.", "danger")
         return redirect(url_for('admin_bp.vendedores'))
+
+    if codigo_asesor:
+        existente = User.query.filter((User.id != id) & (User.codigo_asesor == codigo_asesor)).first()
+        if existente:
+            flash(f"El código de asesor '{codigo_asesor}' ya está asignado a otro usuario.", "danger")
+            return redirect(url_for('admin_bp.vendedores'))
     
     try:
         if nombre:
@@ -181,6 +200,7 @@ def editar_vendedor(id):
             usuario.telefono = telefono.strip()
         if rol:
             usuario.rol = rol
+        usuario.codigo_asesor = codigo_asesor or None
             
         target_rol = rol or usuario.rol
         if target_rol in ['vendedor', 'bodega']:
@@ -1708,6 +1728,19 @@ def recibo_comision(payment_id):
     )
 
 
+def get_next_asesor_code():
+    from models import Asesor
+    max_num = 0
+    for a in Asesor.query.all():
+        if a.codigo and a.codigo.startswith('ASE-'):
+            part = a.codigo.replace('ASE-', '').strip()
+            if part.isdigit():
+                max_num = max(max_num, int(part))
+        elif a.codigo and a.codigo.isdigit():
+            max_num = max(max_num, int(a.codigo))
+    return f"ASE-{(max_num + 1):03d}"
+
+
 @admin_bp.route('/asesores', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -1716,22 +1749,42 @@ def asesores():
     if request.method == 'POST':
         nombre = request.form.get('nombre')
         salario_base_raw = request.form.get('salario_base', '0')
+        codigo = request.form.get('codigo', '').strip().upper()
+        
         if not nombre or not nombre.strip():
             flash('Acción Denegada: El nombre del asesor no puede estar vacío.', 'danger')
         else:
             try:
+                if not codigo:
+                    codigo = get_next_asesor_code()
+                elif Asesor.query.filter_by(codigo=codigo).first():
+                    flash(f"Acción Denegada: El código '{codigo}' ya está asignado a otro asesor.", 'danger')
+                    return redirect(url_for('admin_bp.asesores'))
+
                 sal_clean = str(salario_base_raw).replace('$', '').replace('.', '').replace(',', '').strip()
                 sal_num = Decimal(sal_clean) if sal_clean else Decimal('0.0')
-                nuevo_asesor = Asesor(nombre=nombre.strip(), salario_base=sal_num, activo=True)
+                nuevo_asesor = Asesor(codigo=codigo, nombre=nombre.strip(), salario_base=sal_num, activo=True)
                 db.session.add(nuevo_asesor)
                 db.session.commit()
-                flash(f"¡Asesor '{nombre.strip()}' registrado exitosamente con salario base de ${sal_num:,.0f}!", "success")
+                flash(f"¡Asesor '{nombre.strip()}' [Cód: {codigo}] registrado exitosamente con salario base de ${sal_num:,.0f}!", "success")
             except Exception as e:
                 db.session.rollback()
                 flash(f'Ocurrió un error al registrar el asesor: {str(e)}', 'danger')
         return redirect(url_for('admin_bp.asesores'))
         
     lista_asesores = Asesor.query.order_by(Asesor.nombre).all()
+    # Auto-asignar código a asesores existentes que no lo tengan
+    cambios = False
+    for a in lista_asesores:
+        if not a.codigo:
+            a.codigo = f"ASE-{a.id:03d}"
+            cambios = True
+    if cambios:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     return render_template('admin/asesores.html', asesores=lista_asesores)
 
 
@@ -1743,16 +1796,27 @@ def editar_asesor(id):
     asesor = Asesor.query.get_or_404(id)
     nombre = request.form.get('nombre')
     salario_base_raw = request.form.get('salario_base', '0')
+    codigo = request.form.get('codigo', '').strip().upper()
+
     if not nombre or not nombre.strip():
         flash('El nombre del asesor no puede estar vacío.', 'danger')
     else:
         try:
+            if not codigo:
+                codigo = asesor.codigo or f"ASE-{asesor.id:03d}"
+            else:
+                existente = Asesor.query.filter((Asesor.id != id) & (Asesor.codigo == codigo)).first()
+                if existente:
+                    flash(f"Acción Denegada: El código '{codigo}' ya pertenece a otro asesor.", 'danger')
+                    return redirect(url_for('admin_bp.asesores'))
+
             sal_clean = str(salario_base_raw).replace('$', '').replace('.', '').replace(',', '').strip()
             sal_num = Decimal(sal_clean) if sal_clean else Decimal('0.0')
             asesor.nombre = nombre.strip()
             asesor.salario_base = sal_num
+            asesor.codigo = codigo
             db.session.commit()
-            flash('Asesor y salario base actualizados correctamente.', 'success')
+            flash('Asesor, código único y salario base actualizados correctamente.', 'success')
         except Exception as e:
             db.session.rollback()
             flash(f'Error al actualizar el asesor: {str(e)}', 'danger')
@@ -2338,11 +2402,22 @@ def gift_combos():
         return redirect(url_for('admin_bp.gift_combos'))
 
     combos = GiftCombo.query.order_by(GiftCombo.fecha_creacion.desc()).all()
+    # Filtrar exclusivamente productos de tipo tienda / accesorios (Restricción estricta: NO celulares)
     productos = Product.query.filter(
-        Product.tipo_inventario.in_(['tienda', 'celulares'])
+        Product.tipo_inventario == 'tienda'
     ).order_by(Product.nombre.asc()).all()
 
-    return render_template('admin/gift_combos.html', combos=combos, productos=productos)
+    # Historial de obsequios efectivamente entregados en ventas
+    from models import SaleDetail, Sale
+    historial_entregas = (
+        SaleDetail.query.join(Sale)
+        .filter(SaleDetail.es_obsequio == True)
+        .order_by(Sale.fecha_venta.desc())
+        .limit(100)
+        .all()
+    )
+
+    return render_template('admin/gift_combos.html', combos=combos, productos=productos, historial_entregas=historial_entregas)
 
 
 @admin_bp.route('/gift-combos/<int:id>/editar', methods=['POST'])

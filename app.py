@@ -306,7 +306,11 @@ def create_app():
             "ALTER TABLE sale_details ADD COLUMN costo_unitario NUMERIC(12, 2) DEFAULT 0.0;",
             "ALTER TABLE sale_payments ADD COLUMN provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;",
             "ALTER TABLE sale_payments ADD COLUMN comprobante VARCHAR(255);",
-            "ALTER TABLE provider_payments ADD COLUMN comprobante VARCHAR(255);"
+            "ALTER TABLE provider_payments ADD COLUMN comprobante VARCHAR(255);",
+            "ALTER TABLE users ADD COLUMN codigo_asesor VARCHAR(50);",
+            "ALTER TABLE asesores ADD COLUMN codigo VARCHAR(50);",
+            "ALTER TABLE vales ADD COLUMN comprobante VARCHAR(255);",
+            "ALTER TABLE sales ADD COLUMN canal_venta VARCHAR(50);"
         ]
         for q in queries:
             try:

@@ -992,6 +992,14 @@ def eliminar_factura(id):
 @login_required
 @any_bodega_required
 def eliminar_cliente(id):
+    # Validación estricta de Token Secreto para eliminación de cuentas de clientes
+    token_esperado = os.environ.get('DELETE_TOKEN', '1234').strip()
+    token_recibido = request.form.get('token_secreto', '').strip()
+
+    if not token_recibido or token_recibido != token_esperado:
+        flash('⚠️ Token secreto / código de confirmación incorrecto o no suministrado. Eliminación de cliente rechazada por seguridad.', 'danger')
+        return redirect(url_for('bodega_bp.clientes'))
+
     cliente = Cliente.query.get_or_404(id)
 
     # Seguridad: No permitir eliminar clientes que tengan deuda pendiente

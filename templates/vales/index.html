@@ -75,7 +75,7 @@
                 </div>
             </div>
             <hr class="my-3">
-            <form method="POST" action="{{ url_for('vales_bp.solicitar') }}">
+            <form method="POST" action="{{ url_for('vales_bp.solicitar') }}" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
                 <div class="mb-3">
@@ -83,7 +83,7 @@
                     <select name="asesor_id" class="form-select bg-light" required>
                         <option value="" disabled selected>-- Seleccionar Asesor --</option>
                         {% for asesor in asesores_activos %}
-                            <option value="{{ asesor.id }}">{{ asesor.nombre }}</option>
+                            <option value="{{ asesor.id }}">[{{ asesor.codigo or ('ASE-%03d' % asesor.id) }}] {{ asesor.nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -95,6 +95,12 @@
                         <input type="text" name="monto" class="form-control bg-light fw-bold fs-5 price-display"
                                placeholder="Ej: 50,000" oninput="formatInputCOP(this)" required autocomplete="off">
                     </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-brand-black">Adjuntar Comprobante / Soporte</label>
+                    <input type="file" name="comprobante" class="form-control bg-light" accept="image/*,application/pdf">
+                    <small class="text-muted extra-small">Foto o PDF del recibo/consignación (Opcional).</small>
                 </div>
 
                 <div class="mb-4">
@@ -177,6 +183,7 @@
                             <th>SEDE / ENVIADO POR</th>
                             <th class="text-end">CANTIDAD</th>
                             <th>MOTIVO / TRAZABILIDAD</th>
+                            <th class="text-center">COMPROBANTE</th>
                             <th class="text-center">ESTADO</th>
                             {% if current_user.rol == 'admin' %}
                             <th class="text-center pe-4">DECISIÓN ADMIN</th>
@@ -231,6 +238,42 @@
                                     {% endif %}
                                 </div>
                                 {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if v.comprobante %}
+                                    <a href="{{ url_for('static', filename=v.comprobante) }}" target="_blank" class="btn btn-sm btn-outline-info rounded-pill px-2 py-1 shadow-sm" title="Ver Comprobante">
+                                        <i class="fa-solid fa-paperclip me-1"></i> Soporte
+                                    </a>
+                                {% else %}
+                                    <button type="button" class="btn btn-sm btn-light border text-muted rounded-pill px-2 py-1" data-bs-toggle="modal" data-bs-target="#modalAdjuntarVale{{ v.id }}" title="Adjuntar soporte/comprobante">
+                                        <i class="fa-solid fa-cloud-arrow-up me-1 text-primary"></i> Subir
+                                    </button>
+                                {% endif %}
+
+                                <!-- Modal Adjuntar Comprobante a Vale {{ v.id }} -->
+                                <div class="modal fade text-start" id="modalAdjuntarVale{{ v.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-sm">
+                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                            <form method="POST" action="{{ url_for('vales_bp.adjuntar_comprobante', id=v.id) }}" enctype="multipart/form-data">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <div class="modal-header border-0 pb-0">
+                                                    <h6 class="modal-title fw-bold text-brand-black">
+                                                        <i class="fa-solid fa-paperclip text-info me-2"></i>Comprobante #VAL-{{ '%04d' % v.id }}
+                                                    </h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body py-3">
+                                                    <p class="small text-muted mb-2">Selecciona la imagen o archivo PDF con el comprobante de este vale:</p>
+                                                    <input type="file" name="comprobante" class="form-control form-control-sm" accept="image/*,application/pdf" required>
+                                                </div>
+                                                <div class="modal-footer border-0 pt-0">
+                                                    <button type="button" class="btn btn-sm btn-light rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">Subir</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                             <td class="text-center">
                                 {% if v.estado == 'PENDIENTE' %}
@@ -352,7 +395,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="{{ 7 if current_user.rol == 'admin' else 6 }}" class="text-center py-5 text-muted">
+                            <td colspan="{{ 8 if current_user.rol == 'admin' else 7 }}" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-hand-holding-dollar fs-1 mb-3 opacity-25 d-block"></i>
                                 <p class="mb-0 fw-semibold">No se encontraron solicitudes de vales registradas.</p>
                                 <small>Cuando un vendedor envíe una solicitud para un asesor, aparecerá aquí con toda su trazabilidad.</small>
@@ -371,7 +414,7 @@
 <div class="modal fade" id="modalSolicitarValeAdmin" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <form method="POST" action="{{ url_for('vales_bp.solicitar') }}">
+            <form method="POST" action="{{ url_for('vales_bp.solicitar') }}" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-header border-0 pb-0">
                     <h5 class="modal-title fw-bold text-brand-black">
@@ -385,7 +428,7 @@
                         <select name="asesor_id" class="form-select bg-light" required>
                             <option value="" disabled selected>-- Seleccionar Asesor --</option>
                             {% for asesor in asesores_activos %}
-                                <option value="{{ asesor.id }}">{{ asesor.nombre }}</option>
+                                <option value="{{ asesor.id }}">[{{ asesor.codigo or ('ASE-%03d' % asesor.id) }}] {{ asesor.nombre }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -396,6 +439,11 @@
                             <input type="text" name="monto" class="form-control bg-light fw-bold fs-5 price-display"
                                    placeholder="Ej: 50,000" oninput="formatInputCOP(this)" required autocomplete="off">
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Adjuntar Comprobante / Soporte</label>
+                        <input type="file" name="comprobante" class="form-control bg-light" accept="image/*,application/pdf">
+                        <small class="text-muted extra-small">Foto o PDF del comprobante de soporte (Opcional).</small>
                     </div>
                     <div class="mb-0">
                         <label class="form-label fw-bold">Motivo / Observación (Opcional)</label>

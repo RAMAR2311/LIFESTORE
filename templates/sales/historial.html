@@ -314,6 +314,7 @@
                 <tr>
                     <th width="120">N° TIPO</th>
                     <th>FECHA DE COBRO</th>
+                    <th>CANAL DE VENTA</th>
                     <th>VENDEDOR RESPONSABLE</th>
                     <th>ASESOR</th>
                     <th class="text-center">VÍA DE PAGO</th>
@@ -334,6 +335,15 @@
                 <tr class="venta-row" data-pagos="{{ metodos_usados|join(',') }}">
                     <td class="fw-bold text-brand-black align-middle">Ticket #{{ "%05d"|format(venta.id) }}</td>
                     <td class="align-middle text-muted"><i class="fa-regular fa-calendar text-brand-pink me-1"></i> {{ venta.fecha_venta.strftime('%Y-%m-%d a las %H:%M') }}</td>
+                    <td class="align-middle">
+                        {% if venta.canal_venta %}
+                            <span class="badge bg-light text-dark border rounded-pill px-2 py-1 small">
+                                <i class="fa-solid fa-bullhorn text-primary me-1"></i>{{ venta.canal_venta }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted small">N/D</span>
+                        {% endif %}
+                    </td>
                     <td class="align-middle fw-semibold text-brand-black">
                         <i class="fa-solid fa-user-circle text-muted me-1"></i> {{ venta.vendedor.nombre }}
                     </td>
@@ -409,12 +419,9 @@
                             <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm w-100" data-bs-toggle="modal" data-bs-target="#editPaymentModal{{ venta.id }}">
                                 <i class="fa-solid fa-pen-to-square me-1"></i> Editar Venta
                             </button>
-                            <form action="{{ url_for('sales_bp.eliminar_venta', sale_id=venta.id) }}" method="POST" onsubmit="return confirm('ATENCIÓN: ¿Está seguro de anular esta venta? Esta acción NO se puede deshacer y retornará el stock de los productos vendidos.');" class="m-0 p-0">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                <button type="submit" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm w-100">
+                                <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm w-100" onclick="abrirModalAnularVenta({{ venta.id }}, '{{ "%05d"|format(venta.id) }}', '{{ (venta.monto_total or 0)|cop }}')">
                                     <i class="fa-solid fa-trash me-1"></i> Anular
                                 </button>
-                            </form>
                             
                             <!-- Modal Ver Costos y Rentabilidad -->
                             <div class="modal fade text-start" id="costModal{{ venta.id }}" tabindex="-1" aria-labelledby="costModalLabel{{ venta.id }}" aria-hidden="true">
@@ -925,5 +932,61 @@
             recalcularTotalModal(ventaId);
         }
     }
+
+    function abrirModalAnularVenta(saleId, folio, monto) {
+        const form = document.getElementById('formAnularVentaSegura');
+        form.action = `/sales/eliminar/${saleId}`;
+        document.getElementById('anularVentaFolio').textContent = folio;
+        document.getElementById('anularVentaMonto').textContent = `$${monto}`;
+        document.getElementById('inputTokenVenta').value = '';
+        const modal = new bootstrap.Modal(document.getElementById('modalAnularVentaSegura'));
+        modal.show();
+    }
 </script>
+
+<!-- MODAL ANULAR VENTA CON TOKEN SEGURO (IDENTICO A ELIMINACION DE INVENTARIO) -->
+<div class="modal fade" id="modalAnularVentaSegura" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white py-2">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Anulación Protegida de Venta
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formAnularVentaSegura" method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4 text-center">
+                    <div class="avatar-lg mx-auto mb-3">
+                        <div class="avatar-title bg-danger-subtle text-danger rounded-circle p-3 d-inline-block">
+                            <i class="fa-solid fa-trash-can fa-2x"></i>
+                        </div>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-2">¿Anular Ticket #<span id="anularVentaFolio"></span>?</h5>
+                    <p class="text-muted small mb-2">
+                        Esta acción es irreversible: anulará la venta por valor de <strong class="text-dark" id="anularVentaMonto"></strong> y retornará el stock de los productos vendidos al inventario.
+                    </p>
+                    
+                    <div class="alert alert-warning text-start small py-2 px-3 mb-3">
+                        <i class="fa-solid fa-key me-1"></i> <strong>Se requiere Token de Seguridad:</strong> Ingrese el código de autorización para anular esta venta.
+                    </div>
+
+                    <div class="text-start mb-2">
+                        <label class="form-label small fw-bold text-secondary">Token Secreto de Anulación:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fa-solid fa-lock text-muted"></i></span>
+                            <input type="password" name="token_secreto" id="inputTokenVenta" class="form-control" placeholder="Ingrese token secreto" required autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-trash-can me-1"></i> Confirmar Anulación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

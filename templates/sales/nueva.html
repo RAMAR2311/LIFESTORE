@@ -147,6 +147,20 @@
 
             <!-- Selector de Proveedor removido para evitar asociar ventas de inventario interno -->
 
+            <!-- Selector Obligatorio: Canal de Venta -->
+            <div class="mb-3">
+                <label class="form-label fw-bold text-brand-black small text-uppercase">
+                    Canal de Venta <span class="text-danger fw-bold">*</span>
+                </label>
+                <select id="canal_venta" class="form-select bg-light border-0 shadow-sm mt-1" required>
+                    <option value="" disabled selected>-- Selecciona Canal de Venta (Obligatorio) --</option>
+                    <option value="Punto físico">🏬 Punto físico</option>
+                    <option value="Redes sociales">📱 Redes sociales</option>
+                    <option value="Referido">👥 Referido</option>
+                    <option value="Cliente Recurrente">🔁 Cliente Recurrente</option>
+                </select>
+            </div>
+
             <!-- Toggle: Pago Único vs Pago Dividido -->
             <div class="mb-3">
                 <div class="d-flex align-items-center gap-3 mb-3">
@@ -1102,6 +1116,10 @@
 
     function toggleObsequio(index) {
         let item = carrito[index];
+        if (item.tipo_inventario === 'celulares') {
+            alert('⚠️ Restricción de seguridad: Los equipos celulares no pueden entregarse como obsequio.');
+            return;
+        }
         if (item.es_obsequio) {
             item.es_obsequio = false;
             // Restaurar precio sugerido
@@ -1235,10 +1253,12 @@
                     ${formatoCOP(subtotal)}
                 </td>
                 <td class="text-center" width="90">
-                    {% if current_user.rol == 'admin' %}
+                    {% if current_user.rol in ['admin', 'vendedor', 'coordinador'] %}
+                    ${item.tipo_inventario !== 'celulares' ? `
                     <button class="btn btn-sm ${isObsequioClass} me-1" title="Marcar como Obsequio" onclick="toggleObsequio(${index})">
                         <i class="fa-solid fa-gift"></i>
                     </button>
+                    ` : ''}
                     {% endif %}
                     <button class="btn btn-sm text-danger" onclick="eliminarItem(${index})"><i class="fa-solid fa-trash"></i></button>
                 </td>
@@ -1513,6 +1533,16 @@
 
     // Evento Transaccional JSON de Salida
     async function procesarPago(datosCliente = null) {
+        const canalVentaSelect = document.getElementById('canal_venta');
+        const canalVentaVal = canalVentaSelect ? canalVentaSelect.value : '';
+        if (!canalVentaVal) {
+            alert('⚠️ El campo "Canal de Venta" es obligatorio. Debe seleccionar: Punto físico, Redes sociales, Referido o Cliente Recurrente.');
+            if (canalVentaSelect) {
+                canalVentaSelect.focus();
+                canalVentaSelect.classList.add('border-danger');
+            }
+            return;
+        }
 
         const esBodega = {% if sucursal_actual and sucursal_actual.tipo == 'bodega' %}true{% else %}false{% endif %};
         const asesorSelect = document.getElementById('asesor-vendedor');
@@ -1588,6 +1618,7 @@
         }
 
         const payload = {
+            canal_venta: canalVentaVal,
             asesor_id: asesorId ? parseInt(asesorId) : null,
             provider_id: null,
             items: carrito.map(item => {
