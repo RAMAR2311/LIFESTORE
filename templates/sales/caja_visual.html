@@ -2435,13 +2435,12 @@ function eliminarRetomaActual() {
         btnProcess.disabled = true;
         btnProcess.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Procesando...';
 
-        // Abrir pestaña emergente INMEDIATAMENTE durante la interacción del usuario para evitar bloqueos en Chrome/Safari
-        let reciboWindow = null;
-        try {
-            reciboWindow = window.open('about:blank', '_blank');
-        } catch(err) {
-            console.warn('Pop-up bloqueado al crear ventana en blanco:', err);
-        }
+        const esMovilOPwa = (
+            window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true ||
+            /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+            window.innerWidth <= 991
+        );
 
         try {
             const response = await fetch('/sales/nueva', {
@@ -2462,13 +2461,8 @@ function eliminarRetomaActual() {
 
             if (response.ok && data.success && data.sale_id) {
                 const reciboUrl = `/sales/recibo/${data.sale_id}`;
-                if (reciboWindow && !reciboWindow.closed) {
-                    reciboWindow.location.href = reciboUrl;
-                } else {
-                    window.open(reciboUrl, '_blank');
-                }
 
-                // Limpiar la caja en la pestaña principal para seguir facturando inmediatamente
+                // Limpiar la caja antes de redirigir o abrir recibo
                 carrito = [];
                 retomasLista = [];
                 pagosMixtos = [];
@@ -2485,17 +2479,23 @@ function eliminarRetomaActual() {
                 btnProcess.disabled = false;
                 btnProcess.innerHTML = '<i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro';
 
-                alert(`✅ ¡Venta #${data.sale_id} Procesada! La factura se abrió en una nueva pestaña para su impresión.`);
+                if (esMovilOPwa) {
+                    window.location.href = reciboUrl;
+                    return;
+                }
+
+                const nuevaVentana = window.open(reciboUrl, '_blank');
+                if (!nuevaVentana) {
+                    window.location.href = reciboUrl;
+                }
                 return;
             } else {
-                if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
                 alert(`⚠️ Error al procesar la venta: ${data.error || 'Verifica los datos de la venta'}`);
                 btnProcess.disabled = false;
                 btnProcess.innerHTML = '<i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro';
             }
         } catch (e) {
             console.error('Error al procesar cobro:', e);
-            if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
             alert(`⚠️ Error de conexión o red: ${e.message || e}`);
             btnProcess.disabled = false;
             btnProcess.innerHTML = '<i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro';

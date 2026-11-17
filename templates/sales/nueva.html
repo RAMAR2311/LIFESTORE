@@ -1664,13 +1664,12 @@
             retoma_data: retomasLista
         };
 
-        // Abrir pestaña emergente INMEDIATAMENTE durante la interacción del usuario para evitar bloqueos en Chrome/Safari
-        let reciboWindow = null;
-        try {
-            reciboWindow = window.open('about:blank', '_blank');
-        } catch(err) {
-            console.warn('Pop-up bloqueado al crear ventana en blanco:', err);
-        }
+        const esMovilOPwa = (
+            window.matchMedia('(display-mode: standalone)').matches ||
+            window.navigator.standalone === true ||
+            /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+            window.innerWidth <= 991
+        );
 
         try {
             const response = await fetch('/sales/nueva', {
@@ -1691,10 +1690,13 @@
 
             if (response.ok && data.success && data.sale_id) {
                 const reciboUrl = `/sales/recibo/${data.sale_id}`;
-                if (reciboWindow && !reciboWindow.closed) {
-                    reciboWindow.location.href = reciboUrl;
-                } else {
-                    window.open(reciboUrl, '_blank');
+                if (esMovilOPwa) {
+                    window.location.href = reciboUrl;
+                    return;
+                }
+                const nuevaVentana = window.open(reciboUrl, '_blank');
+                if (!nuevaVentana) {
+                    window.location.href = reciboUrl;
                 }
 
                 // Purgar carrito para continuar facturando en la pantalla actual
@@ -1711,15 +1713,12 @@
                 limpiarComprobanteUnico();
                 resetPagosMixtos();
 
-                alert(`✅ ¡Venta #${data.sale_id} Procesada! La factura se abrió en una nueva pestaña para su impresión.`);
                 return;
             } else {
-                if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
                 alert(`⚠️ Error devuelto del servidor: ${data.error || 'Verifique los datos e intente de nuevo.'}`);
             }
 
         } catch (error) {
-            if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
             console.error(error);
             alert(`⚠️ Error de conexión o red: ${error.message || error}`);
         }
