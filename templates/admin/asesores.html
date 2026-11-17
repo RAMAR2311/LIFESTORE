@@ -26,6 +26,12 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 
                 <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Código Único del Asesor</label>
+                    <input type="text" name="codigo" class="form-control bg-light border-0 py-2 text-uppercase font-monospace" placeholder="Ej. ASE-001 (opcional, autogenerado)">
+                    <small class="text-muted extra-small">Identificador exclusivo para seguimiento y ventas.</small>
+                </div>
+
+                <div class="mb-3">
                     <label class="form-label text-brand-black fw-semibold small">Nombre Completo <span class="text-danger">*</span></label>
                     <input type="text" name="nombre" class="form-control bg-light border-0 py-2" required placeholder="Ej. Carlos Mendoza">
                 </div>
@@ -59,7 +65,8 @@
                 <table class="table table-hover align-middle m-0">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-4">NOMBRE DEL ASESOR</th>
+                            <th class="ps-4">CÓDIGO</th>
+                            <th>NOMBRE DEL ASESOR</th>
                             <th class="text-end">SALARIO BASE</th>
                             <th>FECHA REGISTRO</th>
                             <th class="text-center">ESTADO</th>
@@ -69,7 +76,10 @@
                     <tbody>
                         {% for asesor in asesores %}
                         <tr>
-                            <td class="fw-bold text-brand-black ps-4">
+                            <td class="ps-4">
+                                <span class="badge bg-dark font-monospace px-2 py-1">{{ asesor.codigo or ('ASE-%03d' % asesor.id) }}</span>
+                            </td>
+                            <td class="fw-bold text-brand-black">
                                 <i class="fa-solid fa-user-tie text-muted me-2"></i>{{ asesor.nombre }}
                             </td>
                             <td class="text-end fw-bold text-success">
@@ -117,6 +127,11 @@
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                                 <div class="modal-body p-4">
                                                     <div class="mb-3">
+                                                        <label class="form-label fw-bold">Código Único del Asesor</label>
+                                                        <input type="text" name="codigo" class="form-control bg-light text-uppercase font-monospace" value="{{ asesor.codigo or ('ASE-%03d' % asesor.id) }}">
+                                                        <small class="text-muted">Identificador único asignado.</small>
+                                                    </div>
+                                                    <div class="mb-3">
                                                         <label class="form-label fw-bold">Nombre Completo</label>
                                                         <input type="text" name="nombre" class="form-control bg-light" value="{{ asesor.nombre }}" required>
                                                     </div>
@@ -138,7 +153,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
+                            <td colspan="6" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-folder-open fs-2 mb-2 d-block opacity-50"></i>
                                 No hay asesores registrados en el sistema.
                             </td>

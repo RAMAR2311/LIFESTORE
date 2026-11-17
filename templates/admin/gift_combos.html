@@ -283,6 +283,92 @@
     </div>
 </div>
 
+<!-- Sección: Historial de Obsequios Entregados -->
+<div class="row g-4 mb-5">
+    <div class="col-12">
+        <div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+            <div class="bg-light p-4 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <h5 class="fw-bold text-brand-black m-0">
+                        <i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>Historial de Obsequios Entregados
+                    </h5>
+                    <small class="text-muted">Registro de accesorios y combos entregados a clientes en el flujo de venta ($0 precio de venta).</small>
+                </div>
+                <span class="badge bg-secondary rounded-pill px-3 py-2">{{ (historial_entregas|length) if historial_entregas else 0 }} entregas</span>
+            </div>
+            <div class="table-responsive p-0">
+                <table class="table table-hover align-middle m-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">FECHA / HORA</th>
+                            <th>TICKET / VENTA</th>
+                            <th>PRODUCTO (OBSEQUIO)</th>
+                            <th class="text-center">CANTIDAD</th>
+                            <th class="text-end">COSTO EMPRESA</th>
+                            <th>SUCURSAL</th>
+                            <th>ASESOR / VENDEDOR</th>
+                            <th class="pe-4">CLIENTE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if historial_entregas %}
+                        {% for det in historial_entregas %}
+                        <tr>
+                            <td class="ps-4 text-muted small">
+                                {{ det.venta.fecha_venta.strftime('%d/%m/%Y %I:%M %p') if det.venta and det.venta.fecha_venta else 'N/A' }}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('sales_bp.recibo_pos', sale_id=det.sale_id) }}" target="_blank" class="badge bg-dark rounded-pill font-mono text-decoration-none">
+                                    #{{ '%05d' % det.sale_id }}
+                                </a>
+                            </td>
+                            <td class="fw-semibold text-brand-black">
+                                <i class="fa-solid fa-gift text-warning me-1"></i>
+                                {{ det.producto.nombre if det.producto else (det.nombre_manual or 'Accesorio') }}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-light text-dark border px-2">{{ det.cantidad_vendida }}</span>
+                            </td>
+                            <td class="text-end fw-bold text-danger font-mono">
+                                ${{ ((det.costo_unitario or 0) * det.cantidad_vendida)|cop }}
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border rounded-pill px-2 py-1">
+                                    <i class="fa-solid fa-store text-primary me-1"></i>{{ det.venta.sucursal if det.venta else 'N/A' }}
+                                </span>
+                            </td>
+                            <td class="small">
+                                {% if det.venta and det.venta.asesor %}
+                                    <span class="fw-semibold text-brand-black">{{ det.venta.asesor.nombre }}</span>
+                                    {% if det.venta.asesor.codigo %}
+                                        <span class="badge bg-secondary font-monospace extra-small">{{ det.venta.asesor.codigo }}</span>
+                                    {% endif %}
+                                {% elif det.venta and det.venta.vendedor %}
+                                    <span class="text-muted">{{ det.venta.vendedor.nombre }}</span>
+                                {% else %}
+                                    <span class="text-muted">N/A</span>
+                                {% endif %}
+                            </td>
+                            <td class="pe-4 small text-muted">
+                                {{ det.venta.cliente.nombre if (det.venta and det.venta.cliente) else 'Cliente Mostrador' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-gift fa-2x mb-3 text-secondary opacity-50 d-block"></i>
+                                No hay registro de obsequios entregados todavía.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <template id="template-fila-producto">
     <div class="fila-producto-combo p-2 rounded bg-light border d-flex gap-2 align-items-center position-relative">
         <input type="hidden" name="product_id[]" class="item-product-id" value="">

@@ -26,6 +26,12 @@
                     <label class="form-label text-brand-black fw-semibold small">Nombre Completo</label>
                     <input type="text" name="nombre" class="form-control bg-light border-0 py-2" required placeholder="Ej. Ana Pérez">
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Código Único de Asesor</label>
+                    <input type="text" name="codigo_asesor" class="form-control bg-light border-0 py-2 text-uppercase font-monospace" placeholder="Ej. ASE-001 (Opcional)">
+                    <div class="form-text small text-muted">Identificador comercial para seguimiento individual de ventas.</div>
+                </div>
                 
                 <div class="mb-3">
                     <label class="form-label text-brand-black fw-semibold small">Correo Empresarial (Login)</label>
@@ -91,6 +97,7 @@
                     <thead class="bg-light">
                         <tr>
                             <th class="ps-4">NOMBRE DE EMPLEADO</th>
+                            <th>CÓDIGO ASESOR</th>
                             <th>EMAIL (LOGIN)</th>
                             <th>ROL / PERFIL</th>
                             <th>SEDE / SUCURSAL</th>
@@ -102,6 +109,13 @@
                         {% for vendedor in vendedores %}
                         <tr>
                             <td class="fw-bold text-brand-black ps-4">{{ vendedor.nombre }}</td>
+                            <td>
+                                {% if vendedor.codigo_asesor %}
+                                    <span class="badge bg-dark font-monospace px-2 py-1">{{ vendedor.codigo_asesor }}</span>
+                                {% else %}
+                                    <span class="text-muted small">N/A</span>
+                                {% endif %}
+                            </td>
                             <td class="text-muted">{{ vendedor.email }}</td>
                             <td class="text-muted">
                                 {% if vendedor.rol == 'vendedor' %}
@@ -136,12 +150,9 @@
                                 <button type="button" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" title="Editar y Rotar Sede" data-bs-toggle="modal" data-bs-target="#editModal{{ vendedor.id }}">
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </button>
-                                <form action="{{ url_for('admin_bp.eliminar_vendedor', id=vendedor.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas eliminar a este trabajador? Esta acción no se puede deshacer.');">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" title="Eliminar trabajador">
-                                        <i class="fa-solid fa-trash-can"></i>
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" title="Eliminar trabajador (Requiere Token)" onclick="abrirModalEliminarUsuario({{ vendedor.id }}, '{{ vendedor.nombre }}')">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
                             </td>
                         </tr>
                         
@@ -160,6 +171,12 @@
                                             <div class="mb-3">
                                                 <label class="form-label text-brand-black fw-semibold small">Nombre Completo</label>
                                                 <input type="text" name="nombre" class="form-control bg-light border-0 py-2" value="{{ vendedor.nombre }}" required>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label text-brand-black fw-semibold small">Código Único de Asesor</label>
+                                                <input type="text" name="codigo_asesor" class="form-control bg-light border-0 py-2 text-uppercase font-monospace" value="{{ vendedor.codigo_asesor or '' }}" placeholder="Ej. ASE-001">
+                                                <div class="form-text small text-muted">Identificador comercial para ventas y liquidación.</div>
                                             </div>
                                             
                                             <div class="mb-3">
@@ -206,7 +223,7 @@
                         </div>
                         {% else %}
                         <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-users-slash fs-1 mb-3 opacity-25"></i>
                                 <p class="mb-0">Aún no has dado de alta a ningún Vendedor/Cajero.</p>
                             </td>
@@ -218,4 +235,60 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Confirmar Eliminación Protegida de Usuario con Token -->
+<div class="modal fade" id="modalEliminarUsuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white py-2">
+                <h5 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Eliminación de Cuenta
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formEliminarUsuario" method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4 text-center">
+                    <div class="avatar-lg mx-auto mb-3">
+                        <div class="avatar-title bg-danger-subtle text-danger rounded-circle p-3 d-inline-block">
+                            <i class="fa-solid fa-user-xmark fa-2x"></i>
+                        </div>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-2" id="eliminarUsuarioTitulo">¿Eliminar cuenta de usuario?</h5>
+                    <p class="text-muted small mb-3" id="eliminarUsuarioDescripcion">
+                        Esta acción revocará el acceso del usuario al sistema.
+                    </p>
+                    <div class="alert alert-warning text-start small py-2 px-3 mb-3">
+                        <i class="fa-solid fa-key me-1"></i> <strong>Se requiere Código de Autorización:</strong> Ingrese el token secreto para confirmar la eliminación de esta cuenta.
+                    </div>
+                    <div class="text-start mb-2">
+                        <label class="form-label small fw-bold text-secondary">Token Secreto / Clave de Autorización:</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fa-solid fa-lock text-muted"></i></span>
+                            <input type="password" name="token_secreto" id="inputTokenUsuario" class="form-control" placeholder="Ingrese token secreto" required autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-trash-can me-1"></i> Confirmar Eliminación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalEliminarUsuario(id, nombre) {
+    const form = document.getElementById('formEliminarUsuario');
+    form.action = `/admin/vendedores/${id}/eliminar`;
+    document.getElementById('eliminarUsuarioTitulo').textContent = `¿Eliminar cuenta de ${nombre}?`;
+    document.getElementById('eliminarUsuarioDescripcion').innerHTML = `Se desactivará el acceso y credenciales del usuario <strong>${nombre}</strong>.`;
+    document.getElementById('inputTokenUsuario').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('modalEliminarUsuario'));
+    modal.show();
+}
+</script>
 {% endblock %}

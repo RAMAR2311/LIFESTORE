@@ -64,7 +64,7 @@
                                            id="asesor_{{ a.id }}"
                                            onclick="event.stopPropagation(); updateCount();">
                                     <label class="form-check-label fw-semibold text-dark w-100 cursor-pointer" for="asesor_{{ a.id }}" onclick="event.stopPropagation();">
-                                        {{ a.nombre }}
+                                        <span class="badge bg-dark font-monospace me-1">{{ a.codigo or ('ASE-%03d' % a.id) }}</span> {{ a.nombre }}
                                     </label>
                                 </div>
                             </div>

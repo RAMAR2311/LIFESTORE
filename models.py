@@ -179,18 +179,20 @@ class User(UserMixin, db.Model):
     rol = db.Column(db.String(50), nullable=False, default='vendedor')
     sucursal = db.Column(db.String(100), nullable=False, default='PRINCIPAL')
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+    codigo_asesor = db.Column(db.String(50), unique=True, nullable=True, index=True)
     
     ventas = db.relationship('Sale', foreign_keys='Sale.vendedor_id', backref='vendedor', lazy=True)
     ajustes_stock = db.relationship('StockAdjustment', backref='admin', lazy=True)
     arqueos = db.relationship('ArqueoCaja', foreign_keys='ArqueoCaja.vendedor_id', backref='cajero', lazy=True, overlaps="arqueos_registrados,vendedor")
 
-    def __init__(self, nombre=None, email=None, telefono=None, password_hash=None, rol=None, branch_id=None, **kwargs):
+    def __init__(self, nombre=None, email=None, telefono=None, password_hash=None, rol=None, branch_id=None, codigo_asesor=None, **kwargs):
         if nombre is not None: kwargs['nombre'] = nombre
         if email is not None: kwargs['email'] = email
         if telefono is not None: kwargs['telefono'] = telefono
         if password_hash is not None: kwargs['password_hash'] = password_hash
         if rol is not None: kwargs['rol'] = rol
         if branch_id is not None: kwargs['branch_id'] = branch_id
+        if codigo_asesor is not None: kwargs['codigo_asesor'] = codigo_asesor
         if 'sucursal' in kwargs: pass
         super(User, self).__init__(**kwargs)
 
@@ -341,6 +343,7 @@ class Sale(db.Model):
     tiene_obsequio = db.Column(db.Boolean, default=False, nullable=False)
     costo_total_obsequios = db.Column(db.Numeric(12, 2), default=0.0, nullable=False)
     ingreso_neto_real = db.Column(db.Numeric(12, 2), default=0.0, nullable=False)
+    canal_venta = db.Column(db.String(50), nullable=True)
     
     detalles = db.relationship('SaleDetail', backref='venta', lazy=True, cascade="all, delete-orphan")
     pagos = db.relationship('SalePayment', backref='venta', lazy=True, cascade="all, delete-orphan")
@@ -950,6 +953,7 @@ class PriceApproval(db.Model):
 class Asesor(db.Model):
     __tablename__ = 'asesores'
     id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(50), unique=True, nullable=True, index=True)
     nombre = db.Column(db.String(100), nullable=False)
     salario_base = db.Column(db.Numeric(14, 2), default=0.0, nullable=False)
     activo = db.Column(db.Boolean, default=True, nullable=False)
@@ -1108,6 +1112,7 @@ class Vale(db.Model):
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     monto = db.Column(db.Numeric(14, 2), nullable=False)
     concepto = db.Column(db.Text, nullable=True)
+    comprobante = db.Column(db.String(255), nullable=True)
     estado = db.Column(db.String(20), nullable=False, default='PENDIENTE', index=True)  # 'PENDIENTE', 'APROBADO', 'RECHAZADO'
     resuelto_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     observacion_resolucion = db.Column(db.Text, nullable=True)
