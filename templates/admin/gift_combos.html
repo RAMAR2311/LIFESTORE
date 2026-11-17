@@ -318,7 +318,7 @@
                                 {{ det.venta.fecha_venta.strftime('%d/%m/%Y %I:%M %p') if det.venta and det.venta.fecha_venta else 'N/A' }}
                             </td>
                             <td>
-                                <a href="{{ url_for('sales_bp.recibo_pos', sale_id=det.sale_id) }}" target="_blank" class="badge bg-dark rounded-pill font-mono text-decoration-none">
+                                <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=det.sale_id) }}" target="_blank" class="badge bg-dark rounded-pill font-mono text-decoration-none">
                                     #{{ '%05d' % det.sale_id }}
                                 </a>
                             </td>

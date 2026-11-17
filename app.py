@@ -335,7 +335,12 @@ def create_app():
             "ALTER TABLE users ADD COLUMN codigo_asesor VARCHAR(50);",
             "ALTER TABLE asesores ADD COLUMN codigo VARCHAR(50);",
             "ALTER TABLE vales ADD COLUMN comprobante VARCHAR(255);",
-            "ALTER TABLE sales ADD COLUMN canal_venta VARCHAR(50);"
+            "ALTER TABLE sales ADD COLUMN canal_venta VARCHAR(50);",
+            "ALTER TABLE arqueo_caja ADD COLUMN shift_id INTEGER REFERENCES cash_shifts(id) ON DELETE SET NULL;",
+            "ALTER TABLE arqueo_caja ADD COLUMN tiene_obsequio BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE arqueo_caja ADD COLUMN costo_total_obsequios NUMERIC(12, 2) DEFAULT 0.0;",
+            "ALTER TABLE arqueo_caja ADD COLUMN ingreso_neto_real NUMERIC(12, 2) DEFAULT 0.0;",
+            "ALTER TABLE arqueo_caja ADD COLUMN closed_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL;"
         ]
         for q in queries:
             try:
