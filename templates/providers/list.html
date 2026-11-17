@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-truck-fast text-brand-blue me-2"></i> Gestión de Proveedores</h2>
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('bancos_bp.index') }}" class="btn btn-outline-success rounded-pill px-3 fw-bold shadow-sm">
+            <i class="fa-solid fa-building-columns me-1"></i> Ir a Bancos
+        </a>
+        <button type="button" class="btn btn-blue rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNuevoProveedor">
+            <i class="fa-solid fa-plus me-1"></i> Registrar Proveedor
+        </button>
+    </div>
+</div>
+
+<div class="card card-custom p-0 shadow-sm border-0">
+    <div class="card-header bg-white border-0 py-3 ps-4">
+        <h5 class="fw-bold m-0 text-muted">Directorio de Proveedores y Cuentas por Pagar</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-center w-100" style="font-size: 0.9rem;">
+            <thead class="bg-light text-nowrap">
+                <tr>
+                    <th class="ps-4 text-start">NOMBRE / CONTACTO</th>
+                    <th class="text-start">EMPRESA</th>
+                    <th>TELÉFONO</th>
+                    <th>ESTADO DE CUENTA</th>
+                    <th class="text-end pe-4">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody class="text-nowrap">
+                {% for prov in proveedores %}
+                <tr>
+                    <td class="ps-4 text-start">
+                        <div class="fw-bold text-dark">{{ prov.nombre }}</div>
+                        <div class="small text-muted">Añadido: {{ prov.fecha_creacion.strftime('%d/%m/%Y') }}</div>
+                    </td>
+                    <td class="text-start">{{ prov.empresa or '-' }}</td>
+                    <td>
+                        {% if prov.telefono %}
+                        <a href="https://wa.me/57{{ prov.telefono|replace(' ', '') }}" target="_blank" class="text-decoration-none text-success fw-bold">
+                            <i class="fa-brands fa-whatsapp"></i> {{ prov.telefono }}
+                        </a>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% set saldo = prov.saldo_pendiente %}
+                        {% if saldo > 0 %}
+                            <span class="badge bg-danger rounded-pill px-3 shadow-sm">Deuda: ${{ saldo|cop }}</span>
+                        {% elif saldo < 0 %}
+                            <span class="badge bg-info rounded-pill px-3 shadow-sm">A favor: ${{ (saldo * -1)|cop }}</span>
+                        {% else %}
+                            <span class="badge bg-success rounded-pill px-3 shadow-sm">Al Día</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4">
+                        <a href="{{ url_for('providers_bp.detail', id=prov.id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold me-1" title="Ver Estado de Cuenta">
+                            <i class="fa-solid fa-folder-open me-1"></i> Ver Cuenta
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold me-1" data-bs-toggle="modal" data-bs-target="#modalEditarProveedor{{ prov.id }}" title="Editar Proveedor">
+                            <i class="fa-solid fa-pen-to-square me-1"></i> Editar
+                        </button>
+                        <form action="{{ url_for('providers_bp.delete_provider', id=prov.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este proveedor? Esto eliminará también todas sus facturas y pagos asociados de manera permanente.');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold" title="Eliminar Proveedor">
+                                <i class="fa-solid fa-trash me-1"></i> Eliminar
+                            </button>
+                        </form>
+
+                        <!-- Modal Editar Proveedor -->
+                        <div class="modal fade text-start" id="modalEditarProveedor{{ prov.id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content border-0 shadow-lg">
+                                    <div class="modal-header bg-dark text-white border-0">
+                                        <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-pen me-2"></i> Editar Proveedor</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <form action="{{ url_for('providers_bp.edit_provider', id=prov.id) }}" method="POST">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div class="modal-body p-4">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Nombre del Proveedor / Asesor <span class="text-danger">*</span></label>
+                                                <input type="text" name="nombre" class="form-control bg-light" value="{{ prov.nombre }}" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Empresa / Marca Comercial</label>
+                                                <input type="text" name="empresa" class="form-control bg-light" value="{{ prov.empresa or '' }}">
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold">Teléfono / WhatsApp</label>
+                                                <input type="text" name="telefono" class="form-control bg-light" value="{{ prov.telefono or '' }}">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer bg-light border-0">
+                                            <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm">Guardar Cambios</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-truck-fast fs-1 mb-3 opacity-50"></i>
+                        <h5>No hay proveedores registrados aún.</h5>
+                        <p>Haz clic en "Registrar Proveedor" para comenzar.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Nuevo Proveedor -->
+<div class="modal fade" id="modalNuevoProveedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-brand-blue text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-plus me-2"></i> Nuevo Proveedor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('providers_bp.create_provider') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nombre del Proveedor / Asesor <span class="text-danger">*</span></label>
+                        <input type="text" name="nombre" class="form-control bg-light" placeholder="Ej: Juan Pérez" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Empresa / Marca Comercial</label>
+                        <input type="text" name="empresa" class="form-control bg-light" placeholder="Ej: Distribuidora Móvil S.A.S.">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Teléfono / WhatsApp</label>
+                        <input type="text" name="telefono" class="form-control bg-light" placeholder="Ej: 3001234567">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold"><i class="fa-solid fa-save me-1"></i> Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

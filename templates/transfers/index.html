@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-brand-black m-0">
+            <i class="fa-solid fa-truck-moving text-primary me-2"></i>Traslados de Inventario
+        </h2>
+        <p class="text-muted small mb-0">Gestión de envíos y recepciones entre sucursales y bodega central.</p>
+    </div>
+    <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-blue rounded-pill px-4 fw-bold shadow-sm">
+        <i class="fa-solid fa-plus me-1"></i> Crear Traslado
+    </a>
+</div>
+
+<!-- Pestañas de Navegación -->
+<ul class="nav nav-pills mb-4 p-1 bg-white rounded-pill shadow-sm border d-inline-flex" id="transfersTabs">
+    <li class="nav-item">
+        <a class="nav-link rounded-pill px-4 fw-semibold {% if tab == 'pendientes' %}active bg-dark text-white{% else %}text-muted{% endif %}" href="{{ url_for('transfers_bp.index', tab='pendientes') }}">
+            <i class="fa-solid fa-inbox me-2"></i>Pendientes por Recibir
+            {% if pendientes|length > 0 %}
+                <span class="badge bg-danger rounded-pill ms-2">{{ pendientes|length }}</span>
+            {% endif %}
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link rounded-pill px-4 fw-semibold {% if tab == 'enviados' %}active bg-dark text-white{% else %}text-muted{% endif %}" href="{{ url_for('transfers_bp.index', tab='enviados') }}">
+            <i class="fa-solid fa-paper-plane me-2"></i>Enviados
+            <span class="badge bg-light text-dark border ms-2">{{ enviados|length }}</span>
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link rounded-pill px-4 fw-semibold {% if tab == 'historial' %}active bg-dark text-white{% else %}text-muted{% endif %}" href="{{ url_for('transfers_bp.index', tab='historial') }}">
+            <i class="fa-solid fa-clock-rotate-left me-2"></i>Historial
+        </a>
+    </li>
+</ul>
+
+<!-- TAB: PENDIENTES POR RECIBIR -->
+{% if tab == 'pendientes' %}
+<div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0 align-middle">
+            <thead class="bg-dark text-white">
+                <tr>
+                    <th width="80" class="ps-4"># TRASLADO</th>
+                    <th>ORIGEN</th>
+                    <th>DESTINO</th>
+                    <th>ENVIADO POR</th>
+                    <th>FECHA ENVÍO</th>
+                    <th class="text-center">PRODUCTOS</th>
+                    <th width="240" class="text-center pe-4">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in pendientes %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ t.id }}</td>
+                    <td>
+                        <span class="badge bg-light text-dark border px-2 py-1">
+                            <i class="fa-solid fa-arrow-up-from-bracket me-1 text-danger"></i> {{ t.origin_branch.nombre }} ({{ t.origin_branch.codigo }})
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border px-2 py-1">
+                            <i class="fa-solid fa-arrow-down-to-bracket me-1 text-success"></i> {{ t.destination_branch.nombre }} ({{ t.destination_branch.codigo }})
+                        </span>
+                    </td>
+                    <td><small class="fw-semibold text-muted">{{ t.created_by.nombre }}</small></td>
+                    <td><small class="text-muted">{{ t.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-dark rounded-pill px-3 py-1" type="button" data-bs-toggle="collapse" data-bs-target="#itemsTransfer{{ t.id }}">
+                            <i class="fa-solid fa-boxes-stacked me-1"></i> {{ t.items|length }} ítem(s) <i class="fa-solid fa-chevron-down ms-1 small"></i>
+                        </button>
+                    </td>
+                    <td class="text-center pe-4">
+                        {% if current_user.rol == 'admin' or current_user.branch_id == t.destination_branch_id %}
+                            <div class="d-flex justify-content-center gap-2">
+                                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAccept{{ t.id }}">
+                                    <i class="fa-solid fa-check me-1"></i> Aceptar
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold" data-bs-toggle="modal" data-bs-target="#modalReject{{ t.id }}">
+                                    <i class="fa-solid fa-xmark me-1"></i> Rechazar
+                                </button>
+                            </div>
+                        {% else %}
+                            <span class="badge bg-light text-muted border">Esperando recepción en destino</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr class="collapse bg-light" id="itemsTransfer{{ t.id }}">
+                    <td colspan="7" class="p-3">
+                        <div class="card p-3 rounded-3 border-0 shadow-sm" style="background: var(--bg-card, #ffffff);">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
+                                <h6 class="fw-bold mb-0 small text-uppercase text-muted">
+                                    <i class="fa-solid fa-shield-halved text-primary me-1"></i> Trazabilidad de Custodia Física
+                                </h6>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50">
+                                        <i class="fa-solid fa-paper-plane text-primary me-1"></i> Despachado por: <strong>{{ t.usuario_despacha.nombre_completo or t.usuario_despacha.username if t.usuario_despacha else 'Desconocido' }}</strong>
+                                    </span>
+                                    <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
+                                        <i class="fa-solid fa-user-check me-1"></i> Recibido y verificado por: <strong>{{ t.usuario_recibe.nombre_completo or t.usuario_recibe.username if t.usuario_recibe else 'Pendiente en Destino' }}</strong>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {% if t.observaciones_entrega or t.notas %}
+                                <div class="alert alert-secondary py-2 px-3 mb-2 small rounded-3">
+                                    <i class="fa-solid fa-comment-dots text-primary me-1"></i> <strong>Notas del Despachador:</strong> {{ t.observaciones_entrega or t.notas }}
+                                </div>
+                            {% endif %}
+                            {% if t.observaciones_recepcion %}
+                                <div class="alert alert-warning py-2 px-3 mb-2 small rounded-3">
+                                    <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> <strong>Novedades de Recepción:</strong> {{ t.observaciones_recepcion }}
+                                </div>
+                            {% endif %}
+
+                            <ul class="list-group list-group-flush mb-0">
+                                {% for item in t.items %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-0 bg-transparent">
+                                    <div>
+                                        <strong>{{ item.product.nombre }}</strong>
+                                        {% if item.variant %}
+                                            <span class="text-muted">({{ item.variant.nombre_variante }})</span>
+                                        {% endif %}
+                                        {% if item.product.imei %}
+                                            <span class="badge bg-dark text-white border font-mono ms-2">IMEI: {{ item.product.imei }}</span>
+                                        {% endif %}
+                                        <small class="text-muted d-block font-mono">SKU: {{ item.product.sku }}</small>
+                                    </div>
+                                    <span class="badge bg-dark rounded-pill px-3 py-2 fw-bold fs-6">
+                                        {{ item.cantidad }} unidad(es)
+                                    </span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+
+                <!-- Modal Aceptar Traslado con Custodia y Novedades -->
+                <div class="modal fade" id="modalAccept{{ t.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <form method="POST" action="{{ url_for('transfers_bp.accept', id=t.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="modal-header bg-success text-white border-0">
+                                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-clipboard-check me-2"></i>Verificar y Recibir Traslado #{{ t.id }}</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body p-4 text-start">
+                                    <div class="card p-3 mb-3 bg-light border-0 rounded-3">
+                                        <div class="small text-muted mb-1">Confirmación de Responsabilidad Individual:</div>
+                                        <div class="fw-bold fs-6 text-dark">
+                                            <i class="fa-solid fa-user-shield text-success me-1"></i> Custodio Receptor: {{ current_user.nombre_completo or current_user.username }}
+                                        </div>
+                                        <div class="small text-muted mt-1">Sede Destino: <strong>{{ t.destination_branch.nombre }}</strong></div>
+                                    </div>
+                                    <p class="small text-muted mb-3">
+                                        Al aceptar, confirmas que contaste físicamente las <strong>{{ t.items|sum(attribute='cantidad') }} unidades / IMEIs</strong> y asumes la custodia en el inventario de esta sede.
+                                    </p>
+                                    <label class="form-label fw-bold small text-uppercase">Novedades u Observaciones al Recibir (Opcional)</label>
+                                    <textarea name="observaciones_recepcion" class="form-control" rows="2" placeholder="Ej: Recibido a entera satisfacción, cajas selladas. O: 'Caja abierta, falta 1 cable usb'"></textarea>
+                                </div>
+                                <div class="modal-footer border-0">
+                                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                                        <i class="fa-solid fa-check me-1"></i> Confirmar y Cargar Stock
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Rechazar Traslado -->
+                <div class="modal fade" id="modalReject{{ t.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <form method="POST" action="{{ url_for('transfers_bp.reject', id=t.id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="modal-header bg-danger text-white border-0">
+                                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-triangle-exclamation me-2"></i>Rechazar Traslado #{{ t.id }}</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body p-4 text-start">
+                                    <p class="mb-3 text-muted">
+                                        Al rechazar este traslado, la mercancía será <strong>reintegrada automáticamente</strong> a la sucursal de origen ({{ t.origin_branch.nombre }}).
+                                    </p>
+                                    <label class="form-label fw-bold small text-uppercase">Motivo del Rechazo</label>
+                                    <textarea name="motivo" class="form-control" rows="3" placeholder="Ej: Mercancía en mal estado, productos faltantes o error de envío..." required></textarea>
+                                </div>
+                                <div class="modal-footer border-0">
+                                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
+                                        Confirmar Rechazo
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-inbox fs-1 mb-3 text-muted opacity-50"></i>
+                        <p class="mb-0 fw-semibold">No hay traslados pendientes por recibir.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- TAB: ENVIADOS -->
+{% elif tab == 'enviados' %}
+<div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0 align-middle">
+            <thead class="bg-dark text-white">
+                <tr>
+                    <th width="80" class="ps-4"># TRASLADO</th>
+                    <th>ORIGEN</th>
+                    <th>DESTINO</th>
+                    <th>FECHA ENVÍO</th>
+                    <th class="text-center">ESTADO</th>
+                    <th class="text-center">ITEMS</th>
+                    <th class="pe-4">RESOLUCIÓN</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in enviados %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ t.id }}</td>
+                    <td>{{ t.origin_branch.nombre }}</td>
+                    <td>{{ t.destination_branch.nombre }}</td>
+                    <td><small class="text-muted">{{ t.created_at.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    <td class="text-center">
+                        {% if t.status == 'PENDIENTE' %}
+                            <span class="badge bg-warning text-dark rounded-pill px-3 py-1 shadow-sm"><i class="fa-solid fa-hourglass-half me-1"></i> Pendiente</span>
+                        {% elif t.status == 'ACEPTADO' %}
+                            <span class="badge bg-success rounded-pill px-3 py-1 shadow-sm"><i class="fa-solid fa-check me-1"></i> Aceptado</span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill px-3 py-1 shadow-sm"><i class="fa-solid fa-xmark me-1"></i> Rechazado</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-light text-dark border">{{ t.items|length }} prod.</span>
+                    </td>
+                    <td class="pe-4">
+                        {% if t.resolved_at %}
+                            <small class="text-muted d-block">{{ t.resolved_at.strftime('%d/%m/%Y %H:%M') }}</small>
+                            <small class="fw-semibold">Por: {{ t.received_by.nombre if t.received_by else 'Sistema' }}</small>
+                        {% else %}
+                            <small class="text-muted">En tránsito...</small>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-paper-plane fs-1 mb-3 text-muted opacity-50"></i>
+                        <p class="mb-0 fw-semibold">No se registran envíos desde esta sede.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- TAB: HISTORIAL -->
+{% elif tab == 'historial' %}
+<div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0 align-middle">
+            <thead class="bg-dark text-white">
+                <tr>
+                    <th width="80" class="ps-4"># TRASLADO</th>
+                    <th>ORIGEN &amp; DESTINO</th>
+                    <th>FECHA</th>
+                    <th class="text-center">ESTADO</th>
+                    <th>DESPACHADO POR</th>
+                    <th>RECIBIDO Y VERIFICADO POR</th>
+                    <th class="pe-4">NOVEDADES / NOTAS</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in historial %}
+                <tr>
+                    <td class="ps-4 fw-bold">#{{ t.id }}</td>
+                    <td>
+                        <div class="small fw-semibold">{{ t.origin_branch.nombre }} <i class="fa-solid fa-arrow-right text-muted mx-1"></i> {{ t.destination_branch.nombre }}</div>
+                    </td>
+                    <td><small class="text-muted">{{ t.resolved_at.strftime('%d/%m/%Y %H:%M') if t.resolved_at else t.created_at.strftime('%d/%m/%Y') }}</small></td>
+                    <td class="text-center">
+                        {% if t.status == 'ACEPTADO' %}
+                            <span class="badge bg-success rounded-pill px-3 py-1"><i class="fa-solid fa-check me-1"></i> Aceptado</span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill px-3 py-1"><i class="fa-solid fa-xmark me-1"></i> Rechazado</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50">
+                            <i class="fa-solid fa-user text-primary me-1"></i> {{ t.usuario_despacha.nombre_completo or t.usuario_despacha.username if t.usuario_despacha else 'Desconocido' }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if t.usuario_recibe %}
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
+                                <i class="fa-solid fa-user-check me-1"></i> {{ t.usuario_recibe.nombre_completo or t.usuario_recibe.username }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted small">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-4">
+                        {% if t.observaciones_recepcion %}
+                            <div class="small text-warning fw-semibold"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ t.observaciones_recepcion }}</div>
+                        {% endif %}
+                        {% if t.observaciones_entrega or t.notas %}
+                            <div class="small text-muted">{{ t.observaciones_entrega or t.notas }}</div>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-clock-rotate-left fs-1 mb-3 text-muted opacity-50"></i>
+                        <p class="mb-0 fw-semibold">No hay traslados históricos cerrados.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

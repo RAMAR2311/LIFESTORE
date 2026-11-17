@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <!-- Título con acento Azul Turquesa según reglas de Branding (.text-brand-blue es #A3D8DE) -->
+        <h2 class="fw-bolder m-0" style="color: var(--brand-blue);">
+            <i class="fa-solid fa-users-gear me-2"></i>Gestión de Personal
+        </h2>
+        <a href="/admin/dashboard" class="btn btn-light rounded-pill px-4 fw-bold text-muted border shadow-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Panel Principal
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <!-- Columna Izquierda: Formulario (Card en Blanco Sólido) -->
+    <div class="col-md-4">
+        <div class="card card-custom p-4 h-100">
+            <h5 class="fw-bold text-brand-black mb-4"><i class="fa-solid fa-id-badge me-2 text-brand-pink"></i> Alta de Nuevo Vendedor</h5>
+            <form method="POST">
+                <!-- Autenticador Estricto para el Servidor Jinja -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Nombre Completo</label>
+                    <input type="text" name="nombre" class="form-control bg-light border-0 py-2" required placeholder="Ej. Ana Pérez">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Correo Empresarial (Login)</label>
+                    <input type="email" name="email" class="form-control bg-light border-0 py-2" required placeholder="ventas@lifestore.com">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Celular / Móvil de Contacto</label>
+                    <input type="text" name="telefono" class="form-control bg-light border-0 py-2" placeholder="Ej. 300 123 4567">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Asignar Rol / Perfil de Usuario</label>
+                    <select name="rol" class="form-select bg-light border-0 py-2" required>
+                        <option value="" disabled selected>Selecciona un perfil...</option>
+                        <option value="admin">Administrador del Sistema</option>
+                        <option value="coordinador">Coordinador de Operaciones</option>
+                        <option value="vendedor">Vendedor (Cajas/Tienda)</option>
+                        <option value="bodega">Encargado de Bodega</option>
+                        <option value="vendedor_bodega">Vendedor de Bodega</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">
+                        Sucursal Asignada <span class="text-danger fw-bold">* (Obligatoria para Vendedor / Bodega)</span>
+                    </label>
+                    <select name="branch_id" class="form-select bg-light border-0 py-2">
+                        <option value="">(Sin asignar / Global para Admin)</option>
+                        {% for suc in sucursales %}
+                        <option value="{{ suc.id }}">
+                            {{ suc.nombre }} [{{ suc.codigo }}] ({{ 'Tienda' if suc.tipo == 'tienda' else 'Bodega' }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text small text-muted">Obligatorio para roles Vendedor o Bodega. Para Admin es opcional.</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-brand-black fw-semibold small">Contraseña (PIN)</label>
+                    <input type="password" name="password" class="form-control bg-light border-0 py-2" required placeholder="••••••••">
+                </div>
+                
+                <div class="d-grid mt-auto">
+                    <!-- Sólida Llamada a la Acción (Azul Turquesa según Identidad Gráfica) -->
+                    <button type="submit" class="btn btn-blue py-3 fw-bold text-white rounded-3 shadow-sm text-uppercase">
+                        <i class="fa-solid fa-user-plus me-1"></i> Otorgar Acceso
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Columna Derecha: Tabla Administrativa -->
+    <div class="col-md-8">
+        <div class="card card-custom p-0 overflow-hidden h-100 table-custom">
+            <!-- Título de cabecera adherido a la tabla -->
+            <div class="bg-light p-4 border-bottom">
+                 <h5 class="fw-bold text-brand-black m-0 mt-2">Plantilla de Personal Activo en Sistema</h5>
+            </div>
+            <div class="table-responsive p-0">
+                <table class="table table-hover align-middle m-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">NOMBRE DE EMPLEADO</th>
+                            <th>EMAIL (LOGIN)</th>
+                            <th>ROL / PERFIL</th>
+                            <th>SEDE / SUCURSAL</th>
+                            <th class="text-center">STATUS</th>
+                            <th class="text-center pe-4">ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vendedor in vendedores %}
+                        <tr>
+                            <td class="fw-bold text-brand-black ps-4">{{ vendedor.nombre }}</td>
+                            <td class="text-muted">{{ vendedor.email }}</td>
+                            <td class="text-muted">
+                                {% if vendedor.rol == 'vendedor' %}
+                                    <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill px-2">Vendedor Cajas</span>
+                                {% elif vendedor.rol == 'bodega' %}
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2">Encargado Bodega</span>
+                                {% elif vendedor.rol == 'vendedor_bodega' %}
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2">Vendedor Bodega</span>
+                                {% elif vendedor.rol == 'coordinador' %}
+                                    <span class="badge rounded-pill px-2" style="color: #6366f1 !important; border: 1px solid #6366f1 !important; background-color: rgba(99, 102, 241, 0.1) !important;">Coordinador</span>
+                                {% elif vendedor.rol == 'admin' %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2">Administrador</span>
+                                {% else %}
+                                    {{ vendedor.rol }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if vendedor.branch %}
+                                    <span class="badge bg-light text-dark border rounded-pill px-2 py-1">
+                                        <i class="fa-solid fa-location-dot text-primary me-1"></i>{{ vendedor.branch.nombre }}
+                                    </span>
+                                {% elif vendedor.rol in ['admin', 'coordinador'] %}
+                                    <span class="badge bg-dark text-white rounded-pill px-2 py-1">Global / Todas</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-muted border rounded-pill px-2 py-1">Sin Asignar</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2 w-100">Activo</span>
+                            </td>
+                            <td class="text-center pe-4 d-flex justify-content-center gap-2">
+                                <button type="button" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" title="Editar y Rotar Sede" data-bs-toggle="modal" data-bs-target="#editModal{{ vendedor.id }}">
+                                    <i class="fa-solid fa-pen-to-square"></i>
+                                </button>
+                                <form action="{{ url_for('admin_bp.eliminar_vendedor', id=vendedor.id) }}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de que deseas eliminar a este trabajador? Esta acción no se puede deshacer.');">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" title="Eliminar trabajador">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        
+                        <!-- Edit Modal for {{ vendedor.nombre }} -->
+                        <div class="modal fade" id="editModal{{ vendedor.id }}" tabindex="-1" aria-labelledby="editModalLabel{{ vendedor.id }}" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-light">
+                                        <h5 class="modal-title fw-bold text-brand-black" id="editModalLabel{{ vendedor.id }}">Editar Trabajador: {{ vendedor.nombre }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <form action="{{ url_for('admin_bp.editar_vendedor', id=vendedor.id) }}" method="POST">
+                                        <div class="modal-body text-start">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            
+                                            <div class="mb-3">
+                                                <label class="form-label text-brand-black fw-semibold small">Nombre Completo</label>
+                                                <input type="text" name="nombre" class="form-control bg-light border-0 py-2" value="{{ vendedor.nombre }}" required>
+                                            </div>
+                                            
+                                            <div class="mb-3">
+                                                <label class="form-label text-brand-black fw-semibold small">Celular / Móvil de Contacto</label>
+                                                <input type="text" name="telefono" class="form-control bg-light border-0 py-2" value="{{ vendedor.telefono or '' }}">
+                                            </div>
+                                            
+                                            <div class="mb-3">
+                                                <label class="form-label text-brand-black fw-semibold small">Asignar Rol / Perfil</label>
+                                                <select name="rol" class="form-select bg-light border-0 py-2" required>
+                                                    <option value="admin" {% if vendedor.rol == 'admin' %}selected{% endif %}>Administrador del Sistema</option>
+                                                    <option value="coordinador" {% if vendedor.rol == 'coordinador' %}selected{% endif %}>Coordinador de Operaciones</option>
+                                                    <option value="vendedor" {% if vendedor.rol == 'vendedor' %}selected{% endif %}>Vendedor (Cajas/Tienda)</option>
+                                                    <option value="bodega" {% if vendedor.rol == 'bodega' %}selected{% endif %}>Encargado de Bodega</option>
+                                                    <option value="vendedor_bodega" {% if vendedor.rol == 'vendedor_bodega' %}selected{% endif %}>Vendedor de Bodega</option>
+                                                </select>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label text-brand-black fw-semibold small">Asignar Sede / Rotación</label>
+                                                <select name="branch_id" class="form-select bg-light border-0 py-2">
+                                                    <option value="" {% if not vendedor.branch_id %}selected{% endif %}>(Sin Asignar / Consolidado Global para Admin)</option>
+                                                    {% for suc in sucursales %}
+                                                    <option value="{{ suc.id }}" {% if vendedor.branch_id == suc.id %}selected{% endif %}>
+                                                        {{ suc.nombre }} [{{ suc.codigo }}] ({{ 'Tienda' if suc.tipo == 'tienda' else 'Bodega' }})
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                                <div class="form-text small">Cambia la sede para rotar vendedores entre locales al instante.</div>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label text-brand-black fw-semibold small">Nueva Contraseña (Opcional)</label>
+                                                <input type="password" name="password" class="form-control bg-light border-0 py-2" placeholder="Dejar en blanco para no cambiar">
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                                            <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar Cambios</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-users-slash fs-1 mb-3 opacity-25"></i>
+                                <p class="mb-0">Aún no has dado de alta a ningún Vendedor/Cajero.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

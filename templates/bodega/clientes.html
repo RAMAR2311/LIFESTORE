@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-address-book text-brand-blue me-2"></i> Directorio de Clientes</h2>
+    <a href="{{ url_for('bodega_bp.nuevo_cliente') }}" class="btn btn-blue rounded-pill px-4 shadow-sm">
+        <i class="fa-solid fa-plus me-1"></i> Registrar Cliente
+    </a>
+</div>
+
+<!-- Buscador Rápido de Clientes -->
+<div class="card card-custom p-3 mb-4 border-0 shadow-sm bg-white">
+    <div class="row align-items-center">
+        <div class="col-md-8 col-lg-6 position-relative">
+            <div class="input-group input-group-lg shadow-sm rounded-pill border">
+                <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" id="clientesSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por Nombre o Documento..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
+                <button class="btn btn-light border-0 px-3 text-muted" type="button" id="clearSearch" title="Limpiar búsqueda" style="border-radius: 0 50px 50px 0;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- Contenedor para resultados desplegables -->
+            <div id="searchDropdown" class="dropdown-menu shadow-lg border-0 w-100 p-0 mt-2 d-none" style="max-height: 400px; overflow-y: auto;">
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-6 text-md-end mt-3 mt-md-0">
+            <small class="text-muted fw-bold text-uppercase" style="font-size: 0.75rem;">
+                Mostrando <span id="visibleCount" class="text-brand-pink">{{ clientes|length }}</span>
+                de <strong>{{ clientes|length }}</strong> clientes
+            </small>
+        </div>
+    </div>
+</div>
+
+<div class="card card-custom p-0 border-0 shadow-sm overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0 align-middle" id="clientesTable">
+            <thead class="bg-light">
+                <tr>
+                    <th class="ps-4">RAZÓN SOCIAL / NOMBRE</th>
+                    <th>DOCUMENTO</th>
+                    <th class="text-center">DEUDA TOTAL</th>
+                    <th class="text-center">ESTADO</th>
+                    <th class="text-center">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in clientes %}
+                <tr class="cliente-row">
+                    <td class="ps-4 fw-bold text-brand-black">{{ c.nombre_o_razon_social }}</td>
+                    <td class="text-muted">{{ c.documento_o_nit }}</td>
+                    <td class="text-center fw-bolder {% if c.deuda_total > 0 %}text-danger{% else %}text-success{% endif %}">
+                        ${{ (c.deuda_total)|cop }}
+                    </td>
+                    <td class="text-center">
+                        {% if c.estado_global == 'Al Día' %}
+                            <span class="badge bg-light text-success border border-success rounded-pill px-3 py-2"><i class="fa-solid fa-check-circle me-1"></i> Al Día</span>
+                        {% else %}
+                            <span class="badge bg-light text-danger border border-danger rounded-pill px-3 py-2"><i class="fa-solid fa-circle-exclamation me-1"></i> Con Deuda</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex gap-2 justify-content-center">
+                            <a href="{{ url_for('bodega_bp.editar_cliente', id=c.id) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                <i class="fa-solid fa-pen me-1"></i> Editar
+                            </a>
+                            <a href="{{ url_for('bodega_bp.cliente_detalle', id=c.id) }}" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+                                <i class="fa-solid fa-eye me-1"></i> Ver Cuenta
+                            </a>
+                            {% if current_user.rol != 'vendedor_bodega' %}
+                                {% if c.deuda_total <= 0 %}
+                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalEliminarCliente{{ c.id }}">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                {% else %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled title="No se puede eliminar: tiene deuda pendiente">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+
+                {% if c.deuda_total <= 0 %}
+                <!-- Modal de Confirmación para Eliminar Cliente -->
+                <div class="modal fade" id="modalEliminarCliente{{ c.id }}" tabindex="-1" aria-labelledby="modalEliminarClienteLabel{{ c.id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+                            <div class="modal-header bg-danger text-white border-0">
+                                <h5 class="modal-title fw-bold" id="modalEliminarClienteLabel{{ c.id }}">
+                                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Eliminación
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <p class="mb-2">¿Estás seguro de que deseas eliminar al cliente:</p>
+                                <p class="fw-bold fs-5 text-brand-black mb-3">{{ c.nombre_o_razon_social }}</p>
+                                <div class="alert alert-warning border-0 rounded-3 mb-0">
+                                    <i class="fa-solid fa-info-circle me-1"></i> Esta acción eliminará también todas sus facturas y registros asociados. <strong>No se puede deshacer.</strong>
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                <form action="{{ url_for('bodega_bp.eliminar_cliente', id=c.id) }}" method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">
+                                        <i class="fa-solid fa-trash-can me-1"></i> Sí, Eliminar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-users-slash fs-2 mb-3 text-brand-pink opacity-50"></i>
+                        <p class="mb-0">No hay clientes en el directorio. Registra uno para comenzar.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('clientesSearch');
+    const clearBtn = document.getElementById('clearSearch');
+    const dropdown = document.getElementById('searchDropdown');
+    const tableRows = document.querySelectorAll('.cliente-row');
+    const visibleCount = document.getElementById('visibleCount');
+    const tbody = document.querySelector('tbody');
+
+    // Crear fila de "No hay resultados"
+    const noResultsRow = document.createElement('tr');
+    noResultsRow.className = 'no-results d-none';
+    noResultsRow.innerHTML = `<td colspan="5" class="text-center py-5 text-muted">
+        <i class="fa-solid fa-magnifying-glass-minus fs-1 mb-3 opacity-25"></i>
+        <p class="mb-0">No se encontraron clientes que coincidan con tu búsqueda.</p>
+    </td>`;
+    tbody.appendChild(noResultsRow);
+
+    let debounceTimer;
+
+    function performSearch() {
+        const query = searchInput.value.toLowerCase().trim();
+        
+        // 1. Filtrado local de la tabla
+        let matches = 0;
+        tableRows.forEach(row => {
+            const nombre = row.cells[0].textContent.toLowerCase();
+            const documento = row.cells[1].textContent.toLowerCase();
+            if (nombre.includes(query) || documento.includes(query)) {
+                row.classList.remove('d-none');
+                matches++;
+            } else {
+                row.classList.add('d-none');
+            }
+        });
+        visibleCount.textContent = matches;
+        if (matches === 0 && query !== '') noResultsRow.classList.remove('d-none');
+        else noResultsRow.classList.add('d-none');
+
+        // 2. Búsqueda AJAX global para el "despliegue"
+        clearTimeout(debounceTimer);
+        if (query.length < 2) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/bodega/clientes/api/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        dropdown.innerHTML = '';
+                        data.forEach(item => {
+                            const btn = document.createElement('a');
+                            btn.href = item.url;
+                            btn.className = 'dropdown-item p-3 border-bottom d-flex justify-content-between align-items-center';
+                            btn.innerHTML = `
+                                <div>
+                                    <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">${item.nombre}</div>
+                                    <small class="text-muted">NIT/Doc: ${item.documento}</small>
+                                </div>
+                                <span class="badge bg-light ${item.deuda > 0 ? 'text-danger' : 'text-success'} border rounded-pill">
+                                    Deuda: $${Math.round(item.deuda).toLocaleString('es-CO')}
+                                </span>
+                            `;
+                            dropdown.appendChild(btn);
+                        });
+                        dropdown.classList.remove('d-none');
+                        dropdown.classList.add('show');
+                    } else {
+                        dropdown.classList.add('d-none');
+                        dropdown.classList.remove('show');
+                    }
+                });
+        }, 300);
+    }
+
+    searchInput.addEventListener('input', performSearch);
+
+    // Ocultar dropdown al hacer click fuera
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+        }
+    });
+
+    clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        performSearch();
+        dropdown.classList.add('d-none');
+        dropdown.classList.remove('show');
+        searchInput.focus();
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,945 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid px-0 px-md-3">
+    <!-- Encabezado y Acciones Principales -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold text-brand-black m-0 d-flex align-items-center gap-2">
+                <span class="badge bg-info bg-opacity-15 text-dark p-2 rounded-3 border border-info border-opacity-25">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                </span>
+                Módulo de Cambios de Celulares
+            </h2>
+            <p class="text-muted small mb-0 mt-1">Control y trazabilidad de celulares entregados a cambio con terceros o aliados comerciales.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <!-- Botón Crear Aliado -->
+            <button type="button" class="btn btn-outline-dark rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCrearAliado">
+                <i class="fa-solid fa-handshake me-1 text-primary"></i> + Registrar Aliado
+            </button>
+            <!-- Botón Directorio de Aliados -->
+            <button type="button" class="btn btn-light border rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDirectorioAliados" title="Directorio de Aliados">
+                <i class="fa-solid fa-address-book text-muted"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Métricas Rápidas -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Pendientes por Recibir</div>
+                        <div class="fs-4 fw-bolder text-warning">{{ pendientes_count }}</div>
+                    </div>
+                    <div class="p-3 bg-warning bg-opacity-10 rounded-circle text-warning fs-5">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Cambios Completados</div>
+                        <div class="fs-4 fw-bolder text-success">{{ completados_count }}</div>
+                    </div>
+                    <div class="p-3 bg-success bg-opacity-10 rounded-circle text-success fs-5">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="card card-custom border-0 shadow-sm p-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="text-muted small fw-bold text-uppercase">Devueltos / Cancelados</div>
+                        <div class="fs-4 fw-bolder text-secondary">{{ devueltos_count }}</div>
+                    </div>
+                    <div class="p-3 bg-secondary bg-opacity-10 rounded-circle text-secondary fs-5">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card card-custom border-0 shadow-sm p-3 mb-4">
+        <form method="GET" action="{{ url_for('exchanges_bp.index') }}" class="row g-2 align-items-center">
+            <div class="col-12 col-md-5">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input type="text" name="q" class="form-control bg-light border-start-0" placeholder="Buscar por IMEI, Modelo o Aliado..." value="{{ q }}">
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="estado" class="form-select bg-light">
+                    <option value="">Todos los Estados</option>
+                    <option value="PENDIENTE" {% if filtro_estado == 'PENDIENTE' %}selected{% endif %}>⏳ Pendientes</option>
+                    <option value="COMPLETADO" {% if filtro_estado == 'COMPLETADO' %}selected{% endif %}>✅ Completados</option>
+                    <option value="DEVUELTO" {% if filtro_estado == 'DEVUELTO' %}selected{% endif %}>↩️ Devueltos al Stock</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="partner_id" class="form-select bg-light">
+                    <option value="">Todos los Aliados</option>
+                    {% for p in partners %}
+                    <option value="{{ p.id }}" {% if filtro_partner == p.id %}selected{% endif %}>{{ p.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary w-100 rounded-3" title="Filtrar">
+                    <i class="fa-solid fa-filter"></i>
+                </button>
+                {% if q or filtro_estado or filtro_partner %}
+                <a href="{{ url_for('exchanges_bp.index') }}" class="btn btn-outline-secondary rounded-3" title="Limpiar Filtros">
+                    <i class="fa-solid fa-xmark"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla Principal de Registros de Cambio -->
+    <div class="card card-custom border-0 shadow-sm p-0">
+        <div class="card-header bg-white border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold m-0 text-brand-black">
+                <i class="fa-solid fa-list-check text-info me-2"></i> Registro de Intercambios Realizados ({{ cambios|length }})
+            </h6>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                <thead class="bg-light text-nowrap">
+                    <tr>
+                        <th class="ps-4">FECHA / SEDE</th>
+                        <th>ALIADO / PERSONA</th>
+                        <th>EQUIPO ENTREGADO (SALIDA)</th>
+                        <th>EQUIPO RECIBIDO (ENTRADA)</th>
+                        <th>ESTADO</th>
+                        <th class="text-end pe-4">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cambios %}
+                    <tr>
+                        <!-- Fecha / Sede -->
+                        <td class="ps-4">
+                            <div class="fw-bold text-dark">{{ c.fecha_salida.strftime('%d/%m/%Y') }}</div>
+                            <small class="text-muted d-block">{{ c.fecha_salida.strftime('%I:%M %p') }}</small>
+                            <span class="badge bg-light text-secondary border px-2 py-0 mt-1" style="font-size: 0.7rem;">
+                                <i class="fa-solid fa-shop me-1"></i>{{ c.branch.nombre if c.branch else 'Principal' }}
+                            </span>
+                        </td>
+
+                        <!-- Aliado / Persona -->
+                        <td>
+                            <div class="fw-bold text-dark d-flex align-items-center gap-1">
+                                <i class="fa-solid fa-user-tag text-info"></i>
+                                <span>{{ c.partner.nombre if c.partner else 'Tercero' }}</span>
+                            </div>
+                            {% if c.partner and c.partner.contacto %}
+                                <small class="text-muted font-mono d-block"><i class="fa-brands fa-whatsapp text-success me-1"></i>{{ c.partner.contacto }}</small>
+                            {% endif %}
+                            {% if c.asesor %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 mt-1" style="font-size: 0.72rem;">
+                                    <i class="fa-solid fa-user-tie me-1"></i>{{ c.asesor.nombre }}
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Equipo Entregado (Salida) -->
+                        <td>
+                            <div class="fw-bold text-brand-black">{{ c.modelo_salida }}</div>
+                            {% if c.imei_salida %}
+                                <span class="badge bg-dark text-white font-mono px-2 py-0" style="font-size: 0.72rem;">IMEI: {{ c.imei_salida }}</span>
+                            {% endif %}
+                            <div class="text-muted small mt-1">Costo ref: ${{ c.costo_salida|cop }}</div>
+                            {% if c.motivo_salida %}
+                                <div class="text-truncate text-muted small" style="max-width: 200px;" title="{{ c.motivo_salida }}">
+                                    <em>Nota: {{ c.motivo_salida }}</em>
+                                </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Equipo Recibido (Entrada) -->
+                        <td>
+                            {% if c.estado == 'COMPLETADO' and c.modelo_entrada %}
+                                <div class="fw-bold text-success">{{ c.marca_entrada or '' }} {{ c.modelo_entrada }}</div>
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono px-2 py-0" style="font-size: 0.72rem;">
+                                    IMEI: {{ c.imei1_entrada }}
+                                </span>
+                                <div class="text-muted small mt-1">
+                                    Nuevo Costo: <strong>${{ c.costo_entrada|cop }}</strong> | Sug: ${{ c.precio_sugerido_entrada|cop }}
+                                </div>
+                            {% elif c.estado == 'DEVUELTO' %}
+                                <span class="text-muted small fst-italic">
+                                    <i class="fa-solid fa-rotate-left me-1"></i> Cancelado. Se devolvió el celular original al inventario.
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark px-2 py-1 rounded-pill">
+                                    <i class="fa-solid fa-hourglass-half me-1"></i> Esperando nuevo celular
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Estado -->
+                        <td>
+                            {% if c.estado == 'PENDIENTE' %}
+                                <span class="badge bg-warning text-dark px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-clock me-1"></i> Pendiente
+                                </span>
+                            {% elif c.estado == 'COMPLETADO' %}
+                                <span class="badge bg-success px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-circle-check me-1"></i> Completado
+                                </span>
+                            {% elif c.estado == 'DEVUELTO' %}
+                                <span class="badge bg-secondary px-3 py-1 rounded-pill fw-bold shadow-sm">
+                                    <i class="fa-solid fa-rotate-left me-1"></i> Devuelto
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="text-end pe-4">
+                            {% if c.estado == 'PENDIENTE' %}
+                                <div class="d-flex justify-content-end gap-1">
+                                    <!-- Botón Recibir Celular -->
+                                    <button type="button" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalRecibirCambio{{ c.id }}">
+                                        <i class="fa-solid fa-plus-circle me-1"></i> Recibir Celular
+                                    </button>
+                                    <!-- Botón Devolver Celular al Stock -->
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDevolverCambio{{ c.id }}" title="Cancelar y devolver celular original al inventario">
+                                        <i class="fa-solid fa-rotate-left me-1"></i> Devolver
+                                    </button>
+                                </div>
+                            {% else %}
+                                <span class="badge bg-light text-muted border px-2 py-1 small">Resuelto</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- MODAL RECIBIR NUEVO CELULAR POR CAMBIO -->
+                    {% if c.estado == 'PENDIENTE' %}
+                    <div class="modal fade text-start" id="modalRecibirCambio{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-lg">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-header border-bottom py-3">
+                                    <h6 class="modal-title fw-bold text-brand-black">
+                                        <i class="fa-solid fa-circle-plus text-success me-2"></i>
+                                        Recibir Celular a Cambio (Canje #{% if c.id %}{{ c.id }}{% endif %})
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('exchanges_bp.recibir_celular_cambio', exchange_id=c.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-body py-3">
+                                        <!-- Resumen de Salida -->
+                                        <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <strong>Equipo Entregado:</strong> {{ c.modelo_salida }}
+                                                <span class="badge bg-dark text-white font-mono">IMEI: {{ c.imei_salida }}</span>
+                                            </div>
+                                            <div class="text-muted">Aliado: <strong>{{ c.partner.nombre if c.partner else 'Tercero' }}</strong> | Costo de Referencia Original: ${{ c.costo_salida|cop }}</div>
+                                        </div>
+
+                                        <h6 class="fw-bold small text-muted text-uppercase mb-2">Datos del Nuevo Celular que se Recibe:</h6>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Marca *</label>
+                                                <select name="marca_entrada" id="cambio_marca_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="actualizarModelosCambio('{{ c.id }}', this.value)" required>
+                                                    <option value="">-- Seleccione Marca --</option>
+                                                    <option value="Apple" selected>Apple</option>
+                                                    <option value="Samsung">Samsung</option>
+                                                    <option value="Meta">Meta</option>
+                                                    <option value="Android">Android (Xiaomi / Otros)</option>
+                                                    <option value="Motorola">Motorola</option>
+                                                    <option value="Huawei">Huawei</option>
+                                                    <option value="Honor">Honor</option>
+                                                    <option value="OPPO">OPPO</option>
+                                                    <option value="Infinix">Infinix</option>
+                                                    <option value="Tecno">Tecno</option>
+                                                    <option value="Otro">Otro / Otra Marca</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Modelo / Referencia *</label>
+                                                <select name="modelo_entrada" id="cambio_modelo_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="actualizarColoresCambio('{{ c.id }}', this.value)" required>
+                                                    <option value="">-- Primero elija Marca --</option>
+                                                </select>
+                                                <input type="text" name="modelo_entrada_custom" id="cambio_modelo_custom_{{ c.id }}" class="form-control form-control-sm mt-1" placeholder="Escriba el modelo si es 'Otro'" style="display:none;" oninput="syncCustomModeloCambio('{{ c.id }}', this.value)">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Capacidad / RAM</label>
+                                                <div class="input-group input-group-sm">
+                                                    <select name="memoria_entrada" id="cambio_memoria_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="toggleManualInputCambio('{{ c.id }}', this, 'cambio_memoria_custom_{{ c.id }}')">
+                                                        <option value="">-- Seleccionar --</option>
+                                                        <option value="N/A">N/A (No Aplica)</option>
+                                                        <option value="64GB">64GB</option>
+                                                        <option value="128GB">128GB</option>
+                                                        <option value="256GB">256GB</option>
+                                                        <option value="512GB">512GB</option>
+                                                        <option value="1T">1T</option>
+                                                        <option value="2T">2T</option>
+                                                        <option value="__OTRO__">✍️ Escribir otro...</option>
+                                                    </select>
+                                                    <input type="text" id="cambio_memoria_custom_{{ c.id }}" class="form-control form-control-sm d-none" placeholder="Escriba capacidad..." oninput="syncManualValueCambio('cambio_memoria_{{ c.id }}', this.value)">
+                                                    <button type="button" id="btn_cancel_memoria_{{ c.id }}" class="btn btn-outline-secondary d-none" onclick="cancelManualInputCambio('cambio_memoria_{{ c.id }}', 'cambio_memoria_custom_{{ c.id }}')" title="Volver a lista">
+                                                        <i class="fa-solid fa-rotate-left"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Color</label>
+                                                <div class="input-group input-group-sm">
+                                                    <select name="color_entrada" id="cambio_color_{{ c.id }}" class="form-select form-select-sm fw-semibold" onchange="toggleManualInputCambio('{{ c.id }}', this, 'cambio_color_custom_{{ c.id }}')">
+                                                        <option value="">-- Primero elija Referencia --</option>
+                                                        <option value="N/A">N/A (No Aplica)</option>
+                                                        <option value="__OTRO__">✍️ Escribir otro...</option>
+                                                    </select>
+                                                    <input type="text" id="cambio_color_custom_{{ c.id }}" class="form-control form-control-sm d-none" placeholder="Escriba color..." oninput="syncManualValueCambio('cambio_color_{{ c.id }}', this.value)">
+                                                    <button type="button" id="btn_cancel_color_{{ c.id }}" class="btn btn-outline-secondary d-none" onclick="cancelManualInputCambio('cambio_color_{{ c.id }}', 'cambio_color_custom_{{ c.id }}')" title="Volver a lista">
+                                                        <i class="fa-solid fa-rotate-left"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Batería (%)</label>
+                                                <input type="text" name="bateria_entrada" class="form-control form-control-sm" placeholder="Ej: 100% o N/A">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Inventario</label>
+                                                <input type="text" name="inventario_entrada" class="form-control form-control-sm" value="Usado" placeholder="Ej: Nuevo, Usado, Vitrina">
+                                            </div>
+                                        </div>
+
+                                        <h6 class="fw-bold small text-muted text-uppercase mb-2">Identificadores IMEI:</h6>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted">IMEI 1 (Principal) *</label>
+                                                <input type="text" name="imei1_entrada" class="form-control form-control-sm font-mono" placeholder="Ingresa el IMEI de 15 dígitos" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-bold text-muted">IMEI 2 (Opcional)</label>
+                                                <input type="text" name="imei2_entrada" class="form-control form-control-sm font-mono" placeholder="Segundo IMEI si aplica">
+                                            </div>
+                                        </div>
+
+                                        <h6 class="fw-bold small text-muted text-uppercase mb-2">Precios y Ubicación:</h6>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Precio de Costo ($ COP) *</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" step="1000" name="costo_entrada" class="form-control" value="{{ "%.0f"|format(c.costo_salida|float) if c.costo_salida else '0' }}" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Precio Mínimo ($ COP) *</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" step="1000" name="precio_minimo_entrada" class="form-control" placeholder="0" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label small fw-bold text-muted">Precio Sugerido ($ COP) *</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">$</span>
+                                                    <input type="number" step="1000" name="precio_sugerido_entrada" class="form-control" placeholder="0" required>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6 mt-2">
+                                                <label class="form-label small fw-bold text-muted">Asesor Responsable *</label>
+                                                <select name="asesor_id" class="form-select form-select-sm" required>
+                                                    <option value="">-- Seleccionar Asesor --</option>
+                                                    {% for asr in asesores %}
+                                                    <option value="{{ asr.id }}" {% if c.asesor_id == asr.id %}selected{% endif %}>{{ asr.nombre }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6 mt-2">
+                                                <label class="form-label small fw-bold text-muted">Sucursal / Bodega donde se alojará *</label>
+                                                <select name="branch_id" class="form-select form-select-sm">
+                                                    {% for b in sucursales %}
+                                                    <option value="{{ b.id }}" {% if c.branch_id == b.id %}selected{% endif %}>
+                                                        {% if b.tipo == 'bodega' %}📦 BODEGA: {% else %}🏪 TIENDA: {% endif %}{{ b.nombre }} ({{ b.codigo }})
+                                                    </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <label class="form-label small fw-bold text-muted">Observaciones de la Recepción</label>
+                                            <input type="text" name="observacion_resolucion" class="form-control form-control-sm" placeholder="Ej: Equipo recibido en perfecto estado con caja...">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-top py-2">
+                                        <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-success rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                            <i class="fa-solid fa-check me-1"></i> Guardar e Ingresar al Inventario
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODAL DEVOLVER CELULAR AL INVENTARIO (CANCELAR CAMBIO) -->
+                    <div class="modal fade text-start" id="modalDevolverCambio{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-sm">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-header border-bottom py-3">
+                                    <h6 class="modal-title fw-bold text-brand-black">
+                                        <i class="fa-solid fa-rotate-left text-danger me-2"></i>Devolver al Inventario
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('exchanges_bp.devolver_al_inventario', exchange_id=c.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-body py-3">
+                                        <p class="small text-muted mb-2">
+                                            ¿El aliado comercial te devolvió el mismo celular o se canceló el canje?
+                                        </p>
+                                        <div class="p-2 bg-light rounded border mb-3 small">
+                                            <strong>{{ c.modelo_salida }}</strong><br>
+                                            <span class="font-mono text-muted">IMEI: {{ c.imei_salida }}</span>
+                                        </div>
+                                        <p class="small text-dark mb-2">
+                                            Al confirmar, este celular <strong>volverá a sumar 1 unidad a su stock activo</strong> en la sucursal de origen.
+                                        </p>
+                                        <label class="form-label small fw-bold text-muted">Motivo / Justificación</label>
+                                        <textarea name="observacion_devolucion" class="form-control form-control-sm" rows="2" placeholder="Ej: No se concretó el negocio, equipo devuelto..."></textarea>
+                                    </div>
+                                    <div class="modal-footer border-top py-2">
+                                        <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                            <i class="fa-solid fa-rotate-left me-1"></i> Confirmar Devolución
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-arrow-right-arrow-left fa-3x text-secondary opacity-25 mb-3 d-block"></i>
+                            <h6 class="fw-bold">No hay registros de cambios de celulares</h6>
+                            <p class="small mb-0">Puedes entregar celulares a cambio directamente desde el Inventario de Celulares usando el botón de canje.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CREAR ALIADO / EMPRESA -->
+<div class="modal fade text-start" id="modalCrearAliado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-handshake text-primary me-2"></i>Registrar Aliado / Empresa
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('exchanges_bp.crear_aliado') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body py-3">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Nombre de la Empresa o Persona *</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Ej: TecnoStore / Pedro Gómez" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Teléfono / WhatsApp</label>
+                        <input type="text" name="contacto" class="form-control" placeholder="Ej: 3101234567">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Documento o NIT</label>
+                        <input type="text" name="documento_o_nit" class="form-control" placeholder="Ej: 901234567-1">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-muted">Dirección o Local</label>
+                        <input type="text" name="direccion" class="form-control" placeholder="Ej: Local 203 Pasaje Central">
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2">
+                    <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-check me-1"></i> Guardar Aliado
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DIRECTORIO DE ALIADOS -->
+<div class="modal fade text-start" id="modalDirectorioAliados" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom py-3">
+                <h6 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-address-book text-primary me-2"></i> Directorio de Aliados Comerciales ({{ partners|length }})
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for p in partners %}
+                    <div class="list-group-item p-3 d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-dark">{{ p.nombre }}</div>
+                            <div class="small text-muted">
+                                {% if p.documento_o_nit %}<span class="badge bg-light text-dark border me-1">NIT/Doc: {{ p.documento_o_nit }}</span>{% endif %}
+                                {% if p.direccion %}<i class="fa-solid fa-location-dot me-1 text-danger"></i>{{ p.direccion }}{% endif %}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            {% if p.contacto %}
+                                <a href="https://wa.me/57{{ p.contacto|replace(' ', '') }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm">
+                                    <i class="fa-brands fa-whatsapp me-1"></i> WhatsApp
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="p-4 text-center text-muted">
+                        No hay aliados registrados. Usa el botón "+ Registrar Aliado".
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPTS CATALOGO Y LISTAS DESPLEGABLES INTELIGENTES PARA CAMBIOS -->
+<script>
+const CATALOGO_MAESTRO_MODELOS = {
+    'Apple': [
+        {
+            categoria: 'iPhones Serie 11',
+            modelos: ['iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 12',
+            modelos: ['iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 13',
+            modelos: ['iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 14',
+            modelos: ['iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 15',
+            modelos: ['iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 16',
+            modelos: ['iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 17',
+            modelos: ['iPhone 17', 'iPhone 17 Air', 'iPhone 17 Pro', 'iPhone 17 Pro Max']
+        },
+        {
+            categoria: 'iPhones Serie 18',
+            modelos: ['iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Duo', 'iPhone 18 Pro', 'iPhone 18 Pro Max']
+        },
+        {
+            categoria: 'MacBooks',
+            modelos: ['MacBook Air M5', 'MacBook Neo', 'MacBook Pro M5', 'MacBook Pro M5 Pro', 'MacBook Pro M5 Max']
+        },
+        {
+            categoria: 'Apple Watch',
+            modelos: ['Apple Watch Serie 11 (42mm)', 'Apple Watch Serie 11 (46mm)', 'Apple Watch Ultra 3 (49mm)']
+        },
+        {
+            categoria: 'AirPods',
+            modelos: ['AirPods Serie 4 (AirPods 4)', 'AirPods Serie 5 (AirPods 5)', 'AirPods Pro 3', 'AirPods Pro 2da Generación (USB-C)', 'AirPods Max (Lightning)', 'AirPods Max (USB-C)']
+        },
+        {
+            categoria: 'iPads',
+            modelos: ['iPad 10ma Gen (A16 Bionic)', 'iPad 11na Gen', 'iPad Mini 6', 'iPad Mini 7', 'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)', 'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)', 'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)']
+        }
+    ],
+    'Samsung': [
+        {
+            categoria: 'Samsung Galaxy Serie S (S24, S25, S26)',
+            modelos: [
+                'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+                'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+                'Galaxy S26', 'Galaxy S26 Plus', 'Galaxy S26 Ultra',
+                'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
+                'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
+                'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra',
+                'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
+                'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
+            ]
+        }
+    ],
+    'Meta': [
+        {
+            categoria: 'Ray-Ban Meta Smart Glasses',
+            modelos: [
+                'Ray-Ban Meta Wayfarer (Standard)',
+                'Ray-Ban Meta Wayfarer (Large)',
+                'Ray-Ban Meta Headliner',
+                'Ray-Ban Meta Skyler'
+            ]
+        },
+        {
+            categoria: 'Oakley Meta Smart Glasses',
+            modelos: [
+                'Oakley Meta Performance Edition',
+                'Oakley Meta Radar EV Edition',
+                'Oakley Meta Holbrook Smart'
+            ]
+        }
+    ],
+    'Android': [
+        {
+            categoria: 'Xiaomi Serie 15 / 14 (Gama Alta)',
+            modelos: [
+                'Xiaomi 15 Ultra',
+                'Xiaomi 15 Pro',
+                'Xiaomi 15',
+                'Xiaomi 14 Ultra',
+                'Xiaomi 14T Pro',
+                'Xiaomi 14T',
+                'Xiaomi MIX Flip'
+            ]
+        },
+        {
+            categoria: 'POCO Serie F & X',
+            modelos: [
+                'POCO F7 Pro',
+                'POCO F7',
+                'POCO F6 Pro',
+                'POCO F6',
+                'POCO X7 Pro',
+                'POCO X6 Pro'
+            ]
+        },
+        {
+            categoria: 'Redmi Note Serie 14 / 13',
+            modelos: [
+                'Redmi Note 14 Pro+ 5G',
+                'Redmi Note 14 Pro 5G',
+                'Redmi Note 14 5G',
+                'Redmi Note 13 Pro+ 5G',
+                'Redmi Note 13 Pro 4G/5G',
+                'Redmi 14C',
+                'Redmi 13C'
+            ]
+        }
+    ],
+    'Motorola': [
+        {
+            categoria: 'Motorola Moto G & Edge',
+            modelos: [
+                'Moto G54', 'Moto G84', 'Moto G24', 'Moto G04', 'Edge 40', 'Edge 40 Neo', 'Edge 50 Pro', 'Edge 50 Ultra', 'Razr 40 Ultra', 'Razr 50 Ultra'
+            ]
+        }
+    ],
+    'Huawei': [
+        {
+            categoria: 'Huawei Pura & Nova',
+            modelos: [
+                'Huawei Pura 70 Ultra', 'Huawei Pura 70 Pro', 'Huawei Pura 70', 'Huawei Nova 12i', 'Huawei Nova 12 SE'
+            ]
+        }
+    ],
+    'Honor': [
+        {
+            categoria: 'Honor Magic & Serie X',
+            modelos: [
+                'Honor Magic 6 Pro', 'Honor Magic 6 Lite', 'Honor 200 Pro', 'Honor 200', 'Honor X8b', 'Honor X7b'
+            ]
+        }
+    ],
+    'OPPO': [
+        {
+            categoria: 'OPPO Reno & Serie A',
+            modelos: [
+                'OPPO Reno 12 Pro', 'OPPO Reno 12', 'OPPO Reno 11 F', 'OPPO A79 5G', 'OPPO A58', 'OPPO A38'
+            ]
+        }
+    ],
+    'Infinix': [
+        {
+            categoria: 'Infinix Note & Hot',
+            modelos: [
+                'Infinix Note 40 Pro', 'Infinix Note 40', 'Infinix GT 20 Pro', 'Infinix Hot 40 Pro', 'Infinix Hot 40i'
+            ]
+        }
+    ],
+    'Tecno': [
+        {
+            categoria: 'Tecno Camon & Spark',
+            modelos: [
+                'Tecno Camon 30 Premier', 'Tecno Camon 30 Pro', 'Tecno Camon 30', 'Tecno Spark 20 Pro+', 'Tecno Spark 20'
+            ]
+        }
+    ]
+};
+
+const CATALOGO_MAESTRO_COLORES = {
+    'iPhone 11': ['Negro (Black)', 'Blanco (White)', 'Verde (Green - tono menta pastel)', 'Amarillo (Yellow)', 'Morado / Malva (Purple)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 11 Pro': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+    'iPhone 11 Pro Max': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+    'iPhone 12': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 12 Mini': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 12 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+    'iPhone 12 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+    'iPhone 13': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 13 Mini': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 13 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+    'iPhone 13 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+    'iPhone 14': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 14 Plus': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+    'iPhone 14 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+    'iPhone 14 Pro Max': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+    'iPhone 15': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+    'iPhone 15 Plus': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+    'iPhone 15 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+    'iPhone 15 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+    'iPhone 16': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+    'iPhone 16 Plus': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+    'iPhone 16 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+    'iPhone 16 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+    'iPhone 17': ['Lavanda (Lavender)', 'Verde salvia (Sage)', 'Azul neblina (Mist Blue)', 'Blanco (White)', 'Negro (Black)'],
+    'iPhone 17 Air': ['Azul cielo (Sky Blue)', 'Dorado claro (Light Gold)', 'Blanco nube (Cloud White)', 'Negro espacial (Space Black)'],
+    'iPhone 17 Pro': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+    'iPhone 17 Pro Max': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+    'iPhone 18': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+    'iPhone 18 Plus': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+    'iPhone 18 Duo': ['Blanco estelar (Starlight)', 'Cielo nocturno (Night Sky - azul oscuro)'],
+    'iPhone 18 Pro': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+    'iPhone 18 Pro Max': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+    'MacBook Air M5': ['Azul cielo (Sky Blue)', 'Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Plata (Silver)'],
+    'MacBook Neo': ['Plata (Silver)', 'Rosa nube (Cloud Pink)', 'Cítrico (Citrus)', 'Índigo (Indigo)'],
+    'MacBook Pro M5': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+    'MacBook Pro M5 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+    'MacBook Pro M5 Max': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+    'AirPods Pro 3': ['Blanco (White)'],
+    'AirPods Serie 4 (AirPods 4)': ['Blanco (White)'],
+    'AirPods Serie 5 (AirPods 5)': ['Blanco (White)'],
+    'Apple Watch Serie 11 (42mm)': [
+        'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+        'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+    ],
+    'Apple Watch Serie 11 (46mm)': [
+        'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+        'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+    ],
+    'Apple Watch Ultra 3 (49mm)': ['Titanio natural (Natural Titanium)', 'Titanio negro (Black Titanium)'],
+    'Galaxy S25 Ultra': [
+        'Titanio Negro (Titanium Black)', 'Titanio Gris (Titanium Gray)', 'Titanio Plata Azul (Titanium Silverblue)', 'Titanio Blanco Plata (Titanium Whitesilver)',
+        'Titanio Negro Intenso (Titanium Jetblack)', 'Titanio Verde Jade (Titanium Jadegreen)', 'Titanio Oro Rosa (Titanium Pinkgold)'
+    ],
+    'Galaxy S26 Ultra': [
+        'Violeta Cobalto (Cobalt Violet)', 'Azul Cielo (Sky Blue)', 'Negro (Black)', 'Blanco (White)',
+        'Gris (Gray)', 'Oro Rosa (Pink Gold)'
+    ],
+    'Ray-Ban Meta Wayfarer (Standard)': ['Negro Brillante (Shiny Black - G15)', 'Negro Mate (Matte Black - Polarized)', 'Jeans (Chalky Gray)', 'Caramel (Transitions)'],
+    'Ray-Ban Meta Wayfarer (Large)': ['Negro Brillante (Shiny Black)', 'Negro Mate (Matte Black)'],
+    'Ray-Ban Meta Headliner': ['Negro Brillante (Shiny Black)', 'Caramelo Brillante (Shiny Caramel)'],
+    'Ray-Ban Meta Skyler': ['Negro Brillante (Shiny Black)', 'Rosa Tiza (Chalky Rose)']
+};
+
+function actualizarModelosCambio(id, marca, modeloPreseleccionado = '') {
+    const sel = document.getElementById(`cambio_modelo_${id}`);
+    const customInput = document.getElementById(`cambio_modelo_custom_${id}`);
+    if (!sel) return;
+    sel.innerHTML = '';
+    if (customInput) customInput.style.display = 'none';
+
+    if (!marca) {
+        sel.innerHTML = '<option value="">-- Primero elija Marca --</option>';
+        actualizarColoresCambio(id, '');
+        return;
+    }
+
+    if (marca === 'Otro' || !CATALOGO_MAESTRO_MODELOS[marca]) {
+        sel.innerHTML = '<option value="__OTRO__">Otro Modelo (Escribir abajo)</option>';
+        if (customInput) {
+            customInput.style.display = 'block';
+            customInput.required = true;
+            customInput.value = modeloPreseleccionado || '';
+        }
+        actualizarColoresCambio(id, '');
+        return;
+    }
+
+    sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
+    CATALOGO_MAESTRO_MODELOS[marca].forEach(grp => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = grp.categoria;
+        grp.modelos.forEach(mod => {
+            const opt = document.createElement('option');
+            opt.value = mod;
+            opt.textContent = mod;
+            if (mod === modeloPreseleccionado) {
+                opt.selected = true;
+            }
+            optgroup.appendChild(opt);
+        });
+        sel.appendChild(optgroup);
+    });
+
+    const optOtro = document.createElement('option');
+    optOtro.value = '__OTRO__';
+    optOtro.textContent = '+ Otro Modelo no listado';
+    sel.appendChild(optOtro);
+
+    actualizarColoresCambio(id, sel.value);
+}
+
+function syncCustomModeloCambio(id, val) {
+    const sel = document.getElementById(`cambio_modelo_${id}`);
+    if (sel && sel.value === '__OTRO__') {
+        actualizarColoresCambio(id, val);
+    }
+}
+
+function actualizarColoresCambio(id, modelo, colorPreseleccionado = '') {
+    const sel = document.getElementById(`cambio_color_${id}`);
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    let colores = [];
+    if (modelo && CATALOGO_MAESTRO_COLORES[modelo]) {
+        colores = CATALOGO_MAESTRO_COLORES[modelo];
+    } else {
+        for (const key in CATALOGO_MAESTRO_COLORES) {
+            if (modelo && modelo.toLowerCase().includes(key.toLowerCase())) {
+                colores = CATALOGO_MAESTRO_COLORES[key];
+                break;
+            }
+        }
+    }
+
+    sel.innerHTML = '<option value="">-- Seleccionar Color --</option>';
+    sel.innerHTML += '<option value="N/A">N/A (No Aplica)</option>';
+
+    if (colores.length > 0) {
+        colores.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            if (colorPreseleccionado && (c.toLowerCase() === colorPreseleccionado.toLowerCase() || c.toLowerCase().includes(colorPreseleccionado.toLowerCase()))) {
+                opt.selected = true;
+            }
+            sel.appendChild(opt);
+        });
+    } else {
+        const todosColores = new Set();
+        for (const m in CATALOGO_MAESTRO_COLORES) {
+            CATALOGO_MAESTRO_COLORES[m].forEach(col => todosColores.add(col));
+        }
+        todosColores.forEach(col => {
+            const opt = document.createElement('option');
+            opt.value = col;
+            opt.textContent = col;
+            if (colorPreseleccionado && col.toLowerCase() === colorPreseleccionado.toLowerCase()) {
+                opt.selected = true;
+            }
+            sel.appendChild(opt);
+        });
+    }
+
+    sel.innerHTML += '<option value="__OTRO__">✍️ Escribir otro...</option>';
+}
+
+function toggleManualInputCambio(id, selectElem, inputId) {
+    const input = document.getElementById(inputId);
+    const cancelBtnId = inputId.includes('memoria') ? `btn_cancel_memoria_${id}` : `btn_cancel_color_${id}`;
+    const cancelBtn = document.getElementById(cancelBtnId);
+
+    if (selectElem.value === '__OTRO__') {
+        selectElem.classList.add('d-none');
+        if (input) {
+            input.classList.remove('d-none');
+            input.required = true;
+            input.focus();
+        }
+        if (cancelBtn) cancelBtn.classList.remove('d-none');
+    } else {
+        if (input) {
+            input.value = selectElem.value;
+            input.required = false;
+        }
+    }
+}
+
+function cancelManualInputCambio(selectId, inputId) {
+    const sel = document.getElementById(selectId);
+    const inp = document.getElementById(inputId);
+    const id = selectId.split('_').pop();
+    const cancelBtnId = inputId.includes('memoria') ? `btn_cancel_memoria_${id}` : `btn_cancel_color_${id}`;
+    const cancelBtn = document.getElementById(cancelBtnId);
+
+    if (inp) {
+        inp.classList.add('d-none');
+        inp.value = '';
+        inp.required = false;
+    }
+    if (cancelBtn) cancelBtn.classList.add('d-none');
+    if (sel) {
+        sel.classList.remove('d-none');
+        sel.value = '';
+    }
+}
+
+function syncManualValueCambio(selectId, value) {
+    // Para validación y submit de forma transparente
+}
+
+// Inicializar modales de cambios al cargar
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[id^="cambio_marca_"]').forEach(sel => {
+        const id = sel.id.replace('cambio_marca_', '');
+        if (sel.value) {
+            actualizarModelosCambio(id, sel.value);
+        }
+    });
+
+    // Control para cuando seleccionan __OTRO__ en el modelo
+    document.querySelectorAll('[id^="cambio_modelo_"]').forEach(sel => {
+        sel.addEventListener('change', function() {
+            const id = this.id.replace('cambio_modelo_', '');
+            const customInput = document.getElementById(`cambio_modelo_custom_${id}`);
+            if (this.value === '__OTRO__') {
+                if (customInput) {
+                    customInput.style.display = 'block';
+                    customInput.required = true;
+                    customInput.focus();
+                }
+            } else {
+                if (customInput) {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                    customInput.value = '';
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid p-0">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('inventory_bp.index') }}" class="btn btn-light rounded-circle me-3 border-0">
+            <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <h2 class="fw-bold text-brand-black mb-0">Detalle de Producto: <span class="text-muted">{{ producto.sku }}</span></h2>
+        <div class="ms-auto">
+            <a href="{{ url_for('inventory_bp.editar_producto', id=producto.id) }}" class="btn btn-blue rounded-pill px-4">
+                <i class="fa-solid fa-pen me-2"></i>Editar Producto
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Ficha de Producto (Izquierda) -->
+        <div class="col-lg-4">
+            <div class="card card-custom p-4 text-center border-0 shadow-sm h-100">
+                {% if producto.imagen %}
+                    <img src="{{ url_for('static', filename='uploads/' ~ producto.imagen) }}" alt="{{ producto.nombre }}" class="img-fluid rounded mb-4 shadow-sm" style="max-height: 280px; object-fit: contain;">
+                {% else %}
+                    <div class="bg-light rounded d-flex align-items-center justify-content-center mb-4 border" style="height: 250px;">
+                        <i class="fa-solid fa-image fa-4x text-muted opacity-50"></i>
+                    </div>
+                {% endif %}
+                
+                <h4 class="fw-bold text-brand-black mb-1">{{ producto.nombre }}</h4>
+                <p class="text-muted mb-4 fs-6">SKU: <strong>{{ producto.sku }}</strong></p>
+
+                <div class="d-flex justify-content-between px-4 py-3 bg-light rounded mb-3">
+                    <span class="text-muted">Stock Actual</span>
+                    {% set total_stock = producto.cantidad_stock %}
+                    {% if producto.variantes %}
+                        {% set total_stock = producto.variantes | sum(attribute='cantidad_stock') %}
+                    {% endif %}
+                    <span class="fw-bold fs-5 {% if total_stock <= 3 %}text-danger{% else %}text-success{% endif %}">
+                        {{ total_stock }} unidades
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between px-4 py-3 bg-light rounded mb-3">
+                    <span class="text-muted">Precio Sugerido</span>
+                    <span class="fw-bold fs-5 text-brand-black">${{ (producto.precio_sugerido)|cop }}</span>
+                </div>
+                
+                {% if producto.variantes %}
+                <div class="text-start mt-4 pt-4 border-top">
+                    <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-sitemap me-2"></i>Subcategorías Registradas</h6>
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                        {% for v in producto.variantes %}
+                            <span class="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill">
+                                <strong>{{ v.nombre_variante }}</strong>: {{ v.cantidad_stock }} unidades
+                            </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="mt-2 pt-3 border-top">
+                    <button type="button" class="btn btn-outline-primary w-100 rounded-pill fw-bold" data-bs-toggle="modal" data-bs-target="#variantesModal{{ producto.id }}">
+                        <i class="fa-solid fa-layer-group me-2"></i>Gestionar Subcategorías
+                    </button>
+                </div>
+                
+                {% if producto.observacion %}
+                <div class="text-start mt-4 pt-4 border-top">
+                    <h6 class="fw-bold text-brand-pink mb-3"><i class="fa-solid fa-note-sticky me-2"></i>Observaciones</h6>
+                    <div class="p-3 bg-light rounded text-muted small lh-base border border-light shadow-sm">
+                        {{ producto.observacion }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Modal de Variantes (Inyectado para que funcione el botón de arriba) -->
+        {% with p = producto %}
+            {% include 'inventory/modal_variantes.html' %}
+        {% endwith %}
+
+        <!-- Trazabilidad de Inventario (Derecha) -->
+        <div class="col-lg-8">
+            <div class="card card-custom border-0 shadow-sm overflow-hidden h-100">
+                <div class="card-header bg-white border-bottom p-4 pb-3">
+                    <h5 class="fw-bold text-brand-black mb-0"><i class="fa-solid fa-clock-rotate-left text-brand-pink me-2"></i>Trazabilidad de Inventario</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-custom mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4">FECHA Y HORA</th>
+                                    <th>USUARIO</th>
+                                    <th>MOVIMIENTO</th>
+                                    <th class="text-center">ST. ANT</th>
+                                    <th class="text-center">ST. NUV</th>
+                                    <th class="text-center pe-4">DIF</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ajuste in ajustes %}
+                                <tr>
+                                    <td class="ps-4 text-muted"><small>{{ ajuste.fecha_ajuste.strftime('%Y-%m-%d %H:%M') }}</small></td>
+                                    <td><span class="badge bg-light text-dark border px-2 py-1"><i class="fa-solid fa-user-tie me-1"></i>{{ ajuste.admin.nombre }}</span></td>
+                                    <td>
+                                        {% if ajuste.tipo_movimiento == 'Creación Inicial' %}
+                                            <span class="badge bg-success rounded-pill px-3 py-2"><i class="fa-solid fa-plus-circle me-1"></i>{{ ajuste.tipo_movimiento }}</span>
+                                        {% elif ajuste.tipo_movimiento == 'Venta' %}
+                                            <span class="badge bg-info text-dark rounded-pill px-3 py-2"><i class="fa-solid fa-cash-register me-1"></i>{{ ajuste.tipo_movimiento }}</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark rounded-pill px-3 py-2"><i class="fa-solid fa-wrench me-1"></i>{{ ajuste.tipo_movimiento }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center fw-bold text-muted">{{ ajuste.stock_anterior }}</td>
+                                    <td class="text-center fw-bold text-brand-black">{{ ajuste.stock_nuevo }}</td>
+                                    <td class="text-center pe-4">
+                                        {% set diff = ajuste.stock_nuevo - ajuste.stock_anterior %}
+                                        {% if diff > 0 %}
+                                            <span class="text-success fw-bold"><i class="fa-solid fa-arrow-up me-1"></i>+{{ diff }}</span>
+                                        {% elif diff < 0 %}
+                                            <span class="text-danger fw-bold"><i class="fa-solid fa-arrow-down me-1"></i>{{ diff }}</span>
+                                        {% else %}
+                                            <span class="text-muted fw-bold">0</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-box-open fs-2 mb-3 text-brand-pink"></i>
+                                        <p class="mb-0">No hay movimientos registrados para este producto.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

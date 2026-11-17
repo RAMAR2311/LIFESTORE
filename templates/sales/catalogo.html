@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bolder m-0 text-brand-black">
+            <i class="fa-solid fa-mobile-screen-button text-brand-pink me-2"></i>Catálogo Masivo de Celulares
+        </h2>
+        <span class="text-muted small">Consulta global de disponibilidad de equipos en Bodega Central y Sucursales en tiempo real.</span>
+    </div>
+    <div>
+        <span class="badge bg-dark rounded-pill px-3 py-2 fs-6 shadow-sm">
+            <i class="fa-solid fa-layer-group me-1 text-brand-pink"></i> Total en catálogo: {{ total_catalogo }}
+        </span>
+    </div>
+</div>
+
+<!-- Barra de Filtros Masivos -->
+<div class="card card-custom p-3 border shadow-sm mb-4">
+    <form method="GET" action="{{ url_for('sales_bp.catalogo') }}" id="filtroCatalogoForm" class="row g-2 align-items-center">
+        <!-- Búsqueda General -->
+        <div class="col-12 col-md-4">
+            <label class="form-label small fw-bold text-muted mb-1"><i class="fa-solid fa-magnifying-glass me-1"></i> Buscar por Texto</label>
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" name="q" value="{{ q }}" class="form-control border-start-0 ps-0" placeholder="Ej: iPhone 17, IMEI, Color, Capacidad..." autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Filtro por Referencia / Modelo -->
+        <div class="col-12 col-md-3">
+            <label class="form-label small fw-bold text-muted mb-1"><i class="fa-solid fa-tag me-1"></i> Filtrar por Referencia</label>
+            <select name="referencia" class="form-select" onchange="document.getElementById('filtroCatalogoForm').submit();">
+                <option value="">-- Todas las Referencias --</option>
+                {% for ref in referencias_disponibles %}
+                <option value="{{ ref }}" {% if referencia_filtro == ref %}selected{% endif %}>{{ ref }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Filtro por Sucursal / Bodega -->
+        <div class="col-12 col-md-3">
+            <label class="form-label small fw-bold text-muted mb-1"><i class="fa-solid fa-warehouse me-1"></i> Ubicación / Sede</label>
+            <select name="branch_id" class="form-select" onchange="document.getElementById('filtroCatalogoForm').submit();">
+                <option value="">-- Todas las Sedes & Bodega --</option>
+                {% for b in sucursales_activas %}
+                <option value="{{ b.id }}" {% if branch_filtro == b.id %}selected{% endif %}>
+                    {% if b.tipo == 'bodega' %}🏢 {{ b.nombre }} (Bodega){% else %}🏬 {{ b.nombre }} (Tienda){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="col-12 col-md-2 d-flex gap-2 align-items-end pt-md-4">
+            <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">
+                <i class="fa-solid fa-filter me-1"></i> Filtrar
+            </button>
+            {% if q or referencia_filtro or branch_filtro or estado_filtro != 'todos' %}
+            <a href="{{ url_for('sales_bp.catalogo') }}" class="btn btn-outline-secondary" title="Limpiar todos los filtros">
+                <i class="fa-solid fa-xmark"></i>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Filtro por Estado Operativo (Tabs rápidos) -->
+        <div class="col-12 mt-2 pt-2 border-top">
+            <div class="d-flex align-items-center gap-1 flex-wrap">
+                <span class="small fw-bold text-muted me-2">Estado Operativo:</span>
+                <input type="hidden" name="estado" id="inputEstadoFiltro" value="{{ estado_filtro }}">
+                
+                <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold {% if estado_filtro == 'todos' %}btn-dark{% else %}btn-outline-secondary{% endif %}" onclick="cambiarEstadoFiltro('todos')">
+                    Todos Disponibles
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold {% if estado_filtro == 'disponible' %}btn-success text-white{% else %}btn-outline-success{% endif %}" onclick="cambiarEstadoFiltro('disponible')">
+                    <i class="fa-solid fa-circle-check me-1"></i> En Tienda / Bodega
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold {% if estado_filtro == 'maneo' %}btn-warning text-dark{% else %}btn-outline-warning text-dark{% endif %}" onclick="cambiarEstadoFiltro('maneo')">
+                    <i class="fa-solid fa-handshake me-1"></i> En Maneo (Prestados)
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold {% if estado_filtro == 'soporte' %}btn-danger text-white{% else %}btn-outline-danger{% endif %}" onclick="cambiarEstadoFiltro('soporte')">
+                    <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Soporte Técnico
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold {% if estado_filtro == 'cambio' %}btn-info text-dark{% else %}btn-outline-info text-dark{% endif %}" onclick="cambiarEstadoFiltro('cambio')">
+                    <i class="fa-solid fa-arrow-right-arrow-left me-1"></i> En Cambio
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function cambiarEstadoFiltro(val) {
+    document.getElementById('inputEstadoFiltro').value = val;
+    document.getElementById('filtroCatalogoForm').submit();
+}
+
+function enviarAlCarritoDesdeCatalogo(btn) {
+    const item = {
+        productId: parseInt(btn.dataset.id, 10),
+        variantId: null,
+        nombre: btn.dataset.nombre,
+        sku: btn.dataset.sku,
+        precio: parseFloat(btn.dataset.precio) || 0,
+        maxStock: parseInt(btn.dataset.stock, 10) || 1,
+        variantName: null,
+        tipoInventario: btn.dataset.tipo || 'celulares',
+        imei: btn.dataset.imei || null,
+        imei2: btn.dataset.imei2 || null,
+        inventario: btn.dataset.inventario || null
+    };
+    sessionStorage.setItem('catalogo_add_item', JSON.stringify(item));
+    window.location.href = "{{ url_for('sales_bp.caja_visual') }}";
+}
+</script>
+
+<style>
+/* Estilos modernos para el catálogo masivo */
+.celular-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    border-radius: 12px;
+}
+.celular-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1) !important;
+    border-color: #0d6efd !important;
+}
+.badge-sede-bodega {
+    background-color: #6f42c1;
+    color: white;
+}
+.badge-sede-tienda {
+    background-color: #0d6efd;
+    color: white;
+}
+</style>
+
+<!-- Cuadrícula de Celulares Masiva -->
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-4 g-3 mb-4">
+    {% for item in celulares_con_info %}
+    {% set p = item.producto %}
+    {% set u = item.ubicacion %}
+    <div class="col">
+        <div class="card h-100 celular-card shadow-sm border bg-white position-relative">
+            <!-- Encabezado de la Tarjeta con Ubicación y Estado -->
+            <div class="card-header bg-light border-bottom d-flex justify-content-between align-items-center py-2 px-3">
+                <!-- Ubicación Física -->
+                <div>
+                    {% if u %}
+                        <span class="badge {% if u.tipo == 'bodega' %}badge-sede-bodega{% else %}badge-sede-tienda{% endif %} rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.72rem;">
+                            <i class="fa-solid {% if u.tipo == 'bodega' %}fa-warehouse{% else %}fa-store{% endif %} me-1"></i> {{ u.nombre }}
+                        </span>
+                    {% else %}
+                        <span class="badge bg-secondary rounded-pill px-2 py-1" style="font-size: 0.72rem;">
+                            <i class="fa-solid fa-location-dot me-1"></i> Sin Asignar
+                        </span>
+                    {% endif %}
+                </div>
+
+                <!-- Estado Operativo -->
+                <div>
+                    <span class="badge bg-{{ item.estado_badge }} text-nowrap rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.72rem;">
+                        {% if item.estado_op == 'DISPONIBLE' %}
+                            <i class="fa-solid fa-check me-1"></i> Disponible
+                        {% elif item.estado_op == 'MANEO' %}
+                            <i class="fa-solid fa-handshake me-1"></i> Maneo
+                        {% elif item.estado_op == 'SOPORTE' %}
+                            <i class="fa-solid fa-screwdriver-wrench me-1"></i> Soporte
+                        {% elif item.estado_op == 'CAMBIO' %}
+                            <i class="fa-solid fa-arrow-right-arrow-left me-1"></i> En Cambio
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            {% set img_mostrar = p.imagen or (ref_images_map.get(p.modelo_celular) if (ref_images_map is defined and p.modelo_celular) else None) %}
+            {% if img_mostrar %}
+            <div class="bg-light border-bottom text-center p-2" style="height: 150px;">
+                <img src="{{ url_for('static', filename='uploads/' ~ img_mostrar) }}" alt="{{ p.modelo_celular or p.nombre }}" style="height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
+            {% endif %}
+
+            <div class="card-body p-3 d-flex flex-column">
+                <!-- Marca & Referencia Principal -->
+                <div class="mb-1">
+                    <span class="text-muted small fw-bold text-uppercase">{{ p.marca or 'CELULAR' }}</span>
+                    <h5 class="fw-bolder text-dark mb-1 lh-sm" title="{{ p.modelo_celular or p.nombre }}">
+                        {{ p.modelo_celular or p.nombre }}
+                    </h5>
+                </div>
+
+                <!-- Detalle Estado Operativo si está en Maneo o Soporte -->
+                {% if item.estado_detalle %}
+                <div class="alert alert-{{ item.estado_badge }} py-1 px-2 small mb-2 text-truncate" style="font-size: 0.75rem;" title="{{ item.estado_detalle }}">
+                    <i class="fa-solid fa-info-circle me-1"></i> {{ item.estado_detalle }}
+                </div>
+                {% endif %}
+
+                <!-- Especificaciones Técnicas del Equipo -->
+                <div class="bg-light rounded-3 p-2 mb-3 border">
+                    <div class="row g-1 text-center small">
+                        <div class="col-4 border-end">
+                            <span class="text-muted d-block" style="font-size: 0.68rem;">CAPACIDAD</span>
+                            <strong class="text-dark">{{ p.memoria or 'N/A' }}</strong>
+                        </div>
+                        <div class="col-4 border-end">
+                            <span class="text-muted d-block" style="font-size: 0.68rem;">BATERÍA</span>
+                            <strong class="text-dark">{{ p.bateria or 'N/A' }}</strong>
+                        </div>
+                        <div class="col-4">
+                            <span class="text-muted d-block" style="font-size: 0.68rem;">COLOR</span>
+                            <strong class="text-dark text-truncate d-block">{{ p.color or 'N/A' }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Identificadores IMEI -->
+                <div class="small text-muted mb-auto">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span style="font-size: 0.72rem;">IMEI 1:</span>
+                        <code class="text-dark fw-bold font-monospace" style="font-size: 0.78rem;">{{ p.imei or 'N/A' }}</code>
+                    </div>
+                    {% if p.imei2 %}
+                    <div class="d-flex justify-content-between">
+                        <span style="font-size: 0.72rem;">IMEI 2:</span>
+                        <code class="text-muted font-monospace" style="font-size: 0.78rem;">{{ p.imei2 }}</code>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Precios de Venta -->
+                <div class="pt-2 mt-3 border-top d-flex justify-content-between align-items-end">
+                    <div>
+                        <span class="text-muted d-block" style="font-size: 0.68rem; font-weight: 600;">PRECIO MÍNIMO</span>
+                        <span class="text-secondary fw-bold" style="font-size: 0.95rem;">${{ p.precio_minimo|cop }}</span>
+                    </div>
+                    <div class="text-end">
+                        <span class="text-muted d-block" style="font-size: 0.68rem; font-weight: 600;">PRECIO SUGERIDO</span>
+                        <span class="text-success fw-bolder fs-5">${{ p.precio_sugerido|cop }}</span>
+                    </div>
+                </div>
+
+                <!-- Botón Enviar al Carrito (Punto de Pago) -->
+                {% if item.estado_op == 'DISPONIBLE' %}
+                <div class="mt-3 d-grid">
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill fw-bold shadow-sm py-2"
+                            data-id="{{ p.id }}"
+                            data-nombre="{{ p.nombre }}"
+                            data-sku="{{ p.sku }}"
+                            data-precio="{{ p.precio_sugerido }}"
+                            data-stock="{{ p.cantidad_stock }}"
+                            data-tipo="{{ p.tipo_inventario }}"
+                            data-imei="{{ p.imei or '' }}"
+                            data-imei2="{{ p.imei2 or '' }}"
+                            data-inventario="{{ p.inventario or '' }}"
+                            onclick="enviarAlCarritoDesdeCatalogo(this)">
+                        <i class="fa-solid fa-cart-plus me-1"></i> Enviar al Carrito
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Pie de tarjeta con proveedor / observaciones si existen -->
+            {% if p.proveedor or p.estado_celular %}
+            <div class="card-footer bg-transparent border-top py-1 px-3 d-flex justify-content-between text-muted" style="font-size: 0.7rem;">
+                <span class="text-truncate" title="Proveedor: {{ p.proveedor or 'Directo' }}">
+                    <i class="fa-solid fa-truck-moving me-1"></i> {{ p.proveedor or 'Directo' }}
+                </span>
+                <span class="badge bg-light text-dark border">{{ p.estado_celular or 'Nuevo' }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-5 bg-white rounded-3 shadow-sm border w-100">
+        <i class="fa-solid fa-mobile-screen-button fs-1 mb-3 text-muted opacity-50"></i>
+        <h4 class="text-dark fw-bold">No se encontraron celulares con los filtros seleccionados</h4>
+        <p class="text-muted mb-3">Verifica la referencia buscada o prueba cambiando la sede o estado operativo.</p>
+        <a href="{{ url_for('sales_bp.catalogo') }}" class="btn btn-primary rounded-pill px-4 fw-bold">
+            <i class="fa-solid fa-rotate-left me-1"></i> Ver Todos los Celulares
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Paginación -->
+{% if paginacion.pages > 1 %}
+<nav aria-label="Paginación catálogo" class="mt-4 mb-5">
+    <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+        <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_prev %}{{ url_for('sales_bp.catalogo', page=paginacion.prev_num, q=q, referencia=referencia_filtro, branch_id=branch_filtro, estado=estado_filtro) }}{% else %}#{% endif %}"
+               aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i> Anterior</a>
+        </li>
+        {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p_num %}
+                <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
+                    <a class="page-link rounded-pill px-3 shadow-sm"
+                       href="{{ url_for('sales_bp.catalogo', page=p_num, q=q, referencia=referencia_filtro, branch_id=branch_filtro, estado=estado_filtro) }}">{{ p_num }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link rounded-pill px-3">…</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_next %}{{ url_for('sales_bp.catalogo', page=paginacion.next_num, q=q, referencia=referencia_filtro, branch_id=branch_filtro, estado=estado_filtro) }}{% else %}#{% endif %}"
+               aria-label="Siguiente">Siguiente <i class="fa-solid fa-chevron-right"></i></a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+{% endblock %}

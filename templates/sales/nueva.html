@@ -1,0 +1,2107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Título de Pantalla Renombrado (Requerimento) -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-cash-register me-2" style="color: var(--brand-pink);"></i>Caja Central</h2>
+    <div>
+        <span class="badge bg-light text-dark border shadow-sm px-3 py-2 rounded-pill fs-6">
+            <i class="fa-solid fa-shop text-primary me-1"></i> Sucursal: 
+            <strong>{{ active_branch.nombre if active_branch else (current_user.branch.nombre if current_user.branch else 'Principal') }}</strong>
+        </span>
+    </div>
+</div>
+
+<div class="row">
+    <!-- UI Escáner y Carrito -->
+    <div class="col-lg-8 mb-4">
+        
+        <!-- Panel de Escaneo -->
+        <div class="card card-custom p-4 mb-4">
+            <label class="form-label fw-bold text-brand-black">Buscar o Escanear Código</label>
+            <div class="d-flex gap-2">
+                <div class="input-group input-group-lg shadow-sm border-0 rounded-3 overflow-hidden flex-grow-1">
+                    <span class="input-group-text bg-white border-0"><i class="fa-solid fa-barcode text-muted"></i></span>
+                    <input type="text" class="form-control border-0" id="sku_input" placeholder="Ingresa SKU o IMEI exacto..." autofocus>
+                    <!-- Botón Secundario Rosa Pastel -->
+                    <button class="btn btn-pink px-4" type="button" id="btn_add_product">
+                        <i class="fa-solid fa-check ms-1"></i> Agregar
+                    </button>
+                </div>
+
+                <button class="btn btn-outline-success rounded-3 px-3 shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#modalProductoExterno" title="Ingresar Producto Externo">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                </button>
+                <button class="btn btn-outline-info rounded-3 px-3 shadow-sm" type="button" data-bs-toggle="modal" data-bs-target="#modalAccesorioExterno" title="Ingresar Accesorio Externo">
+                    <i class="fa-solid fa-mobile-retro"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabla Carrito de Compras -->
+        <div class="card card-custom p-0 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-custom mb-0 align-middle">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Producto Seleccionado</th>
+                            <th class="text-center" width="130">Cantidad</th>
+                            <th class="text-end" width="160">Precio U.</th>
+                            <th class="text-end" width="120">Subtotal</th>
+                            <th class="text-center" width="70"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart_body">
+                        <!-- ESPACIO RESERVADO PARA INYECCIÓN JS DINÁMICA -->
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted" id="empty_cart_msg">
+                                <!-- Icono Rosa Pastel -->
+                                <i class="fa-solid fa-cart-arrow-down fs-2 mb-2 d-block text-brand-pink opacity-50"></i>
+                                La venta está vacía actualmente.
+                            </td>
+                        </tr>
+                        <!-- Fin items JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Vertical Cobro Total -->
+    <div class="col-lg-4">
+        <div class="card card-custom p-4 position-sticky" style="top: 100px;">
+            <h4 class="fw-bold text-brand-black mb-4 pb-3 border-bottom">Balance</h4>
+            
+            <div class="d-flex justify-content-between mb-3">
+                <span class="text-muted fw-bold">Unidades Totales:</span>
+                <span class="fw-bold fs-5" id="total_items">0</span>
+            </div>
+            
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted fw-bold align-self-center">Subtotal:</span>
+                <span class="fw-bold fs-4 text-dark" id="subtotal_amount">$0</span>
+            </div>
+
+            <div class="mb-2 text-danger" id="retoma_discount_row" style="display: none !important;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold align-self-center"><i class="fa-solid fa-recycle me-1"></i> Retomas (<span id="retomas_count">0</span>):</span>
+                    <span class="fw-bold fs-5" id="retoma_amount">-$0</span>
+                </div>
+                <div id="retomas_list_container" class="ps-2 border-start border-2 border-danger ms-1 mb-2 bg-light rounded p-2" style="font-size: 0.85rem;">
+                    <!-- Lista dinámica de retomas -->
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mb-4 border-top pt-2">
+                <span class="text-muted fw-bold align-self-center">Total a Pagar:</span>
+                <span class="fw-bolder fs-1 text-brand-black" id="total_amount">$0</span>
+            </div>
+
+            <button type="button" class="btn btn-outline-dark btn-sm rounded-pill fw-bold w-100 mb-4" onclick="abrirModalRetoma()">
+                <i class="fa-solid fa-recycle me-1"></i> Añadir Equipo en Retoma
+            </button>
+
+            {% if current_user.rol == 'admin' %}
+            <!-- Selector de Fecha de Venta (colapsable) exclusivo para Admin -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <small class="text-muted fw-semibold"><i class="fa-regular fa-calendar me-1"></i> Fecha de Venta:</small>
+                    <button type="button" class="btn btn-sm btn-link text-decoration-none p-0" id="btn_toggle_fecha" onclick="toggleFechaVenta()">
+                        <span id="fecha_display_label" class="badge bg-light text-dark border rounded-pill px-3 py-1" style="font-size: 0.8rem; cursor: pointer;">
+                            📅 Hoy
+                        </span>
+                    </button>
+                </div>
+                <div id="fecha_venta_container" style="display: none; margin-top: 8px;">
+                    <input type="date" id="fecha_venta_input" class="form-control form-control-sm bg-light border-0 shadow-sm" value="">
+                    <small class="form-text text-muted"><i class="fa-solid fa-circle-info text-primary me-1"></i>Cambia la fecha para registrar ventas de días anteriores.</small>
+                </div>
+            </div>
+            {% endif %}
+
+            <hr class="mb-4">
+
+            <!-- Información de Turno de Asesores (Ventas compartidas por apertura de caja) -->
+            {% if turno_activo and turno_activo.asesores_obj %}
+            <div class="mb-3">
+                <div class="p-3 rounded-3 bg-light border border-primary border-opacity-25 shadow-sm">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="fw-bold text-primary small text-uppercase"><i class="fa-solid fa-users me-1"></i> Asesores de Turno</span>
+                        <span class="badge bg-primary rounded-pill">{{ turno_activo.asesores_obj|length }} activo(s)</span>
+                    </div>
+                    <div class="text-truncate text-dark fw-semibold small" title="{{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}">
+                        {{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}
+                    </div>
+                    <div class="extra-small text-muted mt-1">
+                        * Las comisiones de este turno se dividen equitativamente entre los asesores registrados al abrir caja.
+                    </div>
+                </div>
+            </div>
+            {% elif sucursal_actual and sucursal_actual.tipo == 'bodega' %}
+            <div class="mb-3">
+                <div class="p-2 px-3 rounded bg-light border text-muted small">
+                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de turnos y comisiones</strong>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Selector de Proveedor removido para evitar asociar ventas de inventario interno -->
+
+            <!-- Toggle: Pago Único vs Pago Dividido -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <label class="form-label fw-bold text-brand-black small text-uppercase m-0">Método de Pago</label>
+                    <div class="form-check form-switch ms-auto">
+                        <input class="form-check-input" type="checkbox" id="toggle_pago_mixto" style="cursor: pointer; width: 3rem; height: 1.5rem;">
+                        <label class="form-check-label fw-bold small text-muted" for="toggle_pago_mixto" style="cursor: pointer;">Dividir Pago</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modo 1: Pago Único (por defecto) -->
+            <div id="pago_unico_section">
+                <select id="metodo-pago" class="form-select form-select-lg border-0 shadow-sm bg-light mb-3" style="cursor: pointer;" onchange="toggleCamposAbonoTerceroUnico(this.value)">
+                    <option value="efectivo">💵 Efectivo</option>
+                    <option value="nequi">🟣 Nequi</option>
+                    <option value="bancolombia">🏦 Bancolombia</option>
+                    <option value="davivienda">🏦 Davivienda</option>
+                    <option value="daviplata">📲 Daviplata</option>
+                    <option value="bold">⚡ Bold (Datáfono)</option>
+                    <option value="addi">🛒 Addi</option>
+                    <option value="sistecredito">💳 Sistecrédito</option>
+                    <option value="abono_tercero">🤝 Abono a Terceros / Proveedor</option>
+                </select>
+
+                <!-- Campos de Comprobante Obligatorio (Todo método diferente a Efectivo) y Proveedor (Abono a Terceros) -->
+                <div id="campos_abono_tercero_unico" class="card border-0 bg-warning bg-opacity-10 p-3 mb-3 rounded-3" style="display: none;">
+                    <div id="titulo_comprobante_unico" class="fw-bold text-dark small mb-2"><i class="fa-solid fa-camera me-1 text-warning"></i> Comprobante de Pago Obligatorio:</div>
+                    <div id="div_proveedor_abono_unico" class="mb-2" style="display: none;">
+                        <label class="form-label extra-small fw-bold text-muted mb-1">Proveedor Destinatario <span class="text-danger">*</span></label>
+                        <select id="abono_provider_id_unico" class="form-select form-select-sm border-0 shadow-sm bg-white">
+                            <option value="" disabled selected>-- Seleccionar Proveedor Destinatario --</option>
+                            {% for prov in providers %}
+                                <option value="{{ prov.id }}">{{ prov.nombre }} (Saldo: ${{ prov.saldo_pendiente|cop }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label extra-small fw-bold text-muted mb-1">Imagen de Comprobante de Pago <span class="text-danger">*</span></label>
+                        <input type="hidden" id="abono_comprobante_unico" value="">
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex gap-2">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_btn_upload_unico">Adjuntar Imagen Comprobante</span>
+                                    <input type="file" id="file_comprobante_unico" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobante(this, 'abono_comprobante_unico', 'label_btn_upload_unico', 'preview_comprobante_unico')">
+                                </label>
+                            </div>
+                            <div id="preview_comprobante_unico" class="small text-truncate text-success fw-bold" style="display: none;">
+                                <i class="fa-solid fa-circle-check me-1"></i> <span id="nombre_archivo_unico"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modo 2: Pago Dividido/Mixto (oculto por defecto) -->
+            <div id="pago_mixto_section" style="display: none;">
+                <!-- Indicador visual del saldo restante -->
+                <div class="alert border-0 shadow-sm py-2 px-3 mb-3" id="saldo_restante_alert" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="fw-bold text-muted text-uppercase"><i class="fa-solid fa-scale-balanced me-1"></i> Saldo por cubrir:</small>
+                        <span class="fw-bolder fs-5" id="saldo_restante" style="color: var(--brand-blue);">$0</span>
+                    </div>
+                    <!-- Barra de progreso visual -->
+                    <div class="progress mt-2" style="height: 6px; border-radius: 10px;">
+                        <div class="progress-bar" id="barra_progreso_pago" role="progressbar" style="width: 0%; background: linear-gradient(90deg, #A3D8DE, #7BC8D0); border-radius: 10px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Lista dinámica de pagos parciales -->
+                <div id="pagos_list" class="d-flex flex-column gap-2 mb-3">
+                    <!-- Se inyecta dinámicamente -->
+                </div>
+
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill fw-bold w-100" id="btn_agregar_pago">
+                    <i class="fa-solid fa-plus me-1"></i> Agregar otro método de pago
+                </button>
+            </div>
+
+            <!-- Botón de Cobro Masivo Azul Turquesa -->
+            <div class="d-grid gap-2 mt-4">
+                <button type="button" class="btn btn-blue btn-lg rounded-3 py-3 shadow-sm text-uppercase" id="btn_process_sale">
+                    <i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro
+                </button>
+                <button type="button" class="btn btn-light mt-2 fw-bold text-muted" id="btn_clear_cart">
+                    Limpiar Venta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estilos para animaciones del pago mixto -->
+<style>
+    #pago_mixto_section .pago-item {
+        animation: slideDown 0.25s ease-out;
+    }
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .form-check-input:checked {
+        background-color: var(--brand-blue) !important;
+        border-color: var(--brand-blue) !important;
+    }
+    #saldo_restante_alert.saldo-cubierto {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%) !important;
+    }
+    #saldo_restante_alert.saldo-excedido {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%) !important;
+    }
+</style>
+
+
+
+<!-- Modal Datos del Cliente (Celulares) -->
+<div class="modal fade" id="modalClienteCelular" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-brand-blue text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-tag me-2"></i>Datos del Cliente</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-warning py-2 mb-4 border-0 small">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> <strong>Venta de Celular Detectada:</strong> Es obligatorio registrar los datos del cliente para temas de garantía y soporte técnico.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Cédula / Documento</label>
+                    <div class="input-group">
+                        <input type="text" id="cliente_documento" class="form-control bg-light" placeholder="Número de identificación" required>
+                        <span class="input-group-text bg-light" id="cliente_lookup_spinner" style="display:none;">
+                            <span class="spinner-border spinner-border-sm text-primary"></span>
+                        </span>
+                        <span class="input-group-text bg-success text-white" id="cliente_found_badge" style="display:none;" title="Cliente encontrado">
+                            <i class="fa-solid fa-check"></i>
+                        </span>
+                    </div>
+                    <div id="cliente_lookup_msg" class="form-text"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre Completo</label>
+                    <input type="text" id="cliente_nombre" class="form-control bg-light" placeholder="Ej: Juan Pérez" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Teléfono / WhatsApp</label>
+                    <input type="text" id="cliente_telefono" class="form-control bg-light" placeholder="Ej: 3001234567" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Correo Electrónico (Opcional)</label>
+                    <input type="email" id="cliente_email" class="form-control bg-light" placeholder="Ej: cliente@correo.com">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Dirección (Opcional)</label>
+                    <input type="text" id="cliente_direccion" class="form-control bg-light" placeholder="Ej: Calle 10 # 5-20">
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success rounded-pill fw-bold px-4" onclick="confirmarVentaCelular()">
+                    <i class="fa-solid fa-check me-1"></i> Confirmar Venta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Datos de Retoma -->
+<div class="modal fade" id="modalRetoma" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-recycle me-2"></i>Datos del Equipo en Retoma</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert py-2 mb-4 border-0 small" style="background: #e8f4fd; border: 1px dashed #90c4e8;">
+                    <i class="fa-solid fa-circle-info text-primary me-1"></i> <strong>Retoma de Equipo:</strong> Ingresa los datos del celular que el cliente entrega como parte de pago.
+                </div>
+                <!-- Fila 1: Marca, Referencia, Capacidad -->
+                <div class="row mb-3">
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label small fw-bold">Marca</label>
+                        <input type="text" id="retoma_marca" class="form-control bg-light" placeholder="Ej: Samsung">
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label small fw-bold">Referencia / Modelo *</label>
+                        <input type="text" id="retoma_modelo" class="form-control bg-light" placeholder="Ej: Galaxy S23" required>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label small fw-bold">Capacidad (Memoria)</label>
+                        <input type="text" id="retoma_memoria" class="form-control bg-light" placeholder="Ej: 128GB">
+                    </div>
+                </div>
+                <!-- Fila 2: Color, Batería -->
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">Color</label>
+                        <input type="text" id="retoma_color" class="form-control bg-light" placeholder="Ej: Negro">
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">Batería (%)</label>
+                        <input type="text" id="retoma_bateria" class="form-control bg-light" placeholder="Ej: 85">
+                    </div>
+                </div>
+                <!-- Fila 3: IMEI 1, IMEI 2 -->
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">IMEI 1 *</label>
+                        <input type="text" id="retoma_imei1" class="form-control bg-light" required>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">IMEI 2 (Opcional)</label>
+                        <input type="text" id="retoma_imei2" class="form-control bg-light">
+                    </div>
+                </div>
+                <!-- Fila 4: Valor de Retoma -->
+                <div class="row mb-3 bg-light p-2 rounded">
+                    <div class="col-12 mb-2">
+                        <label class="form-label small fw-bold text-success">Valor Acordado (Descuento) *</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-0">$</span>
+                            <input type="text" inputmode="numeric" id="retoma_valor" class="form-control bg-white fw-bold text-end format-price-ext" placeholder="Ej: 500.000" required>
+                        </div>
+                    </div>
+                </div>
+                <!-- Observaciones -->
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Observaciones / Estado</label>
+                    <textarea id="retoma_observaciones" class="form-control bg-light" rows="2" placeholder="Detalles de golpes, rayones, fallas..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-danger rounded-pill px-3" onclick="eliminarRetomaActual()" id="btnEliminarRetoma" style="display:none;"><i class="fa-solid fa-trash"></i> Eliminar</button>
+                <div>
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-dark rounded-pill fw-bold px-4" onclick="confirmarRetoma()">
+                        Guardar Retoma
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Producto Externo -->
+<div class="modal fade" id="modalProductoExterno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-mobile-screen-button me-2"></i> Ingresar Producto Externo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formProductoExterno">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row mb-3">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Marca</label>
+                            <select name="marca" id="ext_marca" class="form-select fw-semibold" onchange="actualizarModelosExterno(this.value)" required>
+                                <option value="">-- Seleccione Marca --</option>
+                                <option value="Apple">Apple</option>
+                                <option value="Samsung">Samsung</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Referencia (Modelo)</label>
+                            <select name="modelo_celular" id="ext_modelo_celular" class="form-select fw-semibold" required>
+                                <option value="">-- Primero elige Marca --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Capacidad</label>
+                            <input type="text" name="memoria" class="form-control" required>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Color</label>
+                            <input type="text" name="color" class="form-control">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Batería (%)</label>
+                            <input type="text" name="bateria" class="form-control">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-bold mb-0">Proveedor</label>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNuevoProveedorRapido">
+                                    <i class="fa-solid fa-plus-circle me-1"></i>Agregar
+                                </button>
+                            </div>
+                            <select name="proveedor" class="form-select select-proveedor-ext" required>
+                                <option value="" disabled selected>Seleccione...</option>
+                                {% for p in providers %}
+                                    <option value="{{ p.nombre }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">IMEI 1 (Obligatorio)</label>
+                            <input type="text" name="imei" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">IMEI 2</label>
+                            <input type="text" name="imei2" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row mb-3 bg-light p-2 rounded">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-danger">Costo ($)</label>
+                            <div class="input-group">
+                                <input type="password" name="precio_costo" class="form-control format-price-ext" required placeholder="0" autocomplete="off">
+                                <button class="btn btn-outline-secondary btn-toggle-costo" type="button" title="Mostrar / Ocultar costo">
+                                    <i class="fa-solid fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-success">Precio Sugerido ($)</label>
+                            <input type="text" name="precio_sugerido" class="form-control format-price-ext" required>
+                        </div>
+                        <div class="modal-footer border-0 pb-0">
+                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-success px-4" id="btnGuardarExterno"><i class="fa-solid fa-check ms-1"></i> Agregar a Venta</button>
+                        </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Accesorio Externo -->
+<div class="modal fade" id="modalAccesorioExterno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-mobile-retro me-2"></i> Ingresar Accesorio Externo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formAccesorioExterno">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">Nombre del Accesorio</label>
+                            <input type="text" name="nombre_accesorio" class="form-control" required placeholder="Ej. Carcasa, Audífonos...">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">Marca</label>
+                            <input type="text" name="marca" class="form-control" required>
+                        </div>
+                        <div class="col-md-12 mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-bold mb-0">Proveedor</label>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNuevoProveedorRapido">
+                                    <i class="fa-solid fa-plus-circle me-1"></i>Agregar
+                                </button>
+                            </div>
+                            <select name="proveedor" class="form-select select-proveedor-ext" required>
+                                <option value="" disabled selected>Seleccione...</option>
+                                {% for p in providers %}
+                                    <option value="{{ p.nombre }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3 bg-light p-2 rounded">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-danger">Costo ($)</label>
+                            <div class="input-group">
+                                <input type="password" name="precio_costo" class="form-control format-price-ext" required placeholder="0" autocomplete="off">
+                                <button class="btn btn-outline-secondary btn-toggle-costo" type="button" title="Mostrar / Ocultar costo">
+                                    <i class="fa-solid fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-info">Precio Sugerido ($)</label>
+                            <input type="text" name="precio_sugerido" class="form-control format-price-ext" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pb-0">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-info text-white px-4" id="btnGuardarAccesorioExterno"><i class="fa-solid fa-check ms-1"></i> Agregar a Venta</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Proveedor Rápido -->
+<div class="modal fade" id="modalNuevoProveedorRapido" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-truck-field me-2"></i> Agregar Nuevo Proveedor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNuevoProveedorRapido">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Nombre del Proveedor *</label>
+                        <input type="text" name="nombre" class="form-control" required placeholder="Ej: Samsung Colombia">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Empresa (Opcional)</label>
+                        <input type="text" name="empresa" class="form-control" placeholder="Ej: Distribuidora Oficial">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Teléfono (Opcional)</label>
+                        <input type="text" name="telefono" class="form-control" placeholder="Ej: 3001234567">
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btnGuardarProveedorRapido">
+                            <i class="fa-solid fa-save me-1"></i> Guardar Proveedor
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Motor Javascript Vanilla para procesar Cajas Dinámicas sin recargar -->
+<script>
+    const csrf_token = "{{ csrf_token() }}";
+    let carrito = [];
+    let activeProductData = null; // Guardar temporalmente el producto al abrir modal
+    let activeVariantsData = null; // Variantes temporales
+    let retomasLista = []; // Arreglo con datos de las retomas agregadas
+    let editRetomaIndex = -1;
+    let pagosMixtos = []; // Array de {metodo_pago, monto}
+
+    // Inicializar fecha de venta con la fecha de hoy (Solo Admin)
+    (function() {
+        const fechaInput = document.getElementById('fecha_venta_input');
+        if (!fechaInput) return; // Si no es admin, no existe en el DOM
+        
+        const hoy = new Date();
+        const yyyy = hoy.getFullYear();
+        const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+        const dd = String(hoy.getDate()).padStart(2, '0');
+        
+        fechaInput.value = `${yyyy}-${mm}-${dd}`;
+        fechaInput.max = `${yyyy}-${mm}-${dd}`; // No permitir fechas futuras
+        fechaInput.addEventListener('change', actualizarLabelFecha);
+    })();
+
+    function toggleFechaVenta() {
+        const container = document.getElementById('fecha_venta_container');
+        if (container) {
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+        }
+    }
+
+    function actualizarLabelFecha() {
+        const fechaInput = document.getElementById('fecha_venta_input');
+        const label = document.getElementById('fecha_display_label');
+        if (!fechaInput || !label) return;
+
+        const hoy = new Date();
+        const yyyy = hoy.getFullYear();
+        const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+        const dd = String(hoy.getDate()).padStart(2, '0');
+        const hoyStr = `${yyyy}-${mm}-${dd}`;
+
+        if (fechaInput.value === hoyStr || !fechaInput.value) {
+            label.innerHTML = '📅 Hoy';
+            label.className = 'badge bg-light text-dark border rounded-pill px-3 py-1';
+        } else {
+            const partes = fechaInput.value.split('-');
+            const fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+            label.innerHTML = `⚠️ ${fechaFormateada}`;
+            label.className = 'badge bg-warning bg-opacity-25 text-dark border border-warning rounded-pill px-3 py-1';
+        }
+    }
+    const LISTA_PROVEEDORES = [
+        {% for prov in providers %}
+        { id: {{ prov.id }}, nombre: {{ prov.nombre|tojson }}, saldo: {{ prov.saldo_pendiente|int }} },
+        {% endfor %}
+    ];
+
+    const METODOS_DISPONIBLES = [
+        { value: 'efectivo',      label: '💵 Efectivo' },
+        { value: 'nequi',         label: '🟣 Nequi' },
+        { value: 'bancolombia',   label: '🏦 Bancolombia' },
+        { value: 'davivienda',    label: '🏦 Davivienda' },
+        { value: 'daviplata',     label: '📲 Daviplata' },
+        { value: 'bold',          label: '⚡ Bold (Datáfono)' },
+        { value: 'addi',          label: '🛒 Addi' },
+        { value: 'sistecredito',  label: '💳 Sistecrédito' },
+        { value: 'abono_tercero', label: '🤝 Abono a Terceros / Proveedor' }
+    ];
+
+    function toggleCamposAbonoTerceroUnico(valor) {
+        const divAbono = document.getElementById('campos_abono_tercero_unico');
+        const divProv = document.getElementById('div_proveedor_abono_unico');
+        const titulo = document.getElementById('titulo_comprobante_unico');
+        if (divAbono) {
+            divAbono.style.display = (valor !== 'efectivo') ? 'block' : 'none';
+        }
+        if (divProv) {
+            divProv.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+        }
+        if (titulo) {
+            if (valor === 'abono_tercero') {
+                titulo.innerHTML = '<i class="fa-solid fa-handshake me-1 text-warning"></i> Datos del Abono a Proveedor:';
+            } else {
+                titulo.innerHTML = '<i class="fa-solid fa-camera me-1 text-warning"></i> Comprobante de Pago Obligatorio:';
+            }
+        }
+    }
+
+    function limpiarComprobanteUnico() {
+        const metodoEl = document.getElementById('metodo-pago');
+        if (metodoEl) metodoEl.value = 'efectivo';
+        const compHidden = document.getElementById('abono_comprobante_unico');
+        if (compHidden) compHidden.value = '';
+        const fileIn = document.getElementById('file_comprobante_unico');
+        if (fileIn) fileIn.value = '';
+        const lbl = document.getElementById('label_btn_upload_unico');
+        if (lbl) lbl.textContent = 'Adjuntar Imagen Comprobante';
+        const prev = document.getElementById('preview_comprobante_unico');
+        if (prev) prev.style.display = 'none';
+        const provSel = document.getElementById('abono_provider_id_unico');
+        if (provSel) provSel.value = '';
+        toggleCamposAbonoTerceroUnico('efectivo');
+    }
+
+    async function subirImagenComprobante(fileInput, hiddenInputId, labelBtnId, previewId) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(labelBtnId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+        const preview = document.getElementById(previewId);
+        const nombreArchivoSpan = document.getElementById('nombre_archivo_unico');
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo imagen...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf_token },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                if (hiddenInput) hiddenInput.value = data.relative_path || data.filename;
+                if (label) label.textContent = 'Comprobante Listo';
+                if (preview) preview.style.display = 'block';
+                if (nombreArchivoSpan) nombreArchivoSpan.textContent = file.name;
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Adjuntar Imagen Comprobante';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen del comprobante.');
+            if (label) label.textContent = 'Adjuntar Imagen Comprobante';
+        }
+    }
+
+    async function subirImagenComprobanteMixto(fileInput, index) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(`label_upload_mixto_${index}`);
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrf_token },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                actualizarPagoParcial(index, 'comprobante', data.relative_path || data.filename);
+                renderizarPagosMixtos();
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Adjuntar Imagen';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen.');
+            if (label) label.textContent = 'Adjuntar Imagen';
+        }
+    }
+
+    // Capturar el ESCANER ("Enter" en el teclado sin enviar un formulario)
+    document.getElementById('sku_input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            buscarYAgregarProducto();
+        }
+    });
+
+    document.getElementById('btn_add_product').addEventListener('click', buscarYAgregarProducto);
+    document.getElementById('btn_clear_cart').addEventListener('click', () => {
+        carrito = [];
+        retomasLista = [];
+        renderizarCarrito();
+        resetPagosMixtos();
+    });
+
+
+
+
+    // Toggle entre Pago Único y Pago Mixto
+    document.getElementById('toggle_pago_mixto').addEventListener('change', function() {
+        const unicoSec = document.getElementById('pago_unico_section');
+        const mixtoSec = document.getElementById('pago_mixto_section');
+        
+        if (this.checked) {
+            unicoSec.style.display = 'none';
+            mixtoSec.style.display = 'block';
+            // Inicializar con un primer pago parcial
+            if (pagosMixtos.length === 0) {
+                agregarPagoParcial();
+            }
+            actualizarSaldoRestante();
+        } else {
+            unicoSec.style.display = 'block';
+            mixtoSec.style.display = 'none';
+        }
+    });
+
+    document.getElementById('btn_agregar_pago').addEventListener('click', agregarPagoParcial);
+
+    function agregarPagoParcial() {
+        pagosMixtos.push({ metodo_pago: 'efectivo', monto: 0, provider_id: null, comprobante: '' });
+        renderizarPagosMixtos();
+    }
+
+    function eliminarPagoParcial(index) {
+        if (pagosMixtos.length <= 1) {
+            alert('Debe existir al menos un método de pago.');
+            return;
+        }
+        pagosMixtos.splice(index, 1);
+        renderizarPagosMixtos();
+    }
+
+    function actualizarPagoParcial(index, campo, valor) {
+        if (campo === 'metodo_pago') {
+            pagosMixtos[index].metodo_pago = valor;
+            renderizarPagosMixtos();
+            return;
+        }
+        if (campo === 'monto') {
+            pagosMixtos[index].monto = parseFloat(valor) || 0;
+        }
+        if (campo === 'provider_id') {
+            pagosMixtos[index].provider_id = valor ? parseInt(valor) : null;
+        }
+        if (campo === 'comprobante') {
+            pagosMixtos[index].comprobante = valor.trim();
+        }
+        actualizarSaldoRestante();
+    }
+
+    function resetPagosMixtos() {
+        pagosMixtos = [];
+        const toggle = document.getElementById('toggle_pago_mixto');
+        if (toggle.checked) {
+            agregarPagoParcial();
+        }
+        renderizarPagosMixtos();
+        actualizarSaldoRestante();
+    }
+
+    function obtenerGranTotal() {
+        let granTotal = carrito.reduce((sum, item) => sum + (item.cantidad * item.precio_final), 0);
+        let valorRetomaTotal = retomasLista.reduce((sum, r) => sum + (parseFloat(r.valor_retoma) || 0), 0);
+        return Math.max(0, granTotal - valorRetomaTotal);
+    }
+    
+    const formatoCOP = (num) => "$" + Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+    function actualizarSaldoRestante() {
+        const granTotal = obtenerGranTotal();
+        const sumaPagos = pagosMixtos.reduce((sum, p) => sum + (p.monto || 0), 0);
+        const saldo = granTotal - sumaPagos;
+        
+        const saldoEl = document.getElementById('saldo_restante');
+        const alertEl = document.getElementById('saldo_restante_alert');
+        const barraEl = document.getElementById('barra_progreso_pago');
+        
+        saldoEl.innerText = formatoCOP(Math.abs(saldo));
+        
+        // Calcular progreso
+        const porcentaje = granTotal > 0 ? Math.min((sumaPagos / granTotal) * 100, 100) : 0;
+        barraEl.style.width = porcentaje + '%';
+        
+        // Estados visuales
+        alertEl.classList.remove('saldo-cubierto', 'saldo-excedido');
+        if (saldo === 0 && granTotal > 0) {
+            alertEl.classList.add('saldo-cubierto');
+            saldoEl.style.color = '#28a745';
+            barraEl.style.background = 'linear-gradient(90deg, #28a745, #34ce57)';
+            document.querySelector('#saldo_restante_alert small').innerHTML = '<i class="fa-solid fa-circle-check me-1"></i> ¡Pago completo!';
+        } else if (saldo < 0) {
+            alertEl.classList.add('saldo-excedido');
+            saldoEl.style.color = '#dc3545';
+            saldoEl.innerText = '+' + formatoCOP(Math.abs(saldo));
+            barraEl.style.background = 'linear-gradient(90deg, #dc3545, #e74c5c)';
+            document.querySelector('#saldo_restante_alert small').innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Excedente:';
+        } else {
+            saldoEl.style.color = 'var(--brand-blue)';
+            barraEl.style.background = 'linear-gradient(90deg, #A3D8DE, #7BC8D0)';
+            document.querySelector('#saldo_restante_alert small').innerHTML = '<i class="fa-solid fa-scale-balanced me-1"></i> Saldo por cubrir:';
+        }
+    }
+
+    function renderizarPagosMixtos() {
+        const container = document.getElementById('pagos_list');
+        container.innerHTML = '';
+
+        pagosMixtos.forEach((pago, index) => {
+            const div = document.createElement('div');
+            div.className = 'pago-item p-2 bg-white rounded-3 border shadow-sm mb-2';
+            
+            // Select del método
+            let optionsHtml = METODOS_DISPONIBLES.map(m => 
+                `<option value="${m.value}" ${m.value === pago.metodo_pago ? 'selected' : ''}>${m.label}</option>`
+            ).join('');
+
+            let abonoCamposHtml = '';
+            if (pago.metodo_pago !== 'efectivo') {
+                if (pago.metodo_pago === 'abono_tercero') {
+                    let provOptions = LISTA_PROVEEDORES.map(pr => 
+                        `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
+                    ).join('');
+
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25">
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold text-muted mb-1 d-block">Proveedor Destinatario <span class="text-danger">*</span></label>
+                                    <select class="form-select form-select-sm border-0 shadow-sm" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
+                                        <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
+                                        ${provOptions}
+                                    </select>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold text-muted mb-1 d-block">Imagen Comprobante <span class="text-danger">*</span></label>
+                                    <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                    <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                        <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                        <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen'}</span>
+                                        <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                    </label>
+                                    ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 bg-warning bg-opacity-10 rounded border border-warning border-opacity-25">
+                            <div>
+                                <label class="extra-small fw-bold text-muted mb-1 d-block"><i class="fa-solid fa-camera text-warning me-1"></i>Imagen Comprobante de Pago <span class="text-danger">*</span></label>
+                                <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen Comprobante'}</span>
+                                    <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                </label>
+                                ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            div.innerHTML = `
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm border-0 shadow-sm bg-light" style="cursor: pointer; flex: 1;" onchange="actualizarPagoParcial(${index}, 'metodo_pago', this.value)">
+                        ${optionsHtml}
+                    </select>
+                    <div class="input-group input-group-sm" style="flex: 1;">
+                        <span class="input-group-text bg-light border-0">$</span>
+                        <input type="number" class="form-control border-0 shadow-sm text-end" placeholder="Monto" value="${pago.monto > 0 ? Math.round(pago.monto) : ''}" 
+                               oninput="actualizarPagoParcial(${index}, 'monto', this.value)" 
+                               step="1" min="0">
+                    </div>
+                    <button type="button" class="btn btn-sm text-danger px-2" onclick="eliminarPagoParcial(${index})" title="Quitar este pago">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                ${abonoCamposHtml}
+            `;
+            container.appendChild(div);
+        });
+
+        actualizarSaldoRestante();
+    }
+
+    async function buscarYAgregarProducto() {
+        const inputStr = document.getElementById('sku_input');
+        const sku = inputStr.value.trim();
+        if (!sku) return;
+
+        try {
+            // Mandar solicitud JSON rápida a nuestra ruta Flask
+            const response = await fetch(`/sales/api/producto/${encodeURIComponent(sku)}`);
+            if (!response.ok) {
+                alert(`Error: El SKU '${sku}' no existe en la base de datos.`);
+                inputStr.value = '';
+                return;
+            }
+
+            const producto = await response.json();
+
+            const existente = carrito.find(item => item.id === producto.id && (!item.variantes || item.variantes.length === 0));
+            if (existente) {
+                // Validación Estricta: Sobreventa (Stock) en productos planos
+                if (existente.cantidad + 1 > producto.cantidad_stock) {
+                    alert(`¡Stock insuficiente! Solo te quedan ${producto.cantidad_stock} unidades de ${producto.nombre}.`);
+                } else {
+                    existente.cantidad++;
+                }
+            } else {
+                if (producto.cantidad_stock <= 0) {
+                    alert(`¡Sin Stock Físico! No puedes vender o agregar ${producto.nombre}.`);
+                    return;
+                }
+                
+                // Si es nuevo, inicializar con el array. Permite encolar un renglón nuevo si tiene variantes.
+                let initial_variant_id = null;
+                let initial_precio = producto.precio_sugerido;
+                let initial_limite = producto.precio_limite;
+                let initial_minimo = producto.precio_minimo;
+                
+                if (producto.variantes && producto.variantes.length > 0) {
+                    let defaultVar = producto.variantes[0];
+                    if (producto.auto_select_variant) {
+                        const foundVar = producto.variantes.find(v => v.id === producto.auto_select_variant);
+                        if (foundVar) defaultVar = foundVar;
+                    }
+                    initial_variant_id = defaultVar.id;
+                    initial_precio = defaultVar.precio_sugerido;
+                    initial_limite = defaultVar.precio_limite;
+                    initial_minimo = defaultVar.precio_minimo;
+                }
+
+                carrito.push({
+                    id: producto.id,
+                    sku: producto.sku,
+                    nombre: producto.nombre,
+                    tipo_inventario: producto.tipo_inventario,
+                    cantidad: 1,
+                    precio_final: initial_precio, 
+                    precio_limite: initial_limite,
+                    precio_minimo: initial_minimo,
+                    cantidad_stock: producto.cantidad_stock,
+                    variantes: producto.variantes,
+                    variant_id: initial_variant_id,
+                    es_obsequio: false,
+                    imei: producto.imei,
+                    imei2: producto.imei2
+                });
+            }
+
+            inputStr.value = ''; // Limpiar cajón para el próximo escaneo
+            renderizarCarrito();
+            
+        } catch (error) {
+            console.error('Error Catcher:', error);
+            alert('Error comunicándose con el Backend (Flask). Verifica el servidor.');
+        }
+    }
+
+    // Detector interactivo de Casillas Precio/Cantidad editadas en Real-Time
+    function actualizarItem(index, campo, valor) {
+        const item = carrito[index];
+        
+        if (campo === 'cantidad') {
+            const nuevaCantidad = parseInt(valor);
+            if (nuevaCantidad <= 0) {
+                alert('La cantidad no debe reducirse en negativo, presiona el cesto de basura para borrar.'); 
+                renderizarCarrito();
+                return;
+            }
+            
+            // Los productos manuales no tienen stock real que validar
+            if (!item.es_manual) {
+                // Validar stock de la variante si existe, si no del producto base
+                let max_stock = item.cantidad_stock;
+                if (item.variantes && item.variantes.length > 0) {
+                    const varSel = item.variantes.find(v => v.id == item.variant_id);
+                    if(varSel) max_stock = varSel.stock;
+                }
+
+                if (nuevaCantidad > max_stock) {
+                    alert(`La empresa no cuenta con Stock suficiente en esta variante/producto. Inventario Máximo: ${max_stock}`);
+                    renderizarCarrito();
+                    return;
+                }
+            }
+            item.cantidad = nuevaCantidad;
+        }
+
+        if (campo === 'variant_id') {
+            item.variant_id = parseInt(valor);
+            
+            const varSel = item.variantes.find(v => v.id == item.variant_id);
+            if (varSel) {
+                if (item.cantidad > varSel.stock) {
+                    alert(`Has seleccionado una variante con poco stock (${varSel.stock}). Se ajustará la cantidad.`);
+                    item.cantidad = varSel.stock > 0 ? varSel.stock : 1;
+                }
+                // Update specific variant bounds & price
+                item.precio_final = varSel.precio_sugerido;
+                item.precio_limite = varSel.precio_limite;
+                item.precio_minimo = varSel.precio_minimo;
+            }
+        }
+
+        if (campo === 'precio_final') {
+            const nuevoPrecio = parseFloat(valor);
+            item.precio_final = nuevoPrecio;
+            
+            // Regla de Negocio: Disparar aprobación inmediatamente si es muy bajo
+            if (!item.es_obsequio && nuevoPrecio < item.precio_limite) {
+                if (!item.aprobacion_remota || item.aprobacion_remota < nuevoPrecio) {
+                    renderizarCarrito(); // Redibujar antes de mostrar modal
+                    startApprovalProcess(index, item);
+                    return;
+                }
+            }
+        }
+        
+        renderizarCarrito(); // Redibujar siempre al procesar total
+    }
+
+    function eliminarItem(index) {
+        carrito.splice(index, 1);
+        renderizarCarrito();
+    }
+
+    function toggleObsequio(index) {
+        let item = carrito[index];
+        if (item.es_obsequio) {
+            item.es_obsequio = false;
+            // Restaurar precio sugerido
+            item.precio_final = item.precio_sugerido || 0;
+        } else {
+            item.es_obsequio = true;
+            item.precio_final = 0;
+        }
+        renderizarCarrito();
+    }
+
+    function renderizarCarrito() {
+        const tbody = document.getElementById('cart_body');
+        const totalAmountEl = document.getElementById('total_amount');
+        const subtotalAmountEl = document.getElementById('subtotal_amount');
+        const totalItemsEl = document.getElementById('total_items');
+        const retomaRow = document.getElementById('retoma_discount_row');
+        
+        tbody.innerHTML = '';
+        let granTotal = 0;
+        let totalItems = 0;
+
+        if (carrito.length === 0) {
+            tbody.innerHTML = `<tr>
+                <td colspan="5" class="text-center py-5 text-muted" id="empty_cart_msg">
+                    <i class="fa-solid fa-cart-arrow-down fs-2 mb-2 d-block text-brand-pink opacity-50"></i>
+                    La venta está vacía actualmente.
+                </td>
+            </tr>`;
+            subtotalAmountEl.innerText = '$0';
+            totalAmountEl.innerText = '$0';
+            totalItemsEl.innerText = '0';
+            
+            if (retomaRow) retomaRow.style.setProperty('display', 'none', 'important');
+            return;
+        }
+
+        // Iterar los productos virtuales agregados y dibujar cascarones DOM
+        carrito.forEach((item, index) => {
+            const subtotal = item.cantidad * item.precio_final;
+            granTotal += subtotal;
+            totalItems += item.cantidad;
+
+            let variantHtml = '';
+            if (item.variantes && item.variantes.length > 0) {
+                variantHtml = `<select class="form-select form-select-sm mt-1 text-secondary bg-light border-0 shadow-sm" onchange="actualizarItem(${index}, 'variant_id', this.value)">`;
+                item.variantes.forEach(v => {
+                    let selected = (v.id == item.variant_id) ? "selected" : "";
+                    // Si tiene 0 despintar opción o alertarlo
+                    let disableStr = v.stock <= 0 ? "(Sin stock)" : `(Stock: ${v.stock})`;
+                    variantHtml += `<option value="${v.id}" ${selected}>${v.nombre} ${disableStr}</option>`;
+                });
+                variantHtml += `</select>`;
+            }
+
+            const tr = document.createElement('tr');
+            // Celdas DOM
+            let skuLabel = '';
+            if (item.es_manual) {
+                skuLabel = `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2" style="font-size: 0.7rem;"><i class="fa-solid fa-handshake me-1"></i>EXTERNO</span>`;
+            } else {
+                skuLabel = `<small class="text-muted">${item.sku}</small>`;
+            }
+            let isObsequioClass = item.es_obsequio ? 'text-success' : 'text-muted';
+            let precioInputState = item.es_obsequio ? 'disabled' : '';
+
+            let approvalBadgeHtml = '';
+            if (item.estado_aprobacion === 'pendiente') {
+                approvalBadgeHtml = `<div class="mt-1"><span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill"><i class="fa-solid fa-clock fa-spin me-1"></i>Falta Aprobación</span></div>`;
+            } else if (item.estado_aprobacion === 'aprobado') {
+                approvalBadgeHtml = `<div class="mt-1"><span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill"><i class="fa-solid fa-check me-1"></i>Aprobado</span></div>`;
+            } else if (item.estado_aprobacion === 'rechazado') {
+                approvalBadgeHtml = `<div class="mt-1"><span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill"><i class="fa-solid fa-xmark me-1"></i>Rechazado</span></div>`;
+            }
+
+            let imeiHtml = '';
+            if (item.tipo_inventario === 'celulares') {
+                let imei1_str = item.imei ? `IMEI 1: ${item.imei}` : 'IMEI 1: N/D';
+                let imei2_str = item.imei2 ? `, IMEI 2: ${item.imei2}` : '';
+                let inv_str = item.inventario ? ` | Inv: ${item.inventario}` : '';
+                imeiHtml = `<div class="text-secondary small mt-1" style="font-size: 0.75rem;"><i class="fa-solid fa-mobile-screen-button me-1"></i>${imei1_str}${imei2_str}${inv_str}</div>`;
+            }
+
+            tr.innerHTML = `
+                <td>
+                    <div class="fw-bold text-brand-black">${item.nombre}</div>
+                    ${skuLabel}
+                    ${imeiHtml}
+                    ${item.es_obsequio ? '<span class="badge bg-success bg-opacity-10 text-success ms-2"><i class="fa-solid fa-gift me-1"></i>Obsequio</span>' : ''}
+                    ${variantHtml}
+                </td>
+                <td width="130">
+                    <input type="number" class="form-control form-control-sm text-center" value="${item.cantidad}" onchange="actualizarItem(${index}, 'cantidad', this.value)">
+                </td>
+                <td width="180">
+                    ${item.es_manual ? `
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0">$</span>
+                        <input type="number" step="1" class="form-control text-end border-start-0 pe-2" value="${Math.round(item.precio_final)}" onchange="actualizarItem(${index}, 'precio_final', this.value)" ${precioInputState}>
+                    </div>
+                    ${approvalBadgeHtml}
+                    ` : `
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0">$</span>
+                        <input type="number" step="1" class="form-control text-end border-start-0 pe-2" value="${Math.round(item.precio_final)}" onchange="actualizarItem(${index}, 'precio_final', this.value)" ${precioInputState}>
+                        <button class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button" data-bs-toggle="dropdown" aria-expanded="false" ${precioInputState}>
+                            <span class="visually-hidden">Opciones</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                            <li><h6 class="dropdown-header">Precios Definidos</h6></li>
+                            <li><a class="dropdown-item py-2" href="#" onclick="event.preventDefault(); actualizarItem(${index}, 'precio_final', ${item.precio_minimo})">
+                                <div class="d-flex justify-content-between">
+                                    <span>💸 Precio Mínimo</span>
+                                    <span class="fw-bold ms-3">${formatoCOP(item.precio_minimo)}</span>
+                                </div>
+                            </a></li>
+                            <li><a class="dropdown-item py-2 text-primary" href="#" onclick="event.preventDefault(); actualizarItem(${index}, 'precio_final', ${item.precio_sugerido})">
+                                <div class="d-flex justify-content-between">
+                                    <span>🏷️ Precio Sugerido</span>
+                                    <span class="fw-bold ms-3">${formatoCOP(item.precio_sugerido)}</span>
+                                </div>
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><div class="px-3 py-1 small text-muted">Límite Permitido: ${formatoCOP(item.precio_limite)}</div></li>
+                        </ul>
+                    </div>
+                    ${approvalBadgeHtml}
+                    `}
+                </td>
+                <td class="text-end fw-bold text-brand-black" width="120">
+                    ${formatoCOP(subtotal)}
+                </td>
+                <td class="text-center" width="90">
+                    {% if current_user.rol == 'admin' %}
+                    <button class="btn btn-sm ${isObsequioClass} me-1" title="Marcar como Obsequio" onclick="toggleObsequio(${index})">
+                        <i class="fa-solid fa-gift"></i>
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-sm text-danger" onclick="eliminarItem(${index})"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const retomaAmountEl = document.getElementById('retoma_amount');
+        const retomasCountEl = document.getElementById('retomas_count');
+        const retomasContainer = document.getElementById('retomas_list_container');
+
+        if (subtotalAmountEl) subtotalAmountEl.innerText = formatoCOP(granTotal);
+
+        let valorRetomaTotal = 0;
+        if (retomasLista.length > 0) {
+            valorRetomaTotal = retomasLista.reduce((sum, r) => sum + (parseFloat(r.valor_retoma) || 0), 0);
+            if (retomaRow) retomaRow.style.setProperty('display', 'block', 'important');
+            if (retomaAmountEl) retomaAmountEl.innerText = '-' + formatoCOP(valorRetomaTotal);
+            if (retomasCountEl) retomasCountEl.innerText = retomasLista.length;
+
+            if (retomasContainer) {
+                retomasContainer.innerHTML = retomasLista.map((r, i) => `
+                    <div class="d-flex justify-content-between align-items-center py-1 border-bottom border-light text-dark small">
+                        <div class="text-truncate me-2" style="max-width: 65%;">
+                            <strong class="text-danger"><i class="fa-solid fa-mobile-screen me-1"></i>${r.marca ? r.marca + ' ' : ''}${r.modelo}</strong>
+                            <small class="text-muted d-block text-truncate" style="font-size: 0.75rem;">IMEI: ${r.imei1} ${r.color ? '| ' + r.color : ''}</small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="fw-bold text-danger me-2" style="font-size: 0.85rem;">-${formatoCOP(r.valor_retoma)}</span>
+                            <button type="button" class="btn btn-link text-primary p-0 me-2 border-0" onclick="abrirModalRetoma(${i})" title="Editar retoma">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="eliminarRetoma(${i})" title="Eliminar retoma">
+                                <i class="fa-solid fa-xmark fs-6"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } else {
+            if (retomaRow) retomaRow.style.setProperty('display', 'none', 'important');
+        }
+
+        const totalPagar = Math.max(0, granTotal - valorRetomaTotal);
+        totalAmountEl.innerText = formatoCOP(totalPagar);
+        totalItemsEl.innerText = totalItems;
+
+        // Actualizar saldo restante si estamos en modo mixto
+        if (document.getElementById('toggle_pago_mixto').checked) {
+            actualizarSaldoRestante();
+        }
+    }
+
+    document.getElementById('btn_process_sale').addEventListener('click', function() {
+        if (carrito.length === 0) {
+            return alert('Agregue un número de serie válido. El carrito está vacío.');
+        }
+
+        checkApprovalsAndProceed();
+    });
+
+    function abrirModalRetoma(index = -1) {
+        editRetomaIndex = index;
+        const btnEliminar = document.getElementById('btnEliminarRetoma');
+        const modalTitle = document.querySelector('#modalRetoma .modal-title');
+
+        if (index >= 0 && index < retomasLista.length) {
+            const r = retomasLista[index];
+            const valNum = parseInt(r.valor_retoma, 10);
+            document.getElementById('retoma_valor').value = !isNaN(valNum) ? valNum.toLocaleString('es-CO') : (r.valor_retoma || '');
+            document.getElementById('retoma_marca').value = r.marca || '';
+            document.getElementById('retoma_modelo').value = r.modelo || '';
+            document.getElementById('retoma_imei1').value = r.imei1 || '';
+            document.getElementById('retoma_imei2').value = r.imei2 || '';
+            document.getElementById('retoma_color').value = r.color || '';
+            document.getElementById('retoma_bateria').value = r.bateria || '';
+            document.getElementById('retoma_memoria').value = r.memoria || '';
+            document.getElementById('retoma_observaciones').value = r.observaciones || '';
+            if (btnEliminar) btnEliminar.style.display = 'block';
+            if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>Editar Equipo en Retoma';
+        } else {
+            limpiarFormularioRetoma();
+            if (btnEliminar) btnEliminar.style.display = 'none';
+            if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-recycle me-2"></i>Añadir Equipo en Retoma';
+        }
+        
+        const modalEl = document.getElementById('modalRetoma');
+        let modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (!modalInstance) {
+            modalInstance = new bootstrap.Modal(modalEl);
+        }
+        modalInstance.show();
+    }
+
+    function limpiarFormularioRetoma() {
+        document.getElementById('retoma_valor').value = '';
+        document.getElementById('retoma_marca').value = '';
+        document.getElementById('retoma_modelo').value = '';
+        document.getElementById('retoma_imei1').value = '';
+        document.getElementById('retoma_imei2').value = '';
+        document.getElementById('retoma_color').value = '';
+        document.getElementById('retoma_bateria').value = '';
+        document.getElementById('retoma_memoria').value = '';
+        document.getElementById('retoma_observaciones').value = '';
+    }
+
+    function confirmarRetoma() {
+        const rawValor = (document.getElementById('retoma_valor').value || '').toString().replace(/\D/g, '');
+        const valor = parseFloat(rawValor);
+        const modelo = document.getElementById('retoma_modelo').value.trim();
+        const imei1 = document.getElementById('retoma_imei1').value.trim();
+
+        if (isNaN(valor) || valor <= 0) {
+            return alert('Debes ingresar un valor de descuento válido para la retoma.');
+        }
+
+        if (!modelo || !imei1) {
+            return alert('El modelo y el IMEI 1 son obligatorios para la retoma.');
+        }
+
+        const imeiDuplicado = retomasLista.some((r, idx) => idx !== editRetomaIndex && r.imei1 === imei1);
+        if (imeiDuplicado) {
+            return alert(`⚠️ El IMEI 1 (${imei1}) ya fue ingresado en otra retoma de esta venta.`);
+        }
+
+        const retomaObj = {
+            valor_retoma: valor,
+            marca: document.getElementById('retoma_marca').value.trim(),
+            modelo: modelo,
+            imei1: imei1,
+            imei2: document.getElementById('retoma_imei2').value.trim(),
+            color: document.getElementById('retoma_color').value.trim(),
+            bateria: document.getElementById('retoma_bateria').value.trim(),
+            memoria: document.getElementById('retoma_memoria').value.trim(),
+            observaciones: document.getElementById('retoma_observaciones').value.trim()
+        };
+
+        if (editRetomaIndex >= 0 && editRetomaIndex < retomasLista.length) {
+            retomasLista[editRetomaIndex] = retomaObj;
+        } else {
+            retomasLista.push(retomaObj);
+        }
+
+        limpiarFormularioRetoma();
+
+        const modalEl = document.getElementById('modalRetoma');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+
+        renderizarCarrito();
+    }
+
+    function eliminarRetoma(index) {
+        if (index >= 0 && index < retomasLista.length) {
+            retomasLista.splice(index, 1);
+            renderizarCarrito();
+        }
+    }
+
+    function eliminarRetomaActual() {
+        if (editRetomaIndex >= 0 && editRetomaIndex < retomasLista.length) {
+            retomasLista.splice(editRetomaIndex, 1);
+        }
+        limpiarFormularioRetoma();
+        const modalEl = document.getElementById('modalRetoma');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+        
+        renderizarCarrito();
+    }
+
+    // Prevenir que la tecla 'Enter' (enviada por el lector de código de barras al leer el IMEI) cierre los modales de Retoma, Productos Externos o Accesorios Externos
+    document.querySelectorAll('#modalRetoma input, #modalRetoma textarea, #modalProductoExterno input, #modalProductoExterno select, #modalAccesorioExterno input, #modalAccesorioExterno select').forEach(input => {
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const modal = this.closest('.modal');
+                if (!modal) return;
+                const campos = Array.from(modal.querySelectorAll('input:not([type="hidden"]), select, textarea'));
+                const idx = campos.indexOf(this);
+                if (idx > -1 && idx + 1 < campos.length) {
+                    campos[idx + 1].focus();
+                    if (typeof campos[idx + 1].select === 'function') {
+                        campos[idx + 1].select();
+                    }
+                }
+            }
+        });
+    });
+
+    function verificarClienteCelular() {
+        const tieneCelular = carrito.some(item => item.tipo_inventario === 'celulares' || (item.tipo_inventario === 'externos' && !item.nombre.startsWith('Acc. Externo')));
+        if (tieneCelular) {
+            // Mostrar modal de cliente
+            const modalCliente = new bootstrap.Modal(document.getElementById('modalClienteCelular'));
+            modalCliente.show();
+        } else {
+            // Procesar normal sin cliente
+            procesarPago(null);
+        }
+    }
+
+    // Auto-buscar cliente por cédula
+    document.getElementById('modalClienteCelular').addEventListener('shown.bs.modal', function() {
+        // Reset state each time modal opens
+        document.getElementById('cliente_documento').value = '';
+        document.getElementById('cliente_nombre').value = '';
+        document.getElementById('cliente_telefono').value = '';
+        document.getElementById('cliente_email').value = '';
+        document.getElementById('cliente_direccion').value = '';
+        document.getElementById('cliente_found_badge').style.display = 'none';
+        document.getElementById('cliente_lookup_msg').textContent = '';
+        document.getElementById('cliente_documento').focus();
+    });
+
+    document.getElementById('cliente_documento').addEventListener('blur', async function() {
+        const doc = this.value.trim();
+        if (!doc) return;
+
+        const spinner = document.getElementById('cliente_lookup_spinner');
+        const badge = document.getElementById('cliente_found_badge');
+        const msg = document.getElementById('cliente_lookup_msg');
+
+        spinner.style.display = 'flex';
+        badge.style.display = 'none';
+        msg.textContent = '';
+
+        try {
+            const res = await fetch(`/celulares/api/cliente/buscar?documento=${encodeURIComponent(doc)}`);
+            const data = await res.json();
+            spinner.style.display = 'none';
+            if (data.encontrado) {
+                document.getElementById('cliente_nombre').value = data.nombre;
+                document.getElementById('cliente_telefono').value = data.telefono;
+                document.getElementById('cliente_email').value = data.email || '';
+                document.getElementById('cliente_direccion').value = data.direccion || '';
+                badge.style.display = 'flex';
+                msg.innerHTML = '<span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Cliente encontrado y datos cargados.</span>';
+            } else {
+                msg.innerHTML = '<span class="text-muted"><i class="fa-solid fa-user-plus me-1"></i>Cliente nuevo. Ingresa sus datos.</span>';
+            }
+        } catch(e) {
+            spinner.style.display = 'none';
+        }
+    });
+
+    function confirmarVentaCelular() {
+        const nombre = document.getElementById('cliente_nombre').value.trim();
+        const doc = document.getElementById('cliente_documento').value.trim();
+        const tel = document.getElementById('cliente_telefono').value.trim();
+        const email = document.getElementById('cliente_email').value.trim();
+        const direccion = document.getElementById('cliente_direccion').value.trim();
+
+        if (!nombre || !doc || !tel) {
+            return alert('Por favor completa todos los datos del cliente.');
+        }
+
+        const datosCliente = {
+            nombre: nombre,
+            documento: doc,
+            telefono: tel,
+            email: email,
+            direccion: direccion
+        };
+
+        const modalEl = document.getElementById('modalClienteCelular');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        modalInstance.hide();
+
+        procesarPago(datosCliente);
+    }
+
+    // Evento Transaccional JSON de Salida
+    async function procesarPago(datosCliente = null) {
+
+        const esBodega = {% if sucursal_actual and sucursal_actual.tipo == 'bodega' %}true{% else %}false{% endif %};
+        const asesorSelect = document.getElementById('asesor-vendedor');
+        const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
+
+        const esMixto = document.getElementById('toggle_pago_mixto').checked;
+
+        // Construir el payload de pagos
+        let pagosPayload = [];
+
+        if (esMixto) {
+            // Validar pagos mixtos
+            const granTotal = obtenerGranTotal();
+            let sumaPagos = 0;
+
+            for (let i = 0; i < pagosMixtos.length; i++) {
+                const p = pagosMixtos[i];
+                const mObj = METODOS_DISPONIBLES.find(m => m.value === p.metodo_pago);
+                const mLabel = mObj ? mObj.label : p.metodo_pago;
+
+                if (!p.monto || p.monto <= 0) {
+                    return alert(`El pago #${i + 1} (${mLabel}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
+                }
+                if (p.metodo_pago === 'abono_tercero' && !p.provider_id) {
+                    return alert(`El pago #${i + 1} (${mLabel}) requiere seleccionar el Proveedor destinatario.`);
+                }
+                if (p.metodo_pago !== 'efectivo' && (!p.comprobante || !p.comprobante.trim())) {
+                    return alert(`⚠️ El pago #${i + 1} (${mLabel}) requiere adjuntar obligatoriamente la imagen del comprobante de pago antes de efectuar la venta.`);
+                }
+                sumaPagos += p.monto;
+                pagosPayload.push({
+                    metodo_pago: p.metodo_pago,
+                    monto: Math.round(p.monto),
+                    provider_id: p.metodo_pago === 'abono_tercero' ? p.provider_id : null,
+                    comprobante: p.metodo_pago !== 'efectivo' ? p.comprobante.trim() : null
+                });
+            }
+
+            // Validar que la suma sea correcta
+            if (Math.round(sumaPagos) !== Math.round(granTotal)) {
+                const diff = Math.round(granTotal) - Math.round(sumaPagos);
+                return alert(`⚠️ La suma de los pagos ($${formatoCOP(sumaPagos).replace('$','')}) no coincide con el total de la venta ($${formatoCOP(granTotal).replace('$','')}). Falta: $${formatoCOP(Math.abs(diff)).replace('$','')}`);
+            }
+        } else {
+            const metodoPago = document.getElementById('metodo-pago').value;
+            const mObj = METODOS_DISPONIBLES.find(m => m.value === metodoPago);
+            const mLabel = mObj ? mObj.label : metodoPago;
+            let providerIdUnico = null;
+            let comprobanteUnico = null;
+
+            if (metodoPago !== 'efectivo' && obtenerGranTotal() > 0) {
+                const compInput = document.getElementById('abono_comprobante_unico');
+                comprobanteUnico = compInput && compInput.value ? compInput.value.trim() : null;
+
+                if (metodoPago === 'abono_tercero') {
+                    const provSelect = document.getElementById('abono_provider_id_unico');
+                    providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
+                    if (!providerIdUnico) {
+                        return alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
+                    }
+                }
+                if (!comprobanteUnico) {
+                    return alert(`⚠️ Para el método de pago "${mLabel}", es obligatorio adjuntar la imagen del comprobante de pago antes de efectuar la venta.`);
+                }
+            }
+
+            pagosPayload.push({
+                metodo_pago: metodoPago,
+                monto: Math.round(obtenerGranTotal()),
+                provider_id: providerIdUnico,
+                comprobante: comprobanteUnico
+            });
+        }
+
+        const payload = {
+            asesor_id: asesorId ? parseInt(asesorId) : null,
+            provider_id: null,
+            items: carrito.map(item => {
+                const base = {
+                    product_id: item.id,
+                    variant_id: item.variant_id,
+                    cantidad: item.cantidad,
+                    precio_final: item.precio_final,
+                    es_obsequio: item.es_obsequio
+                };
+                if (item.es_manual) {
+                    base.es_manual = true;
+                    base.nombre_manual = item.nombre;
+                    base.precio_costo = item.precio_costo;
+                }
+                return base;
+            }),
+            pagos: pagosPayload,
+            fecha_venta: document.getElementById('fecha_venta_input') ? document.getElementById('fecha_venta_input').value : null,
+            cliente: datosCliente,
+            retoma_data: retomasLista
+        };
+
+        // Abrir pestaña emergente INMEDIATAMENTE durante la interacción del usuario para evitar bloqueos en Chrome/Safari
+        let reciboWindow = null;
+        try {
+            reciboWindow = window.open('about:blank', '_blank');
+        } catch(err) {
+            console.warn('Pop-up bloqueado al crear ventana en blanco:', err);
+        }
+
+        try {
+            const response = await fetch('/sales/nueva', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf_token // Clave Maestra de Seguridad Requerida por Flask-WTF
+                },
+                body: JSON.stringify(payload)
+            });
+
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonErr) {
+                data = { error: `Error en la respuesta del servidor (${response.status} ${response.statusText})` };
+            }
+
+            if (response.ok && data.success && data.sale_id) {
+                const reciboUrl = `/sales/recibo/${data.sale_id}`;
+                if (reciboWindow && !reciboWindow.closed) {
+                    reciboWindow.location.href = reciboUrl;
+                } else {
+                    window.open(reciboUrl, '_blank');
+                }
+
+                // Purgar carrito para continuar facturando en la pantalla actual
+                carrito = [];
+                pagosMixtos = [];
+                retomasLista = [];
+
+                if (document.getElementById('cliente_nombre')) document.getElementById('cliente_nombre').value = '';
+                if (document.getElementById('cliente_documento')) document.getElementById('cliente_documento').value = '';
+                if (document.getElementById('cliente_telefono')) document.getElementById('cliente_telefono').value = '';
+                if (document.getElementById('cliente_email')) document.getElementById('cliente_email').value = '';
+
+                renderizarCarrito();
+                limpiarComprobanteUnico();
+                resetPagosMixtos();
+
+                alert(`✅ ¡Venta #${data.sale_id} Procesada! La factura se abrió en una nueva pestaña para su impresión.`);
+                return;
+            } else {
+                if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
+                alert(`⚠️ Error devuelto del servidor: ${data.error || 'Verifique los datos e intente de nuevo.'}`);
+            }
+
+        } catch (error) {
+            if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
+            console.error(error);
+            alert(`⚠️ Error de conexión o red: ${error.message || error}`);
+        }
+    }
+
+    // Catálogo específico de Modelos para Apple y Samsung
+    const CATALOGO_PRODUCTOS_EXTERNO = {
+        'Apple': [
+            {
+                categoria: 'iPhones (11 al 18 Pro Max)',
+                modelos: [
+                    'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
+                    'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+                    'iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+                    'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+                    'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+                    'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
+                    'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+                    'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                ]
+            },
+            {
+                categoria: 'iPads (A16, Air, Pro)',
+                modelos: [
+                    'iPad 10ma Gen (A16 Bionic)',
+                    'iPad 11na Gen',
+                    'iPad Mini 6', 'iPad Mini 7',
+                    'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
+                    'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)',
+                    'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
+                ]
+            },
+            {
+                categoria: 'MacBook (Air, Pro, Neo)',
+                modelos: [
+                    'MacBook Neo',
+                    'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
+                    'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
+                    'MacBook Pro 14" (M1 Pro/Max)', 'MacBook Pro 16" (M1 Pro/Max)',
+                    'MacBook Pro 14" (M2 Pro/Max)', 'MacBook Pro 16" (M2 Pro/Max)',
+                    'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
+                    'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)'
+                ]
+            },
+            {
+                categoria: 'AirPods (Últimas Generaciones)',
+                modelos: [
+                    'AirPods 3ra Generación',
+                    'AirPods 4ta Generación',
+                    'AirPods 4ta Generación con ANC',
+                    'AirPods Pro 2da Generación (USB-C)',
+                    'AirPods Max (Lightning)',
+                    'AirPods Max (USB-C)'
+                ]
+            }
+        ],
+        'Samsung': [
+            {
+                categoria: 'Samsung Galaxy Serie S (Desde S24 en adelante)',
+                modelos: [
+                    'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+                    'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
+                    'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
+                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE',
+                    'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
+                    'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
+                ]
+            }
+        ]
+    };
+
+    function actualizarModelosExterno(marca) {
+        const sel = document.getElementById('ext_modelo_celular');
+        if (!sel) return;
+        sel.innerHTML = '';
+        if (!marca || !CATALOGO_PRODUCTOS_EXTERNO[marca]) {
+            sel.innerHTML = '<option value="">-- Primero elige Marca --</option>';
+            return;
+        }
+        sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
+        CATALOGO_PRODUCTOS_EXTERNO[marca].forEach(grp => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = grp.categoria;
+            grp.modelos.forEach(mod => {
+                const opt = document.createElement('option');
+                opt.value = mod;
+                opt.textContent = mod;
+                optgroup.appendChild(opt);
+            });
+            sel.appendChild(optgroup);
+        });
+    }
+
+    // Lógica para Producto Externo
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('format-price-ext')) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value !== '') {
+                e.target.value = parseInt(value, 10).toLocaleString('es-CO');
+            } else {
+                e.target.value = '';
+            }
+        }
+    });
+
+    document.getElementById('formProductoExterno').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        let btn = document.getElementById('btnGuardarExterno');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+
+        let formData = new FormData(this);
+        
+        // Limpiar formato de precios
+        ['precio_costo', 'precio_sugerido'].forEach(field => {
+            let val = formData.get(field);
+            if (val) {
+                formData.set(field, val.replace(/\D/g, ''));
+            }
+        });
+
+        fetch("{{ url_for('externos_bp.api_nuevo_desde_caja') }}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let p = data.product;
+                
+                // Agregar al carrito (Lógica de nueva.html)
+                carrito.push({
+                    id: p.id,
+                    sku: p.sku,
+                    nombre: p.nombre,
+                    cantidad: 1,
+                    precio_final: p.precio_sugerido,
+                    precio_limite: p.precio_minimo,
+                    precio_minimo: p.precio_minimo,
+                    precio_sugerido: p.precio_sugerido,
+                    cantidad_stock: p.stock,
+                    variantes: [],
+                    variant_id: null,
+                    es_manual: false
+                });
+                
+                renderizarCarrito();
+                
+                // Cerrar modal y limpiar
+                bootstrap.Modal.getInstance(document.getElementById('modalProductoExterno')).hide();
+                document.getElementById('formProductoExterno').reset();
+            } else {
+                alert("Error: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Ocurrió un error al procesar el producto externo.");
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check ms-1"></i> Agregar a Venta';
+        });
+    });
+
+    // Lógica para Accesorio Externo
+    document.getElementById('formAccesorioExterno').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        let btn = document.getElementById('btnGuardarAccesorioExterno');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+
+        let formData = new FormData(this);
+        
+        // Limpiar formato de precios
+        ['precio_costo', 'precio_sugerido'].forEach(field => {
+            let val = formData.get(field);
+            if (val) {
+                formData.set(field, val.replace(/\D/g, ''));
+            }
+        });
+
+        fetch("{{ url_for('externos_bp.api_nuevo_accesorio_caja') }}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let p = data.product;
+                
+                // Agregar al carrito
+                carrito.push({
+                    id: p.id,
+                    sku: p.sku,
+                    nombre: p.nombre,
+                    cantidad: 1,
+                    precio_final: p.precio_sugerido,
+                    precio_limite: p.precio_minimo,
+                    precio_minimo: p.precio_minimo,
+                    precio_sugerido: p.precio_sugerido,
+                    cantidad_stock: p.stock,
+                    variantes: [],
+                    variant_id: null,
+                    es_manual: false
+                });
+                
+                renderizarCarrito();
+                
+                // Cerrar modal y limpiar
+                bootstrap.Modal.getInstance(document.getElementById('modalAccesorioExterno')).hide();
+                document.getElementById('formAccesorioExterno').reset();
+            } else {
+                alert("Error: " + data.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Ocurrió un error al procesar el accesorio externo.");
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check ms-1"></i> Agregar a Venta';
+        });
+    });
+</script>
+
+<!-- Modal Aprobación de Precio -->
+<div class="modal fade" id="modalPriceApproval" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-lock me-2"></i> Aprobación de Precio Requerida</h5>
+            </div>
+            <div class="modal-body text-center p-4">
+                <i class="fa-solid fa-clock-rotate-left fa-spin text-danger mb-3" style="font-size: 3rem;"></i>
+                <h5 class="fw-bold mb-2 text-dark" id="approvalProductName">Producto</h5>
+                <p class="text-muted small mb-3">Estás intentando vender este producto por debajo del precio mínimo autorizado. Hemos enviado una solicitud remota al administrador.</p>
+                <div class="d-flex justify-content-center gap-4 mb-3">
+                    <div>
+                        <div class="small text-muted fw-bold">Mínimo</div>
+                        <div class="fw-bold text-decoration-line-through text-danger" id="approvalMinPrice">--</div>
+                    </div>
+                    <div>
+                        <div class="small text-muted fw-bold">Solicitado</div>
+                        <div class="fw-bold text-success" id="approvalReqPrice">--</div>
+                    </div>
+                </div>
+                <div class="alert alert-warning border-0 fw-bold small">
+                    <i class="fa-solid fa-spinner fa-pulse me-2"></i> Esperando autorización del administrador...
+                </div>
+                <div id="approvalError" class="alert alert-danger fw-bold text-start small border-0 mt-2" style="display: none;"></div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-dark rounded-pill fw-bold px-4" onclick="cancelApprovalPolling()">Cancelar Venta</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global polling interval for async approvals
+    setInterval(async () => {
+        let updateUI = false;
+        for (let i = 0; i < carrito.length; i++) {
+            let item = carrito[i];
+            if (item.estado_aprobacion === 'pendiente' && item.solicitud_id) {
+                try {
+                    const res = await fetch(`/api/precio/estado/${item.solicitud_id}`);
+                    const data = await res.json();
+                    
+                    if (data.estado === 'aprobado') {
+                        item.estado_aprobacion = 'aprobado';
+                        item.aprobacion_remota = parseFloat(data.precio_aprobado);
+                        // Fix item price if admin modified it
+                        if(item.aprobacion_remota > parseFloat(item.precio_final)) {
+                            item.precio_final = item.aprobacion_remota;
+                        }
+                        updateUI = true;
+                    } else if (data.estado === 'rechazado') {
+                        item.estado_aprobacion = 'rechazado';
+                        item.motivo_rechazo = data.motivo_rechazo;
+                        updateUI = true;
+                    }
+                } catch(e) {
+                    console.error("Polling error", e);
+                }
+            }
+        }
+        if (updateUI) renderizarCarrito();
+    }, 3000);
+
+    function checkApprovalsAndProceed() {
+        if (carrito.length === 0) {
+            return alert('Agregue un número de serie válido. El carrito está vacío.');
+        }
+
+        // Buscar si algún ítem está rechazado
+        const rechazados = carrito.filter(i => i.estado_aprobacion === 'rechazado');
+        if (rechazados.length > 0) {
+            return alert('Existen productos con el descuento rechazado por el administrador. Ajusta los precios o elimina los productos para continuar.');
+        }
+
+        // Buscar si algún ítem sigue pendiente
+        const pendientes = carrito.filter(i => i.estado_aprobacion === 'pendiente');
+        if (pendientes.length > 0) {
+            return alert('Aún hay productos esperando la aprobación de descuento por el administrador. Por favor espera.');
+        }
+
+        // Check if there's any item that requires approval but hasn't started yet
+        let pendingNew = false;
+        for (let i = 0; i < carrito.length; i++) {
+            let item = carrito[i];
+            if (!item.es_manual && !item.es_obsequio) {
+                if (parseFloat(item.precio_final) < parseFloat(item.precio_limite)) {
+                    if (!item.aprobacion_remota || item.aprobacion_remota < parseFloat(item.precio_final)) {
+                        if (item.estado_aprobacion !== 'pendiente') {
+                            startApprovalProcess(i, item);
+                            pendingNew = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (pendingNew) {
+            return alert('Se han detectado precios no autorizados y se enviaron a revisión. Por favor espera la aprobación.');
+        }
+
+        // Si llega aquí, todo está aprobado o válido. Proceder a la venta.
+        verificarClienteCelular();
+    }
+
+    async function startApprovalProcess(index, item) {
+        item.estado_aprobacion = 'pendiente';
+        renderizarCarrito();
+
+        try {
+            const res = await fetch('/api/precio/solicitar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf_token
+                },
+                body: JSON.stringify({
+                    product_id: item.id,
+                    variant_id: item.variant_id,
+                    precio_original: item.precio_minimo,
+                    precio_solicitado: item.precio_final
+                })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                item.solicitud_id = data.solicitud_id;
+            } else {
+                item.estado_aprobacion = 'rechazado';
+                item.motivo_rechazo = data.error || "Error al solicitar aprobación.";
+                renderizarCarrito();
+            }
+        } catch(e) {
+            item.estado_aprobacion = 'rechazado';
+            item.motivo_rechazo = "Error de red.";
+            renderizarCarrito();
+        }
+    }
+
+    // Toggle visibilidad del campo Costo
+    document.addEventListener('click', function (e) {
+        let btn = e.target.closest('.btn-toggle-costo');
+        if (btn) {
+            let input = btn.previousElementSibling;
+            let icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            }
+        }
+    });
+
+    // Guardar Proveedor Rápido vía AJAX
+    let formProv = document.getElementById('formNuevoProveedorRapido');
+    if (formProv) {
+        formProv.addEventListener('submit', function (e) {
+            e.preventDefault();
+            let btn = document.getElementById('btnGuardarProveedorRapido');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Guardando...';
+
+            let formData = new FormData(this);
+
+            fetch("{{ url_for('providers_bp.create_provider_api') }}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let p = data.provider;
+                    // Agregar el nuevo proveedor a todos los select de proveedor
+                    let selects = document.querySelectorAll('.select-proveedor-ext, select[name="proveedor"]');
+                    selects.forEach(select => {
+                        let exists = Array.from(select.options).some(opt => opt.value === p.nombre);
+                        if (!exists) {
+                            let opt = new Option(p.nombre, p.nombre, true, true);
+                            select.add(opt);
+                        } else {
+                            select.value = p.nombre;
+                        }
+                    });
+
+                    let modalEl = document.getElementById('modalNuevoProveedorRapido');
+                    let modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    this.reset();
+                } else {
+                    alert('Error al guardar proveedor: ' + (data.message || 'Error desconocido'));
+                }
+            })
+            .catch(err => {
+                alert('Error de conexión al guardar proveedor.');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Guardar Proveedor';
+            });
+        });
+    }
+</script>
+{% endblock %}

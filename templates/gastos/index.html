@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-money-bill-wave text-success me-2"></i>Control de Gastos y Costos</h2>
+    <div class="d-flex align-items-center gap-2">
+        <a href="{{ url_for('bancos_bp.index') }}" class="btn btn-outline-success rounded-pill px-3 fw-bold shadow-sm">
+            <i class="fa-solid fa-building-columns me-1"></i> Ir a Bancos
+        </a>
+        <a href="{{ url_for('admin_bp.dashboard') if current_user.rol == 'admin' else url_for('sales_bp.procesar_venta') }}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver al Menú
+        </a>
+    </div>
+</div>
+
+<!-- Tarjetas de Resumen Financiero -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card card-custom h-100 p-4 border-0 shadow-sm" style="border-left: 5px solid var(--brand-blue) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-brand-black fw-bold mb-0">Total Gastos Diarios (Mes)</h5>
+                <i class="fa-solid fa-cart-shopping fs-2" style="color: var(--brand-blue);"></i>
+            </div>
+            <h2 class="fw-bolder m-0">${{ (total_diarios)|cop }}</h2>
+            <p class="text-muted small mt-2 m-0">Operativos: comida, transportes, aseo.</p>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card card-custom h-100 p-4 border-0 shadow-sm" style="border-left: 5px solid var(--brand-pink) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-brand-black fw-bold mb-0">Total Costos Indirectos (Mes)</h5>
+                <i class="fa-solid fa-building-columns fs-2" style="color: var(--brand-pink);"></i>
+            </div>
+            <h2 class="fw-bolder m-0">${{ (total_indirectos)|cop }}</h2>
+            <p class="text-muted small mt-2 m-0">Fijos: arriendo, nómina, servicios.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Formulario para Registrar Nuevo Gasto -->
+<div class="card card-custom p-4 mb-5 shadow-sm border-0">
+    <h5 class="text-brand-black fw-bold mb-4"><i class="fa-solid fa-money-bill-transfer text-brand-blue me-2"></i>Registrar Salida de Dinero</h5>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold text-brand-black">Tipo de Salida</label>
+                <select name="tipo_gasto" class="form-select bg-light border-0" required>
+                    {% if current_user.rol == 'admin' %}
+                    <option value="" selected disabled>Seleccionar tipo...</option>
+                    <option value="Gasto Diario">Gasto Diario / Operativo</option>
+                    <option value="Costo Indirecto">Costo Indirecto / Fijo</option>
+                    {% else %}
+                    <option value="Gasto Diario" selected>Gasto Diario / Operativo</option>
+                    {% endif %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold text-brand-black">Categoría</label>
+                <!-- Usamos datalist para permitir escribir o seleccionar opciones -->
+                <input type="text" name="categoria" list="categoriasComunes" class="form-control bg-light border-0" autocomplete="off" placeholder="Ej: Arriendo, Aseo..." required>
+                <datalist id="categoriasComunes">
+                    <option value="Arriendo">
+                    <option value="Servicios Públicos">
+                    <option value="Nómina">
+                    <option value="Internet / Teléfono">
+                    <option value="Aseo y Mantenimiento">
+                    <option value="Alimentación">
+                    <option value="Transporte / Fletes">
+                    <option value="Caja Menor">
+                    <option value="Insumos Varios">
+                </datalist>
+            </div>
+            <div class="col-md-6 border-start ps-4">
+                <label class="form-label fw-bold text-brand-black">División de Pagos (Monto y Método)</label>
+                <div id="gastos-lineas-container">
+                    <div class="row g-2 align-items-center mb-2 linea-gasto">
+                        <div class="col-5">
+                            <input type="number" step="1" min="0" name="monto[]" class="form-control bg-light border-0" placeholder="Monto $" required>
+                        </div>
+                        <div class="col-5">
+                            <select name="metodo_pago[]" class="form-select bg-light border-0" required>
+                                <option value="addi">🛍️ Addi</option>
+                                <option value="sitecredito">💳 Sitecredito</option>
+                                <option value="bancolombia">🏦 Bancolombia</option>
+                                <option value="davivienda">🏦 Davivienda</option>
+                                <option value="efectivo" selected>💵 Efectivo (Caja)</option>
+                                <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                            </select>
+                        </div>
+                        <div class="col-2 text-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-circle btn-add-linea"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold text-brand-black">Fecha</label>
+                <input type="date" name="fecha_gasto" class="form-control bg-light border-0" value="{{ hoy }}" required>
+            </div>
+            <div class="col-md-10 mt-3">
+                <label class="form-label fw-bold text-brand-black">Nota o Descripción</label>
+                <input type="text" name="descripcion" class="form-control bg-light border-0" placeholder="Breve detalle del gasto..." required>
+            </div>
+            <div class="col-md-2 mt-3 text-end">
+                <button type="submit" class="btn btn-blue w-100 rounded-pill fw-bold h-100 py-2"><i class="fa-solid fa-plus me-1"></i> Guardar</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Tabla Historial -->
+<div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th class="ps-4">FECHA</th>
+                    <th>REGISTRADO POR</th>
+                    <th>TIPO</th>
+                    <th>CATEGORÍA</th>
+                    <th>DESCRIPCIÓN</th>
+                    <th class="text-center">MÉTODO PAGO</th>
+                    <th class="text-end pe-4">MONTO</th>
+                    {% if current_user.rol == 'admin' %}
+                    <th class="text-center">ACCIÓN</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for gasto in gastos %}
+                <tr>
+                    <td class="ps-4 text-muted"><small>{{ gasto.fecha_gasto.strftime('%d/%m/%Y') }}</small></td>
+                    <td><span class="text-brand-black fw-semibold"><i class="fa-solid fa-user-tie text-muted me-1"></i>{{ gasto.usuario.nombre }}</span></td>
+                    <td>
+                        {% if gasto.tipo_gasto == 'Gasto Diario' %}
+                            <span class="badge rounded-pill text-dark" style="background-color: var(--brand-blue);">{{ gasto.tipo_gasto }}</span>
+                        {% else %}
+                            <span class="badge rounded-pill text-dark" style="background-color: var(--brand-pink);">{{ gasto.tipo_gasto }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-bold">{{ gasto.categoria }}</td>
+                    <td class="text-muted"><small>{{ gasto.descripcion }}</small></td>
+                    <td class="text-center">
+                        {% if gasto.metodo_pago == 'efectivo' %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="fa-solid fa-money-bill-wave me-1"></i> Efectivo</span>
+                        {% else %}
+                        <span class="badge bg-info bg-opacity-10 text-info border border-info"><i class="fa-solid fa-building-columns me-1"></i> {{ gasto.metodo_pago|capitalize }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4 fw-bolder text-brand-black">${{ (gasto.monto)|cop }}</td>
+                    {% if current_user.rol == 'admin' %}
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalEliminarGasto{{ gasto.id }}">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+
+                {% if current_user.rol == 'admin' %}
+                <!-- Modal de Confirmación para Eliminar Gasto -->
+                <div class="modal fade" id="modalEliminarGasto{{ gasto.id }}" tabindex="-1" aria-labelledby="modalEliminarGastoLabel{{ gasto.id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+                            <div class="modal-header bg-danger text-white border-0">
+                                <h5 class="modal-title fw-bold" id="modalEliminarGastoLabel{{ gasto.id }}">
+                                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Eliminación
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <p class="mb-2">¿Estás seguro de que deseas eliminar este gasto?</p>
+                                <div class="bg-light rounded-3 p-3 mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="text-muted small">Categoría</span>
+                                        <span class="fw-bold">{{ gasto.categoria }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="text-muted small">Monto</span>
+                                        <span class="fw-bolder text-danger">${{ (gasto.monto)|cop }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted small">Descripción</span>
+                                        <span class="small">{{ gasto.descripcion or '—' }}</span>
+                                    </div>
+                                </div>
+                                <div class="alert alert-warning border-0 rounded-3 mb-0">
+                                    <i class="fa-solid fa-info-circle me-1"></i> Esta acción <strong>no se puede deshacer</strong> y afectará los reportes financieros.
+                                </div>
+                            </div>
+                            <div class="modal-footer border-0 pt-0">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                <form action="{{ url_for('gastos_bp.eliminar_gasto', id=gasto.id) }}" method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">
+                                        <i class="fa-solid fa-trash-can me-1"></i> Sí, Eliminar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <tr>
+                    <td colspan="{{ 7 if current_user.rol == 'admin' else 6 }}" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-wallet fs-2 mb-3 text-brand-blue opacity-50"></i>
+                        <p class="mb-0">No se han registrado salidas de dinero este mes.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('gastos-lineas-container');
+    
+    container.addEventListener('click', function(e) {
+        if (e.target.closest('.btn-add-linea')) {
+            const nuevaLinea = document.createElement('div');
+            nuevaLinea.className = 'row g-2 align-items-center mb-2 linea-gasto';
+            nuevaLinea.innerHTML = `
+                <div class="col-5">
+                    <input type="number" step="1" min="0" name="monto[]" class="form-control bg-light border-0" placeholder="Monto $" required>
+                </div>
+                <div class="col-5">
+                    <select name="metodo_pago[]" class="form-select bg-light border-0" required>
+                        <option value="addi">🛍️ Addi</option>
+                        <option value="sitecredito">💳 Sitecredito</option>
+                        <option value="bancolombia">🏦 Bancolombia</option>
+                        <option value="davivienda">🏦 Davivienda</option>
+                        <option value="efectivo" selected>💵 Efectivo (Caja)</option>
+                        <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                    </select>
+                </div>
+                <div class="col-2 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger rounded-circle btn-remove-linea"><i class="fa-solid fa-minus"></i></button>
+                </div>
+            `;
+            container.appendChild(nuevaLinea);
+        } else if (e.target.closest('.btn-remove-linea')) {
+            e.target.closest('.linea-gasto').remove();
+        }
+    });
+});
+</script>
+{% endblock %}

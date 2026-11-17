@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-boxes-stacked text-brand-blue me-2"></i> Área de Bodega</h2>
+</div>
+
+<!-- Buscador Rápido de Facturas -->
+<div class="card card-custom p-3 mb-4 border-0 shadow-sm bg-white">
+    <div class="row align-items-center">
+        <div class="col-md-8 col-lg-6 position-relative">
+            <div class="input-group input-group-lg shadow-sm rounded-pill border">
+                <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" id="facturasSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca Factura por número (#)..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
+                <button class="btn btn-light border-0 px-3 text-muted" type="button" id="clearSearch" title="Limpiar búsqueda" style="border-radius: 0 50px 50px 0;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- Contenedor para resultados desplegables -->
+            <div id="searchDropdown" class="dropdown-menu shadow-lg border-0 w-100 p-0 mt-2 d-none" style="max-height: 400px; overflow-y: auto;">
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-6 text-md-end mt-3 mt-md-0">
+            <small class="text-muted fw-bold text-uppercase" style="font-size: 0.75rem;">
+                Consulta rápida de documentos registrados
+            </small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card card-custom border-0 p-4 text-center shadow-sm d-flex flex-column flex-md-row align-items-center justify-content-center gap-4">
+            <div class="text-md-end">
+                <h5 class="text-muted fw-bold mb-1">{% if current_user.rol == 'vendedor_bodega' %}Mis Clientes{% else %}Total Clientes en Bodega{% endif %}</h5>
+                <h1 class="display-4 fw-bolder text-brand-black mb-0" style="color: var(--brand-blue) !important;">{{ clientes_count }}</h1>
+            </div>
+            <div class="vr d-none d-md-block mx-2" style="opacity: 0.1; width: 2px;"></div>
+            <div class="text-md-start">
+                <a href="{{ url_for('bodega_bp.nuevo_cliente') }}" class="btn btn-blue btn-lg rounded-pill shadow-sm"><i class="fa-solid fa-plus me-1"></i> Nuevo Cliente</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── SECCIÓN: TRASLADOS DEL DÍA & FLUJO EN TIEMPO REAL (BODEGA) ─── -->
+<div class="d-flex justify-content-between align-items-center mb-3 mt-4">
+    <div>
+        <h4 class="fw-bold mb-1" style="color: var(--text-primary); letter-spacing: -0.02em;">
+            <i class="fa-solid fa-truck-ramp-box text-primary me-2"></i>Traslados del Día & Logística
+        </h4>
+        <p class="text-muted small mb-0">Control diario en tiempo real de despachos, retornos a bodega y recepciones.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('transfers_bp.trazabilidad') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm">
+            <i class="fa-solid fa-timeline me-1"></i> Bitácora Trazabilidad
+        </a>
+        <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">
+            <i class="fa-solid fa-plus me-1"></i> Nuevo Traslado
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- KPI 1: En Tránsito (Pendientes) -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #F59E0B !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">En Tránsito (Pendientes)</span>
+                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill">PENDIENTE</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 {% if traslados_pendientes_count > 0 %}text-warning{% endif %}">
+                {{ traslados_pendientes_count }} <span class="fs-6 text-muted fw-normal">guías</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index', tab='pendientes') }}" class="text-decoration-none small fw-bold text-warning">
+                    Ver por recibir <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 2: Enviados Hoy hacia Tiendas -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #3B82F6 !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">Despachos a Tiendas Hoy</span>
+                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill">SALIDAS</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 text-primary">
+                {{ enviados_hoy_tiendas }} <span class="fs-6 text-muted fw-normal">envíos</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index', tab='enviados') }}" class="text-decoration-none small fw-bold text-primary">
+                    Ver enviados <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 3: Devoluciones / Retornos a Bodega Hoy -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #8B5CF6 !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">Retornos a Bodega Hoy</span>
+                <span class="badge bg-purple bg-opacity-10 text-purple border rounded-pill">DEVOLUCIONES</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 text-purple">
+                {{ retornos_hoy_bodega }} <span class="fs-6 text-muted fw-normal">retornos</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index') }}" class="text-decoration-none small fw-bold text-purple">
+                    Supervisar recepciones <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI 4: Completados y Tasa de Éxito Hoy -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="card card-custom border-0 p-3 h-100 shadow-sm" style="border-left: 4px solid #10B981 !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-uppercase small fw-bold text-muted">Tasa de Aceptación Hoy</span>
+                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill">EFECTIVIDAD</span>
+            </div>
+            <h3 class="fw-bold font-mono my-1 text-success">
+                {{ tasa_exito_recepcion }}% <span class="fs-6 text-muted fw-normal">({{ completados_hoy }} ok / {{ rechazados_hoy }} rech)</span>
+            </h3>
+            <div class="mt-2 pt-2 border-top">
+                <a href="{{ url_for('transfers_bp.index', tab='historial') }}" class="text-decoration-none small fw-bold text-success">
+                    Historial del día <i class="fa-solid fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABLA RÁPIDA DE TRASLADOS DE LA JORNADA -->
+<div class="card card-custom border-0 shadow-sm rounded-4 overflow-hidden mb-4">
+    <div class="p-3 px-4 d-flex justify-content-between align-items-center border-bottom bg-light">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-dark rounded-pill px-3 py-1 font-mono">HOY</span>
+            <h6 class="fw-bold m-0 text-dark">Traslados Activos y de la Jornada</h6>
+        </div>
+        <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-sm btn-outline-dark rounded-pill px-3">
+            Ver Todos <i class="fa-solid fa-arrow-right ms-1"></i>
+        </a>
+    </div>
+    <div class="table-responsive p-0">
+        <table class="table table-hover align-middle m-0" style="font-size: 0.88rem;">
+            <thead class="bg-light text-muted" style="font-size: 0.75rem; text-transform: uppercase;">
+                <tr>
+                    <th class="ps-4">ID</th>
+                    <th>RUTA</th>
+                    <th>SOLICITANTE</th>
+                    <th class="text-center">ÍTEMS</th>
+                    <th class="text-center">ESTADO</th>
+                    <th>HORA</th>
+                    <th class="text-end pe-4">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in traslados_jornada %}
+                <tr>
+                    <td class="ps-4 fw-bold font-mono">#{{ t.id }}</td>
+                    <td>
+                        <span class="badge bg-light text-dark border px-2 py-1">{{ t.origin_branch.nombre }}</span>
+                        <i class="fa-solid fa-arrow-right text-muted small mx-1"></i>
+                        <span class="badge bg-light text-dark border px-2 py-1">{{ t.destination_branch.nombre }}</span>
+                    </td>
+                    <td><small class="fw-semibold text-muted">{{ t.created_by.nombre if t.created_by else 'Sistema' }}</small></td>
+                    <td class="text-center">
+                        <span class="badge bg-light text-dark border">{{ t.items|length }} prod.</span>
+                    </td>
+                    <td class="text-center">
+                        {% if t.status == 'PENDIENTE' %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2.5 py-1">
+                                <i class="fa-solid fa-clock me-1"></i> Pendiente
+                            </span>
+                        {% elif t.status == 'ACEPTADO' %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2.5 py-1">
+                                <i class="fa-solid fa-check me-1"></i> Aceptado
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-2.5 py-1">
+                                <i class="fa-solid fa-xmark me-1"></i> Rechazado
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td><small class="text-muted font-mono">{{ t.created_at.strftime('%H:%M') }}</small></td>
+                    <td class="text-end pe-4">
+                        {% if t.status == 'PENDIENTE' and (current_user.rol == 'admin' or current_user.branch_id == t.destination_branch_id) %}
+                            <form method="POST" action="{{ url_for('transfers_bp.accept', id=t.id) }}" class="d-inline" onsubmit="return confirm('¿Aceptar traslado #{{ t.id }} e ingresar stock a bodega?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-sm btn-success rounded-pill px-2.5 py-0.5 fw-bold" title="Aceptar">
+                                    <i class="fa-solid fa-check"></i>
+                                </button>
+                            </form>
+                        {% endif %}
+                        <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-0.5" title="Ver Detalle">
+                            <i class="fa-solid fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        No hay traslados registrados hoy.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card card-custom border-0 p-0 overflow-hidden h-100 shadow-sm">
+            <h5 class="fw-bold p-4 bg-light mb-0 border-bottom"><i class="fa-solid fa-file-pdf text-brand-pink me-2"></i> Últimas Facturas</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-custom mb-0">
+                    <thead class="bg-light text-muted">
+                        <tr>
+                            <th class="ps-4">TICKET/DOC</th>
+                            <th>CLIENTE</th>
+                            <th>FECHA</th>
+                            <th class="text-center">ESTADO / ARCHIVO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in facturas %}
+                        <tr>
+                            <td class="ps-4 fw-bold">#{{ f.numero_factura }}</td>
+                            <td><a href="{{ url_for('bodega_bp.cliente_detalle', id=f.cliente.id) }}" class="text-decoration-none text-brand-black fw-bold"><i class="fa-solid fa-user-circle text-muted me-1"></i> {{ f.cliente.nombre_o_razon_social }}</a></td>
+                            <td class="text-muted"><small>{{ f.fecha_subida.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                            <td class="text-center">
+                                {% if f.estado == 'Pagado' %}
+                                    <span class="badge bg-success rounded-pill px-2 py-1">Pagado</span>
+                                {% elif f.estado == 'Parcial' %}
+                                    <span class="badge bg-warning text-dark rounded-pill px-2 py-1">Parcial</span>
+                                {% else %}
+                                    <span class="badge bg-danger rounded-pill px-2 py-1">Pend.</span>
+                                {% endif %}
+                                {% if f.archivo_ruta %}
+                                <a href="{{ url_for('static', filename=f.archivo_ruta) }}" target="_blank" class="btn btn-outline-secondary btn-sm ms-2 rounded-pill"><i class="fa-solid fa-download"></i></a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">Aún no has registrado facturas para los clientes.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3 text-end bg-light border-top mt-auto">
+                <a href="{{ url_for('bodega_bp.nueva_factura') }}" class="btn btn-pink rounded-pill shadow-sm"><i class="fa-solid fa-upload me-1"></i> Subir Documento</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card card-custom border-0 p-0 overflow-hidden h-100 shadow-sm">
+            <h5 class="fw-bold p-4 bg-light mb-0 border-bottom"><i class="fa-solid fa-money-bill-transfer text-success me-2"></i> Últimos Abonos</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-custom mb-0">
+                    <thead class="bg-light text-muted">
+                        <tr>
+                            <th class="ps-4">CLIENTE</th>
+                            <th>MONTO</th>
+                            <th>FECHA</th>
+                            <th class="text-center">MÉTODO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in abonos %}
+                        <tr>
+                            <td class="ps-4"><a href="{{ url_for('bodega_bp.cliente_detalle', id=a.cliente.id) }}" class="text-decoration-none text-brand-black fw-bold"><i class="fa-solid fa-user-circle text-muted me-1"></i> {{ a.cliente.nombre_o_razon_social }}</a></td>
+                            <td class="fw-bold text-success">${{ a.monto|cop }}</td>
+                            <td class="text-muted"><small>{{ a.fecha_abono.strftime('%d/%m/%Y') if a.fecha_abono else '-' }}</small></td>
+                            <td class="text-center text-capitalize">{{ a.metodo_pago }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">No se han registrado abonos recientemente.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3 text-end bg-light border-top mt-auto">
+                <a href="{{ url_for('bodega_bp.modulo_abonos') }}" class="btn btn-blue rounded-pill shadow-sm"><i class="fa-solid fa-plus me-1"></i> Nuevo Abono Rápido</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('facturasSearch');
+    const clearBtn = document.getElementById('clearSearch');
+    const dropdown = document.getElementById('searchDropdown');
+
+    let debounceTimer;
+
+    function performSearch() {
+        const query = searchInput.value.toLowerCase().trim();
+        
+        clearTimeout(debounceTimer);
+        if (query.length < 2) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/bodega/facturas/api/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        dropdown.innerHTML = '';
+                        data.forEach(item => {
+                            const btn = document.createElement('a');
+                            btn.href = item.url;
+                            btn.className = 'dropdown-item p-3 border-bottom d-flex justify-content-between align-items-center';
+                            
+                            let badgeClass = 'bg-danger';
+                            if (item.estado === 'Pagado') badgeClass = 'bg-success';
+                            else if (item.estado === 'Parcial') badgeClass = 'bg-warning text-dark';
+
+                            btn.innerHTML = `
+                                <div>
+                                    <div class="fw-bold text-dark">Factura #${item.numero}</div>
+                                    <small class="text-muted">${item.cliente}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge ${badgeClass} rounded-pill d-block mb-1">${item.estado}</span>
+                                    <small class="text-muted d-block" style="font-size: 0.7rem;">${item.fecha}</small>
+                                </div>
+                            `;
+                            dropdown.appendChild(btn);
+                        });
+                        dropdown.classList.remove('d-none');
+                        dropdown.classList.add('show');
+                    } else {
+                        dropdown.classList.add('d-none');
+                        dropdown.classList.remove('show');
+                    }
+                });
+        }, 300);
+    }
+
+    searchInput.addEventListener('input', performSearch);
+
+    // Ocultar dropdown al hacer click fuera
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+        }
+    });
+
+    clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        performSearch();
+        dropdown.classList.add('d-none');
+        dropdown.classList.remove('show');
+        searchInput.focus();
+    });
+});
+</script>
+{% endblock %}

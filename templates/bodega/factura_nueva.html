@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-file-invoice text-brand-pink me-2"></i> Anexar Factura</h2>
+            <a href="{{ url_for('bodega_bp.dashboard') }}" class="btn btn-light rounded-pill px-3 shadow-sm border">Volver</a>
+        </div>
+
+        <div class="card card-custom p-4 border-0">
+            <form method="POST" action="{{ url_for('bodega_bp.nueva_factura') }}" id="facturaForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold mb-0">Fijar al Cliente <span class="text-danger">*</span></label>
+                        <a href="{{ url_for('bodega_bp.nuevo_cliente', from_factura=1) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                            <i class="fa-solid fa-plus me-1"></i> Nuevo Cliente
+                        </a>
+                    </div>
+                    <select name="cliente_id" class="form-select border-0 bg-light shadow-sm" required>
+                        <option value="" disabled {% if not preselected_id %}selected{% endif %}>-- Selecciona el destinatario --</option>
+                        {% for c in clientes %}
+                            <option value="{{ c.id }}" {% if preselected_id == c.id %}selected{% endif %}>
+                                {{ c.nombre_o_razon_social }} - (NIT: {{ c.documento_o_nit }})
+                                {% if current_user.rol != 'vendedor_bodega' or c.creado_por_id == current_user.id %}
+                                    | [{{ c.estado_global }}: ${{ c.deuda_total|cop }}]
+                                {% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="row g-3 mb-4">
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label fw-bold">Número Factura <span class="text-danger">*</span></label>
+                        <input type="text" name="numero_factura" class="form-control bg-light border-0 shadow-sm" required placeholder="Ej: FAC-987">
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label fw-bold">Fecha de Factura <span class="text-danger">*</span></label>
+                        <input type="date" name="fecha_factura" class="form-control bg-light border-0 shadow-sm" id="fechaFactura" required {% if current_user.rol == 'vendedor_bodega' %}readonly style="pointer-events: none; background-color: #e9ecef !important;" tabindex="-1" onkeydown="return false;" onclick="return false;"{% endif %}>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label fw-bold">Modalidad <span class="text-danger">*</span></label>
+                        <select name="modalidad_pago" id="selectModalidad" class="form-select bg-light border-0 shadow-sm" required>
+                            <option value="credito">⏳ A Crédito</option>
+                            <option value="contado">💵 De Contado</option>
+                        </select>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <label class="form-label fw-bold">Monto Total <span class="text-danger">*</span></label>
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text border-0 bg-light text-success fw-bold">$</span>
+                            <input type="text" name="monto_total" id="inputMontoTotal" class="form-control bg-light border-0" required placeholder="0" title="Calculado automáticamente, pero puedes ajustarlo si hay descuentos finales" oninput="formatInputCOP(this)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card bg-light border-0 p-3 mb-4">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold text-primary"><i class="fa-solid fa-hand-holding-dollar me-1"></i> Registrar Abono Inicial (Opcional)</label>
+                            <div class="input-group shadow-sm">
+                                <span class="input-group-text border-0 bg-white text-primary fw-bold">$</span>
+                                <input type="text" name="monto_abono_inicial" id="inputAbonoInicial" class="form-control bg-white border-0" placeholder="¿Cuánto paga ahora?" oninput="formatInputCOP(this)">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Método de Pago</label>
+                            <select name="metodo_pago_abono" class="form-select bg-white border-0 shadow-sm">
+                                <option value="addi">🛍️ Addi</option>
+                                <option value="sitecredito">💳 Sitecredito</option>
+                                <option value="bancolombia">🏦 Bancolombia</option>
+                                <option value="davivienda">🏦 Davivienda</option>
+                                <option value="efectivo">💵 Efectivo</option>
+                                <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="button" class="btn btn-outline-primary w-100 rounded-pill fw-bold" onclick="copiarTotal()">
+                                <i class="fa-solid fa-check-double me-1"></i> Paga Total
+                            </button>
+                        </div>
+                    </div>
+                    <small class="text-muted mt-2 d-block"><i class="fa-solid fa-circle-info me-1"></i> Si es **De Contado**, el sistema asumirá el pago total si dejas este campo vacío.</small>
+                </div>
+
+                <!-- SECCIÓN DE BÚSQUEDA Y CARRITO DE FACTURA -->
+                <div class="mb-4 bg-light p-4 rounded-3 border position-relative">
+                    <h5 class="fw-bold border-bottom pb-2 mb-3"><i class="fa-solid fa-barcode text-brand-blue me-2"></i> Escanear Productos</h5>
+                    
+                    <div class="row g-2 mb-4 align-items-end">
+                        <div class="col-md-10">
+                            <label class="form-label fw-semibold small text-muted">Código SKU o Nombre del Producto</label>
+                            <div class="input-group">
+                                <span class="input-group-text border-0 bg-white"><i class="fa-solid fa-search text-muted"></i></span>
+                                <input type="text" id="skuBuscador" class="form-control border-0 shadow-sm form-control-lg" placeholder="Pistolea o escribe el nombre/código aquí..." autofocus autocomplete="off" list="productosList">
+                                <datalist id="productosList">
+                                    {% for p in productos %}
+                                        <option value="{{ p.sku }}">{{ p.nombre }}</option>
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="button" class="btn btn-blue w-100 fw-bold shadow-sm py-2" onclick="buscarSKUManual()" title="Buscar Manual"><i class="fa-solid fa-magnifying-glass"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Carrito -->
+                    <div class="table-responsive bg-white rounded-3 shadow-sm border">
+                        <table class="table table-hover mb-0 text-center align-middle" id="tablaProductos">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-3 text-start">Producto (SKU)</th>
+                                    <th width="15%">Ctd.</th>
+                                    <th width="25%">Precio Und.</th>
+                                    <th width="20%">Subtotal</th>
+                                    <th class="pe-3" width="10%"><i class="fa-solid fa-trash text-muted"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody id="carritoBody">
+                                <!-- Filas dinámicas se agregan vía JS -->
+                                <tr id="emptyRow">
+                                    <td colspan="5" class="text-muted py-4"><i class="fa-solid fa-barcode opacity-50 fs-2 mb-2"></i><br>Escanea un producto para agregarlo a la factura.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+
+                <button type="button" onclick="validarEnvio()" class="btn btn-pink w-100 rounded-pill fw-bold py-3 shadow-sm text-uppercase"><i class="fa-solid fa-cloud-arrow-up me-2"></i> Procesar y Subir Factura</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    let carrito = {};
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const fechaInput = document.getElementById('fechaFactura');
+        if (fechaInput && !fechaInput.value) {
+            fechaInput.value = new Date().toISOString().split('T')[0];
+        }
+    });
+    // Escucha el evento Enter en la pistola o teclado
+    document.getElementById('skuBuscador').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // Evita que se envíe el formulario globalmente
+            buscarSKUManual();
+        }
+    });
+
+    function buscarSKUManual() {
+        const skuInput = document.getElementById('skuBuscador');
+        const sku = skuInput.value.trim();
+        
+        if (!sku) return;
+
+        fetch(`/bodega/api/producto/${encodeURIComponent(sku)}`)
+            .then(res => {
+                if (!res.ok) throw new Error("Producto no existe en la bodega o no hay stock.");
+                return res.json();
+            })
+            .then(data => {
+                agregarProducto(data);
+                skuInput.value = ''; // limpiar Input
+                skuInput.focus(); // mantener el cursor ahí
+            })
+            .catch(err => {
+                alert(err.message);
+                skuInput.select();
+            });
+    }
+
+    function agregarProducto(data) {
+        // Logica para subcategorias
+        let variant_id = null;
+        let variantHtml = '';
+        let row_stock = parseInt(data.cantidad_stock);
+        let row_precio = parseFloat(data.precio_sugerido);
+        
+        if (data.variantes && data.variantes.length > 0) {
+            let defaultVar = data.variantes[0];
+            variant_id = defaultVar.id;
+            row_stock = defaultVar.stock;
+            row_precio = defaultVar.precio_sugerido || data.precio_sugerido;
+            row_precio_minimo = defaultVar.precio_minimo || data.precio_minimo;
+            
+            variantHtml = `
+            <select class="form-select form-select-sm mt-1 text-secondary bg-light border-0 shadow-sm" name="variant_id[]" onchange="actualizarVariante(this, '${data.id}')">
+            `;
+            data.variantes.forEach(v => {
+                let disableStr = v.stock <= 0 ? "(Sin stock)" : `(Stock: ${v.stock})`;
+                variantHtml += `<option value="${v.id}" data-precio="${v.precio_sugerido || data.precio_sugerido}" data-preciominimo="${v.precio_minimo || data.precio_minimo}" data-stock="${v.stock}">${v.nombre} ${disableStr}</option>`;
+            });
+            variantHtml += `</select>`;
+        } else {
+            variantHtml = `<input type="hidden" name="variant_id[]" value="">`;
+        }
+
+        if (row_stock <= 0) {
+            alert(`No hay stock disponible para ${data.nombre} en la opción por defecto.`);
+            return;
+        }
+
+        const uniqueKey = data.id + "_" + (variant_id || "base");
+
+        if (carrito[uniqueKey]) {
+            const nuevaCantidad = carrito[uniqueKey].cantidad + 1;
+            if (nuevaCantidad > row_stock) {
+                alert(`Solo hay ${row_stock} uds en stock de ${data.nombre}.`);
+                return;
+            }
+            carrito[uniqueKey].cantidad = nuevaCantidad;
+            document.getElementById('input_cant_' + uniqueKey).value = nuevaCantidad;
+            actualizarFilaUI(uniqueKey);
+        } else {
+            // Producto nuevo en la tabla
+            carrito[uniqueKey] = { 
+                id: data.id, 
+                variant_id: variant_id, 
+                nombre: data.nombre, 
+                cantidad: 1, 
+                max_stock: row_stock, 
+                precio: row_precio,
+                precio_minimo: typeof row_precio_minimo !== 'undefined' ? row_precio_minimo : data.precio_minimo,
+                precio_sugerido: row_precio
+            };
+            
+            const emptyRow = document.getElementById('emptyRow');
+            if (emptyRow) emptyRow.style.display = 'none';
+
+            const tbody = document.getElementById('carritoBody');
+            const tr = document.createElement('tr');
+            tr.id = 'row_' + uniqueKey;
+            tr.innerHTML = `
+                <td class="ps-3 text-start">
+                    <span class="fw-bold">${data.nombre}</span><br>
+                    <small class="text-muted"><i class="fa-solid fa-barcode"></i> ${data.sku}</small>
+                    <input type="hidden" name="producto_id[]" value="${data.id}">
+                    ${variantHtml}
+                </td>
+                <td>
+                    <input type="number" name="cantidad[]" value="1" min="1" max="${row_stock}" class="form-control form-control-sm text-center fw-bold" id="input_cant_${uniqueKey}" onchange="actualizarCantidad('${uniqueKey}', this.value)">
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input type="text" name="precio_unitario[]" value="${formatCOP(row_precio)}" class="form-control text-end fw-bold" id="input_precio_${uniqueKey}" oninput="formatInputCOP(this); actualizarPrecio('${uniqueKey}', this.value)">
+                    </div>
+                </td>
+                <td class="fw-bolder text-success" id="subtotal_${uniqueKey}">$${formatCOP(row_precio)}</td>
+                <td class="pe-3">
+                    <button type="button" class="btn btn-sm btn-outline-danger rounded-circle shadow-sm" onclick="eliminarProducto('${uniqueKey}')"><i class="fa-solid fa-times"></i></button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+        recalcularTotal();
+    }
+    
+    function actualizarVariante(selectElement, idProducto) {
+        const tr = selectElement.closest('tr');
+        const uniqueKeyOld = tr.id.replace('row_', '');
+        
+        const opt = selectElement.options[selectElement.selectedIndex];
+        const new_variant_id = opt.value;
+        const new_stock = parseInt(opt.dataset.stock);
+        const new_precio = parseFloat(opt.dataset.precio);
+        const new_precio_min = parseFloat(opt.dataset.preciominimo);
+        
+        const uniqueKeyNew = idProducto + "_" + new_variant_id;
+        
+        if (new_stock <= 0) {
+            alert('Variante seleccionada no tiene stock.');
+            // Volver al valor anterior (no implementado en esta UI simple, asume que el usuario cambiará)
+            return;
+        }
+        
+        if (uniqueKeyOld !== uniqueKeyNew) {
+            if (carrito[uniqueKeyNew]) {
+                alert('Esta variante ya está agregada al carrito. Por favor elimina la fila duplicada e incrementa la cantidad.');
+            }
+            
+            // Actualizar carrito
+            carrito[uniqueKeyNew] = carrito[uniqueKeyOld];
+            delete carrito[uniqueKeyOld];
+            
+            carrito[uniqueKeyNew].variant_id = new_variant_id;
+            carrito[uniqueKeyNew].max_stock = new_stock;
+            carrito[uniqueKeyNew].precio = new_precio;
+            carrito[uniqueKeyNew].precio_minimo = new_precio_min;
+            carrito[uniqueKeyNew].precio_sugerido = new_precio;
+            
+            if (carrito[uniqueKeyNew].cantidad > new_stock) {
+                carrito[uniqueKeyNew].cantidad = new_stock;
+            }
+            
+            // Actualizar IDs en DOM
+            tr.id = 'row_' + uniqueKeyNew;
+            
+            const numInput = tr.querySelector(`input[id="input_cant_${uniqueKeyOld}"]`);
+            if(numInput) {
+                numInput.id = 'input_cant_' + uniqueKeyNew;
+                numInput.max = new_stock;
+                numInput.value = carrito[uniqueKeyNew].cantidad;
+                numInput.setAttribute('onchange', `actualizarCantidad('${uniqueKeyNew}', this.value)`);
+            }
+            
+            const precioInput = tr.querySelector(`input[id="input_precio_${uniqueKeyOld}"]`);
+            if(precioInput) {
+                precioInput.id = 'input_precio_' + uniqueKeyNew;
+                precioInput.value = formatCOP(new_precio);
+                precioInput.setAttribute('oninput', `formatInputCOP(this); actualizarPrecio('${uniqueKeyNew}', this.value)`);
+            }
+            
+            const subTot = tr.querySelector(`td[id="subtotal_${uniqueKeyOld}"]`);
+            if(subTot) {
+                subTot.id = 'subtotal_' + uniqueKeyNew;
+            }
+            
+            const delBtn = tr.querySelector(`button[onclick="eliminarProducto('${uniqueKeyOld}')"]`);
+            if(delBtn) {
+                delBtn.setAttribute('onclick', `eliminarProducto('${uniqueKeyNew}')`);
+            }
+            
+            actualizarFilaUI(uniqueKeyNew);
+        }
+    }
+
+    function actualizarCantidad(key, newVal) {
+        let val = parseInt(newVal);
+        if (isNaN(val) || val <= 0) val = 1;
+        
+        if (val > carrito[key].max_stock) {
+            alert(`El stock máximo es ${carrito[key].max_stock}`);
+            val = carrito[key].max_stock;
+        }
+        
+        document.getElementById('input_cant_' + key).value = val;
+        carrito[key].cantidad = val;
+        
+        actualizarFilaUI(key);
+    }
+
+    function actualizarPrecio(key, newVal) {
+        let raw = newVal.toString().replace(/\D/g, '');
+        let val = parseFloat(raw);
+        if (isNaN(val) || val < 0) val = 0.00;
+        
+        const p_min = carrito[key].precio_minimo;
+        const p_max = carrito[key].precio_sugerido;
+        if (val < p_min) {
+            alert('El precio no puede ser menor al precio mínimo establecido ($' + formatCOP(p_min) + ')');
+            val = p_min;
+            document.getElementById('input_precio_' + key).value = formatCOP(val);
+        } else if (val > p_max) {
+            alert('El precio no puede ser mayor al precio sugerido ($' + formatCOP(p_max) + ')');
+            val = p_max;
+            document.getElementById('input_precio_' + key).value = formatCOP(val);
+        }
+        
+        carrito[key].precio = val;
+        
+        actualizarFilaUI(key);
+    }
+
+    function actualizarFilaUI(key) {
+        const sub = carrito[key].cantidad * carrito[key].precio;
+        document.getElementById('subtotal_' + key).innerText = "$" + formatCOP(sub);
+        recalcularTotal();
+    }
+
+    function eliminarProducto(key) {
+        delete carrito[key];
+        const row = document.getElementById('row_' + key);
+        if (row) row.remove();
+        
+        if (Object.keys(carrito).length === 0) {
+            document.getElementById('emptyRow').style.display = '';
+        }
+        recalcularTotal();
+    }
+
+    function recalcularTotal() {
+        let suma = 0;
+        for (const key in carrito) {
+            suma += (carrito[key].cantidad * carrito[key].precio);
+        }
+        // Actualizamos el input de Monto Total Principal para que se envíe formateado
+        document.getElementById('inputMontoTotal').value = formatCOP(suma);
+    }
+
+    function copiarTotal() {
+        const total = document.getElementById('inputMontoTotal').value;
+        document.getElementById('inputAbonoInicial').value = total;
+    }
+
+    function validarEnvio() {
+        if (Object.keys(carrito).length === 0) {
+            alert("No has pistoleado ningún producto. La factura no puede ir vacía.");
+            document.getElementById('skuBuscador').focus();
+            return;
+        }
+        document.getElementById('facturaForm').submit();
+    }
+
+    // Set default date to today
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInput = document.querySelector('input[name="fecha_factura"]');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
+    });
+</script>
+{% endblock %}

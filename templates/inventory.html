@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .header-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    h1 {
+        font-size: 2.2rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #f8fafc, #94a3b8);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -1px;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    .premium-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        text-align: left;
+    }
+
+    .premium-table th {
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .premium-table td {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+        color: var(--light);
+        font-size: 0.95rem;
+        transition: background 0.3s;
+    }
+
+    /* Hover effect dinámico */
+    .premium-table tbody tr {
+        transition: all 0.2s ease;
+    }
+    .premium-table tbody tr:hover td {
+        background: rgba(79, 70, 229, 0.05); /* Glow morado sutil al pasar cursor */
+    }
+
+    .stock-badge {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+        padding: 0.35rem 0.85rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+    }
+
+    /* Animación pulsante para stock crítico */
+    @keyframes pulse {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4); }
+        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(225, 29, 72, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+    }
+
+    .stock-badge.low {
+        background: rgba(225, 29, 72, 0.15);
+        color: #fb7185;
+        animation: pulse 2s infinite;
+    }
+
+    .money {
+        font-family: 'Inter', sans-serif;
+        font-weight: 500;
+        color: var(--text-muted);
+    }
+    
+    .money-highlight {
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
+        color: var(--primary-light);
+    }
+</style>
+
+<div class="card">
+    <div class="header-section">
+        <h1>📦 Control de Inventario Central</h1>
+    </div>
+
+    <div class="table-container">
+        <table class="premium-table">
+            <thead>
+                <tr>
+                    <th>SKU / Código</th>
+                    <th>Nombre del Producto</th>
+                    <th>Existencias</th>
+                    <th>Precio Mínimo</th>
+                    <th>Precio Sugerido</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in productos %}
+                <tr>
+                    <td style="color: var(--text-muted); font-family: monospace; font-size: 0.9rem;">{{ p.sku }}</td>
+                    <td style="font-weight: 500;">{{ p.nombre }}</td>
+                    <td>
+                        <span class="stock-badge {% if p.cantidad_stock < 15 %}low{% endif %}">
+                            {{ p.cantidad_stock }} uds.
+                        </span>
+                    </td>
+                    <td class="money">${{ (p.precio_minimo)|cop }}</td>
+                    <td class="money-highlight">${{ (p.precio_sugerido)|cop }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 4rem;">
+                        No existen productos. Asegúrate de ejecutar tu seed_inventory.py
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

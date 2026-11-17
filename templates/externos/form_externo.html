@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-brand-black m-0">{% if celular %}Editar Producto Externo{% else %}Ingresar Producto Externo{% endif %}</h2>
+            <a href="{{ url_for('externos_bp.inventario') }}" class="btn btn-light rounded-pill px-4 shadow-sm border">
+                <i class="fa-solid fa-arrow-left me-1"></i> Volver al Inventario
+            </a>
+        </div>
+
+        <div class="card card-custom border-0 shadow-sm p-4">
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <h5 class="fw-bold mb-3 border-bottom pb-2">Datos del Dispositivo</h5>
+                
+                <div class="row mb-4">
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Marca</label>
+                        <input type="text" name="marca" class="form-control" value="{{ celular.marca if celular else '' }}" placeholder="Ej: Apple, Samsung" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Referencia</label>
+                        <input type="text" name="modelo_celular" class="form-control" value="{{ celular.modelo_celular if celular else '' }}" placeholder="Ej: iPhone 13 Pro" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Capacidad</label>
+                        <input type="text" name="memoria" class="form-control" value="{{ celular.memoria if celular else '' }}" placeholder="Ej: 128GB" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Color</label>
+                        <input type="text" name="color" class="form-control" value="{{ celular.color if celular else '' }}" placeholder="Ej: Negro, Azul">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Batería (%)</label>
+                        <input type="text" name="bateria" class="form-control" value="{{ celular.bateria if celular else '' }}" placeholder="Ej: 85%">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">Proveedor</label>
+                        <input type="text" name="proveedor" class="form-control" value="{{ celular.proveedor if celular else '' }}" placeholder="Ej: Mayorista A">
+                    </div>
+                </div>
+
+                <h5 class="fw-bold mb-3 border-bottom pb-2">Identificación (IMEI)</h5>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">IMEI 1 (Obligatorio)</label>
+                        <input type="text" name="imei" class="form-control bg-light" value="{{ celular.imei if celular else '' }}" placeholder="Ingresa el IMEI de 15 dígitos" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold small text-muted text-uppercase">IMEI 2 (Opcional)</label>
+                        <input type="text" name="imei2" class="form-control bg-light" value="{{ celular.imei2 if celular else '' }}" placeholder="Segundo IMEI (si es dual SIM)">
+                    </div>
+                </div>
+
+                <h5 class="fw-bold mb-3 border-bottom pb-2">Precios</h5>
+                
+                <div class="row bg-light rounded-3 p-3 mx-0 border mb-4">
+                    <div class="col-md-6 mb-2 mb-md-0">
+                        <label class="form-label text-danger fw-bold small text-uppercase">Costo ($)</label>
+                        <input type="text" name="precio_costo" class="form-control format-price" value="{{ "%.0f"|format(celular.precio_costo|float) if celular and celular.precio_costo else '0' }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-success fw-bold small text-uppercase">Precio Sugerido ($)</label>
+                        <input type="text" name="precio_sugerido" class="form-control format-price" value="{{ "%.0f"|format(celular.precio_sugerido|float) if celular and celular.precio_sugerido else '0' }}" required>
+                    </div>
+                </div>
+
+                <div class="text-end mt-2">
+                    <button type="submit" class="btn btn-blue rounded-pill px-5 py-2 fw-bold shadow-sm" onclick="cleanPrices(this.form)">
+                        <i class="fa-solid fa-save me-1"></i> {% if celular %}Actualizar Externo{% else %}Guardar Externo{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('format-price')) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value !== '') {
+                e.target.value = parseInt(value, 10).toLocaleString('es-CO');
+            } else {
+                e.target.value = '';
+            }
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.format-price').forEach(input => {
+            if (input.value && input.value !== '0') {
+                let value = input.value.replace(/\D/g, '');
+                input.value = parseInt(value, 10).toLocaleString('es-CO');
+            } else {
+                input.value = '';
+            }
+        });
+    });
+
+    function cleanPrices(form) {
+        form.querySelectorAll('.format-price').forEach(input => {
+            input.value = input.value.replace(/\D/g, '');
+            if (input.value === '') input.value = '0';
+        });
+    }
+
+    document.querySelectorAll('form input, form select').forEach(input => {
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const form = this.closest('form');
+                if (!form) return;
+                const campos = Array.from(form.querySelectorAll('input:not([type="hidden"]), select, button[type="submit"]'));
+                const idx = campos.indexOf(this);
+                if (idx > -1 && idx + 1 < campos.length) {
+                    campos[idx + 1].focus();
+                    if (typeof campos[idx + 1].select === 'function') {
+                        campos[idx + 1].select();
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h2 class="fw-bold text-brand-black m-0">Inventario Central</h2>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-truck-moving me-1"></i> Trasladar Mercancía
+        </a>
+        <button type="button" class="btn btn-outline-success rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#importarModal">
+            <i class="fa-solid fa-file-excel me-1"></i> Importar Masivo
+        </button>
+        <a href="/inventory/nuevo" class="btn btn-blue rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-plus me-1"></i> Nuevo Producto
+        </a>
+    </div>
+</div>
+
+
+
+<!-- Buscador Rápido de Inventario -->
+<div class="card card-custom p-3 mb-4 border-0 shadow-sm bg-white">
+    <div class="row align-items-center">
+        <div class="col-md-8 col-lg-6 position-relative">
+            <div class="input-group input-group-lg shadow-sm rounded-pill border">
+                <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" id="inventarioSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por SKU o Nombre del producto..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
+                <button class="btn btn-light border-0 px-3 text-muted" type="button" id="clearSearch" title="Limpiar búsqueda" style="border-radius: 0 50px 50px 0;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <!-- Contenedor para resultados desplegables -->
+            <div id="searchDropdown" class="dropdown-menu shadow-lg border-0 w-100 p-0 mt-2 d-none" style="max-height: 400px; overflow-y: auto;">
+            </div>
+        </div>
+        <div class="col-md-4 col-lg-6 text-md-end mt-3 mt-md-0">
+            <small class="text-muted fw-bold text-uppercase" style="font-size: 0.75rem;">
+                Mostrando <span id="visibleCount" class="text-brand-pink">{{ productos|length }}</span>
+                de <strong>{{ total_productos }}</strong> productos
+                {% if paginacion.pages > 1 %}<span class="text-muted">&nbsp;· pág. {{ paginacion.page }}/{{ paginacion.pages }}</span>{% endif %}
+            </small>
+        </div>
+    </div>
+</div>
+
+<div class="card card-custom p-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0">
+            <thead class="bg-dark text-white">
+                <tr>
+                    <th width="120" class="ps-4 fw-bold">SKU</th>
+                    <th class="fw-bold">PRODUCTO</th>
+                    <th width="150" class="text-center fw-bold">STOCK</th>
+                    {% if current_user.rol != 'coordinador' %}
+                    <th width="150" class="text-end fw-bold">PRECIO COSTO</th>
+                    {% endif %}
+                    <th width="150" class="text-end fw-bold">PRECIO MÍNIMO</th>
+                    <th width="150" class="text-end pe-4 fw-bold">PRECIO SUGERIDO</th>
+                    <th width="220" class="text-center fw-bold">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody class="align-middle">
+                {% for p in productos %}
+                <tr>
+                    <td class="text-muted text-nowrap">
+                        {% if p.variantes %}
+                            <button class="btn btn-sm btn-light border me-1 rounded-circle shadow-sm p-1" style="width: 28px; height: 28px;" type="button" data-bs-toggle="collapse" data-bs-target="#collapseVariantes{{ p.id }}" aria-expanded="false" title="Ver Subcategorías">
+                                <i class="fa-solid fa-chevron-down small"></i>
+                            </button>
+                        {% endif %}
+                        <small><strong>{{ p.sku }}</strong></small>
+                    </td>
+                    <td class="fw-semibold text-brand-black">{{ p.nombre }}</td>
+                    <td class="text-center">
+                        {% set p_stock_info = stock_por_producto.get(p.id) if stock_por_producto else none %}
+                        {% set st_display = p_stock_info.local_stock if p_stock_info else p.total_stock %}
+                        
+                        {% if current_user.rol == 'vendedor' %}
+                            <!-- Rol vendedor: Solo ve el stock de su sucursal -->
+                            {% if st_display <= 3 %}
+                                <span class="badge bg-brand-pink text-white rounded-pill px-3 py-2 shadow-sm"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ st_display }} (Bajo)</span>
+                            {% else %}
+                                <span class="badge bg-light text-brand-black border border-dark rounded-pill px-3 py-2 fw-bold">{{ st_display }} uds.</span>
+                            {% endif %}
+                        {% else %}
+                            <!-- Admin / Bodega: Stock y desglose por sucursal -->
+                            {% if st_display <= 3 %}
+                                <span class="badge bg-brand-pink text-white rounded-pill px-3 py-2 shadow-sm"><i class="fa-solid fa-triangle-exclamation me-1"></i> {{ st_display }} uds.</span>
+                            {% else %}
+                                <span class="badge bg-light text-brand-black border border-dark rounded-pill px-3 py-2 fw-bold">{{ st_display }} uds.</span>
+                            {% endif %}
+
+                            <!-- Desglose por sucursales -->
+                            {% if p_stock_info and p_stock_info.distribucion %}
+                            <div class="mt-1 d-flex flex-wrap justify-content-center gap-1" style="font-size: 0.7rem;">
+                                {% for d in p_stock_info.distribucion %}
+                                    <span class="badge {% if d.cantidad > 0 %}bg-dark-subtle text-dark border{% else %}text-muted bg-light border-0{% endif %} px-2 py-0" title="{{ d.branch_name }}: {{ d.cantidad }}">
+                                        {{ d.branch_code }}: <strong>{{ d.cantidad }}</strong>
+                                    </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    {% if current_user.rol != 'coordinador' %}
+                    <td class="text-end fw-bold" style="color: var(--brand-pink);">
+                        {% if p.rango_costos %}
+                            {% if p.rango_costos is number %}
+                                ${{ (p.rango_costos)|cop }}
+                            {% else %}
+                                <div class="small text-muted fw-normal" style="line-height:1;">Desde</div>
+                                ${{ (p.rango_costos[0])|cop }}
+                                <div class="small text-muted fw-normal mt-1" style="line-height:1;">hasta</div>
+                                ${{ (p.rango_costos[1])|cop }}
+                            {% endif %}
+                        {% else %}
+                            ${{ (p.precio_costo)|cop }}
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    <td class="text-end text-muted fw-bold">
+                        {% if p.rango_minimos %}
+                            {% if p.rango_minimos is number %}
+                                ${{ (p.rango_minimos)|cop }}
+                            {% else %}
+                                <div class="small text-muted fw-normal" style="line-height:1;">Desde</div>
+                                ${{ (p.rango_minimos[0])|cop }}
+                                <div class="small text-muted fw-normal mt-1" style="line-height:1;">hasta</div>
+                                ${{ (p.rango_minimos[1])|cop }}
+                            {% endif %}
+                        {% else %}
+                            ${{ (p.precio_minimo)|cop }}
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold text-brand-black pe-4">
+                        {% if p.rango_precios %}
+                            {% if p.rango_precios is number %}
+                                ${{ (p.rango_precios)|cop }}
+                            {% else %}
+                                <div class="small text-muted fw-normal" style="line-height:1;">Desde</div>
+                                ${{ (p.rango_precios[0])|cop }}<br>
+                                <div class="small text-muted fw-normal mt-1" style="line-height:1;">hasta</div>
+                                ${{ (p.rango_precios[1])|cop }}
+                            {% endif %}
+                        {% else %}
+                            ${{ (p.precio_sugerido)|cop }}
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex justify-content-center align-items-center gap-2 text-nowrap">
+                            <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id) }}" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Trasladar este Producto">
+                                <i class="fa-solid fa-truck-moving"></i>
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-dark rounded-pill fw-bold shadow-sm" title="Gestionar Subcategorías" data-bs-toggle="modal" data-bs-target="#variantesModal{{ p.id }}">
+                                <i class="fa-solid fa-sitemap me-1"></i> Variantes
+                            </button>
+                            <a href="{{ url_for('inventory_bp.ver_producto', id=p.id) }}" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Ver Detalle">
+                                <i class="fa-solid fa-eye"></i>
+                            </a>
+                            <a href="{{ url_for('inventory_bp.editar_producto', id=p.id) }}" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Editar Maestro">
+                                <i class="fa-solid fa-pen"></i>
+                            </a>
+                            <form method="POST" action="{{ url_for('inventory_bp.eliminar_producto', id=p.id) }}" class="d-inline m-0 flex-shrink-0" onsubmit="return confirm('ATENCIÓN: ¿Está seguro de que desea ELIMINAR PERMANENTEMENTE este producto del sistema en la Nube? Esto no se puede deshacer.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm text-white bg-brand-pink rounded-circle shadow-sm" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Eliminar Producto">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% if p.variantes %}
+                <tr class="collapse bg-light" id="collapseVariantes{{ p.id }}">
+                    <td colspan="7" class="p-0 border-bottom border-dark border-opacity-10 shadow-inner">
+                        <div class="p-3 bg-white" style="border-left: 4px solid var(--brand-pink); border-radius: 0 0 8px 8px;">
+                            <table class="table table-sm table-borderless mb-0">
+                                <thead class="text-muted" style="font-size: 0.8rem; border-bottom: 1px solid #eee;">
+                                    <tr>
+                                        <th class="ps-3"><i class="fa-solid fa-arrow-turn-down me-2 text-black-50"></i>Subcategoría (Variante)</th>
+                                        <th class="text-center">Stock Físico</th>
+                                        {% if current_user.rol != 'coordinador' %}
+                                        <th class="text-end">Costo Unitario</th>
+                                        <th class="text-end text-success">Valor Invertido (Costo)</th>
+                                        {% endif %}
+                                        <th class="text-end">Sugerido</th>
+                                        <th class="text-center" width="100">Trasladar</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for v in p.variantes %}
+                                    <tr class="align-middle">
+                                        <td class="ps-4 fw-semibold text-brand-black" style="font-size: 0.95rem;">{{ v.nombre_variante }}</td>
+                                        <td class="text-center">
+                                            {% if v.cantidad_stock <= 3 %}
+                                                <span class="badge bg-danger rounded-pill">{{ v.cantidad_stock }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary rounded-pill text-white">{{ v.cantidad_stock }}</span>
+                                            {% endif %}
+                                        </td>
+                                        {% if current_user.rol != 'coordinador' %}
+                                        <td class="text-end text-muted">${{ (v.precio_costo or p.precio_costo)|cop }}</td>
+                                        <td class="text-end fw-bold text-success">${{ ((v.precio_costo or p.precio_costo) * v.cantidad_stock)|cop }}</td>
+                                        {% endif %}
+                                        <td class="text-end text-muted">${{ (v.precio_sugerido or p.precio_sugerido)|cop }}</td>
+                                        <td class="text-center">
+                                            <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id, variant_id=v.id) }}" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.75rem;" title="Trasladar esta variante">
+                                                <i class="fa-solid fa-truck-moving me-1"></i> Enviar
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>
+                {% endif %}
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <!-- Icono en Rosa Pastel -->
+                        <i class="fa-solid fa-box-open fs-1 mb-3 text-brand-pink"></i>
+                        <p class="mb-0">El inventario está vacío.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════ PAGINACIÓN ════════════════════════════════════ -->
+{% if paginacion.pages > 1 %}
+<nav aria-label="Paginación de inventario" class="mt-4">
+    <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+
+        <!-- Anterior -->
+        <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_prev %}{{ url_for('inventory_bp.index', page=paginacion.prev_num) }}{% else %}#{% endif %}"
+               aria-label="Anterior">
+                <i class="fa-solid fa-chevron-left"></i>
+            </a>
+        </li>
+
+        <!-- Páginas numeradas -->
+        {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p_num %}
+                <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
+                    <a class="page-link rounded-pill px-3 shadow-sm"
+                       href="{{ url_for('inventory_bp.index', page=p_num) }}">{{ p_num }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link rounded-pill px-3">…</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Siguiente -->
+        <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_next %}{{ url_for('inventory_bp.index', page=paginacion.next_num) }}{% else %}#{% endif %}"
+               aria-label="Siguiente">
+                <i class="fa-solid fa-chevron-right"></i>
+            </a>
+        </li>
+
+    </ul>
+</nav>
+{% endif %}
+<!-- ═══════════════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Modales de Variantes generados fuera de la tabla para evitar cortes de interfaz -->
+{% for p in productos %}
+    {% include 'inventory/modal_variantes.html' %}
+{% endfor %}
+
+<!-- Modal para Importación Masiva -->
+<div class="modal fade" id="importarModal" tabindex="-1" aria-labelledby="importarModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('inventory_bp.importar_inventario') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header border-0 bg-light">
+                    <h5 class="modal-title fw-bold text-success" id="importarModalLabel">
+                        <i class="fa-solid fa-cloud-arrow-up me-2"></i>Carga Masiva de Productos
+                    </h5>
+                    <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4 text-center">
+                    <i class="fa-solid fa-file-excel text-success d-block mb-3" style="font-size: 3rem;"></i>
+                    <p class="mb-4">Puedes registrar o actualizar docenas de productos simultáneamente subiendo un documento Excel <strong>(.xlsx)</strong> o <strong>CSV</strong>.</p>
+                    
+                    <a href="{{ url_for('inventory_bp.descargar_plantilla') }}" class="btn btn-outline-secondary rounded-pill fw-bold w-100 mb-4 text-start shadow-sm">
+                        <i class="fa-solid fa-download ms-2 me-2"></i> 1. Descargar Plantilla de Ejemplo
+                    </a>
+
+                    {% if current_user.rol == 'admin' %}
+                    <div class="text-start mb-3">
+                        <label class="form-label fw-bold"><i class="fa-solid fa-location-dot text-primary me-1"></i>Sucursal o Bodega de Destino</label>
+                        <select name="branch_id" class="form-select bg-light border-0 shadow-sm fw-semibold">
+                            {% for b in todas_sucursales %}
+                                <option value="{{ b.id }}" {% if active_b_id == b.id %}selected{% elif b.tipo == 'bodega' %}selected{% endif %}>
+                                    {{ b.nombre }} ({{ b.codigo }}) - {{ b.tipo|capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted d-block mt-1">El stock cargado se registrará en esta sede.</small>
+                    </div>
+                    {% endif %}
+
+                    <div class="text-start mb-2">
+                        <label class="form-label fw-bold">2. Subir archivo rellenado</label>
+                        <input type="file" name="archivo" accept=".xlsx, .csv" class="form-control bg-light border-0 shadow-sm" required>
+                        <small class="text-muted d-block mt-2"><i class="fa-solid fa-circle-info text-info me-1"></i>Si el código SKU ya existe, su cantidad será <strong>SUMADA</strong> al inventario actual y se pisarán los precios.</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light rounded-bottom">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success rounded-pill fw-bold px-4 shadow-sm">
+                        <i class="fa-solid fa-gear me-1"></i> Subir y Procesar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('inventarioSearch');
+    const clearBtn = document.getElementById('clearSearch');
+    const dropdown = document.getElementById('searchDropdown');
+    const tableRows = document.querySelectorAll('tbody tr:not(.no-results)');
+    const visibleCount = document.getElementById('visibleCount');
+    const tbody = document.querySelector('tbody');
+
+    // Crear fila de "No hay resultados" si no existe
+    const noResultsRow = document.createElement('tr');
+    noResultsRow.className = 'no-results d-none';
+    noResultsRow.innerHTML = `<td colspan="7" class="text-center py-5 text-muted">
+        <i class="fa-solid fa-magnifying-glass-minus fs-1 mb-3 opacity-25"></i>
+        <p class="mb-0">No se encontraron productos que coincidan con tu búsqueda.</p>
+    </td>`;
+    tbody.appendChild(noResultsRow);
+
+    let debounceTimer;
+
+    function performSearch() {
+        const query = searchInput.value.toLowerCase().trim();
+        
+        // 1. Filtrado local de la tabla (lo que ya está cargado)
+        let matches = 0;
+        tableRows.forEach(row => {
+            const sku = row.cells[0].textContent.toLowerCase();
+            const nombre = row.cells[1].textContent.toLowerCase();
+            if (sku.includes(query) || nombre.includes(query)) {
+                row.classList.remove('d-none');
+                matches++;
+            } else {
+                row.classList.add('d-none');
+            }
+        });
+        visibleCount.textContent = matches;
+        if (matches === 0 && query !== '') noResultsRow.classList.remove('d-none');
+        else noResultsRow.classList.add('d-none');
+
+        // 2. Búsqueda AJAX global para el "despliegue"
+        clearTimeout(debounceTimer);
+        if (query.length < 2) {
+            dropdown.classList.add('d-none');
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/inventory/api/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        dropdown.innerHTML = '';
+                        data.forEach(item => {
+                            const btn = document.createElement('a');
+                            btn.href = item.url;
+                            btn.className = 'dropdown-item p-3 border-bottom d-flex justify-content-between align-items-center';
+                            btn.innerHTML = `
+                                <div>
+                                    <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">${item.nombre}</div>
+                                    <small class="text-muted">SKU: ${item.sku}</small>
+                                </div>
+                                <span class="badge bg-light text-dark border rounded-pill">${item.stock} uds</span>
+                            `;
+                            dropdown.appendChild(btn);
+                        });
+                        dropdown.classList.remove('d-none');
+                        dropdown.classList.add('show');
+                    } else {
+                        dropdown.classList.add('d-none');
+                        dropdown.classList.remove('show');
+                    }
+                });
+        }, 300);
+    }
+
+    searchInput.addEventListener('input', performSearch);
+
+    // Ocultar dropdown al hacer click fuera
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+        }
+    });
+
+    clearBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        performSearch();
+        dropdown.classList.add('d-none');
+        dropdown.classList.remove('show');
+        searchInput.focus();
+    });
+});
+</script>
+{% endblock %}

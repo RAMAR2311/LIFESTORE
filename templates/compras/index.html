@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-12 d-flex justify-content-between align-items-center mb-2">
+        <div>
+            <h2 class="brand-title mb-1"><i class="fa-solid fa-cart-flatbed me-2" style="color: var(--brand-primary);"></i> Módulo de Compras</h2>
+            <p class="brand-subtitle mb-0">INGRESO DE MERCANCÍA &bull; CELULARES Y ACCESORIOS</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('purchases_bp.nueva', tipo='accesorios') }}" class="btn btn-pink px-3 py-2 fw-bold shadow-sm">
+                <i class="fa-solid fa-boxes-stacked me-1"></i> + Compra Accesorios
+            </a>
+            <a href="{{ url_for('purchases_bp.nueva', tipo='celulares') }}" class="btn btn-blue px-3 py-2 fw-bold shadow-sm">
+                <i class="fa-solid fa-mobile-screen-button me-1"></i> + Compra Celulares
+            </a>
+        </div>
+    </div>
+
+    <!-- Tarjetas Informativas -->
+    <div class="col-12">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="card p-3 shadow-sm border" style="border-left: 4px solid var(--brand-primary) !important;">
+                    <small class="text-muted fw-bold text-uppercase d-block mb-1">Total Compras Registradas</small>
+                    <h3 class="mb-0 fw-bold font-mono">{{ compras|length }}</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3 shadow-sm border" style="border-left: 4px solid var(--brand-secondary) !important;">
+                    <small class="text-muted fw-bold text-uppercase d-block mb-1">Proveedores Activos</small>
+                    <h3 class="mb-0 fw-bold font-mono">{{ proveedores|length }}</h3>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3 shadow-sm border" style="border-left: 4px solid var(--brand-dark) !important;">
+                    <small class="text-muted fw-bold text-uppercase d-block mb-1">Inversión Total Registrada</small>
+                    <h3 class="mb-0 fw-bold price-display font-mono">
+                        ${{ (compras | sum(attribute='total_costo'))|cop }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Historial de Compras -->
+    <div class="col-12">
+        <div class="card shadow-sm p-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-clock-rotate-left me-2" style="color: var(--brand-primary);"></i> Historial de Ingresos de Mercancía</h5>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th width="8%">ID Compra</th>
+                            <th width="12%">Fecha</th>
+                            <th width="12%">Inventario</th>
+                            <th width="20%">Proveedor</th>
+                            <th width="15%">No. Factura</th>
+                            <th width="10%" class="text-center">Items</th>
+                            <th width="13%" class="text-end">Total Costo</th>
+                            <th width="10%" class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in compras %}
+                        <tr>
+                            <td class="font-mono fw-bold">#{{ "%04d"|format(c.id) }}</td>
+                            <td class="text-muted small">{{ c.fecha_compra.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>
+                                {% if c.tipo_inventario == 'celulares' %}
+                                    <span class="badge rounded-pill px-3 py-1" style="background: rgba(30, 86, 34, 0.1); color: var(--brand-secondary); border: 1px solid var(--brand-secondary);">
+                                        <i class="fa-solid fa-mobile-screen-button me-1"></i> Celulares
+                                    </span>
+                                {% else %}
+                                    <span class="badge rounded-pill px-3 py-1" style="background: rgba(118, 188, 33, 0.1); color: var(--brand-primary); border: 1px solid var(--brand-primary);">
+                                        <i class="fa-solid fa-headphones me-1"></i> Accesorios
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-semibold">
+                                {{ c.proveedor.nombre if c.proveedor else 'Sin Proveedor' }}
+                            </td>
+                            <td class="font-mono text-muted">
+                                {{ c.numero_factura or 'S/N' }}
+                            </td>
+                            <td class="text-center font-mono fw-bold">
+                                {{ c.items|sum(attribute='cantidad') }} uds
+                            </td>
+                            <td class="text-end font-mono fw-bold price-display">
+                                ${{ (c.total_costo)|cop }}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('purchases_bp.detalle', id=c.id) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                                    <i class="fa-solid fa-eye me-1"></i> Ver
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-cart-flatbed fa-3x mb-3 text-secondary opacity-50"></i>
+                                <p class="mb-2">No se han registrado órdenes de compra aún.</p>
+                                <a href="{{ url_for('purchases_bp.nueva') }}" class="btn btn-sm btn-pink rounded-pill px-4">
+                                    Registrar Primera Compra
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-brand-black m-0">Inventario de Productos Externos</h2>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalImportarExcel">
+            <i class="fa-solid fa-file-excel me-1"></i> Importar Excel
+        </button>
+        <a href="{{ url_for('externos_bp.nuevo_externo') }}" class="btn btn-blue rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-plus me-1"></i> Ingresar Externo
+        </a>
+    </div>
+</div>
+
+<!-- Barra de Búsqueda Server-Side -->
+<form method="GET" action="{{ url_for('externos_bp.inventario') }}" id="searchForm" class="mb-4">
+    <div class="input-group shadow-sm" style="max-width: 480px;">
+        <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+        <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0"
+               placeholder="Buscar por IMEI, Marca, Modelo o Proveedor..."
+               value="{{ q }}">
+        {% if q %}
+        <a href="{{ url_for('externos_bp.inventario') }}" class="btn btn-outline-secondary" title="Limpiar búsqueda"><i class="fa-solid fa-xmark"></i></a>
+        {% endif %}
+    </div>
+</form>
+
+<!-- Modal Importar Excel -->
+<div class="modal fade" id="modalImportarExcel" tabindex="-1" aria-labelledby="modalImportarExcelLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title fw-bold" id="modalImportarExcelLabel"><i class="fa-solid fa-file-excel me-2"></i> Subida Masiva de Externos por Excel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('externos_bp.importar_excel') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4 text-center">
+                    <p class="mb-4 text-muted">Sube tu archivo de Excel con el inventario de celulares externos. Asegúrate de usar el formato correcto.</p>
+                    
+                    <a href="{{ url_for('externos_bp.descargar_plantilla') }}" class="btn btn-outline-success fw-bold mb-4 rounded-pill">
+                        <i class="fa-solid fa-download me-1"></i> Descargar Plantilla de Ejemplo
+                    </a>
+                    
+                    <div class="mb-3 text-start">
+                        <label for="archivo_excel" class="form-label fw-bold">Archivo Excel (.xlsx, .xls)</label>
+                        <input class="form-control" type="file" id="archivo_excel" name="archivo_excel" accept=".xlsx, .xls" required>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold"><i class="fa-solid fa-upload me-1"></i> Subir Inventario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card card-custom p-0 shadow-sm border-0">
+    <form id="formMasivoExternos" method="POST" action="{{ url_for('externos_bp.enviar_inventario_masivo') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+        <!-- Barra de Acciones Masivas (visible cuando se seleccionan filas) -->
+        <div id="barraAccionesMasivas" class="bg-dark text-white p-2 px-3 d-none align-items-center justify-content-between rounded-top" style="transition: all 0.3s ease;">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-check-double text-success"></i>
+                <span class="fw-semibold small"><span id="contadorSeleccionados" class="badge bg-primary rounded-pill me-1">0</span> seleccionados</span>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3" onclick="deseleccionarTodos()">
+                    Cancelar
+                </button>
+                <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" onclick="return confirm('¿Confirmas enviar los productos seleccionados al inventario principal de celulares?');">
+                    <i class="fa-solid fa-truck-fast me-1"></i> Enviar Seleccionados al Inventario
+                </button>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0 align-middle text-center w-100" style="font-size: 0.85rem;">
+                <thead class="bg-dark text-white text-nowrap" style="font-size: 0.8rem;">
+                    <tr>
+                        <th class="ps-3 py-2 text-center" style="width: 40px;">
+                            <input type="checkbox" id="checkAll" class="form-check-input" title="Seleccionar todos los disponibles">
+                        </th>
+                        <th class="py-2 text-start fw-bold">MARCA</th>
+                        <th class="py-2 text-start fw-bold">REFERENCIA</th>
+                        <th class="py-2 fw-bold">CAP.</th>
+                        <th class="py-2 fw-bold">BAT.</th>
+                        <th class="py-2 fw-bold">COLOR</th>
+                        <th class="py-2 fw-bold">IMEI</th>
+                        <th class="py-2 fw-bold">IMEI 2</th>
+                        <th class="py-2 fw-bold">PROVEEDOR</th>
+                        <th class="py-2 fw-bold">FECHA</th>
+                        <th class="py-2 fw-bold">COSTO</th>
+                        <th class="py-2 fw-bold">SUGERIDO</th>
+                        <th class="pe-3 py-2 text-center fw-bold">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody class="text-nowrap">
+                    {% for c in celulares %}
+                    <tr class="{% if c.estado_celular == 'Enviado' %}table-light opacity-75{% endif %}">
+                        <td class="ps-3 text-center">
+                            {% if c.estado_celular != 'Enviado' %}
+                                <input type="checkbox" name="producto_ids" value="{{ c.id }}" class="form-check-input check-item" onchange="actualizarSeleccion()">
+                            {% else %}
+                                <i class="fa-solid fa-check text-muted" style="font-size: 0.75rem;" title="Ya enviado"></i>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold text-dark text-start">{{ c.marca or '-' }}</td>
+                        <td class="fw-semibold text-start">{{ c.modelo_celular or '-' }}</td>
+                        <td>{{ c.memoria or '-' }}</td>
+                        <td>{{ c.bateria or '-' }}</td>
+                        <td>{{ c.color or '-' }}</td>
+                        <td class="text-muted">{{ (c.imei or '').replace('-EXT', '') or '-' }}</td>
+                        <td class="text-muted">{{ c.imei2 or '-' }}</td>
+                        <td class="text-truncate" style="max-width: 120px;" title="{{ c.proveedor or '-' }}">{{ c.proveedor or '-' }}</td>
+                        <td>{{ c.fecha_creacion.strftime('%d/%m/%Y') }}</td>
+                        
+                        <td class="text-brand-black fw-bold">${{ c.precio_costo|cop }}</td>
+                        <td class="text-brand-black fw-bolder">${{ c.precio_sugerido|cop }}</td>
+                        
+                        <td class="pe-3 text-center">
+                            <div class="d-flex justify-content-center align-items-center gap-1">
+                                {% if c.estado_celular == 'Enviado' %}
+                                    <span class="badge bg-dark rounded-pill shadow-sm me-1"><i class="fa-solid fa-check me-1"></i> Al Inventario</span>
+                                {% else %}
+                                    <button type="button" class="btn btn-sm btn-outline-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Enviar a Inventario Principal" onclick="enviarIndividual({{ c.id }})">
+                                        <i class="fa-solid fa-truck-fast" style="font-size: 0.75rem;"></i>
+                                    </button>
+                                    <a href="{{ url_for('externos_bp.editar_externo', id=c.id) }}" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Editar">
+                                        <i class="fa-solid fa-pen" style="font-size: 0.75rem;"></i>
+                                    </a>
+                                {% endif %}
+
+                                {% if c.detalles_venta %}
+                                <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=c.detalles_venta[0].sale_id) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Ver Factura de Venta (#{{ c.detalles_venta[0].sale_id }})">
+                                    <i class="fa-solid fa-file-invoice-dollar" style="font-size: 0.75rem;"></i>
+                                </a>
+                                {% elif c.retoma_origen %}
+                                <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=c.retoma_origen.sale_id) }}" target="_blank" class="btn btn-sm btn-outline-info rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Ver Factura de Origen (#{{ c.retoma_origen.sale_id }})">
+                                    <i class="fa-solid fa-receipt" style="font-size: 0.75rem;"></i>
+                                </a>
+                                {% else %}
+                                <button type="button" class="btn btn-sm text-muted bg-light border rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px; opacity: 0.4;" disabled title="Sin factura asociada (En Inventario)">
+                                    <i class="fa-solid fa-file-invoice-dollar" style="font-size: 0.75rem;"></i>
+                                </button>
+                                {% endif %}
+
+                                {% if c.estado_celular != 'Enviado' %}
+                                <button type="button" class="btn btn-sm text-white bg-brand-pink border-0 rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Eliminar" onclick="eliminarIndividual({{ c.id }})">
+                                    <i class="fa-solid fa-trash-can" style="font-size: 0.75rem;"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="13" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-box-open fs-3 mb-2 opacity-50"></i>
+                            <p class="mb-0">No hay productos externos registrados.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<!-- Forms ocultos para acciones individuales sin anidar etiquetas form -->
+<form id="formIndividualEnviar" method="POST" action="" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<form id="formIndividualEliminar" method="POST" action="" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
+<!-- Paginación -->
+{% if paginacion.pages > 1 %}
+<nav aria-label="Paginación externos" class="mt-4">
+    <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+        <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_prev %}{{ url_for('externos_bp.inventario', page=paginacion.prev_num, q=q) }}{% else %}#{% endif %}"
+               aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></a>
+        </li>
+        {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p_num %}
+                <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
+                    <a class="page-link rounded-pill px-3 shadow-sm"
+                       href="{{ url_for('externos_bp.inventario', page=p_num, q=q) }}">{{ p_num }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link rounded-pill px-3">…</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_next %}{{ url_for('externos_bp.inventario', page=paginacion.next_num, q=q) }}{% else %}#{% endif %}"
+               aria-label="Siguiente"><i class="fa-solid fa-chevron-right"></i></a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+<script>
+    // Search: debounced server-side submit
+    let searchTimer;
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            document.getElementById('searchForm').submit();
+        }, 500);
+    });
+
+    // Gestión de Selección Múltiple
+    const checkAll = document.getElementById('checkAll');
+    const barraAcciones = document.getElementById('barraAccionesMasivas');
+    const contador = document.getElementById('contadorSeleccionados');
+
+    if (checkAll) {
+        checkAll.addEventListener('change', function() {
+            const items = document.querySelectorAll('.check-item');
+            items.forEach(cb => cb.checked = checkAll.checked);
+            actualizarSeleccion();
+        });
+    }
+
+    function actualizarSeleccion() {
+        const seleccionados = document.querySelectorAll('.check-item:checked').length;
+        if (contador) contador.textContent = seleccionados;
+        
+        if (barraAcciones) {
+            if (seleccionados > 0) {
+                barraAcciones.classList.remove('d-none');
+                barraAcciones.classList.add('d-flex');
+            } else {
+                barraAcciones.classList.add('d-none');
+                barraAcciones.classList.remove('d-flex');
+                if (checkAll) checkAll.checked = false;
+            }
+        }
+    }
+
+    function deseleccionarTodos() {
+        const items = document.querySelectorAll('.check-item');
+        items.forEach(cb => cb.checked = false);
+        if (checkAll) checkAll.checked = false;
+        actualizarSeleccion();
+    }
+
+    function enviarIndividual(id) {
+        if (confirm('¿Enviar este equipo al inventario principal de celulares?')) {
+            const form = document.getElementById('formIndividualEnviar');
+            form.action = `/externos/enviar_inventario/${id}`;
+            form.submit();
+        }
+    }
+
+    function eliminarIndividual(id) {
+        if (confirm('¿Eliminar permanente?')) {
+            const form = document.getElementById('formIndividualEliminar');
+            form.action = `/externos/eliminar/${id}`;
+            form.submit();
+        }
+    }
+</script>
+{% endblock %}

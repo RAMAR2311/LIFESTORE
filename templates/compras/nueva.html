@@ -1,0 +1,867 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Encabezado -->
+    <div class="col-12 d-flex justify-content-between align-items-center mb-1">
+        <div>
+            <h2 class="brand-title mb-1"><i class="fa-solid fa-cart-plus me-2" style="color: var(--brand-primary);"></i> Registrar Ingreso de Mercancía</h2>
+            <p class="brand-subtitle mb-0">MÓDULO DE COMPRAS &bull; ABASTECIMIENTO DE STOCK</p>
+        </div>
+        <a href="{{ url_for('purchases_bp.index') }}" class="btn btn-outline-secondary rounded-pill px-3">
+            <i class="fa-solid fa-arrow-left me-1"></i> Volver al Listado
+        </a>
+    </div>
+
+    <!-- Formulario de Compra -->
+    <form action="{{ url_for('purchases_bp.guardar') }}" method="POST" id="formCompra" class="col-12">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="items_json" id="items_json" value="[]">
+
+        <div class="row g-4">
+            <!-- Columna Izquierda: Datos del Comprobante y Buscador de Productos -->
+            <div class="col-lg-8">
+                <!-- Tarjeta 1: Parámetros del Comprobante -->
+                <div class="card p-4 shadow-sm mb-4">
+                    <h5 class="fw-bold mb-3 border-bottom pb-2">
+                        <i class="fa-solid fa-file-invoice text-brand-pink me-2"></i> 1. Información de la Compra y Proveedor
+                    </h5>
+                    <div class="row g-3">
+                        <!-- Selector de Inventario -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-uppercase">Tipo de Inventario a Ingresar</label>
+                            <select name="tipo_inventario" id="tipo_inventario" class="form-select form-select-lg fw-bold" onchange="cambiarTipoInventario(this.value)">
+                                <option value="accesorios" {% if tipo == 'accesorios' %}selected{% endif %}>📦 Accesorios y Tecnología General</option>
+                                <option value="celulares" {% if tipo == 'celulares' %}selected{% endif %}>📱 Celulares y Equipos (Con IMEI/Serial)</option>
+                            </select>
+                        </div>
+
+                        <!-- Selector de Proveedor -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-uppercase">Proveedor</label>
+                            <div class="input-group">
+                                <select name="provider_id" id="provider_id" class="form-select">
+                                    <option value="">-- Sin Proveedor / Compra Directa --</option>
+                                    {% for prov in proveedores %}
+                                        <option value="{{ prov.id }}">{{ prov.nombre }} {% if prov.empresa %}({{ prov.empresa }}){% endif %}</option>
+                                    {% endfor %}
+                                </select>
+                                <a href="{{ url_for('providers_bp.list_providers') }}" target="_blank" class="btn btn-outline-secondary" title="Crear Nuevo Proveedor">
+                                    <i class="fa-solid fa-plus"></i>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Número de Factura -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-uppercase">Número de Factura / Remisión</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white" style="border-color: var(--brand-border);"><i class="fa-solid fa-hashtag text-muted"></i></span>
+                                <input type="text" name="numero_factura" class="form-control font-mono" placeholder="Ej: FAC-98421 o REM-0012">
+                            </div>
+                        </div>
+
+                        <!-- Observaciones -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-uppercase">Observaciones de la Entrega</label>
+                            <input type="text" name="observaciones" class="form-control" placeholder="Detalles de garantía con proveedor, estado del paquete, etc.">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 2: Barra de Búsqueda Avanzada de Productos -->
+                <div class="card p-4 shadow-sm mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                        <h5 class="fw-bold m-0">
+                            <i class="fa-solid fa-magnifying-glass text-brand-pink me-2"></i> 2. Búsqueda Avanzada de Productos
+                        </h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge rounded-pill px-3 py-1 bg-light text-secondary border" id="badgeTipoActual">
+                                Filtrando: Accesorios
+                            </span>
+                            <button type="button" class="btn btn-outline-success btn-sm rounded-pill fw-bold" onclick="abrirModalCrearDirecto()">
+                                <i class="fa-solid fa-plus me-1"></i> + Crear y Agregar Nuevo
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="position-relative mb-3">
+                        <div class="input-group input-group-lg">
+                            <span class="input-group-text bg-white border-end-0" style="border-color: var(--brand-border); color: var(--brand-primary);">
+                                <i class="fa-solid fa-search"></i>
+                            </span>
+                            <input type="text" id="buscadorAvanzado" class="form-control border-start-0 ps-0" 
+                                   placeholder="Escanea con la pistola o escribe serial, IMEI, SKU o nombre..." 
+                                   autocomplete="off">
+                        </div>
+                        
+                        <!-- Lista de Sugerencias desplegable -->
+                        <div id="resultadosBusqueda" class="list-group position-absolute w-100 shadow-lg mt-1 rounded-3 overflow-auto" 
+                             style="max-height: 320px; z-index: 1050; display: none; background: #FFFFFF; border: 1px solid var(--brand-border);">
+                            <!-- Se inyecta con JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 3: Tabla de Mercancía a Ingresar -->
+                <div class="card p-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold m-0"><i class="fa-solid fa-dolly text-brand-pink me-2"></i> Productos en la Orden de Ingreso</h5>
+                        <span class="badge rounded-pill px-3 py-1" style="background: rgba(118,188,33,0.1); color: var(--brand-primary); border: 1px solid var(--brand-border);" id="badgeTotalItems">
+                            0 Productos
+                        </span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle mb-0" id="tablaItemsCompra">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="35%">Producto / Detalle</th>
+                                    <th width="15%" class="text-center">Stock Actual</th>
+                                    <th width="15%" class="text-center">Cant. Ingresa</th>
+                                    <th width="18%" class="text-end">Costo Unitario</th>
+                                    <th width="17%" class="text-end">Subtotal</th>
+                                    <th width="5%" class="text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cuerpoTablaItems">
+                                <tr id="filaVacia">
+                                    <td colspan="6" class="text-center py-4 text-muted">
+                                        <i class="fa-solid fa-box-open fa-2x mb-2 text-secondary opacity-50"></i>
+                                        <p class="mb-0">Usa la barra de búsqueda avanzada para añadir productos al ingreso.</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Resumen de Totales y Confirmación -->
+            <div class="col-lg-4">
+                <div class="card p-4 shadow-sm position-sticky" style="top: 100px;">
+                    <h5 class="fw-bold mb-3 border-bottom pb-2">
+                        <i class="fa-solid fa-receipt text-brand-pink me-2"></i> Resumen del Ingreso
+                    </h5>
+
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted fw-bold">Variedad de Items:</span>
+                        <span class="fw-bold font-mono" id="resumenVariedad">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <span class="text-muted fw-bold">Unidades Totales a Ingresar:</span>
+                        <span class="fw-bold font-mono fs-5" id="resumenTotalUnidades">0</span>
+                    </div>
+
+                    <div class="p-3 rounded-3 mb-4 border" style="background: rgba(118, 188, 33, 0.05); border-color: var(--brand-border) !important;">
+                        <span class="text-muted fw-bold text-uppercase d-block small mb-1">Costo Total de la Compra</span>
+                        <h2 class="mb-0 fw-bold price-display font-mono" id="resumenCostoTotal">$0</h2>
+                    </div>
+
+                    <div class="alert alert-light border small text-muted mb-4" style="border-color: var(--brand-border) !important;">
+                        <i class="fa-solid fa-circle-info text-primary me-1"></i>
+                        Al confirmar el ingreso, las unidades ingresadas se sumarán directamente al stock del producto o variante seleccionada.
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-pink btn-lg fw-bold shadow-sm py-3" id="btnGuardarCompra" disabled>
+                            <i class="fa-solid fa-check-double me-2"></i> Confirmar e Ingresar Stock
+                        </button>
+                        <a href="{{ url_for('purchases_bp.index') }}" class="btn btn-outline-secondary rounded-pill">
+                            Cancelar
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Script del Módulo de Compras -->
+<script>
+    let itemsCompra = [];
+    const tipoSelect = document.getElementById('tipo_inventario');
+    const badgeTipo = document.getElementById('badgeTipoActual');
+    const inputBusqueda = document.getElementById('buscadorAvanzado');
+    const resultadosBox = document.getElementById('resultadosBusqueda');
+    const cuerpoTabla = document.getElementById('cuerpoTablaItems');
+    const filaVacia = document.getElementById('filaVacia');
+    const btnGuardar = document.getElementById('btnGuardarCompra');
+    const itemsJsonInput = document.getElementById('items_json');
+
+    function cambiarTipoInventario(tipo) {
+        if (itemsCompra.length > 0) {
+            if (!confirm('Al cambiar el tipo de inventario se limpiarán los productos agregados a la lista actual. ¿Deseas continuar?')) {
+                tipoSelect.value = (tipo === 'celulares') ? 'accesorios' : 'celulares';
+                return;
+            }
+        }
+        itemsCompra = [];
+        renderizarTabla();
+        badgeTipo.textContent = 'Filtrando: ' + (tipo === 'celulares' ? 'Celulares' : 'Accesorios');
+        badgeTipo.className = (tipo === 'celulares') ? 'badge rounded-pill px-3 py-1 bg-success bg-opacity-10 text-success border border-success' : 'badge rounded-pill px-3 py-1 bg-light text-secondary border';
+        inputBusqueda.value = '';
+        resultadosBox.style.display = 'none';
+    }
+
+    // Buscador Avanzado con Debounce
+    let timerBusqueda = null;
+    let ultimosProductosEncontrados = [];
+
+    inputBusqueda.addEventListener('input', function() {
+        clearTimeout(timerBusqueda);
+        const query = this.value.trim();
+        if (query.length < 1) {
+            resultadosBox.style.display = 'none';
+            ultimosProductosEncontrados = [];
+            return;
+        }
+
+        timerBusqueda = setTimeout(() => {
+            fetch(`/compras/api/buscar_productos?tipo=${tipoSelect.value}&q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    ultimosProductosEncontrados = data.productos || [];
+                    mostrarResultados(ultimosProductosEncontrados, query);
+                })
+                .catch(err => console.error('Error buscando productos:', err));
+        }, 200);
+    });
+
+    // Detectar pistola lectora o Enter en el buscador
+    inputBusqueda.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = this.value.trim();
+            if (!query) return;
+
+            // Si hay exactamente 1 producto encontrado, agregarlo de inmediato
+            if (ultimosProductosEncontrados.length === 1) {
+                const p = ultimosProductosEncontrados[0];
+                if (!p.variantes || p.variantes.length === 0) {
+                    agregarProducto(p.id, p.nombre, null, null, p.stock, p.costo, p.tipo_inventario, p.imei || '');
+                    this.value = '';
+                    resultadosBox.style.display = 'none';
+                    return;
+                }
+            }
+
+            // Si no hay productos encontrados con ese serial/código, abrir ventana para crearlo al instante
+            if (ultimosProductosEncontrados.length === 0) {
+                abrirModalCrearDirecto(query);
+            }
+        }
+    });
+
+    function mostrarResultados(productos, query) {
+        const queryEsc = escapeHtml(query || inputBusqueda.value.trim());
+        const esCelular = (tipoSelect.value === 'celulares');
+        
+        if (!productos || productos.length === 0) {
+            resultadosBox.innerHTML = `
+                <div class="p-3 text-center bg-white">
+                    <p class="text-muted mb-2"><i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> No se encontró ningún producto con: <strong class="text-dark font-mono">"${queryEsc}"</strong></p>
+                    <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" onclick="abrirModalCrearDirecto('${queryEsc}')">
+                        <i class="fa-solid fa-plus-circle me-1"></i> Ingresar / Registrar como Nuevo Producto
+                    </button>
+                </div>
+            `;
+            resultadosBox.style.display = 'block';
+            return;
+        }
+
+        let html = '';
+        productos.forEach(p => {
+            if (p.variantes && p.variantes.length > 0) {
+                // Producto con variantes
+                p.variantes.forEach(v => {
+                    html += `
+                        <a href="javascript:void(0)" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
+                           onclick='agregarProducto(${p.id}, "${escapeHtml(p.nombre)}", ${v.id}, "${escapeHtml(v.nombre)}", ${v.stock}, ${v.costo}, "${p.tipo_inventario}")'>
+                            <div>
+                                <span class="fw-bold text-dark">${p.nombre}</span>
+                                <span class="badge bg-secondary ms-1">${v.nombre}</span>
+                                <small class="text-muted d-block font-mono">SKU: ${p.sku}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-light text-dark border">Stock: ${v.stock}</span>
+                                <div class="text-success small font-mono fw-bold">Costo: $${formatCOP(v.costo)}</div>
+                            </div>
+                        </a>
+                    `;
+                });
+            } else {
+                // Producto individual o celular
+                html += `
+                    <a href="javascript:void(0)" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
+                       onclick='agregarProducto(${p.id}, "${escapeHtml(p.nombre)}", null, null, ${p.stock}, ${p.costo}, "${p.tipo_inventario}", "${p.imei || ''}")'>
+                        <div>
+                            <span class="fw-bold text-dark">${p.nombre}</span>
+                            ${p.marca ? `<span class="badge bg-light text-secondary border ms-1">${p.marca}</span>` : ''}
+                            <small class="text-muted d-block font-mono">
+                                ${p.tipo_inventario === 'celulares' ? (p.imei ? 'IMEI: ' + p.imei : 'Sin IMEI asignado') : 'SKU: ' + p.sku}
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-light text-dark border">Stock: ${p.stock}</span>
+                            <div class="text-success small font-mono fw-bold">Costo: $${formatCOP(p.costo)}</div>
+                        </div>
+                    </a>
+                `;
+            }
+        });
+
+        // Opción rápida al pie de la lista por si el usuario quiere crearlo aunque hayan coincidencias parciales
+        html += `
+            <div class="p-2 border-top bg-light text-center">
+                <a href="javascript:void(0)" class="text-decoration-none small text-success fw-bold" onclick="abrirModalCrearDirecto('${queryEsc}')">
+                    <i class="fa-solid fa-plus-circle me-1"></i> ¿No es ninguno de estos? Registrar "${queryEsc}" como nuevo producto
+                </a>
+            </div>
+        `;
+
+        resultadosBox.innerHTML = html;
+        resultadosBox.style.display = 'block';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // Cerrar sugerencias al hacer click fuera
+    document.addEventListener('click', function(e) {
+        if (!inputBusqueda.contains(e.target) && !resultadosBox.contains(e.target)) {
+            resultadosBox.style.display = 'none';
+        }
+    });
+
+    function agregarProducto(prodId, nombre, varId, varNombre, stock, costo, tipoInv, imei) {
+        const esCelular = (tipoInv === 'celulares');
+
+        // Si es celular, cada equipo es una unidad física única identificada por su IMEI / serial
+        if (esCelular) {
+            const yaEnLista = itemsCompra.some(it => it.product_id === prodId || (imei && it.imei && it.imei === imei));
+            if (yaEnLista) {
+                alert(`Este equipo con IMEI/Serial (${imei || nombre}) ya fue agregado a la lista de ingreso.`);
+                inputBusqueda.value = '';
+                resultadosBox.style.display = 'none';
+                return;
+            }
+
+            itemsCompra.push({
+                product_id: prodId,
+                nombre: nombre,
+                variant_id: null,
+                variant_nombre: null,
+                stock_actual: stock || 0,
+                cantidad: 1, // En celulares siempre es exactamente 1 unidad por cada serial único
+                costo_unitario: costo || 0,
+                tipo_inventario: 'celulares',
+                imei: imei || '',
+                imei2: ''
+            });
+        } else {
+            // Accesorios / tienda general por lote
+            const index = itemsCompra.findIndex(it => it.product_id === prodId && it.variant_id === varId);
+            if (index >= 0) {
+                itemsCompra[index].cantidad += 1;
+            } else {
+                itemsCompra.push({
+                    product_id: prodId,
+                    nombre: nombre,
+                    variant_id: varId,
+                    variant_nombre: varNombre,
+                    stock_actual: stock,
+                    cantidad: 1,
+                    costo_unitario: costo || 0,
+                    tipo_inventario: tipoInv,
+                    imei: '',
+                    imei2: ''
+                });
+            }
+        }
+
+        inputBusqueda.value = '';
+        resultadosBox.style.display = 'none';
+        renderizarTabla();
+    }
+
+    function eliminarItem(index) {
+        itemsCompra.splice(index, 1);
+        renderizarTabla();
+    }
+
+    function actualizarCantidad(index, val) {
+        if (itemsCompra[index].tipo_inventario === 'celulares') {
+            itemsCompra[index].cantidad = 1;
+            renderizarTotales();
+            return;
+        }
+        const qty = parseInt(val) || 1;
+        itemsCompra[index].cantidad = qty > 0 ? qty : 1;
+        renderizarTotales();
+    }
+
+    function actualizarCosto(index, val) {
+        const costo = parseFloat(val) || 0;
+        itemsCompra[index].costo_unitario = costo >= 0 ? costo : 0;
+        renderizarTotales();
+    }
+
+    function actualizarImei(index, campo, val) {
+        itemsCompra[index][campo] = val.trim();
+        actualizarHiddenInput();
+    }
+
+    function renderizarTabla() {
+        if (itemsCompra.length === 0) {
+            cuerpoTabla.innerHTML = `
+                <tr id="filaVacia">
+                    <td colspan="6" class="text-center py-4 text-muted">
+                        <i class="fa-solid fa-box-open fa-2x mb-2 text-secondary opacity-50"></i>
+                        <p class="mb-0">Usa la barra de búsqueda avanzada para añadir productos al ingreso.</p>
+                    </td>
+                </tr>
+            `;
+            btnGuardar.disabled = true;
+            renderizarTotales();
+            return;
+        }
+
+        let html = '';
+        itemsCompra.forEach((it, idx) => {
+            const subtotal = it.cantidad * it.costo_unitario;
+            const esCelular = (it.tipo_inventario === 'celulares');
+
+            html += `
+                <tr>
+                    <td>
+                        <div class="fw-bold text-dark">${it.nombre}</div>
+                        ${it.variant_nombre ? `<span class="badge bg-secondary mb-1">${it.variant_nombre}</span>` : ''}
+                        
+                        ${esCelular ? `
+                            <div class="row g-2 mt-1">
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm font-mono" 
+                                           placeholder="IMEI 1" value="${it.imei || ''}" 
+                                           onchange="actualizarImei(${idx}, 'imei', this.value)">
+                                </div>
+                                <div class="col-6">
+                                    <input type="text" class="form-control form-control-sm font-mono" 
+                                           placeholder="IMEI 2 (Opcional)" value="${it.imei2 || ''}" 
+                                           onchange="actualizarImei(${idx}, 'imei2', this.value)">
+                                </div>
+                            </div>
+                        ` : ''}
+                    </td>
+                    <td class="text-center font-mono">
+                        <span class="badge bg-light text-dark border">${it.stock_actual} uds</span>
+                    </td>
+                    <td class="text-center">
+                        ${esCelular ? `
+                            <span class="badge bg-secondary font-mono fw-bold px-3 py-2" title="Unidad única por Serial/IMEI">1 ud</span>
+                            <input type="hidden" value="1">
+                        ` : `
+                            <input type="number" class="form-control text-center font-mono fw-bold" 
+                                   min="1" value="${it.cantidad}" 
+                                   onchange="actualizarCantidad(${idx}, this.value)"
+                                   onkeyup="actualizarCantidad(${idx}, this.value)">
+                        `}
+                    </td>
+                    <td>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white">$</span>
+                            <input type="number" class="form-control text-end font-mono" 
+                                   step="100" min="0" value="${it.costo_unitario}" 
+                                   onchange="actualizarCosto(${idx}, this.value)"
+                                   onkeyup="actualizarCosto(${idx}, this.value)">
+                        </div>
+                    </td>
+                    <td class="text-end font-mono fw-bold price-display" id="subtotal_${idx}">
+                        $${formatCOP(subtotal)}
+                    </td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="eliminarItem(${idx})" title="Eliminar fila">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        cuerpoTabla.innerHTML = html;
+        btnGuardar.disabled = false;
+        renderizarTotales();
+    }
+
+    function renderizarTotales() {
+        let variedad = itemsCompra.length;
+        let totalUnidades = 0;
+        let totalCosto = 0;
+
+        itemsCompra.forEach((it, idx) => {
+            const subtotal = it.cantidad * it.costo_unitario;
+            totalUnidades += it.cantidad;
+            totalCosto += subtotal;
+
+            const subtotalEl = document.getElementById(`subtotal_${idx}`);
+            if (subtotalEl) {
+                subtotalEl.textContent = `$${formatCOP(subtotal)}`;
+            }
+        });
+
+        document.getElementById('badgeTotalItems').textContent = `${variedad} Productos`;
+        document.getElementById('resumenVariedad').textContent = variedad;
+        document.getElementById('resumenTotalUnidades').textContent = `${totalUnidades} uds`;
+        document.getElementById('resumenCostoTotal').textContent = `$${formatCOP(totalCosto)}`;
+
+        actualizarHiddenInput();
+    }
+
+    function actualizarHiddenInput() {
+        itemsJsonInput.value = JSON.stringify(itemsCompra);
+    }
+
+    function formatCOP(val) {
+        if (!val && val !== 0) return '0';
+        return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Catálogo específico de Modelos para Apple y Samsung
+    const CATALOGO_PRODUCTOS = {
+        'Apple': [
+            {
+                categoria: 'iPhones (11 al 18 Pro Max)',
+                modelos: [
+                    'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
+                    'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+                    'iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+                    'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+                    'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+                    'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
+                    'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+                    'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                ]
+            },
+            {
+                categoria: 'iPads (A16, Air, Pro)',
+                modelos: [
+                    'iPad 10ma Gen (A16 Bionic)',
+                    'iPad 11na Gen',
+                    'iPad Mini 6', 'iPad Mini 7',
+                    'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
+                    'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)',
+                    'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
+                ]
+            },
+            {
+                categoria: 'MacBook (Air, Pro, Neo)',
+                modelos: [
+                    'MacBook Neo',
+                    'MacBook Air 13" (M1)', 'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
+                    'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
+                    'MacBook Pro 14" (M1 Pro/Max)', 'MacBook Pro 16" (M1 Pro/Max)',
+                    'MacBook Pro 14" (M2 Pro/Max)', 'MacBook Pro 16" (M2 Pro/Max)',
+                    'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
+                    'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)'
+                ]
+            },
+            {
+                categoria: 'AirPods (Últimas Generaciones)',
+                modelos: [
+                    'AirPods 3ra Generación',
+                    'AirPods 4ta Generación',
+                    'AirPods 4ta Generación con ANC',
+                    'AirPods Pro 2da Generación (USB-C)',
+                    'AirPods Max (Lightning)',
+                    'AirPods Max (USB-C)'
+                ]
+            }
+        ],
+        'Samsung': [
+            {
+                categoria: 'Samsung Galaxy Serie S (Desde S24 en adelante)',
+                modelos: [
+                    'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+                    'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
+                    'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
+                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE',
+                    'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
+                    'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
+                ]
+            }
+        ]
+    };
+
+    function actualizarModelosSegunMarca(marcaSeleccionada) {
+        const selectModelo = document.getElementById('rapido_modelo');
+        selectModelo.innerHTML = '';
+
+        if (!marcaSeleccionada || !CATALOGO_PRODUCTOS[marcaSeleccionada]) {
+            selectModelo.innerHTML = '<option value="">-- Primero elige Marca --</option>';
+            return;
+        }
+
+        selectModelo.innerHTML = '<option value="">-- Selecciona el Modelo / Referencia --</option>';
+        const grupos = CATALOGO_PRODUCTOS[marcaSeleccionada];
+
+        grupos.forEach(grp => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = grp.categoria;
+            grp.modelos.forEach(mod => {
+                const opt = document.createElement('option');
+                opt.value = mod;
+                opt.textContent = mod;
+                optgroup.appendChild(opt);
+            });
+            selectModelo.appendChild(optgroup);
+        });
+    }
+
+    // Modal Crear Producto Rápido
+    let modalCrearBS = null;
+    function abrirModalCrearDirecto(codigoInicial = '') {
+        if (!modalCrearBS) {
+            modalCrearBS = new bootstrap.Modal(document.getElementById('modalCrearProductoRapido'));
+        }
+        
+        const esCelular = (tipoSelect.value === 'celulares');
+        document.getElementById('modal_tipo_inventario').value = tipoSelect.value;
+        
+        // Configurar vista según tipo
+        if (esCelular) {
+            document.getElementById('tituloModalCrear').innerHTML = '<i class="fa-solid fa-mobile-screen me-2 text-success"></i> Registrar Celular o Equipo Apple/Samsung';
+            document.getElementById('camposCelular').style.display = 'block';
+            document.getElementById('camposAccesorio').style.display = 'none';
+            document.getElementById('rapido_imei').value = codigoInicial || '';
+            document.getElementById('rapido_imei2').value = '';
+            document.getElementById('rapido_marca').value = 'Apple'; // Por defecto Apple
+            actualizarModelosSegunMarca('Apple');
+            document.getElementById('rapido_modelo').value = '';
+            document.getElementById('rapido_color').value = '';
+            document.getElementById('rapido_memoria').value = '';
+            document.getElementById('rapido_bateria').value = '100';
+            document.getElementById('rapido_estado').value = 'Excelente';
+        } else {
+            document.getElementById('tituloModalCrear').innerHTML = '<i class="fa-solid fa-boxes-stacked me-2 text-success"></i> Registrar Accesorio / Producto al Ingreso';
+            document.getElementById('camposCelular').style.display = 'none';
+            document.getElementById('camposAccesorio').style.display = 'block';
+            document.getElementById('rapido_nombre_acc').value = '';
+            document.getElementById('rapido_sku_acc').value = codigoInicial || '';
+        }
+        
+        document.getElementById('rapido_costo').value = '';
+        document.getElementById('rapido_precio_sugerido').value = '';
+        document.getElementById('rapido_precio_minimo').value = '';
+        document.getElementById('alertaErrorModal').style.display = 'none';
+
+        modalCrearBS.show();
+
+        setTimeout(() => {
+            if (esCelular) {
+                if (codigoInicial) {
+                    document.getElementById('rapido_marca').focus();
+                } else {
+                    document.getElementById('rapido_imei').focus();
+                }
+            } else {
+                if (codigoInicial) {
+                    document.getElementById('rapido_nombre_acc').focus();
+                } else {
+                    document.getElementById('rapido_sku_acc').focus();
+                }
+            }
+        }, 400);
+    }
+
+    async function guardarProductoRapido() {
+        const btn = document.getElementById('btnGuardarProdRapido');
+        const alertBox = document.getElementById('alertaErrorModal');
+        const tipoInv = document.getElementById('modal_tipo_inventario').value;
+        const esCelular = (tipoInv === 'celulares');
+
+        let payload = {
+            tipo_inventario: tipoInv,
+            costo: parseFloat(document.getElementById('rapido_costo').value) || 0,
+            precio_sugerido: parseFloat(document.getElementById('rapido_precio_sugerido').value) || 0,
+            precio_minimo: parseFloat(document.getElementById('rapido_precio_minimo').value) || 0
+        };
+
+        if (esCelular) {
+            payload.imei = document.getElementById('rapido_imei').value.trim();
+            payload.imei2 = document.getElementById('rapido_imei2').value.trim();
+            payload.marca = document.getElementById('rapido_marca').value.trim();
+            payload.modelo = document.getElementById('rapido_modelo').value.trim();
+            payload.color = document.getElementById('rapido_color').value.trim();
+            payload.memoria = document.getElementById('rapido_memoria').value.trim();
+            payload.bateria = document.getElementById('rapido_bateria').value.trim();
+            payload.estado = document.getElementById('rapido_estado').value.trim();
+
+            payload.nombre = `${payload.marca} ${payload.modelo}`.trim();
+
+            if (!payload.imei || !payload.marca || !payload.modelo) {
+                alertBox.textContent = 'Por favor completa al menos Marca, Modelo e IMEI.';
+                alertBox.style.display = 'block';
+                return;
+            }
+        } else {
+            payload.nombre = document.getElementById('rapido_nombre_acc').value.trim();
+            payload.sku = document.getElementById('rapido_sku_acc').value.trim();
+
+            if (!payload.nombre) {
+                alertBox.textContent = 'Por favor ingresa el nombre del producto.';
+                alertBox.style.display = 'block';
+                return;
+            }
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Guardando...';
+
+        try {
+            const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+            const res = await fetch('/compras/api/crear_producto_rapido', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || data.error || `Error ${res.status}: no se pudo guardar el producto.`);
+            }
+
+            // Producto creado con éxito -> Agregarlo a la tabla de compra
+            const p = data.producto;
+            agregarProducto(p.id, p.nombre, null, null, p.stock || 0, p.costo || payload.costo, p.tipo_inventario, p.imei || '');
+
+            // Cerrar modal y limpiar
+            modalCrearBS.hide();
+            inputBusqueda.value = '';
+            resultadosBox.style.display = 'none';
+        } catch (err) {
+            alertBox.textContent = err.message || 'Ocurrió un error inesperado.';
+            alertBox.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Guardar y Agregar al Ingreso';
+        }
+    }
+
+    // Inicializar estado según selección previa
+    document.addEventListener('DOMContentLoaded', () => {
+        cambiarTipoInventario(tipoSelect.value);
+    });
+</script>
+
+<!-- MODAL CREAR PRODUCTO RÁPIDO DIRECTO AL ESCANEAR/ESCRIBIR -->
+<div class="modal fade" id="modalCrearProductoRapido" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content shadow-lg border-0 rounded-4">
+            <div class="modal-header border-0 pb-0 pt-4 px-4">
+                <h5 class="modal-title fw-bold" id="tituloModalCrear">
+                    <i class="fa-solid fa-plus-circle text-success me-2"></i> Registrar Producto al Ingreso
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body px-4 py-3">
+                <div id="alertaErrorModal" class="alert alert-danger py-2 small" style="display: none;"></div>
+                <input type="hidden" id="modal_tipo_inventario" value="celulares">
+
+                <!-- Campos para Celulares -->
+                <div id="camposCelular">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">IMEI 1 (Serial Principal) *</label>
+                            <input type="text" id="rapido_imei" class="form-control font-mono fw-bold" placeholder="Escanear o escribir IMEI">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">IMEI 2 (Opcional)</label>
+                            <input type="text" id="rapido_imei2" class="form-control font-mono" placeholder="Segundo IMEI si aplica">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted mb-1">Marca *</label>
+                            <select id="rapido_marca" class="form-select fw-bold" onchange="actualizarModelosSegunMarca(this.value)">
+                                <option value="">-- Seleccionar Marca --</option>
+                                <option value="Apple">Apple</option>
+                                <option value="Samsung">Samsung</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-bold text-muted mb-1">Modelo / Referencia *</label>
+                            <select id="rapido_modelo" class="form-select fw-bold">
+                                <option value="">-- Primero elige Marca --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold text-muted mb-1">Color</label>
+                            <input type="text" id="rapido_color" class="form-control" placeholder="Ej: Negro, Azul">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted mb-1">Capacidad / RAM</label>
+                            <input type="text" id="rapido_memoria" class="form-control" placeholder="Ej: 128GB / 6GB">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted mb-1">Batería (%)</label>
+                            <input type="text" id="rapido_bateria" class="form-control font-mono" placeholder="Ej: 100">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted mb-1">Estado</label>
+                            <select id="rapido_estado" class="form-select">
+                                <option value="Nuevo">Nuevo</option>
+                                <option value="Excelente" selected>Excelente / Seminuevo</option>
+                                <option value="Bueno">Bueno</option>
+                                <option value="Detalles">Con Detalles</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campos para Accesorios / Tienda -->
+                <div id="camposAccesorio" style="display: none;">
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label class="form-label small fw-bold text-muted mb-1">Nombre del Producto / Accesorio *</label>
+                            <input type="text" id="rapido_nombre_acc" class="form-control" placeholder="Ej: Cargador Tipo C 20W">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label small fw-bold text-muted mb-1">Código de Barras / SKU (Opcional)</label>
+                            <input type="text" id="rapido_sku_acc" class="form-control font-mono" placeholder="Escanear código">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Precios Comunes -->
+                <div class="p-3 bg-light rounded-3 mt-3 border">
+                    <h6 class="fw-bold mb-2 text-dark small text-uppercase"><i class="fa-solid fa-tags text-success me-1"></i> Costos y Precios de Venta</h6>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-1">Costo Unitario ($)</label>
+                            <input type="number" id="rapido_costo" class="form-control font-mono fw-bold" placeholder="0" step="100">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-1">Precio Sugerido Venta ($)</label>
+                            <input type="number" id="rapido_precio_sugerido" class="form-control font-mono text-success fw-bold" placeholder="0" step="100">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small text-muted mb-1">Precio Mínimo ($)</label>
+                            <input type="number" id="rapido_precio_minimo" class="form-control font-mono" placeholder="0" step="100">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" id="btnGuardarProdRapido" onclick="guardarProductoRapido()">
+                    <i class="fa-solid fa-check me-1"></i> Guardar y Agregar al Ingreso
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

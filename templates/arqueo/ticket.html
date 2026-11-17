@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Arqueo {{ fecha }} - LifeStore - Celulares</title>
+    <!-- Fuente Roboto Mono idéntica al ticket de venta 80mm -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #FFFFFF; /* 100% White Canvas */
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            font-family: 'Roboto Mono', monospace, sans-serif;
+        }
+        
+        .ticket {
+            background-color: #FFFFFF;
+            width: 100%;
+            max-width: 380px; /* Ancho térmico 80mm */
+            padding: 25px 20px;
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+            color: #1A1A1A;
+            box-sizing: border-box;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px dashed #1A1A1A;
+            padding-bottom: 15px;
+            margin-bottom: 18px;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: 0.12em;
+            line-height: 1.2;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin: 4px 0 6px 0;
+            letter-spacing: 0.15em;
+        }
+
+        .info {
+            font-size: 0.8rem;
+            margin: 3px 0;
+            line-height: 1.4;
+        }
+
+        .section-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            border-bottom: 2px solid #1A1A1A;
+            padding-bottom: 4px;
+            margin: 14px 0 8px 0;
+            color: #1A1A1A;
+        }
+
+        .row-data {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin: 4px 0;
+        }
+
+        .row-data.bold {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .divider {
+            border-top: 1px dashed #1A1A1A;
+            margin: 12px 0;
+        }
+
+        .sale-card {
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px dotted #888888;
+        }
+
+        .sale-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            font-size: 0.82rem;
+        }
+
+        .sale-meta {
+            font-size: 0.73rem;
+            color: #444444;
+            margin-bottom: 4px;
+        }
+
+        .prod-item {
+            font-size: 0.76rem;
+            margin-left: 6px;
+            display: flex;
+            justify-content: space-between;
+            line-height: 1.35;
+        }
+
+        .prod-name {
+            width: 70%;
+            word-break: break-word;
+        }
+
+        .prod-price {
+            width: 30%;
+            text-align: right;
+            font-weight: bold;
+        }
+
+        .totals-box {
+            border-top: 2px dashed #1A1A1A;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.2rem;
+            font-weight: 700;
+            background-color: #FFFFFF;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 2px solid #1A1A1A;
+            margin-top: 8px;
+            color: #0F172A;
+        }
+
+        .btn-print {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            background-color: #1A1A1A;
+            color: #FFFFFF;
+            border: 2px solid #1A1A1A;
+            font-size: 1rem;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 25px;
+            font-family: inherit;
+            transition: 0.2s;
+        }
+
+        .btn-print:hover {
+            background-color: #334155;
+            border-color: #334155;
+            color: #FFFFFF;
+        }
+
+        @media print {
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+            html, body {
+                height: auto !important;
+                overflow: visible !important;
+            }
+            body { 
+                background-color: #FFFFFF !important; 
+                padding: 0 !important; 
+                display: block !important; 
+                color: #000000 !important;
+            }
+            .ticket { 
+                box-shadow: none !important; 
+                max-width: 100% !important; 
+                padding: 5px !important; 
+                margin: 0 auto !important; 
+                width: 80mm !important; 
+                border: none !important;
+                color: #000000 !important;
+            }
+            * {
+                color: #000000 !important;
+                box-shadow: none !important;
+                text-shadow: none !important;
+            }
+            .btn-print { display: none !important; }
+            .d-print-none { display: none !important; }
+            .total-row {
+                background-color: transparent !important;
+                border-top: 1px dashed #000000 !important;
+                border-bottom: 1px dashed #000000 !important;
+                border-left: none !important;
+                border-right: none !important;
+                padding: 8px 0 !important;
+                border-radius: 0 !important;
+            }
+            .section-title {
+                border-bottom: 1px solid #000000 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ticket">
+        <div class="header">
+            <div style="margin-bottom: 8px;">
+                <img src="{{ url_for('static', filename='img/lifestore_logo_print.png') }}" alt="LifeStore" style="max-width: 170px; width: 80%; height: auto; object-fit: contain; filter: grayscale(100%) contrast(150%);">
+            </div>
+            <div class="subtitle">VENTA DE CELULARES &amp; TECNOLOGÍA</div>
+            <div style="font-size: 0.8rem; font-weight: 700; margin: 4px 0;">CIERRE DE CAJA Y DETALLE VENTAS</div>
+            <div class="info">FECHA CIERRE: <strong>{{ fecha }}</strong></div>
+            <div class="info">SEDE: <strong>TIENDA PRINCIPAL</strong></div>
+            <div class="info">EMISIÓN: {{ fecha_generacion }}</div>
+        </div>
+
+        <!-- CUSTODIA Y AUDITORÍA DE TURNO -->
+        <div class="section-title">AUDITORÍA Y CUSTODIA DE CAJA</div>
+        <div style="font-size: 0.75rem; line-height: 1.35; margin-bottom: 8px; border-bottom: 1px dashed #333; padding-bottom: 6px; text-align: left;">
+            <div>• <strong>Apertura realizada por:</strong> {{ (turno.opened_by.nombre_completo or turno.opened_by.username) if (turno and turno.opened_by) else ((arqueo.vendedor.nombre_completo or arqueo.vendedor.username) if (arqueo and arqueo.vendedor) else 'Cajero Apertura') }}</div>
+            <div>• <strong>Asesores de turno:</strong> {{ asesores_nombres|join(', ') if asesores_nombres else 'Personal general de tienda' }}</div>
+            <div>• <strong>Arqueo y Cierre efectuado por:</strong> {{ (arqueo.closed_by.nombre_completo or arqueo.closed_by.username) if (arqueo and arqueo.closed_by) else ((turno.closed_by.nombre_completo or turno.closed_by.username) if (turno and turno.closed_by) else (current_user.nombre_completo or current_user.username)) }}</div>
+        </div>
+
+        <!-- RESUMEN FINANCIERO DE CAJA -->
+        <div class="section-title">RESUMEN DE CAJA</div>
+        {% if arqueo %}
+        <div class="row-data">
+            <span>Base Inicial:</span>
+            <span>${{ arqueo.base_inicial|cop }}</span>
+        </div>
+        {% endif %}
+        <div class="row-data">
+            <span>Ventas en Efectivo:</span>
+            <span>${{ total_efectivo|cop }}</span>
+        </div>
+        <div class="row-data">
+            <span>Ventas Transferencia/Bancos:</span>
+            <span>${{ total_transferencia|cop }}</span>
+        </div>
+        <div class="row-data">
+            <span>Gastos del Día:</span>
+            <span style="color: #c00;">-${{ total_gastos|cop }}</span>
+        </div>
+        
+        <div class="totals-box">
+            <div class="total-row">
+                <span>TOTAL VENTAS:</span>
+                <span>${{ total_ventas|cop }}</span>
+            </div>
+        </div>
+
+        <!-- CONCILIACIÓN FÍSICA Y SOBRANTES -->
+        {% if arqueo and arqueo.efectivo_fisico is not none %}
+        <div class="section-title" style="margin-top: 15px;">CONCILIACIÓN FÍSICA Y SOBRANTE</div>
+        {% set esperado = (arqueo.base_inicial or 0) + total_efectivo - total_gastos %}
+        <div class="row-data">
+            <span>Efectivo Esperado:</span>
+            <span>${{ esperado|cop }}</span>
+        </div>
+        <div class="row-data">
+            <span>Efectivo Contado:</span>
+            <span style="font-weight: bold;">${{ (arqueo.efectivo_fisico)|cop }}</span>
+        </div>
+        <div class="totals-box" style="margin-top: 6px; padding: 6px; background-color: #f9f9f9; border: 1px dashed #333;">
+            <div class="total-row" style="font-size: 0.95rem;">
+                {% if arqueo.diferencia and arqueo.diferencia > 0 %}
+                    <span style="color: #155724; font-weight: bold;">SOBRANTE EN CAJA (+):</span>
+                    <span style="color: #155724; font-weight: bold;">+${{ (arqueo.diferencia)|cop }}</span>
+                {% elif arqueo.diferencia and arqueo.diferencia < 0 %}
+                    <span style="color: #721c24; font-weight: bold;">FALTANTE EN CAJA (-):</span>
+                    <span style="color: #721c24; font-weight: bold;">-${{ (arqueo.diferencia|abs)|cop }}</span>
+                {% else %}
+                    <span>DIFERENCIA CAJA:</span>
+                    <span>CUADRADA ($0)</span>
+                {% endif %}
+            </div>
+            {% if arqueo.observacion_diferencia %}
+            <div style="font-size: 0.72rem; margin-top: 4px; font-style: italic; border-top: 1px solid #ddd; padding-top: 3px;">
+                <strong>Nota:</strong> {{ arqueo.observacion_diferencia }}
+            </div>
+            {% endif %}
+            {% if arqueo.diferencia and arqueo.diferencia != 0 %}
+            <div style="font-size: 0.72rem; margin-top: 5px; border-top: 1px dashed #721c24; padding-top: 4px; font-weight: bold; color: #721c24; text-align: left;">
+                ⚠️ CUSTODIO RESPONSABLE DEL CIERRE: {{ (arqueo.closed_by.nombre_completo or arqueo.closed_by.username) if (arqueo and arqueo.closed_by) else ((turno.closed_by.nombre_completo or turno.closed_by.username) if (turno and turno.closed_by) else (current_user.nombre_completo or current_user.username)) }}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- DETALLE DE VENTAS Y PRODUCTOS INVOLUCRADOS -->
+        <div class="section-title" style="margin-top: 20px;">DETALLE DE VENTAS ({{ ventas|length }})</div>
+
+        {% for v in ventas %}
+        <div class="sale-card">
+            <div class="sale-header">
+                <span>Ticket #{{ "%05d"|format(v.id) }}</span>
+                <span>${{ v.monto_total|cop }}</span>
+            </div>
+            <div class="sale-meta">
+                Hora: {{ v.fecha_venta.strftime('%I:%M %p') }} | Método: 
+                {% if v.pagos|length > 1 %}
+                    Mixto
+                {% elif v.pagos|length == 1 %}
+                    {{ v.pagos[0].metodo_pago|capitalize }}
+                {% else %}
+                    {{ v.metodo_pago|capitalize }}
+                {% endif %}
+            </div>
+            
+            {% for d in v.detalles %}
+            <div class="prod-item">
+                <span class="prod-name">• {{ d.cantidad_vendida }}x 
+                    {% if d.nombre_manual %}
+                        {{ d.nombre_manual }} (Ext)
+                    {% else %}
+                        {{ d.producto.nombre if d.producto else 'Producto' }}
+                    {% endif %}
+                </span>
+                <span class="prod-price">${{ (d.precio_venta_final * d.cantidad_vendida)|cop }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="info" style="text-align: center; margin: 15px 0; font-style: italic;">
+            No se registraron ventas en esta fecha.
+        </div>
+        {% endfor %}
+
+        <div class="divider"></div>
+        
+        <div class="info" style="text-align: center; font-size: 0.75rem; margin-top: 15px;">
+            Total de Tickets Procesados: {{ ventas|length }}<br>
+            *** FIN DEL TICKET DE CIERRE ***
+        </div>
+
+        <button class="btn-print" onclick="window.print()">🖨️ IMPRIMIR TICKET (80mm)</button>
+        <button class="btn-print d-print-none" style="background-color: #6c757d; border-color: #6c757d; margin-top: 10px;" onclick="window.close()">VOLVER</button>
+    </div>
+
+    <script>
+        // Imprimir automáticamente al cargar si se pasa ?autoprint=1
+        if (window.location.search.includes('autoprint=1')) {
+            window.onload = function() {
+                window.print();
+            }
+        }
+    </script>
+</body>
+</html>

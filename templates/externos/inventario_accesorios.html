@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold text-brand-black m-0">Inventario de Accesorios Externos</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('externos_bp.nuevo_externo') }}" class="btn btn-blue rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-plus me-1"></i> Ingresar Externo
+        </a>
+    </div>
+</div>
+
+<!-- Barra de Búsqueda Server-Side -->
+<form method="GET" action="{{ url_for('externos_bp.inventario_accesorios') }}" id="searchForm" class="mb-4">
+    <div class="input-group shadow-sm" style="max-width: 480px;">
+        <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+        <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0"
+               placeholder="Buscar por Marca, Nombre o Proveedor..."
+               value="{{ q }}">
+        {% if q %}
+        <a href="{{ url_for('externos_bp.inventario_accesorios') }}" class="btn btn-outline-secondary" title="Limpiar búsqueda"><i class="fa-solid fa-xmark"></i></a>
+        {% endif %}
+    </div>
+</form>
+
+<div class="card card-custom p-0 shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover table-sm mb-0 align-middle text-center w-100" style="font-size: 0.85rem;">
+            <thead class="bg-dark text-white text-nowrap" style="font-size: 0.8rem;">
+                <tr>
+                    <th class="ps-3 py-2 text-start fw-bold">MARCA</th>
+                    <th class="py-2 text-start fw-bold">NOMBRE</th>
+                    <th class="py-2 fw-bold">PROVEEDOR</th>
+                    <th class="py-2 fw-bold">FECHA</th>
+                    <th class="py-2 fw-bold">COSTO</th>
+                    <th class="py-2 fw-bold">SUGERIDO</th>
+                    <th class="pe-3 py-2 text-center fw-bold">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody class="text-nowrap">
+                {% for c in accesorios %}
+                <tr>
+                    <td class="ps-3 fw-bold text-dark text-start">{{ c.marca or '-' }}</td>
+                    <td class="fw-semibold text-start">{{ c.nombre or '-' }}</td>
+                    <td class="text-truncate" style="max-width: 120px;" title="{{ c.proveedor or '-' }}">{{ c.proveedor or '-' }}</td>
+                    <td>{{ c.fecha_creacion.strftime('%d/%m/%Y') }}</td>
+                    
+                    <td class="text-brand-black fw-bold">${{ c.precio_costo|cop }}</td>
+                    <td class="text-brand-black fw-bolder">${{ c.precio_sugerido|cop }}</td>
+                    
+                    <td class="pe-3 text-center">
+                        <div class="d-flex justify-content-center align-items-center gap-1">
+                            {% if c.estado_celular == 'Enviado' %}
+                                <span class="badge bg-dark rounded-pill shadow-sm me-1"><i class="fa-solid fa-check me-1"></i> Al Inventario</span>
+                            {% endif %}
+
+                            {% if c.detalles_venta %}
+                            <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=c.detalles_venta[0].sale_id) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Ver Factura de Venta (#{{ c.detalles_venta[0].sale_id }})">
+                                <i class="fa-solid fa-file-invoice-dollar" style="font-size: 0.75rem;"></i>
+                            </a>
+                            {% else %}
+                            <button type="button" class="btn btn-sm text-muted bg-light border rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px; opacity: 0.4;" disabled title="Sin factura asociada (En Inventario)">
+                                <i class="fa-solid fa-file-invoice-dollar" style="font-size: 0.75rem;"></i>
+                            </button>
+                            {% endif %}
+
+                            {% if c.estado_celular != 'Enviado' %}
+                            <form method="POST" action="{{ url_for('externos_bp.eliminar_externo', id=c.id) }}" class="d-inline" onsubmit="return confirm('¿Eliminar permanente?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm text-white bg-brand-pink border-0 rounded-circle shadow-sm" style="width: 28px; height: 28px; padding: 0; line-height: 26px;" title="Eliminar">
+                                    <i class="fa-solid fa-trash-can" style="font-size: 0.75rem;"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="fa-solid fa-box-open fs-3 mb-2 opacity-50"></i>
+                        <p class="mb-0">No hay accesorios externos registrados.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Paginación -->
+{% if paginacion.pages > 1 %}
+<nav aria-label="Paginación externos" class="mt-4">
+    <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
+        <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_prev %}{{ url_for('externos_bp.inventario_accesorios', page=paginacion.prev_num, q=q) }}{% else %}#{% endif %}"
+               aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></a>
+        </li>
+        {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p_num %}
+                <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
+                    <a class="page-link rounded-pill px-3 shadow-sm"
+                       href="{{ url_for('externos_bp.inventario_accesorios', page=p_num, q=q) }}">{{ p_num }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link rounded-pill px-3">…</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
+            <a class="page-link rounded-pill px-3 shadow-sm"
+               href="{% if paginacion.has_next %}{{ url_for('externos_bp.inventario_accesorios', page=paginacion.next_num, q=q) }}{% else %}#{% endif %}"
+               aria-label="Siguiente"><i class="fa-solid fa-chevron-right"></i></a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+<script>
+    // Search: debounced server-side submit
+    let searchTimer;
+    document.getElementById('searchInput').addEventListener('keyup', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            document.getElementById('searchForm').submit();
+        }, 500);
+    });
+</script>
+{% endblock %}

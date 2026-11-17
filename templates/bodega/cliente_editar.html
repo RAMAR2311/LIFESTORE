@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-user-pen text-brand-blue me-2"></i> Editar Cliente</h2>
+            <a href="{{ url_for('bodega_bp.clientes') }}" class="btn btn-light rounded-pill px-3 shadow-sm border">Volver</a>
+        </div>
+
+        <div class="card card-custom p-4 border-0">
+            <form method="POST" action="{{ url_for('bodega_bp.editar_cliente', id=cliente.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Razón Social o Nombre Completo <span class="text-danger">*</span></label>
+                    <input type="text" name="nombre" class="form-control bg-light border-0" required autofocus placeholder="Empresa S.A.S o Nombre de Persona" value="{{ cliente.nombre_o_razon_social }}">
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Documento / NIT <span class="text-danger">*</span></label>
+                        <input type="text" name="documento" class="form-control bg-light border-0" required placeholder="Ej: 900123456-7" value="{{ cliente.documento_o_nit }}">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Teléfono de Contacto <span class="text-danger">*</span></label>
+                        <input type="text" name="telefono" class="form-control bg-light border-0" required placeholder="300 000 0000" value="{{ cliente.telefono }}">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Correo Electrónico <span class="text-muted">(Opcional)</span></label>
+                    <input type="email" name="email" class="form-control bg-light border-0" placeholder="contacto@empresa.com" value="{{ cliente.email or '' }}">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Dirección de Envío / Domicilio <span class="text-muted">(Opcional)</span></label>
+                    <textarea name="direccion" class="form-control bg-light border-0" rows="2" placeholder="Carrera X # Y - Z">{{ cliente.direccion or '' }}</textarea>
+                </div>
+
+                <button type="submit" class="btn btn-blue w-100 rounded-pill fw-bold py-2 shadow-sm"><i class="fa-solid fa-save me-2"></i> Guardar Cambios</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="d-flex align-items-center mb-4">
+            <a href="/inventory" class="btn btn-light rounded-circle me-3 border-0"><i class="fa-solid fa-arrow-left"></i></a>
+            <h2 class="fw-bold text-brand-black mb-0">{% if producto %}Editar Producto{% else %}Crear Producto{% endif %}</h2>
+        </div>
+
+        <div class="card card-custom p-5">
+            <form method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="row g-4">
+                    {% if not producto %}
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold text-brand-black"><i class="fa-solid fa-location-dot text-primary me-1"></i> Sucursal Destino de Ingreso</label>
+                        <select name="branch_id" class="form-select bg-light border-0 fw-semibold">
+                            {% for b in sucursales %}
+                                <option value="{{ b.id }}" {% if default_branch_id and default_branch_id == b.id %}selected{% endif %}>
+                                    {{ b.nombre }} ({{ b.codigo }}) - Tipo: {{ b.tipo|capitalize }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">El stock ingresado se asignará a esta sucursal o bodega.</small>
+                    </div>
+                    {% endif %}
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-brand-black">SKU / Código Maestro</label>
+                        <input type="text" class="form-control bg-light border-0" name="sku" required placeholder="Ej: FUNDA-XXX" value="{{ producto.sku if producto else '' }}">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-bold text-brand-black">Nombre del Producto Maestro</label>
+                        <input type="text" class="form-control bg-light border-0" name="nombre" required placeholder="Acme Case Pro" value="{{ producto.nombre if producto else '' }}">
+                    </div>
+                    
+                    <div class="col-md-12">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="fw-bold text-brand-black mb-0"><i class="fa-solid fa-sitemap me-2"></i>Subcategorías</h5>
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3" id="addVariantBtn">
+                                <i class="fa-solid fa-plus me-1"></i> Añadir Subcategoría
+                            </button>
+                        </div>
+                        <div class="alert alert-info py-2 small border-0 rounded-3">
+                            <i class="fa-solid fa-circle-info me-1"></i> Si no añades variantes, el sistema usará los valores base (stock y precios) definidos abajo.
+                        </div>
+                        
+                        <div id="variantsContainer" class="mb-4">
+                            {% if producto and producto.variantes %}
+                                {% for v in producto.variantes %}
+                                <div class="variant-row card border-0 shadow-sm p-3 mb-2 bg-white">
+                                    <input type="hidden" name="variant_id[]" value="{{ v.id }}">
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-bold">Nombre</label>
+                                            <input type="text" name="v_nombre[]" class="form-control form-control-sm" value="{{ v.nombre_variante }}" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-bold">Stock</label>
+                                            <input type="number" name="v_stock[]" class="form-control form-control-sm" value="{{ v.cantidad_stock }}" required>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-bold">Costo</label>
+                                            <input type="number" step="1" name="v_costo[]" class="form-control form-control-sm" value="{{ "%.0f"|format(v.precio_costo|float) if v.precio_costo else '' }}">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-bold">P. Min</label>
+                                            <input type="number" step="1" name="v_min[]" class="form-control form-control-sm" value="{{ "%.0f"|format(v.precio_minimo|float) if v.precio_minimo else '' }}">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-bold">P. Sug</label>
+                                            <input type="number" step="1" name="v_sug[]" class="form-control form-control-sm" value="{{ "%.0f"|format(v.precio_sugerido|float) if v.precio_sugerido else '' }}">
+                                        </div>
+                                        <div class="col-md-1 text-end">
+                                            <button type="button" class="btn btn-sm btn-link text-danger remove-variant" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div id="baseInfoSection" class="row g-4 {% if producto and producto.variantes %}d-none{% endif %}">
+                        <div class="col-md-3 mt-4">
+                            <label class="form-label fw-bold text-brand-black text-truncate">Existencias (Base)</label>
+                            <input type="number" class="form-control bg-light border-0" name="cantidad_stock" value="{{ producto.cantidad_stock if producto else '0' }}">
+                        </div>
+                        <div class="col-md-3 mt-4">
+                            <label class="form-label fw-bold text-brand-black text-truncate">Costo Compra (Base)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-0">$</span>
+                                <input type="number" step="1" class="form-control bg-light border-0" name="precio_costo" value="{{ "%.0f"|format(producto.precio_costo|float) if producto else '0' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-3 mt-4">
+                            <label class="form-label fw-bold text-brand-black text-truncate">Precio Mínimo (Base)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-0">$</span>
+                                <input type="number" step="1" class="form-control bg-light border-0" name="precio_minimo" value="{{ "%.0f"|format(producto.precio_minimo|float) if producto else '0' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-3 mt-4">
+                            <label class="form-label fw-bold text-brand-black text-truncate">Precio Sugerido (Base)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-0">$</span>
+                                <input type="number" step="1" class="form-control bg-light border-0" name="precio_sugerido" value="{{ "%.0f"|format(producto.precio_sugerido|float) if producto else '0' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mt-4">
+                        <label class="form-label fw-bold text-brand-black">Imagen del Producto Maestro</label>
+                        <input type="file" class="form-control bg-light border-0" name="imagen" accept="image/*">
+                        {% if producto and producto.imagen %}
+                            <small class="text-muted d-block mt-2">Imagen actual: <a href="{{ url_for('static', filename='uploads/' ~ producto.imagen) }}" target="_blank">{{ producto.imagen }}</a></small>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 mt-4">
+                        <label class="form-label fw-bold text-brand-black">Observaciones Generales</label>
+                        <textarea class="form-control bg-light border-0" name="observacion" rows="3" placeholder="Notas sobre el producto maestro...">{{ producto.observacion if producto and producto.observacion else '' }}</textarea>
+                    </div>
+                </div>
+
+                <hr class="my-5 border-light">
+                
+                <div class="text-end">
+                    <a href="/inventory" class="btn btn-link text-muted text-decoration-none fw-bold me-3">Cancelar</a>
+                    <!-- Botón Guardar en Azul Turquesa -->
+                    <button type="submit" class="btn btn-blue px-5 py-2 rounded-pill shadow-sm fw-bold">
+                        Guardar Producto Maestro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<template id="variantTemplate">
+    <div class="variant-row card border-0 shadow-sm p-3 mb-2 bg-white animate__animated animate__fadeInUp">
+        <input type="hidden" name="variant_id[]" value="">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Nombre de Subcategoría</label>
+                <input type="text" name="v_nombre[]" class="form-control form-control-sm" placeholder="Ej: Rojo / L" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Stock</label>
+                <input type="number" name="v_stock[]" class="form-control form-control-sm" placeholder="0" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Costo</label>
+                <input type="number" step="1" name="v_costo[]" class="form-control form-control-sm" placeholder="Opcional">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">P. Min</label>
+                <input type="number" step="1" name="v_min[]" class="form-control form-control-sm" placeholder="Opcional">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">P. Sug</label>
+                <input type="number" step="1" name="v_sug[]" class="form-control form-control-sm" placeholder="Opcional">
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-sm btn-link text-danger remove-variant" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('variantsContainer');
+    const addBtn = document.getElementById('addVariantBtn');
+    const template = document.getElementById('variantTemplate');
+    const baseInfoSection = document.getElementById('baseInfoSection');
+
+    function toggleBaseInfo() {
+        if (container.children.length > 0) {
+            baseInfoSection.classList.add('d-none');
+        } else {
+            baseInfoSection.classList.remove('d-none');
+        }
+    }
+
+    addBtn.addEventListener('click', () => {
+        const clone = template.content.cloneNode(true);
+        container.appendChild(clone);
+        toggleBaseInfo();
+    });
+
+    container.addEventListener('click', (e) => {
+        if (e.target.closest('.remove-variant')) {
+            e.target.closest('.variant-row').remove();
+            toggleBaseInfo();
+        }
+    });
+});
+</script>
+{% endblock %}

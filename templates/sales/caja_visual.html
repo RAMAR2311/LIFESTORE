@@ -1,0 +1,2730 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    /* Estilos específicos de Caja Visual - Silver Tech */
+    .product-card {
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .product-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.15);
+        border-color: #94A3B8 !important;
+    }
+    [data-theme="dark"] .product-card {
+        background-color: #111827 !important;
+        border: 1px solid rgba(226, 232, 240, 0.15) !important;
+    }
+    [data-theme="dark"] .product-card:hover {
+        border-color: rgba(226, 232, 240, 0.4) !important;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+    .product-img-box {
+        background: #F1F5F9;
+        border-bottom: 1px solid #E2E8F0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .product-img-box .placeholder-icon {
+        color: #64748B;
+    }
+    [data-theme="dark"] .product-img-box {
+        background: linear-gradient(145deg, #1E293B, #0F172A) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    }
+    [data-theme="dark"] .product-img-box .placeholder-icon {
+        color: #94A3B8 !important;
+    }
+    .product-card .card-title {
+        font-weight: 600;
+        color: var(--text-primary) !important;
+    }
+    [data-theme="dark"] .product-card .card-title {
+        color: #FFFFFF !important;
+    }
+    .product-sku, .product-stock {
+        color: #64748B;
+        font-size: 0.8rem;
+    }
+    [data-theme="dark"] .product-sku, 
+    [data-theme="dark"] .product-stock {
+        color: #CBD5E1 !important;
+    }
+    .product-price {
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        color: #10B981 !important; /* Esmeralda luminoso */
+    }
+    /* Estilos temáticos para Retomas y Botones de Caja (Modo Día y Modo Noche) */
+    .pos-retoma-btn {
+        background-color: #F8FAFC !important;
+        color: #0F172A !important;
+        border: 1px solid #CBD5E1 !important;
+        transition: all 0.2s ease;
+    }
+    .pos-retoma-btn:hover {
+        background-color: #F1F5F9 !important;
+        border-color: #94A3B8 !important;
+        color: #000000 !important;
+    }
+    [data-theme="dark"] .pos-retoma-btn {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #F1F5F9 !important;
+        border-color: rgba(226, 232, 240, 0.2) !important;
+    }
+    [data-theme="dark"] .pos-retoma-btn:hover {
+        background-color: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(226, 232, 240, 0.4) !important;
+    }
+
+    .retoma-container-box {
+        background: rgba(239, 68, 68, 0.08) !important;
+        border-left: 3px solid #EF4444 !important;
+    }
+    [data-theme="dark"] .retoma-container-box {
+        background: rgba(239, 68, 68, 0.15) !important;
+    }
+    
+    .retoma-item-row {
+        color: #1E293B !important;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    [data-theme="dark"] .retoma-item-row {
+        color: #F8FAFC !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .pos-btn-secondary-action {
+        background-color: #F8FAFC !important;
+        color: #334155 !important;
+        border: 1px solid #CBD5E1 !important;
+    }
+    .pos-btn-secondary-action:hover {
+        background-color: #F1F5F9 !important;
+        color: #0F172A !important;
+    }
+    [data-theme="dark"] .pos-btn-secondary-action {
+        background-color: transparent !important;
+        color: #CBD5E1 !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }
+</style>
+<div class="row h-100 g-4">
+    <!-- Panel Izquierdo: Catálogo de Productos -->
+    <div class="col-lg-8 d-flex flex-column h-100">
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-store text-brand-pink me-2"></i> Punto de Pago</h2>
+                {% if sucursal_actual %}
+                <small class="text-muted">
+                    <i class="fa-solid fa-location-dot text-primary me-1"></i>Sede: <strong>{{ sucursal_actual.nombre }}</strong> ({{ sucursal_actual.prefijo_factura or 'FAC' }})
+                    {% if turno_activo %}
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill ms-2">
+                        <i class="fa-solid fa-circle text-success me-1" style="font-size: 8px;"></i>Turno Abierto ({{ turno_activo.fecha_apertura.strftime('%I:%M %p') }})
+                    </span>
+                    {% elif sucursal_actual.tipo == 'bodega' %}
+                    <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill ms-2">
+                        <i class="fa-solid fa-boxes-stacked text-info me-1" style="font-size: 8px;"></i>Bodega (Exenta de Turno)
+                    </span>
+                    {% endif %}
+                </small>
+                {% else %}
+                <small class="text-muted">
+                    <i class="fa-solid fa-globe text-primary me-1"></i>Sede: <strong>Todas las Sedes (Global)</strong>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill ms-2">
+                        <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Enrutamiento automático a sede del producto
+                    </span>
+                </small>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn rounded-pill fw-semibold px-3 py-2 shadow-sm border-0 text-white d-inline-flex align-items-center gap-2" type="button" data-bs-toggle="modal" data-bs-target="#modalProductoExterno" title="Ingresar Producto Externo" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                    <i class="fa-solid fa-mobile-screen-button"></i>
+                    <span>Externo</span>
+                </button>
+                <button class="btn rounded-pill fw-semibold px-3 py-2 shadow-sm border-0 text-white d-inline-flex align-items-center gap-2" type="button" data-bs-toggle="modal" data-bs-target="#modalAccesorioExterno" title="Ingresar Accesorio Externo" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);">
+                    <i class="fa-solid fa-headphones"></i>
+                    <span>Acc. Externo</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Selector de Categoría + Buscador de productos -->
+        <div class="mb-4 d-flex flex-wrap align-items-center gap-2">
+            <div class="btn-group shadow-sm" role="group" aria-label="Categoría de productos">
+                <button type="button" id="btnCatEquipos" class="btn btn-primary fw-bold px-3 py-2" onclick="seleccionarCategoriaCaja('equipos')">
+                    <i class="fa-solid fa-mobile-screen-button me-1"></i> Equipos
+                </button>
+                <button type="button" id="btnCatAccesorios" class="btn btn-outline-primary fw-bold px-3 py-2" onclick="seleccionarCategoriaCaja('accesorios')">
+                    <i class="fa-solid fa-headphones me-1"></i> Accesorios
+                </button>
+            </div>
+            <div class="search-bar-silver flex-grow-1">
+                <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="productSearch" placeholder="Buscar producto por nombre, SKU o IMEI..." autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Grilla de productos -->
+        <div class="row g-3 overflow-auto pb-4" id="productsGrid" style="max-height: calc(100vh - 250px);">
+            {% for p in productos %}
+            {% set total_stock = p.stock_local if p.stock_local is defined else p.cantidad_stock %}
+            {% set vars_data = [] %}
+            {% if p.variantes %}
+                {% set total_stock = p.stock_local if p.stock_local is defined else (p.variantes | sum(attribute='cantidad_stock')) %}
+                {% for v in p.variantes %}
+                    {% set v_stock = v.stock_local if v.stock_local is defined else v.cantidad_stock %}
+                    {% if v_stock > 0 %}
+                        {% set _ = vars_data.append({"id": v.id, "nombre": v.nombre_variante, "stock": v_stock, "precio_sugerido": v.precio_sugerido or p.precio_sugerido or 0}) %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            <div class="col-6 col-md-4 col-xl-3 product-card-container" data-categoria="{{ 'equipos' if p.tipo_inventario == 'celulares' else 'accesorios' }}" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}" data-imei="{{ p.imei|lower if p.imei else '' }}" data-imei2="{{ p.imei2|lower if p.imei2 else '' }}">
+                <div class="card h-100 border-0 shadow-sm cursor-pointer product-card" 
+                     data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario, "imei": p.imei, "imei2": p.imei2, "inventario": p.inventario}|tojson|safe }}'
+                     data-variants='{{ vars_data|tojson|safe }}'
+                     onclick="handleProductClick(this)">
+                    <div class="ratio ratio-1x1 product-img-box rounded-top">
+                        {% set img_mostrar = p.imagen or (ref_images_map.get(p.modelo_celular) if (ref_images_map is defined and p.modelo_celular) else None) %}
+                        {% if img_mostrar %}
+                            <img src="{{ url_for('static', filename='uploads/' + img_mostrar) }}" alt="{{ p.nombre }}" style="object-fit: cover; width: 100%; height: 100%;">
+                        {% else %}
+                            <span class="small text-center pt-2 placeholder-icon"><i class="fa-solid fa-image fa-2x mb-1 d-block opacity-50"></i>Sin Imagen</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-3 text-center d-flex flex-column justify-content-between">
+                        <div>
+                            <h6 class="card-title mb-1 lh-sm" style="font-size: 0.92rem;" title="{{ p.nombre }}">
+                                {% if p.tipo_inventario == 'celulares' and p.modelo_celular %}
+                                    {{ p.modelo_celular }}
+                                {% else %}
+                                    {{ p.nombre }}
+                                {% endif %}
+                            </h6>
+                            {% if p.tipo_inventario == 'celulares' and p.imei %}
+                                <small class="product-sku d-block mb-2 font-mono">IMEI: {{ p.imei }}</small>
+                            {% else %}
+                                <small class="product-sku d-block mb-2">{{ p.sku }}</small>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h5 class="product-price mb-1">${{ p.precio_sugerido|cop }}</h5>
+                            <div class="d-flex justify-content-center align-items-center gap-1 flex-wrap">
+                                <small class="product-stock"><i class="fa-solid fa-box me-1"></i>{{ total_stock }} en stock</small>
+                                {% if not sucursal_actual and p.sede_nombre %}
+                                <span class="badge bg-light text-primary border" style="font-size: 0.7rem;">
+                                    <i class="fa-solid fa-location-dot me-1"></i>{{ p.sede_nombre }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12 text-center py-5">
+                <i class="fa-solid fa-box-open fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No hay productos en tienda.</h5>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Panel Derecho: Carrito -->
+    <div class="col-lg-4">
+        <div class="card card-custom checkout-panel pos-cart p-3 p-xl-4 position-sticky" style="top: 100px; height: 100%;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold m-0 text-brand-black"><i class="fa-solid fa-cart-shopping text-brand-pink me-2"></i> Balance</h5>
+                <span class="badge rounded-pill bg-dark border border-secondary text-light px-3" id="total_items">0 items</span>
+            </div>
+            
+            {% if combos_obsequio %}
+            <button type="button" class="btn btn-sm btn-outline-warning text-dark fw-bold rounded-pill w-100 mb-3 shadow-sm d-flex align-items-center justify-content-center gap-1" data-bs-toggle="modal" data-bs-target="#modalComboObsequio">
+                <i class="fa-solid fa-gifts text-warning"></i> Agregar Combo Obsequio
+            </button>
+            {% endif %}
+            
+            <div class="card-body p-0 overflow-auto mb-3" style="max-height: 40vh;" id="cartContainer">
+                <ul class="list-group list-group-flush" id="cart_body">
+                    <!-- Javascript inyectará items aquí -->
+                    <li class="cart-empty-box my-2" id="empty_cart_msg">
+                        <i class="fa-solid fa-basket-shopping fa-3x mb-3 d-block opacity-75"></i>Tu carrito está vacío.
+                    </li>
+                </ul>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                <span class="checkout-label align-self-center">Subtotal:</span>
+                <span class="fw-bold checkout-total-val text-end text-nowrap" style="font-size: 1.15rem;" id="subtotal_amount">$0</span>
+            </div>
+
+            <div class="mb-2 text-danger" id="retoma_discount_row" style="display: none !important;">
+                <div class="d-flex justify-content-between align-items-center mb-1 gap-2">
+                    <span class="fw-bold align-self-center"><i class="fa-solid fa-recycle me-1"></i> Retomas (<span id="retomas_count">0</span>):</span>
+                    <span class="fw-bold text-end text-nowrap" style="font-size: 1.05rem;" id="retoma_amount">-$0</span>
+                </div>
+                <div id="retomas_list_container" class="ps-2 ms-1 mb-2 rounded p-2 retoma-container-box" style="font-size: 0.85rem;">
+                    <!-- Lista dinámica de retomas -->
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-baseline mb-4 border-top pt-2 gap-2" style="border-color: rgba(226, 232, 240, 0.15) !important;">
+                <span class="checkout-total-label text-nowrap">Total a Cobrar:</span>
+                <span class="fw-bolder checkout-total-val price-display font-mono text-end text-nowrap" style="font-size: clamp(1.2rem, 1.5vw, 1.5rem); letter-spacing: -0.03em;" id="total_amount">$0</span>
+            </div>
+
+            <button type="button" class="btn pos-retoma-btn btn-sm rounded-pill fw-bold w-100 mb-4 shadow-sm" onclick="abrirModalRetoma()">
+                <i class="fa-solid fa-recycle me-1 text-danger"></i> Añadir Equipo en Retoma
+            </button>
+
+            {% if current_user.rol == 'admin' %}
+            <div class="mb-3">
+                <label class="form-label checkout-label small">Fecha de Venta:</label>
+                <input type="date" id="fecha_venta_input" class="form-control form-control-sm pos-input shadow-sm" value="{{ hoy }}">
+            </div>
+            {% endif %}
+
+            <!-- Toggle: Pago Único vs Pago Dividido -->
+            <!-- Información de Turno de Asesores (Ventas compartidas por apertura de caja) -->
+            {% if turno_activo and turno_activo.asesores_obj %}
+            <div class="mb-3">
+                <div class="p-2 px-3 rounded border text-light small shadow-sm" style="background: rgba(13, 110, 253, 0.12); border-color: rgba(13, 110, 253, 0.3) !important;">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="text-info fw-bold"><i class="fa-solid fa-users me-1"></i> Asesores de Turno</span>
+                        <span class="badge bg-info text-dark rounded-pill">{{ turno_activo.asesores_obj|length }} activo(s)</span>
+                    </div>
+                    <div class="text-truncate text-muted small" title="{{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}">
+                        {{ turno_activo.asesores_obj|map(attribute='nombre')|join(', ') }}
+                    </div>
+                    <div class="extra-small text-secondary mt-1">
+                        * Las comisiones de este turno se dividen equitativamente entre los asesores registrados al abrir caja.
+                    </div>
+                </div>
+            </div>
+            {% elif sucursal_actual and sucursal_actual.tipo == 'bodega' %}
+            <div class="mb-3">
+                <div class="p-2 px-3 rounded border text-muted small" style="background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.1) !important;">
+                    <i class="fa-solid fa-boxes-stacked me-1 text-info"></i> Bodega: <strong>Exenta de turnos y comisiones</strong>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Método de Pago -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between gap-1 mb-2">
+                    <label class="form-label checkout-label m-0 fw-bold small text-uppercase">Método de Pago</label>
+                    <div class="form-switch m-0 p-0 d-flex align-items-center gap-1" style="min-height: auto;">
+                        <input class="form-check-input m-0" type="checkbox" id="toggle_pago_mixto" role="switch" style="cursor: pointer; width: 2.1rem; height: 1.15rem; float: none;">
+                        <label class="form-check-label fw-bold text-nowrap m-0" for="toggle_pago_mixto" style="cursor: pointer; font-size: 0.72rem; color: #64748b;">Dividir Pago</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modo 1: Pago Único (por defecto) -->
+            <div id="pago_unico_section">
+                <select id="metodo-pago" class="form-select form-select-lg pos-select shadow-sm mb-3" style="cursor: pointer;" onchange="toggleCamposAbonoTerceroUnico(this.value)">
+                    <option value="efectivo">💵 Efectivo</option>
+                    <option value="nequi">🟣 Nequi</option>
+                    <option value="bancolombia">🏦 Bancolombia</option>
+                    <option value="davivienda">🏦 Davivienda</option>
+                    <option value="daviplata">📲 Daviplata</option>
+                    <option value="bold">⚡ Bold (Datáfono)</option>
+                    <option value="addi">🛒 Addi</option>
+                    <option value="sistecredito">💳 Sistecrédito</option>
+                    <option value="abono_tercero">🤝 Abono a Terceros / Proveedor</option>
+                </select>
+
+                <!-- Campos de Comprobante Obligatorio (Todo método diferente a Efectivo) y Proveedor (Abono a Terceros) -->
+                <div id="campos_abono_tercero_unico" class="card border p-3 mb-3 rounded-3" style="display: none; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.3) !important;">
+                    <div id="titulo_comprobante_unico" class="fw-bold small mb-2 text-warning"><i class="fa-solid fa-camera me-1"></i> Comprobante de Pago Obligatorio:</div>
+                    <div id="div_proveedor_abono_unico" class="mb-2" style="display: none;">
+                        <label class="form-label extra-small fw-bold checkout-label mb-1">Proveedor Destinatario <span class="text-danger">*</span></label>
+                        <select id="abono_provider_id_unico" class="form-select form-select-sm pos-select">
+                            <option value="" disabled selected>-- Seleccionar Proveedor Destinatario --</option>
+                            {% for prov in providers %}
+                                <option value="{{ prov.id }}">{{ prov.nombre }} (Saldo: ${{ prov.saldo_pendiente|cop }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label extra-small fw-bold checkout-label mb-1">Imagen de Comprobante de Pago <span class="text-danger">*</span></label>
+                        <input type="hidden" id="abono_comprobante_unico" value="">
+                        
+                        <div class="d-flex flex-column gap-2">
+                            <div class="d-flex gap-2">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_btn_upload_unico">Adjuntar Imagen Comprobante</span>
+                                    <input type="file" id="file_comprobante_unico" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobante(this, 'abono_comprobante_unico', 'label_btn_upload_unico', 'preview_comprobante_unico')">
+                                </label>
+                            </div>
+                            <div id="preview_comprobante_unico" class="small text-truncate text-success fw-bold d-flex align-items-center justify-content-between p-1 px-2 rounded border border-success bg-white mt-1 shadow-sm" style="display: none;">
+                                <div class="text-truncate me-2">
+                                    <i class="fa-solid fa-circle-check text-success me-1"></i> <span id="nombre_archivo_unico"></span>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-link text-danger p-0 border-0 text-decoration-none" title="Quitar comprobante" onclick="limpiarComprobanteUnico()">
+                                    <i class="fa-solid fa-xmark fs-6"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modo 2: Pago Dividido/Mixto (oculto por defecto) -->
+            <div id="pago_mixto_section" style="display: none;">
+                <!-- Indicador visual del saldo restante -->
+                <div class="alert border-0 shadow-sm py-2 px-3 mb-3" id="saldo_restante_alert" style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1) !important;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="fw-bold checkout-label text-uppercase"><i class="fa-solid fa-scale-balanced me-1"></i> Saldo por cubrir:</small>
+                        <span class="fw-bolder fs-5 text-brand-black" id="saldo_restante">$0</span>
+                    </div>
+                    <!-- Barra de progreso visual -->
+                    <div class="progress mt-2" style="height: 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.1);">
+                        <div class="progress-bar" id="barra_progreso_pago" role="progressbar" style="width: 0%; background: linear-gradient(90deg, #f8fafc, #cbd5e1); border-radius: 10px;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+
+                <!-- Lista dinámica de pagos parciales -->
+                <div id="pagos_list" class="d-flex flex-column gap-2 mb-3">
+                    <!-- Se inyecta dinámicamente -->
+                </div>
+
+                <button type="button" class="btn pos-btn-secondary-action btn-sm rounded-pill fw-bold w-100" id="btn_agregar_pago">
+                    <i class="fa-solid fa-plus me-1"></i> Agregar otro método de pago
+                </button>
+            </div>
+
+            <!-- Botón de Cobro Masivo -->
+            <div class="d-grid gap-2 mt-auto">
+                <button type="button" class="btn-checkout-primary shadow-sm" id="btn_process_sale">
+                    <i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro
+                </button>
+                <button type="button" class="btn-checkout-secondary mt-2" id="btn_clear_cart">
+                    Limpiar Venta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Variantes -->
+<div class="modal fade" id="modalVariantes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-list-ul me-2"></i>Selecciona Variante</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="modalVariantesBody">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Datos de Retoma -->
+<div class="modal fade" id="modalRetoma" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-recycle me-2"></i>Datos del Equipo en Retoma</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert py-2 mb-4 border-0 small" style="background: #e8f4fd; border: 1px dashed #90c4e8;">
+                    <i class="fa-solid fa-circle-info text-primary me-1"></i> <strong>Retoma de Equipo:</strong> Ingresa los datos del celular que el cliente entrega como parte de pago.
+                </div>
+                <!-- Fila 1: Marca, Referencia, Capacidad -->
+                <div class="row mb-3">
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label small fw-bold">Marca *</label>
+                        <select id="retoma_marca" class="form-select bg-light fw-semibold" onchange="actualizarModelosRetoma(this.value)" required>
+                            <option value="">-- Seleccione Marca --</option>
+                            <option value="Apple">Apple</option>
+                            <option value="Samsung">Samsung</option>
+                            <option value="Meta">Meta</option>
+                            <option value="Android">Android (Xiaomi / Otros)</option>
+                            <option value="Motorola">Motorola</option>
+                            <option value="Huawei">Huawei</option>
+                            <option value="Honor">Honor</option>
+                            <option value="OPPO">OPPO</option>
+                            <option value="Infinix">Infinix</option>
+                            <option value="Tecno">Tecno</option>
+                            <option value="Otro">Otro / Otra Marca</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label small fw-bold">Referencia / Modelo *</label>
+                        <select id="retoma_modelo" class="form-select bg-light fw-semibold" onchange="actualizarColoresRetoma(this.value)" required>
+                            <option value="">-- Primero elija Marca --</option>
+                        </select>
+                        <input type="text" id="retoma_modelo_custom" class="form-control bg-light mt-1" placeholder="Escriba el modelo si es 'Otro'" style="display:none;">
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <label class="form-label small fw-bold">Capacidad / RAM</label>
+                        <div class="input-group">
+                            <select id="retoma_memoria" class="form-select bg-light fw-semibold" onchange="toggleManualInputGenerico(this, 'retoma_memoria_custom')">
+                                <option value="">-- Seleccionar --</option>
+                                <option value="N/A">N/A (No Aplica)</option>
+                                <option value="64GB">64GB</option>
+                                <option value="128GB">128GB</option>
+                                <option value="256GB">256GB</option>
+                                <option value="512GB">512GB</option>
+                                <option value="1T">1T</option>
+                                <option value="2T">2T</option>
+                                <option value="__OTRO__">✍️ Escribir otro...</option>
+                            </select>
+                            <input type="text" id="retoma_memoria_custom" class="form-control bg-light d-none" placeholder="Escriba capacidad...">
+                            <button type="button" id="btn_cancel_retoma_memoria_custom" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('retoma_memoria', 'retoma_memoria_custom')" title="Volver a lista">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Fila 2: Color, Batería -->
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">Color</label>
+                        <div class="input-group">
+                            <select id="retoma_color" class="form-select bg-light fw-semibold" onchange="toggleManualInputGenerico(this, 'retoma_color_custom')">
+                                <option value="">-- Primero elija Referencia --</option>
+                                <option value="N/A">N/A (No Aplica)</option>
+                                <option value="__OTRO__">✍️ Escribir otro...</option>
+                            </select>
+                            <input type="text" id="retoma_color_custom" class="form-control bg-light d-none" placeholder="Escriba color...">
+                            <button type="button" id="btn_cancel_retoma_color_custom" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('retoma_color', 'retoma_color_custom')" title="Volver a lista">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">Batería (%)</label>
+                        <input type="text" id="retoma_bateria" class="form-control bg-light" placeholder="Ej: 85% o N/A">
+                    </div>
+                </div>
+                <!-- Fila 3: IMEI 1, IMEI 2 -->
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">IMEI 1 *</label>
+                        <input type="text" id="retoma_imei1" class="form-control bg-light" required>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label small fw-bold">IMEI 2 (Opcional)</label>
+                        <input type="text" id="retoma_imei2" class="form-control bg-light">
+                    </div>
+                </div>
+                <!-- Fila 4: Valor de Retoma -->
+                <div class="row mb-3 bg-light p-2 rounded">
+                    <div class="col-12 mb-2">
+                        <label class="form-label small fw-bold text-success">Valor Acordado (Descuento) *</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-0">$</span>
+                            <input type="text" inputmode="numeric" id="retoma_valor" class="form-control bg-white fw-bold text-end format-price-ext" placeholder="Ej: 500.000" required>
+                        </div>
+                    </div>
+                </div>
+                <!-- Observaciones -->
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Observaciones / Estado</label>
+                    <textarea id="retoma_observaciones" class="form-control bg-light" rows="2" placeholder="Detalles de golpes, rayones, fallas..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-danger rounded-pill px-3" onclick="eliminarRetomaActual()" id="btnEliminarRetoma" style="display:none;"><i class="fa-solid fa-trash"></i> Eliminar</button>
+                <div>
+                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-dark rounded-pill fw-bold px-4" onclick="confirmarRetoma()">
+                        Guardar Retoma
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Datos del Cliente (Celulares) -->
+<div class="modal fade" id="modalClienteCelular" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white border-0" style="background-color: var(--brand-blue) !important;">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-tag me-2"></i>Datos del Cliente</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-warning py-2 mb-4 border-0 small">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> <strong>Venta de Celular Detectada:</strong> Es obligatorio registrar los datos del cliente para temas de garantía y soporte técnico.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Cédula / Documento</label>
+                    <div class="input-group">
+                        <input type="text" id="cliente_documento" class="form-control bg-light" placeholder="Número de identificación" required>
+                        <span class="input-group-text bg-light" id="cliente_lookup_spinner" style="display:none;">
+                            <span class="spinner-border spinner-border-sm text-primary"></span>
+                        </span>
+                        <span class="input-group-text bg-success text-white" id="cliente_found_badge" style="display:none;" title="Cliente encontrado">
+                            <i class="fa-solid fa-check"></i>
+                        </span>
+                    </div>
+                    <div id="cliente_lookup_msg" class="form-text"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nombre Completo</label>
+                    <input type="text" id="cliente_nombre" class="form-control bg-light" placeholder="Ej: Juan Pérez" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Teléfono / WhatsApp</label>
+                    <input type="text" id="cliente_telefono" class="form-control bg-light" placeholder="Ej: 3001234567" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Correo Electrónico (Opcional)</label>
+                    <input type="email" id="cliente_email" class="form-control bg-light" placeholder="Ej: cliente@correo.com">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Dirección (Opcional)</label>
+                    <input type="text" id="cliente_direccion" class="form-control bg-light" placeholder="Ej: Calle 10 # 5-20">
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success rounded-pill fw-bold px-4" onclick="confirmarVentaCelular()">
+                    <i class="fa-solid fa-check me-1"></i> Confirmar Venta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Seleccionar Combo de Obsequio -->
+<div class="modal fade" id="modalComboObsequio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-light border-bottom">
+                <h5 class="modal-title fw-bold text-brand-black">
+                    <i class="fa-solid fa-gifts me-2 text-warning"></i>Combos de Obsequios Disponibles
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">Selecciona un combo promocional para agregarlo automáticamente al carrito con precio <strong>$0</strong> como regalo de esta venta.</p>
+                <div class="d-flex flex-column gap-3">
+                    {% for c in combos_obsequio %}
+                    <div class="border rounded-3 p-3 bg-white shadow-sm">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-gift text-warning me-1"></i> {{ c.nombre }}</h6>
+                                {% if c.descripcion %}
+                                <small class="text-muted d-block">{{ c.descripcion }}</small>
+                                {% endif %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold" data-combo-id="{{ c.id }}" onclick="aplicarComboObsequio(this.dataset.comboId)">
+                                <i class="fa-solid fa-plus me-1"></i> Aplicar
+                            </button>
+                        </div>
+                        <div class="bg-light p-2 rounded-2 small">
+                            <span class="fw-semibold text-muted d-block mb-1">Incluye:</span>
+                            <ul class="list-unstyled m-0 ps-1">
+                                {% for it in c.items %}
+                                <li><i class="fa-solid fa-circle-check text-success me-1"></i><strong>{{ it.cantidad }}x</strong> {{ it.producto.nombre if it.producto else 'N/D' }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fa-solid fa-gift fa-2x mb-2 text-secondary opacity-50"></i>
+                        <p class="small m-0">No hay combos de obsequio configurados o activos actualmente.</p>
+                        {% if current_user.rol == 'admin' %}
+                        <a href="{{ url_for('admin_bp.gift_combos') }}" class="btn btn-sm btn-outline-primary mt-2 rounded-pill">
+                            <i class="fa-solid fa-plus me-1"></i> Crear Combos en Administración
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Producto Externo -->
+<div class="modal fade" id="modalProductoExterno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-mobile-screen-button me-2"></i> Ingresar Producto Externo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formProductoExterno">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row mb-3">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Marca</label>
+                            <select name="marca" id="ext_marca_visual" class="form-select fw-semibold" onchange="actualizarModelosExternoVisual(this.value)" required>
+                                <option value="">-- Seleccione Marca --</option>
+                                <option value="Apple">Apple</option>
+                                <option value="Samsung">Samsung</option>
+                                <option value="Meta">Meta</option>
+                                <option value="Android">Android (Xiaomi / Otros)</option>
+                                <option value="Otro">Otro / Otra Marca</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Referencia (Modelo)</label>
+                            <select name="modelo_celular" id="ext_modelo_visual" class="form-select fw-semibold" onchange="actualizarColoresExternoVisual(this.value)" required>
+                                <option value="">-- Primero elige Marca --</option>
+                            </select>
+                            <input type="text" id="ext_modelo_custom" class="form-control mt-1 d-none" placeholder="Escriba el modelo...">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Capacidad / RAM</label>
+                            <div class="input-group">
+                                <select name="memoria" id="ext_memoria_visual" class="form-select fw-semibold" onchange="toggleManualInputGenerico(this, 'ext_memoria_manual')">
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="N/A">N/A (No Aplica)</option>
+                                    <option value="64GB">64GB</option>
+                                    <option value="128GB">128GB</option>
+                                    <option value="256GB">256GB</option>
+                                    <option value="512GB">512GB</option>
+                                    <option value="1T">1T</option>
+                                    <option value="2T">2T</option>
+                                    <option value="__OTRO__">✍️ Escribir otro...</option>
+                                </select>
+                                <input type="text" id="ext_memoria_manual" class="form-control d-none" placeholder="Escriba capacidad...">
+                                <button type="button" id="btn_cancel_ext_memoria_manual" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('ext_memoria_visual', 'ext_memoria_manual')" title="Volver a lista">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Color</label>
+                            <div class="input-group">
+                                <select name="color" id="ext_color_visual" class="form-select fw-semibold" onchange="toggleManualInputGenerico(this, 'ext_color_manual')">
+                                    <option value="">-- Primero elige Referencia --</option>
+                                    <option value="N/A">N/A (No Aplica)</option>
+                                    <option value="__OTRO__">✍️ Escribir otro...</option>
+                                </select>
+                                <input type="text" id="ext_color_manual" class="form-control d-none" placeholder="Escriba color...">
+                                <button type="button" id="btn_cancel_ext_color_manual" class="btn btn-outline-secondary d-none" onclick="cancelManualInputGenerico('ext_color_visual', 'ext_color_manual')" title="Volver a lista">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label small fw-bold">Batería (%)</label>
+                            <input type="text" name="bateria" class="form-control" placeholder="Ej: 85% o N/A">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-bold mb-0">Proveedor</label>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNuevoProveedorRapido">
+                                    <i class="fa-solid fa-plus-circle me-1"></i>Agregar
+                                </button>
+                            </div>
+                            <select name="proveedor" class="form-select select-proveedor-ext" required>
+                                <option value="" disabled selected>Seleccione...</option>
+                                {% for p in providers %}
+                                    <option value="{{ p.nombre }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">IMEI 1 (Obligatorio)</label>
+                            <input type="text" name="imei" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">IMEI 2</label>
+                            <input type="text" name="imei2" class="form-control">
+                        </div>
+                    </div>
+                    <div class="row mb-3 bg-light p-2 rounded">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-danger">Costo ($)</label>
+                            <div class="input-group">
+                                <input type="password" name="precio_costo" class="form-control format-price-ext" required placeholder="0" autocomplete="off">
+                                <button class="btn btn-outline-secondary btn-toggle-costo" type="button" title="Mostrar / Ocultar costo">
+                                    <i class="fa-solid fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-success">Precio Sugerido ($)</label>
+                            <input type="text" name="precio_sugerido" class="form-control format-price-ext" required>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success" id="btnGuardarExterno"><i class="fa-solid fa-plus me-1"></i> Guardar y Vender</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Accesorio Externo -->
+<div class="modal fade" id="modalAccesorioExterno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-info text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-mobile-retro me-2"></i> Ingresar Accesorio Externo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formAccesorioExterno">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row mb-3">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">Nombre del Accesorio</label>
+                            <input type="text" name="nombre_accesorio" class="form-control" required placeholder="Ej. Carcasa, Audífonos...">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold">Marca</label>
+                            <input type="text" name="marca" class="form-control" required>
+                        </div>
+                        <div class="col-md-12 mb-2">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-bold mb-0">Proveedor</label>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none small fw-semibold" data-bs-toggle="modal" data-bs-target="#modalNuevoProveedorRapido">
+                                    <i class="fa-solid fa-plus-circle me-1"></i>Agregar
+                                </button>
+                            </div>
+                            <select name="proveedor" class="form-select select-proveedor-ext" required>
+                                <option value="" disabled selected>Seleccione...</option>
+                                {% for p in providers %}
+                                    <option value="{{ p.nombre }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3 bg-light p-2 rounded">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-danger">Costo ($)</label>
+                            <div class="input-group">
+                                <input type="password" name="precio_costo" class="form-control format-price-ext" required placeholder="0" autocomplete="off">
+                                <button class="btn btn-outline-secondary btn-toggle-costo" type="button" title="Mostrar / Ocultar costo">
+                                    <i class="fa-solid fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label small fw-bold text-info">Precio Sugerido ($)</label>
+                            <input type="text" name="precio_sugerido" class="form-control format-price-ext" required>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-info text-white" id="btnGuardarAccesorioExterno"><i class="fa-solid fa-plus me-1"></i> Guardar y Vender</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nuevo Proveedor Rápido -->
+<div class="modal fade" id="modalNuevoProveedorRapido" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-truck-field me-2"></i> Agregar Nuevo Proveedor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formNuevoProveedorRapido">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Nombre del Proveedor *</label>
+                        <input type="text" name="nombre" class="form-control" required placeholder="Ej: Samsung Colombia">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Empresa (Opcional)</label>
+                        <input type="text" name="empresa" class="form-control" placeholder="Ej: Distribuidora Oficial">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Teléfono (Opcional)</label>
+                        <input type="text" name="telefono" class="form-control" placeholder="Ej: 3001234567">
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" id="btnGuardarProveedorRapido">
+                            <i class="fa-solid fa-save me-1"></i> Guardar Proveedor
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="listaProveedoresData">
+[
+    {% for prov in providers %}
+    {"id": {{ prov.id }}, "nombre": {{ prov.nombre|tojson }}, "saldo": {{ prov.saldo_pendiente|int }}}{{ "," if not loop.last else "" }}
+    {% endfor %}
+]
+</script>
+
+<script>
+    const csrf_token = "{{ csrf_token() }}";
+    let carrito = [];
+    let activeProductData = null;
+    let activeVariantsData = null;
+    let retomasLista = [];
+    let editRetomaIndex = -1;
+    let pagosMixtos = [];
+
+    const LISTA_PROVEEDORES = JSON.parse(document.getElementById('listaProveedoresData')?.textContent || '[]');
+
+    const METODOS_DISPONIBLES = [
+        { value: 'efectivo',        label: '💵 Efectivo' },
+        { value: 'nequi',           label: '🟣 Nequi' },
+        { value: 'bancolombia',     label: '🏦 Bancolombia' },
+        { value: 'davivienda',      label: '🏦 Davivienda' },
+        { value: 'daviplata',       label: '📲 Daviplata' },
+        { value: 'bold',            label: '⚡ Bold (Datáfono)' },
+        { value: 'addi',            label: '🛒 Addi' },
+        { value: 'sistecredito',    label: '💳 Sistecrédito' },
+        { value: 'abono_tercero',   label: '🤝 Abono a Terceros / Proveedor' }
+    ];
+
+    function toggleCamposAbonoTerceroUnico(valor) {
+        const divAbono = document.getElementById('campos_abono_tercero_unico');
+        const divProv = document.getElementById('div_proveedor_abono_unico');
+        const titulo = document.getElementById('titulo_comprobante_unico');
+        if (divAbono) {
+            divAbono.style.display = (valor !== 'efectivo') ? 'block' : 'none';
+        }
+        if (divProv) {
+            divProv.style.display = (valor === 'abono_tercero') ? 'block' : 'none';
+        }
+        if (titulo) {
+            if (valor === 'abono_tercero') {
+                titulo.innerHTML = '<i class="fa-solid fa-handshake me-1"></i> Datos del Abono a Proveedor:';
+            } else {
+                titulo.innerHTML = '<i class="fa-solid fa-camera me-1"></i> Comprobante de Pago Obligatorio:';
+            }
+        }
+    }
+
+    function limpiarComprobanteUnico() {
+        const metodoEl = document.getElementById('metodo-pago');
+        if (metodoEl) metodoEl.value = 'efectivo';
+        const compHidden = document.getElementById('abono_comprobante_unico');
+        if (compHidden) compHidden.value = '';
+        const fileIn = document.getElementById('file_comprobante_unico');
+        if (fileIn) fileIn.value = '';
+        const lbl = document.getElementById('label_btn_upload_unico');
+        if (lbl) lbl.textContent = 'Adjuntar Imagen Comprobante';
+        const prev = document.getElementById('preview_comprobante_unico');
+        if (prev) prev.style.display = 'none';
+        const nombreArchivo = document.getElementById('nombre_archivo_unico');
+        if (nombreArchivo) nombreArchivo.textContent = '';
+        const provSel = document.getElementById('abono_provider_id_unico');
+        if (provSel) provSel.value = '';
+        toggleCamposAbonoTerceroUnico('efectivo');
+    }
+
+    async function subirImagenComprobante(fileInput, hiddenInputId, labelBtnId, previewId) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(labelBtnId);
+        const hiddenInput = document.getElementById(hiddenInputId);
+        const preview = document.getElementById(previewId);
+        const nombreArchivoSpan = document.getElementById('nombre_archivo_unico');
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo imagen...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf_token
+                },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                if (hiddenInput) hiddenInput.value = data.relative_path || data.filename;
+                if (label) label.textContent = 'Comprobante Listo';
+                if (preview) preview.style.display = 'block';
+                if (nombreArchivoSpan) nombreArchivoSpan.textContent = file.name;
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Cargar Imagen Comprobante';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen del comprobante.');
+            if (label) label.textContent = 'Cargar Imagen Comprobante';
+        }
+    }
+
+    async function subirImagenComprobanteMixto(fileInput, index) {
+        if (!fileInput.files || fileInput.files.length === 0) return;
+        const file = fileInput.files[0];
+        const label = document.getElementById(`label_upload_mixto_${index}`);
+
+        const formData = new FormData();
+        formData.append('comprobante_file', file);
+
+        if (label) label.textContent = 'Subiendo...';
+
+        try {
+            const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrf_token
+                },
+                body: formData
+            });
+            const data = await resp.json();
+            if (resp.ok && data.success) {
+                actualizarPagoParcial(index, 'comprobante', data.relative_path || data.filename);
+            } else {
+                alert(data.error || 'Error al subir la imagen del comprobante.');
+                if (label) label.textContent = 'Cargar Imagen';
+            }
+        } catch (err) {
+            console.error('Error subiendo comprobante:', err);
+            alert('Error de conexión al subir la imagen.');
+            if (label) label.textContent = 'Cargar Imagen';
+        }
+    }
+
+    function formatoCOP(valor) {
+        const num = Math.round(Number(valor) || 0);
+        return '$' + num.toLocaleString('es-CO');
+    }
+
+    let categoriaActivaCaja = 'equipos';
+
+    function seleccionarCategoriaCaja(cat) {
+        categoriaActivaCaja = cat;
+        const btnEq = document.getElementById('btnCatEquipos');
+        const btnAcc = document.getElementById('btnCatAccesorios');
+        if (btnEq && btnAcc) {
+            if (cat === 'equipos') {
+                btnEq.classList.remove('btn-outline-primary');
+                btnEq.classList.add('btn-primary');
+                btnAcc.classList.remove('btn-primary');
+                btnAcc.classList.add('btn-outline-primary');
+            } else {
+                btnAcc.classList.remove('btn-outline-primary');
+                btnAcc.classList.add('btn-primary');
+                btnEq.classList.remove('btn-primary');
+                btnEq.classList.add('btn-outline-primary');
+            }
+        }
+        filtrarProductosCaja();
+    }
+
+    function filtrarProductosCaja() {
+        const searchEl = document.getElementById('productSearch');
+        const query = searchEl ? searchEl.value.toLowerCase().trim() : '';
+        document.querySelectorAll('.product-card-container').forEach(card => {
+            const name = card.dataset.name || '';
+            const sku = card.dataset.sku || '';
+            const imei = card.dataset.imei || '';
+            const imei2 = card.dataset.imei2 || '';
+            const cat = card.dataset.categoria || '';
+
+            if (query.length > 0) {
+                // Si hay texto en la barra de búsqueda, busca en AMBOS (Equipos y Accesorios)
+                if (name.includes(query) || sku.includes(query) || imei.includes(query) || imei2.includes(query)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            } else {
+                // Sin texto de búsqueda, filtra por el botón seleccionado (Equipos o Accesorios)
+                card.style.display = (cat === categoriaActivaCaja) ? 'block' : 'none';
+            }
+        });
+    }
+
+    document.getElementById('productSearch').addEventListener('input', filtrarProductosCaja);
+    document.addEventListener('DOMContentLoaded', filtrarProductosCaja);
+
+    function handleProductClick(el) {
+        const pData = JSON.parse(el.dataset.product);
+        const vData = JSON.parse(el.dataset.variants);
+
+        if (vData && vData.length > 0) {
+            activeProductData = pData;
+            activeVariantsData = vData;
+            
+            let html = `<div class="mb-3"><h6 class="fw-bold">${pData.nombre}</h6><small class="text-muted">Stock Total: ${pData.cantidad_stock}</small></div>`;
+            html += `<div class="list-group">`;
+            vData.forEach(v => {
+                let badge = v.stock > 0 ? `<span class="badge bg-success rounded-pill">${v.stock} disp</span>` : `<span class="badge bg-danger rounded-pill">0 disp</span>`;
+                let btnState = v.stock > 0 ? '' : 'disabled';
+                html += `
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="addVariantToCart(${v.id})" ${btnState}>
+                    <div>
+                        <strong>${v.nombre}</strong><br>
+                        <small class="text-muted">${formatoCOP(v.precio_sugerido)}</small>
+                    </div>
+                    ${badge}
+                </button>
+                `;
+            });
+            html += `</div>`;
+            
+            document.getElementById('modalVariantesBody').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('modalVariantes')).show();
+        } else {
+            if (pData.cantidad_stock <= 0) {
+                alert("Este producto no tiene stock disponible.");
+                return;
+            }
+            addToCart(pData.id, null, pData.nombre, pData.sku, pData.precio_sugerido, pData.cantidad_stock, null, pData.tipo_inventario, pData.imei, pData.imei2, pData.inventario);
+        }
+    }
+
+    window.addVariantToCart = function(variantId) {
+        const vData = activeVariantsData.find(v => v.id === variantId);
+        if (!vData) return;
+        addToCart(activeProductData.id, vData.id, activeProductData.nombre, activeProductData.sku, vData.precio_sugerido, vData.stock, vData.nombre, activeProductData.tipo_inventario, activeProductData.imei, activeProductData.imei2, activeProductData.inventario);
+        bootstrap.Modal.getInstance(document.getElementById('modalVariantes')).hide();
+    };
+
+    function addToCart(productId, variantId, nombre, sku, precio, maxStock, variantName = null, tipoInventario = null, imei = null, imei2 = null, inventario = null) {
+        let existingIndex = carrito.findIndex(i => i.product_id === productId && i.variant_id === variantId);
+        
+        if (existingIndex > -1) {
+            if (carrito[existingIndex].cantidad + 1 > maxStock) {
+                alert('No puedes agregar más de la cantidad disponible en stock.');
+                return;
+            }
+            carrito[existingIndex].cantidad++;
+        } else {
+            if (maxStock <= 0) {
+                alert('No hay stock de este producto.');
+                return;
+            }
+            let nombreMostrar = variantName ? `${nombre} - ${variantName}` : nombre;
+            carrito.push({
+                product_id: productId,
+                variant_id: variantId,
+                nombre: nombreMostrar,
+                sku: sku,
+                precio_final: precio,
+                precio_sugerido: precio,
+                cantidad: 1,
+                max_stock: maxStock,
+                es_obsequio: false,
+                tipo_inventario: tipoInventario,
+                imei: imei,
+                imei2: imei2,
+                inventario: inventario
+            });
+        }
+        renderCart();
+    }
+
+    function updateCartItem(index, qty) {
+        let val = parseInt(qty);
+        if (isNaN(val) || val < 1) val = 1;
+        if (val > carrito[index].max_stock) {
+            alert('Stock insuficiente.');
+            val = carrito[index].max_stock;
+        }
+        carrito[index].cantidad = val;
+        renderCart();
+    }
+
+    function updateCartItemPrice(index, newPrice) {
+        let val = parseFloat(String(newPrice).replace(/\D/g, ''));
+        if (isNaN(val) || val < 0) val = 0;
+        carrito[index].precio_final = val;
+        renderCart();
+    }
+
+    function toggleObsequio(index) {
+        let item = carrito[index];
+        if (item.es_obsequio) {
+            item.es_obsequio = false;
+            // Restore suggested price
+            item.precio_final = item.precio_sugerido || 0;
+        } else {
+            item.es_obsequio = true;
+            item.precio_final = 0;
+        }
+        renderCart();
+    }
+
+    async function aplicarComboObsequio(comboId) {
+        try {
+            const resp = await fetch('/sales/api/gift-combos');
+            const data = await resp.json();
+            if (!data.success) {
+                alert('Error al consultar los combos de obsequio.');
+                return;
+            }
+            const combo = data.combos.find(c => c.id === comboId);
+            if (!combo) {
+                alert('Combo no encontrado.');
+                return;
+            }
+
+            // Validación atómica de stock en la sucursal actual para todos los ítems del combo
+            let faltantes = [];
+            for (const it of combo.items) {
+                if (it.stock_local < it.cantidad) {
+                    faltantes.push(`${it.nombre} (Disponible: ${it.stock_local}, Requerido: ${it.cantidad})`);
+                }
+            }
+
+            if (faltantes.length > 0) {
+                alert(`⚠️ Stock insuficiente en la sucursal para el combo '${combo.nombre}':\n- ` + faltantes.join('\n- '));
+                return;
+            }
+
+            // Si todos tienen stock, agregarlos al carrito marcados como obsequio ($0)
+            for (const it of combo.items) {
+                carrito.push({
+                    product_id: it.product_id,
+                    variant_id: null,
+                    nombre: it.nombre,
+                    sku: it.sku,
+                    precio_sugerido: it.precio_sugerido,
+                    precio_final: 0,
+                    cantidad: it.cantidad,
+                    max_stock: it.stock_local,
+                    es_obsequio: true,
+                    tipo_inventario: it.tipo_inventario,
+                    imei: it.imei,
+                    imei2: it.imei2,
+                    inventario: null
+                });
+            }
+
+            renderCart();
+
+            const modalEl = document.getElementById('modalComboObsequio');
+            const modalInstance = bootstrap.Modal.getInstance(modalEl);
+            if (modalInstance) modalInstance.hide();
+
+        } catch (err) {
+            console.error('Error aplicando combo:', err);
+            alert('Error inesperado al aplicar el combo de obsequios.');
+        }
+    }
+
+    function removeCartItem(index) {
+        carrito.splice(index, 1);
+        if (carrito.length === 0) {
+            limpiarComprobanteUnico();
+            resetPagosMixtos();
+        }
+        renderCart();
+    }
+
+    function renderCart() {
+        const tbody = document.getElementById('cart_body');
+        const totalAmountEl = document.getElementById('total_amount');
+        const subtotalAmountEl = document.getElementById('subtotal_amount');
+        const totalItemsEl = document.getElementById('total_items');
+        const retomaRow = document.getElementById('retoma_discount_row');
+        
+        tbody.innerHTML = '';
+        let granTotal = 0;
+        let totalItems = 0;
+
+        if (carrito.length === 0) {
+            tbody.innerHTML = `
+            <li class="cart-empty-box my-2" id="empty_cart_msg">
+                <i class="fa-solid fa-basket-shopping fa-3x mb-3 d-block opacity-75"></i>Tu carrito está vacío.
+            </li>`;
+            subtotalAmountEl.innerText = '$0';
+            totalAmountEl.innerText = '$0';
+            totalItemsEl.innerText = '0 items';
+            
+            if (retomaRow) retomaRow.style.setProperty('display', 'none', 'important');
+            return;
+        }
+
+        carrito.forEach((item, index) => {
+            const subtotal = item.cantidad * item.precio_final;
+            granTotal += subtotal;
+            totalItems += item.cantidad;
+
+            const li = document.createElement('li');
+            li.className = 'list-group-item px-3 py-3 border-bottom';
+            li.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+            let precioInputState = item.es_obsequio ? 'disabled' : '';
+            let isObsequioClass = item.es_obsequio ? 'text-success' : 'checkout-label';
+
+            let imeiHtml = '';
+            if (item.tipo_inventario === 'celulares') {
+                let imei1_str = item.imei ? `IMEI 1: ${item.imei}` : 'IMEI 1: N/D';
+                let imei2_str = item.imei2 ? `, IMEI 2: ${item.imei2}` : '';
+                let inv_str = item.inventario ? ` | Inv: ${item.inventario}` : '';
+                imeiHtml = `<small class="product-sku d-block fw-normal mt-1" style="font-size: 0.75rem;"><i class="fa-solid fa-mobile-screen-button me-1"></i>${imei1_str}${imei2_str}${inv_str}</small>`;
+            }
+
+            let displayNombre = item.nombre || '';
+            if (item.tipo_inventario === 'celulares' && displayNombre.startsWith('Celular ')) {
+                displayNombre = displayNombre.replace(/^Celular\s+\S+\s+/i, '');
+            }
+
+            li.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="fw-bold text-brand-black" style="max-width: 78%; word-break: break-word;">
+                        ${displayNombre}
+                        ${imeiHtml}
+                        ${item.es_obsequio ? '<span class="badge bg-success bg-opacity-10 text-success mt-1"><i class="fa-solid fa-gift me-1"></i>Obsequio</span>' : ''}
+                    </div>
+                    <div>
+                        {% if current_user.rol == 'admin' %}
+                        <button class="btn btn-link ${isObsequioClass} p-0 border-0 me-3" title="Marcar como Obsequio" onclick="toggleObsequio(${index})">
+                            <i class="fa-solid fa-gift fs-5"></i>
+                        </button>
+                        {% endif %}
+                        <button class="btn btn-link text-danger p-0 border-0" onclick="removeCartItem(${index})">
+                            <i class="fa-solid fa-xmark fs-5"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 gap-2">
+                    <div class="input-group input-group-sm" style="width: 88px; flex-shrink: 0;">
+                        <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.72rem;">Cant</span>
+                        <input type="number" class="form-control pos-input text-center fw-bold border-0 px-1" style="font-size: 0.85rem;" value="${item.cantidad}" onchange="updateCartItem(${index}, this.value)">
+                    </div>
+                    <div class="input-group input-group-sm flex-grow-1" style="min-width: 130px;">
+                        <span class="input-group-text pos-input border-0 px-2" style="font-size: 0.75rem;">$</span>
+                        <input type="text" inputmode="numeric" class="form-control pos-input text-end fw-bold border-0 px-2 text-brand-black format-price-ext" style="font-size: 0.86rem;" value="${Math.round(item.precio_final).toLocaleString('es-CO')}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
+                    </div>
+                </div>
+            `;
+            tbody.appendChild(li);
+        });
+        
+        const retomaAmountEl = document.getElementById('retoma_amount');
+        const retomasCountEl = document.getElementById('retomas_count');
+        const retomasContainer = document.getElementById('retomas_list_container');
+
+        subtotalAmountEl.innerText = formatoCOP(granTotal);
+        
+        let valorRetomaTotal = 0;
+        if (retomasLista.length > 0) {
+            valorRetomaTotal = retomasLista.reduce((sum, r) => sum + (parseFloat(r.valor_retoma) || 0), 0);
+            if (retomaRow) retomaRow.style.setProperty('display', 'block', 'important');
+            if (retomaAmountEl) retomaAmountEl.innerText = '-' + formatoCOP(valorRetomaTotal);
+            if (retomasCountEl) retomasCountEl.innerText = retomasLista.length;
+
+            if (retomasContainer) {
+                retomasContainer.innerHTML = retomasLista.map((r, i) => `
+                    <div class="d-flex justify-content-between align-items-center py-1 retoma-item-row small">
+                        <div class="text-truncate me-2" style="max-width: 65%;">
+                            <strong class="text-danger"><i class="fa-solid fa-mobile-screen me-1"></i>${r.marca ? r.marca + ' ' : ''}${r.modelo}</strong>
+                            <small class="text-muted d-block text-truncate" style="font-size: 0.75rem;">IMEI: ${r.imei1} ${r.color ? '| ' + r.color : ''}</small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="fw-bold text-danger me-2" style="font-size: 0.85rem;">-${formatoCOP(r.valor_retoma)}</span>
+                            <button type="button" class="btn btn-link text-primary p-0 me-2 border-0" onclick="abrirModalRetoma(${i})" title="Editar retoma">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="eliminarRetoma(${i})" title="Eliminar retoma">
+                                <i class="fa-solid fa-xmark fs-6"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } else {
+            if (retomaRow) retomaRow.style.setProperty('display', 'none', 'important');
+        }
+
+        const totalPagar = Math.max(0, granTotal - valorRetomaTotal);
+        totalAmountEl.innerText = formatoCOP(totalPagar);
+        totalItemsEl.innerText = `${totalItems} items`;
+
+        if (document.getElementById('toggle_pago_mixto').checked) {
+            actualizarSaldoRestante();
+        }
+    }
+
+    function obtenerGranTotal() {
+        let granTotal = carrito.reduce((sum, item) => sum + (item.cantidad * item.precio_final), 0);
+        let valorRetomaTotal = retomasLista.reduce((sum, r) => sum + (parseFloat(r.valor_retoma) || 0), 0);
+        return Math.max(0, granTotal - valorRetomaTotal);
+    }
+
+    document.getElementById('toggle_pago_mixto').addEventListener('change', function() {
+        const unicoSec = document.getElementById('pago_unico_section');
+        const mixtoSec = document.getElementById('pago_mixto_section');
+        
+        if (this.checked) {
+            unicoSec.style.display = 'none';
+            mixtoSec.style.display = 'block';
+            if (pagosMixtos.length === 0) {
+                agregarPagoParcial();
+            }
+            actualizarSaldoRestante();
+        } else {
+            unicoSec.style.display = 'block';
+            mixtoSec.style.display = 'none';
+        }
+    });
+
+    document.getElementById('btn_agregar_pago').addEventListener('click', agregarPagoParcial);
+
+    function agregarPagoParcial() {
+        pagosMixtos.push({ metodo_pago: 'efectivo', monto: 0 });
+        renderizarPagosMixtos();
+    }
+
+    function eliminarPagoParcial(index) {
+        if (pagosMixtos.length <= 1) {
+            alert('Debe existir al menos un método de pago.');
+            return;
+        }
+        pagosMixtos.splice(index, 1);
+        renderizarPagosMixtos();
+    }
+
+    function actualizarPagoParcial(index, campo, valor) {
+        if (campo === 'metodo_pago') {
+            pagosMixtos[index].metodo_pago = valor;
+            renderizarPagosMixtos();
+            return;
+        }
+        if (campo === 'monto') {
+            pagosMixtos[index].monto = parseFloat(valor) || 0;
+        }
+        if (campo === 'provider_id') {
+            pagosMixtos[index].provider_id = valor ? parseInt(valor) : null;
+        }
+        if (campo === 'comprobante') {
+            pagosMixtos[index].comprobante = valor.trim();
+        }
+        actualizarSaldoRestante();
+    }
+
+    function resetPagosMixtos() {
+        pagosMixtos = [];
+        const toggle = document.getElementById('toggle_pago_mixto');
+        if (toggle.checked) {
+            agregarPagoParcial();
+        }
+        renderizarPagosMixtos();
+        actualizarSaldoRestante();
+    }
+
+    function actualizarSaldoRestante() {
+        const granTotal = obtenerGranTotal();
+        const sumaPagos = pagosMixtos.reduce((sum, p) => sum + (p.monto || 0), 0);
+        const saldo = granTotal - sumaPagos;
+        
+        const saldoEl = document.getElementById('saldo_restante');
+        const alertEl = document.getElementById('saldo_restante_alert');
+        const barraEl = document.getElementById('barra_progreso_pago');
+        
+        saldoEl.innerText = formatoCOP(Math.abs(saldo));
+        
+        const porcentaje = granTotal > 0 ? Math.min((sumaPagos / granTotal) * 100, 100) : 0;
+        barraEl.style.width = porcentaje + '%';
+        
+        alertEl.classList.remove('saldo-cubierto', 'saldo-excedido');
+        if (saldo === 0 && granTotal > 0) {
+            alertEl.classList.add('saldo-cubierto');
+            saldoEl.style.color = '#28a745';
+            barraEl.style.background = 'linear-gradient(90deg, #28a745, #34ce57)';
+            document.querySelector('#saldo_restante_alert small').innerHTML = '<i class="fa-solid fa-circle-check me-1"></i> ¡Pago completo!';
+        } else if (saldo < 0) {
+            alertEl.classList.add('saldo-excedido');
+            saldoEl.style.color = '#dc3545';
+            saldoEl.innerText = '+' + formatoCOP(Math.abs(saldo));
+            barraEl.style.background = 'linear-gradient(90deg, #dc3545, #e74c5c)';
+            document.querySelector('#saldo_restante_alert small').innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Excedente:';
+        } else {
+            saldoEl.style.color = 'var(--brand-blue)';
+            barraEl.style.background = 'linear-gradient(90deg, #A3D8DE, #7BC8D0)';
+            document.querySelector('#saldo_restante_alert small').innerHTML = '<i class="fa-solid fa-scale-balanced me-1"></i> Saldo por cubrir:';
+        }
+    }
+
+    function renderizarPagosMixtos() {
+        const container = document.getElementById('pagos_list');
+        container.innerHTML = '';
+
+        pagosMixtos.forEach((pago, index) => {
+            const div = document.createElement('div');
+            div.className = 'pago-item p-2 rounded-3 border mb-2';
+            div.style.background = 'rgba(255, 255, 255, 0.04)';
+            div.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+            
+            let optionsHtml = METODOS_DISPONIBLES.map(m => 
+                `<option value="${m.value}" ${m.value === pago.metodo_pago ? 'selected' : ''}>${m.label}</option>`
+            ).join('');
+
+            let abonoCamposHtml = '';
+            if (pago.metodo_pago !== 'efectivo') {
+                if (pago.metodo_pago === 'abono_tercero') {
+                    let provOptions = LISTA_PROVEEDORES.map(pr => 
+                        `<option value="${pr.id}" ${pago.provider_id === pr.id ? 'selected' : ''}>${pr.nombre} (Saldo: $${formatoCOP(pr.saldo).replace('$','')})</option>`
+                    ).join('');
+
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 rounded border" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3) !important;">
+                            <div class="row g-2">
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold checkout-label mb-1 d-block">Proveedor Destinatario <span class="text-danger">*</span></label>
+                                    <select class="form-select form-select-sm pos-select" onchange="actualizarPagoParcial(${index}, 'provider_id', this.value)">
+                                        <option value="" disabled ${!pago.provider_id ? 'selected' : ''}>-- Elegir Proveedor --</option>
+                                        ${provOptions}
+                                    </select>
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="extra-small fw-bold checkout-label mb-1 d-block">Imagen Comprobante <span class="text-danger">*</span></label>
+                                    <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                    <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                        <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                        <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen'}</span>
+                                        <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                    </label>
+                                    ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    abonoCamposHtml = `
+                        <div class="p-2 mt-2 rounded border" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3) !important;">
+                            <div>
+                                <label class="extra-small fw-bold checkout-label mb-1 d-block"><i class="fa-solid fa-camera text-warning me-1"></i>Imagen Comprobante de Pago <span class="text-danger">*</span></label>
+                                <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
+                                <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
+                                    <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
+                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen Comprobante'}</span>
+                                    <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
+                                </label>
+                                ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            div.innerHTML = `
+                <div class="d-flex gap-2 align-items-center">
+                    <select class="form-select form-select-sm pos-select" style="cursor: pointer; flex: 1;" onchange="actualizarPagoParcial(${index}, 'metodo_pago', this.value)">
+                        ${optionsHtml}
+                    </select>
+                    <div class="input-group input-group-sm shadow-sm" style="flex: 1.5;">
+                        <span class="input-group-text pos-input border-0 text-muted">$</span>
+                        <input type="number" class="form-control pos-input border-0 fw-bold text-end text-brand-black" value="${pago.monto || ''}" placeholder="0" onchange="actualizarPagoParcial(${index}, 'monto', this.value)" onkeyup="actualizarPagoParcial(${index}, 'monto', this.value)">
+                    </div>
+                    <button type="button" class="btn btn-sm text-danger border-0 bg-transparent p-1" onclick="eliminarPagoParcial(${index})">
+                        <i class="fa-solid fa-circle-xmark fs-5"></i>
+                    </button>
+                </div>
+                ${abonoCamposHtml}
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    document.getElementById('btn_clear_cart').addEventListener('click', () => {
+        if(confirm('¿Seguro que deseas limpiar la venta?')){
+            carrito = [];
+            pagosMixtos = [];
+            retomasLista = [];
+            if (document.getElementById('cliente_nombre')) document.getElementById('cliente_nombre').value = '';
+            if (document.getElementById('cliente_documento')) document.getElementById('cliente_documento').value = '';
+            if (document.getElementById('cliente_telefono')) document.getElementById('cliente_telefono').value = '';
+            limpiarComprobanteUnico();
+            resetPagosMixtos();
+            renderCart();
+        }
+    });
+
+    function validarPagosAntesDeCobrar() {
+        const esMixto = document.getElementById('toggle_pago_mixto').checked;
+        const granTotal = obtenerGranTotal();
+
+        if (granTotal <= 0) {
+            return { valido: true, pagosPayload: [{ metodo_pago: 'efectivo', monto: 0, provider_id: null, comprobante: null }] };
+        }
+
+        let pagosPayload = [];
+        if (esMixto) {
+            let sumaPagos = 0;
+            for (let i = 0; i < pagosMixtos.length; i++) {
+                const p = pagosMixtos[i];
+                const mObj = METODOS_DISPONIBLES.find(m => m.value === p.metodo_pago);
+                const mLabel = mObj ? mObj.label : p.metodo_pago;
+
+                if (!p.monto || p.monto <= 0) {
+                    alert(`⚠️ El pago #${i + 1} (${mLabel}) tiene un monto inválido. Todos los pagos deben tener un monto mayor a $0.`);
+                    return { valido: false };
+                }
+                if (p.metodo_pago === 'abono_tercero' && !p.provider_id) {
+                    alert(`⚠️ El pago #${i + 1} (${mLabel}) requiere seleccionar obligatoriamente el Proveedor destinatario.`);
+                    return { valido: false };
+                }
+                if (p.metodo_pago !== 'efectivo' && (!p.comprobante || !p.comprobante.trim())) {
+                    alert(`⚠️ El pago #${i + 1} (${mLabel}) requiere adjuntar obligatoriamente la imagen del comprobante de pago antes de efectuar la venta.`);
+                    return { valido: false };
+                }
+                sumaPagos += p.monto;
+                pagosPayload.push({
+                    metodo_pago: p.metodo_pago,
+                    monto: Math.round(p.monto),
+                    provider_id: p.metodo_pago === 'abono_tercero' ? p.provider_id : null,
+                    comprobante: p.metodo_pago !== 'efectivo' ? p.comprobante.trim() : null
+                });
+            }
+            if (Math.round(sumaPagos) !== Math.round(granTotal)) {
+                const diff = Math.round(granTotal) - Math.round(sumaPagos);
+                alert(`⚠️ La suma de los pagos no coincide con el total de la venta. Falta: $${formatoCOP(Math.abs(diff)).replace('$','')}`);
+                return { valido: false };
+            }
+        } else {
+            const metodoPago = document.getElementById('metodo-pago').value;
+            const mObj = METODOS_DISPONIBLES.find(m => m.value === metodoPago);
+            const mLabel = mObj ? mObj.label : metodoPago;
+            let providerIdUnico = null;
+            let comprobanteUnico = null;
+
+            if (metodoPago !== 'efectivo') {
+                const compInput = document.getElementById('abono_comprobante_unico');
+                comprobanteUnico = compInput && compInput.value ? compInput.value.trim() : null;
+
+                if (metodoPago === 'abono_tercero') {
+                    const provSelect = document.getElementById('abono_provider_id_unico');
+                    providerIdUnico = provSelect && provSelect.value ? parseInt(provSelect.value) : null;
+                    if (!providerIdUnico) {
+                        alert('⚠️ Para el método "Abono a Terceros / Proveedor", debes seleccionar el Proveedor destinatario.');
+                        return { valido: false };
+                    }
+                }
+
+                if (!comprobanteUnico) {
+                    alert(`⚠️ Para el método de pago "${mLabel}", es obligatorio adjuntar la imagen del comprobante de pago antes de efectuar la venta.`);
+                    return { valido: false };
+                }
+            }
+
+            pagosPayload.push({
+                metodo_pago: metodoPago,
+                monto: Math.round(granTotal),
+                provider_id: providerIdUnico,
+                comprobante: comprobanteUnico
+            });
+        }
+
+        return { valido: true, pagosPayload: pagosPayload };
+    }
+
+    document.getElementById('btn_process_sale').addEventListener('click', async function() {
+        if (carrito.length === 0) {
+            return alert('El carrito está vacío.');
+        }
+
+        const validacion = validarPagosAntesDeCobrar();
+        if (!validacion.valido) return;
+
+        verificarClienteCelular();
+    });
+
+    function verificarClienteCelular() {
+        const tieneCelular = carrito.some(item => item.tipo_inventario === 'celulares' || (item.tipo_inventario === 'externos' && !item.nombre.startsWith('Acc. Externo')));
+        if (tieneCelular) {
+            const modalCliente = new bootstrap.Modal(document.getElementById('modalClienteCelular'));
+            modalCliente.show();
+        } else {
+            procesarPagoGlobal(null);
+        }
+    }
+
+    // Auto-buscar cliente por cédula
+    document.getElementById('modalClienteCelular').addEventListener('shown.bs.modal', function() {
+        document.getElementById('cliente_documento').value = '';
+        document.getElementById('cliente_nombre').value = '';
+        document.getElementById('cliente_telefono').value = '';
+        document.getElementById('cliente_email').value = '';
+        document.getElementById('cliente_direccion').value = '';
+        document.getElementById('cliente_found_badge').style.display = 'none';
+        document.getElementById('cliente_lookup_msg').textContent = '';
+        document.getElementById('cliente_documento').focus();
+    });
+
+    document.getElementById('cliente_documento').addEventListener('blur', async function() {
+        const doc = this.value.trim();
+        if (!doc) return;
+        const spinner = document.getElementById('cliente_lookup_spinner');
+        const badge = document.getElementById('cliente_found_badge');
+        const msg = document.getElementById('cliente_lookup_msg');
+        spinner.style.display = 'flex';
+        badge.style.display = 'none';
+        msg.textContent = '';
+        try {
+            const res = await fetch(`/celulares/api/cliente/buscar?documento=${encodeURIComponent(doc)}`);
+            const data = await res.json();
+            spinner.style.display = 'none';
+            if (data.encontrado) {
+                document.getElementById('cliente_nombre').value = data.nombre;
+                document.getElementById('cliente_telefono').value = data.telefono;
+                document.getElementById('cliente_email').value = data.email || '';
+                document.getElementById('cliente_direccion').value = data.direccion || '';
+                badge.style.display = 'flex';
+                msg.innerHTML = '<span class="text-success"><i class="fa-solid fa-circle-check me-1"></i>Cliente encontrado y datos cargados.</span>';
+            } else {
+                msg.innerHTML = '<span class="text-muted"><i class="fa-solid fa-user-plus me-1"></i>Cliente nuevo. Ingresa sus datos.</span>';
+            }
+        } catch(e) { spinner.style.display = 'none'; }
+    });
+
+    function confirmarVentaCelular() {
+        const nombre = document.getElementById('cliente_nombre').value.trim();
+        const doc = document.getElementById('cliente_documento').value.trim();
+        const tel = document.getElementById('cliente_telefono').value.trim();
+        const email = document.getElementById('cliente_email').value.trim();
+        const direccion = document.getElementById('cliente_direccion').value.trim();
+
+        if (!nombre || !doc || !tel) {
+            return alert('Por favor completa todos los datos del cliente.');
+        }
+
+        const datosCliente = {
+            nombre: nombre,
+            documento: doc,
+            telefono: tel,
+            email: email,
+            direccion: direccion
+        };
+
+        const modalEl = document.getElementById('modalClienteCelular');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) {
+            modalInstance.hide();
+        } else {
+            bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+
+        procesarPagoGlobal(datosCliente);
+    }
+
+    // Funciones genéricas para inputs de escritura manual libre / regreso a select
+    function toggleManualInputGenerico(selectElem, inputId) {
+        if (!selectElem) return;
+        const inputElem = document.getElementById(inputId);
+        const btnCancel = document.getElementById(`btn_cancel_${inputId}`);
+        if (selectElem.value === '__OTRO__') {
+            selectElem.classList.add('d-none');
+            if (inputElem) {
+                inputElem.classList.remove('d-none');
+                if (selectElem.name) {
+                    inputElem.name = selectElem.name;
+                    selectElem.removeAttribute('name');
+                }
+                inputElem.value = '';
+                inputElem.focus();
+            }
+            if (btnCancel) btnCancel.classList.remove('d-none');
+        }
+    }
+
+    function cancelManualInputGenerico(selectId, inputId) {
+        const selectElem = document.getElementById(selectId);
+        const inputElem = document.getElementById(inputId);
+        const btnCancel = document.getElementById(`btn_cancel_${inputId}`);
+        if (selectElem && inputElem) {
+            inputElem.classList.add('d-none');
+            inputElem.value = '';
+
+            selectElem.classList.remove('d-none');
+            if (selectId.includes('memoria')) {
+                selectElem.name = 'memoria';
+            } else if (selectId.includes('color')) {
+                selectElem.name = 'color';
+            }
+            inputElem.removeAttribute('name');
+            selectElem.value = '';
+        }
+        if (btnCancel) btnCancel.classList.add('d-none');
+    }
+
+    // Catálogo Maestro Unificado de Modelos
+    const CATALOGO_MAESTRO_MODELOS = {
+        'Apple': [
+            {
+                categoria: 'iPhones (11 al 18 Duo / Pro Max)',
+                modelos: [
+                    'iPhone 11', 'iPhone 11 Pro', 'iPhone 11 Pro Max',
+                    'iPhone 12', 'iPhone 12 Mini', 'iPhone 12 Pro', 'iPhone 12 Pro Max',
+                    'iPhone 13', 'iPhone 13 Mini', 'iPhone 13 Pro', 'iPhone 13 Pro Max',
+                    'iPhone 14', 'iPhone 14 Plus', 'iPhone 14 Pro', 'iPhone 14 Pro Max',
+                    'iPhone 15', 'iPhone 15 Plus', 'iPhone 15 Pro', 'iPhone 15 Pro Max',
+                    'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
+                    'iPhone 17', 'iPhone 17 Air', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
+                    'iPhone 18', 'iPhone 18 Duo', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                ]
+            },
+            {
+                categoria: 'Apple Watch',
+                modelos: [
+                    'Apple Watch Serie 11 (42mm)',
+                    'Apple Watch Serie 11 (46mm)',
+                    'Apple Watch Ultra 3 (49mm)'
+                ]
+            },
+            {
+                categoria: 'MacBook (Air, Pro, Neo)',
+                modelos: [
+                    'MacBook Neo',
+                    'MacBook Air M5',
+                    'MacBook Pro M5',
+                    'MacBook Pro M5 Pro',
+                    'MacBook Pro M5 Max',
+                    'MacBook Air 13" (M2)', 'MacBook Air 15" (M2)',
+                    'MacBook Air 13" (M3)', 'MacBook Air 15" (M3)',
+                    'MacBook Pro 14" (M3 / Pro / Max)', 'MacBook Pro 16" (M3 Pro / Max)',
+                    'MacBook Pro 14" (M4 / Pro / Max)', 'MacBook Pro 16" (M4 Pro / Max)'
+                ]
+            },
+            {
+                categoria: 'AirPods',
+                modelos: [
+                    'AirPods Serie 4 (AirPods 4)',
+                    'AirPods Serie 5 (AirPods 5)',
+                    'AirPods Pro 3',
+                    'AirPods Pro 2da Generación (USB-C)',
+                    'AirPods Max (Lightning)',
+                    'AirPods Max (USB-C)'
+                ]
+            },
+            {
+                categoria: 'iPads (A16, Air, Pro)',
+                modelos: [
+                    'iPad 10ma Gen (A16 Bionic)',
+                    'iPad 11na Gen',
+                    'iPad Mini 6', 'iPad Mini 7',
+                    'iPad Air 5 (M1)', 'iPad Air 11" (M2)', 'iPad Air 13" (M2)',
+                    'iPad Pro 11" (M2)', 'iPad Pro 12.9" (M2)',
+                    'iPad Pro 11" (M4 OLED)', 'iPad Pro 13" (M4 OLED)'
+                ]
+            }
+        ],
+        'Samsung': [
+            {
+                categoria: 'Samsung Galaxy Serie S (S24, S25, S26)',
+                modelos: [
+                    'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
+                    'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
+                    'Galaxy S26', 'Galaxy S26 Plus', 'Galaxy S26 Ultra',
+                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
+                    'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
+                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra',
+                    'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
+                    'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
+                ]
+            }
+        ],
+        'Meta': [
+            {
+                categoria: 'Ray-Ban Meta Smart Glasses',
+                modelos: [
+                    'Ray-Ban Meta Wayfarer (Standard)',
+                    'Ray-Ban Meta Wayfarer (Large)',
+                    'Ray-Ban Meta Headliner',
+                    'Ray-Ban Meta Skyler'
+                ]
+            },
+            {
+                categoria: 'Oakley Meta Smart Glasses',
+                modelos: [
+                    'Oakley Meta Performance Edition',
+                    'Oakley Meta Radar EV Edition',
+                    'Oakley Meta Holbrook Smart'
+                ]
+            }
+        ],
+        'Android': [
+            {
+                categoria: 'Xiaomi Serie 15 / 14 (Gama Alta)',
+                modelos: [
+                    'Xiaomi 15 Ultra',
+                    'Xiaomi 15 Pro',
+                    'Xiaomi 15',
+                    'Xiaomi 14 Ultra',
+                    'Xiaomi 14T Pro',
+                    'Xiaomi 14T',
+                    'Xiaomi MIX Flip'
+                ]
+            },
+            {
+                categoria: 'POCO Serie F & X',
+                modelos: [
+                    'POCO F7 Pro',
+                    'POCO F7',
+                    'POCO F6 Pro',
+                    'POCO F6',
+                    'POCO X7 Pro',
+                    'POCO X6 Pro'
+                ]
+            },
+            {
+                categoria: 'Redmi Note Serie 14 / 13',
+                modelos: [
+                    'Redmi Note 14 Pro+ 5G',
+                    'Redmi Note 14 Pro 5G',
+                    'Redmi Note 14 5G',
+                    'Redmi Note 13 Pro+ 5G',
+                    'Redmi Note 13 Pro 4G/5G',
+                    'Redmi 14C',
+                    'Redmi 13C'
+                ]
+            }
+        ],
+        'Motorola': [
+            {
+                categoria: 'Motorola Moto G & Edge',
+                modelos: [
+                    'Moto G54', 'Moto G84', 'Moto G24', 'Moto G04', 'Edge 40', 'Edge 40 Neo', 'Edge 50 Pro', 'Edge 50 Ultra', 'Razr 40 Ultra', 'Razr 50 Ultra'
+                ]
+            }
+        ],
+        'Huawei': [
+            {
+                categoria: 'Huawei Pura & Nova',
+                modelos: [
+                    'Huawei Pura 70 Ultra', 'Huawei Pura 70 Pro', 'Huawei Pura 70', 'Huawei Nova 12i', 'Huawei Nova 12 SE'
+                ]
+            }
+        ],
+        'Honor': [
+            {
+                categoria: 'Honor Magic & Serie X',
+                modelos: [
+                    'Honor Magic 6 Pro', 'Honor Magic 6 Lite', 'Honor 200 Pro', 'Honor 200', 'Honor X8b', 'Honor X7b'
+                ]
+            }
+        ],
+        'OPPO': [
+            {
+                categoria: 'OPPO Reno & Serie A',
+                modelos: [
+                    'OPPO Reno 12 Pro', 'OPPO Reno 12', 'OPPO Reno 11 F', 'OPPO A79 5G', 'OPPO A58', 'OPPO A38'
+                ]
+            }
+        ],
+        'Infinix': [
+            {
+                categoria: 'Infinix Note & Hot',
+                modelos: [
+                    'Infinix Note 40 Pro', 'Infinix Note 40', 'Infinix GT 20 Pro', 'Infinix Hot 40 Pro', 'Infinix Hot 40i'
+                ]
+            }
+        ],
+        'Tecno': [
+            {
+                categoria: 'Tecno Camon & Spark',
+                modelos: [
+                    'Tecno Camon 30 Premier', 'Tecno Camon 30 Pro', 'Tecno Camon 30', 'Tecno Spark 20 Pro+', 'Tecno Spark 20'
+                ]
+            }
+        ]
+    };
+
+    // Mapeo detallado de colores oficiales por modelo
+    const CATALOGO_MAESTRO_COLORES = {
+        // SERIE iPHONE 11
+        'iPhone 11': ['Negro (Black)', 'Blanco (White)', 'Verde (Green - tono menta pastel)', 'Amarillo (Yellow)', 'Morado / Malva (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 11 Pro': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+        'iPhone 11 Pro Max': ['Gris espacial (Space Gray)', 'Plata (Silver)', 'Oro (Gold)', 'Verde noche (Midnight Green)'],
+
+        // SERIE iPHONE 12
+        'iPhone 12': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 12 Mini': ['Negro (Black)', 'Blanco (White)', 'Azul (Blue)', 'Verde (Green)', 'Morado (Purple)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 12 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+        'iPhone 12 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul pacífico (Pacific Blue)'],
+
+        // SERIE iPHONE 13
+        'iPhone 13': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 13 Mini': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Rosa (Pink)', 'Verde (Green)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 13 Pro': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+        'iPhone 13 Pro Max': ['Grafito (Graphite)', 'Plata (Silver)', 'Oro (Gold)', 'Azul Sierra (Sierra Blue)', 'Verde alpino (Alpine Green)'],
+
+        // SERIE iPHONE 14
+        'iPhone 14': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 14 Plus': ['Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Azul (Blue)', 'Morado (Purple)', 'Amarillo (Yellow)', 'Rojo ((PRODUCT)RED)'],
+        'iPhone 14 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+        'iPhone 14 Pro Max': ['Negro espacial (Space Black)', 'Plata (Silver)', 'Oro (Gold)', 'Morado oscuro (Deep Purple)'],
+
+        // SERIE iPHONE 15
+        'iPhone 15': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+        'iPhone 15 Plus': ['Negro (Black)', 'Azul (Blue)', 'Verde (Green)', 'Amarillo (Yellow)', 'Rosa (Pink)'],
+        'iPhone 15 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+        'iPhone 15 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio azul (Blue Titanium)', 'Titanio natural (Natural Titanium)'],
+
+        // SERIE iPHONE 16
+        'iPhone 16': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+        'iPhone 16 Plus': ['Negro (Black)', 'Blanco (White)', 'Rosa (Pink)', 'Verde azulado (Teal)', 'Ultramarino (Ultramarine)'],
+        'iPhone 16 Pro': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+        'iPhone 16 Pro Max': ['Titanio negro (Black Titanium)', 'Titanio blanco (White Titanium)', 'Titanio natural (Natural Titanium)', 'Titanio desierto (Desert Titanium)'],
+
+        // SERIE iPHONE 17
+        'iPhone 17': ['Lavanda (Lavender)', 'Verde salvia (Sage)', 'Azul neblina (Mist Blue)', 'Blanco (White)', 'Negro (Black)'],
+        'iPhone 17 Air': ['Azul cielo (Sky Blue)', 'Dorado claro (Light Gold)', 'Blanco nube (Cloud White)', 'Negro espacial (Space Black)'],
+        'iPhone 17 Pro': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+        'iPhone 17 Pro Max': ['Naranja cósmico (Cosmic Orange)', 'Azul oscuro (Dark Blue)', 'Plata (Silver)'],
+
+        // SERIE iPHONE 18
+        'iPhone 18': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+        'iPhone 18 Plus': ['Blanco estelar (Starlight)', 'Medianoche (Midnight)', 'Azul (Blue)', 'Plata (Silver)'],
+        'iPhone 18 Duo': ['Blanco estelar (Starlight)', 'Cielo nocturno (Night Sky - azul oscuro)'],
+        'iPhone 18 Pro': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+        'iPhone 18 Pro Max': ['Negro (Black)', 'Plata (Silver)', 'Glaciar (Glacier)', 'Borgoña (Burgundy)'],
+
+        // MACBOOKS
+        'MacBook Air M5': ['Azul cielo (Sky Blue)', 'Medianoche (Midnight)', 'Blanco estelar (Starlight)', 'Plata (Silver)'],
+        'MacBook Neo': ['Plata (Silver)', 'Rosa nube (Cloud Pink)', 'Cítrico (Citrus)', 'Índigo (Indigo)'],
+        'MacBook Pro M5': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+        'MacBook Pro M5 Pro': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+        'MacBook Pro M5 Max': ['Negro espacial (Space Black)', 'Plata (Silver)'],
+
+        // AIRPODS
+        'AirPods Pro 3': ['Blanco (White)'],
+        'AirPods Serie 4 (AirPods 4)': ['Blanco (White)'],
+        'AirPods Serie 5 (AirPods 5)': ['Blanco (White)'],
+
+        // APPLE WATCH
+        'Apple Watch Serie 11 (42mm)': [
+            'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+            'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+        ],
+        'Apple Watch Serie 11 (46mm)': [
+            'Negro azabache (Jet Black - Aluminio)', 'Oro rosa (Rose Gold - Aluminio)', 'Plata (Silver - Aluminio)', 'Gris espacial (Space Grey - Aluminio)',
+            'Natural (Titanio)', 'Oro (Gold - Titanio)', 'Pizarra (Slate - Titanio)'
+        ],
+        'Apple Watch Ultra 3 (49mm)': ['Titanio natural (Natural Titanium)', 'Titanio negro (Black Titanium)'],
+
+        // SAMSUNG
+        'Galaxy S25 Ultra': [
+            'Titanio Negro (Titanium Black)', 'Titanio Gris (Titanium Gray)', 'Titanio Plata Azul (Titanium Silverblue)', 'Titanio Blanco Plata (Titanium Whitesilver)',
+            'Titanio Negro Intenso (Titanium Jetblack)', 'Titanio Verde Jade (Titanium Jadegreen)', 'Titanio Oro Rosa (Titanium Pinkgold)'
+        ],
+        'Galaxy S26 Ultra': [
+            'Violeta Cobalto (Cobalt Violet)', 'Azul Cielo (Sky Blue)', 'Negro (Black)', 'Blanco (White)',
+            'Gris (Gray)', 'Oro Rosa (Pink Gold)'
+        ],
+
+        // META
+        'Ray-Ban Meta Wayfarer (Standard)': ['Negro Brillante (Shiny Black - G15)', 'Negro Mate (Matte Black - Polarized)', 'Jeans (Chalky Gray)', 'Caramel (Transitions)'],
+        'Ray-Ban Meta Wayfarer (Large)': ['Negro Brillante (Shiny Black)', 'Negro Mate (Matte Black)'],
+        'Ray-Ban Meta Headliner': ['Negro Brillante (Shiny Black)', 'Caramelo Brillante (Shiny Caramel)'],
+        'Ray-Ban Meta Skyler': ['Negro Brillante (Shiny Black)', 'Rosa Tiza (Chalky Rose)']
+    };
+
+    function poblarColoresEnSelect(selectElem, modelo, colorPreseleccionado = '') {
+        if (!selectElem) return;
+        selectElem.innerHTML = '';
+
+        let colores = [];
+        if (modelo && CATALOGO_MAESTRO_COLORES[modelo]) {
+            colores = CATALOGO_MAESTRO_COLORES[modelo];
+        } else {
+            for (const key in CATALOGO_MAESTRO_COLORES) {
+                if (modelo && modelo.toLowerCase().includes(key.toLowerCase())) {
+                    colores = CATALOGO_MAESTRO_COLORES[key];
+                    break;
+                }
+            }
+        }
+
+        selectElem.innerHTML = '<option value="">-- Seleccionar Color --</option>';
+        selectElem.innerHTML += '<option value="N/A">N/A (No Aplica)</option>';
+
+        if (colores.length > 0) {
+            colores.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                if (colorPreseleccionado && (c.toLowerCase() === colorPreseleccionado.toLowerCase() || c.toLowerCase().includes(colorPreseleccionado.toLowerCase()))) {
+                    opt.selected = true;
+                }
+                selectElem.appendChild(opt);
+            });
+        } else {
+            const todosColores = new Set();
+            for (const m in CATALOGO_MAESTRO_COLORES) {
+                CATALOGO_MAESTRO_COLORES[m].forEach(col => todosColores.add(col));
+            }
+            todosColores.forEach(col => {
+                const opt = document.createElement('option');
+                opt.value = col;
+                opt.textContent = col;
+                if (colorPreseleccionado && col.toLowerCase() === colorPreseleccionado.toLowerCase()) {
+                    opt.selected = true;
+                }
+                selectElem.appendChild(opt);
+            });
+        }
+
+        selectElem.innerHTML += '<option value="__OTRO__">✍️ Escribir otro...</option>';
+
+        if (colorPreseleccionado && colorPreseleccionado !== 'N/A' && !selectElem.value) {
+            const optCustom = document.createElement('option');
+            optCustom.value = colorPreseleccionado;
+            optCustom.textContent = `${colorPreseleccionado} (Personalizado)`;
+            optCustom.selected = true;
+            selectElem.appendChild(optCustom);
+        }
+    }
+
+    function actualizarColoresRetoma(modelo, colorPreseleccionado = '') {
+        const sel = document.getElementById('retoma_color');
+        poblarColoresEnSelect(sel, modelo, colorPreseleccionado);
+    }
+
+    function actualizarModelosRetoma(marca, modeloPreseleccionado = '', colorPreseleccionado = '') {
+        const sel = document.getElementById('retoma_modelo');
+        const customInput = document.getElementById('retoma_modelo_custom');
+        if (!sel) return;
+        sel.innerHTML = '';
+        if (customInput) customInput.style.display = 'none';
+
+        if (!marca) {
+            sel.innerHTML = '<option value="">-- Primero elija Marca --</option>';
+            actualizarColoresRetoma('', colorPreseleccionado);
+            return;
+        }
+
+        if (marca === 'Otro' || !CATALOGO_MAESTRO_MODELOS[marca]) {
+            sel.innerHTML = '<option value="__OTRO__">Otro Modelo (Escribir abajo)</option>';
+            if (customInput) {
+                customInput.style.display = 'block';
+                customInput.value = modeloPreseleccionado || '';
+            }
+            actualizarColoresRetoma('', colorPreseleccionado);
+            return;
+        }
+
+        sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
+        CATALOGO_MAESTRO_MODELOS[marca].forEach(grp => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = grp.categoria;
+            grp.modelos.forEach(mod => {
+                const opt = document.createElement('option');
+                opt.value = mod;
+                opt.textContent = mod;
+                if (mod === modeloPreseleccionado) {
+                    opt.selected = true;
+                }
+                optgroup.appendChild(opt);
+            });
+            sel.appendChild(optgroup);
+        });
+
+        const optOtro = document.createElement('option');
+        optOtro.value = '__OTRO__';
+        optOtro.textContent = '+ Otro Modelo no listado';
+        sel.appendChild(optOtro);
+
+        if (modeloPreseleccionado && !sel.value) {
+            sel.value = '__OTRO__';
+            if (customInput) {
+                customInput.style.display = 'block';
+                customInput.value = modeloPreseleccionado;
+            }
+        }
+
+        actualizarColoresRetoma(sel.value, colorPreseleccionado);
+
+        sel.onchange = function() {
+            if (this.value === '__OTRO__') {
+                if (customInput) {
+                    customInput.style.display = 'block';
+                    customInput.focus();
+                }
+            } else {
+                if (customInput) customInput.style.display = 'none';
+            }
+            actualizarColoresRetoma(this.value);
+        };
+    }
+
+    function abrirModalRetoma(index = -1) {
+        editRetomaIndex = index;
+        const btnEliminar = document.getElementById('btnEliminarRetoma');
+        const modalTitle = document.querySelector('#modalRetoma .modal-title');
+
+        if (index >= 0 && index < retomasLista.length) {
+            const r = retomasLista[index];
+            const valNum = parseInt(r.valor_retoma, 10);
+            document.getElementById('retoma_valor').value = !isNaN(valNum) ? valNum.toLocaleString('es-CO') : (r.valor_retoma || '');
+            
+            const marcaVal = r.marca || '';
+            const modeloVal = r.modelo || '';
+            const colorVal = r.color || '';
+            document.getElementById('retoma_marca').value = marcaVal;
+            actualizarModelosRetoma(marcaVal, modeloVal, colorVal);
+
+            document.getElementById('retoma_imei1').value = r.imei1 || '';
+            document.getElementById('retoma_imei2').value = r.imei2 || '';
+            
+            // Setear memoria
+            const selMemoria = document.getElementById('retoma_memoria');
+            const memVal = r.memoria || '';
+            if (selMemoria) {
+                selMemoria.value = memVal;
+                if (!selMemoria.value && memVal) {
+                    selMemoria.value = '__OTRO__';
+                    toggleManualInputGenerico(selMemoria, 'retoma_memoria_custom');
+                    const memCustom = document.getElementById('retoma_memoria_custom');
+                    if (memCustom) memCustom.value = memVal;
+                }
+            }
+
+            // Setear color
+            const selColor = document.getElementById('retoma_color');
+            if (selColor && !selColor.value && colorVal) {
+                selColor.value = '__OTRO__';
+                toggleManualInputGenerico(selColor, 'retoma_color_custom');
+                const colCustom = document.getElementById('retoma_color_custom');
+                if (colCustom) colCustom.value = colorVal;
+            }
+
+            document.getElementById('retoma_bateria').value = r.bateria || '';
+            document.getElementById('retoma_observaciones').value = r.observaciones || '';
+            if (btnEliminar) btnEliminar.style.display = 'block';
+            if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-pen-to-square me-2"></i>Editar Equipo en Retoma';
+        } else {
+            limpiarFormularioRetoma();
+            if (btnEliminar) btnEliminar.style.display = 'none';
+            if (modalTitle) modalTitle.innerHTML = '<i class="fa-solid fa-recycle me-2"></i>Añadir Equipo en Retoma';
+        }
+        
+        const modalEl = document.getElementById('modalRetoma');
+        let modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (!modalInstance) {
+            modalInstance = new bootstrap.Modal(modalEl);
+        }
+        modalInstance.show();
+    }
+
+    function limpiarFormularioRetoma() {
+        document.getElementById('retoma_valor').value = '';
+        document.getElementById('retoma_marca').value = '';
+        actualizarModelosRetoma('');
+        const customInput = document.getElementById('retoma_modelo_custom');
+        if (customInput) {
+            customInput.value = '';
+            customInput.style.display = 'none';
+        }
+        document.getElementById('retoma_imei1').value = '';
+        document.getElementById('retoma_imei2').value = '';
+        
+        cancelManualInputGenerico('retoma_color', 'retoma_color_custom');
+        cancelManualInputGenerico('retoma_memoria', 'retoma_memoria_custom');
+        
+        document.getElementById('retoma_color').value = '';
+        document.getElementById('retoma_bateria').value = '';
+        document.getElementById('retoma_memoria').value = '';
+        document.getElementById('retoma_observaciones').value = '';
+    }
+
+    function confirmarRetoma() {
+        const rawValor = (document.getElementById('retoma_valor').value || '').toString().replace(/\D/g, '');
+        const valor = parseFloat(rawValor);
+        
+        const marcaSelect = document.getElementById('retoma_marca');
+        const marca = marcaSelect ? marcaSelect.value.trim() : '';
+
+        const modeloSelect = document.getElementById('retoma_modelo');
+        const customInput = document.getElementById('retoma_modelo_custom');
+        let modelo = modeloSelect ? modeloSelect.value.trim() : '';
+        if (modelo === '__OTRO__' && customInput) {
+            modelo = customInput.value.trim();
+        }
+
+        const imei1 = document.getElementById('retoma_imei1').value.trim();
+
+        if (isNaN(valor) || valor <= 0) {
+            return alert('Debes ingresar un valor de descuento válido para la retoma.');
+        }
+
+        if (!marca) {
+            return alert('Debes seleccionar la marca del equipo.');
+        }
+
+        if (!modelo || modelo === '__OTRO__') {
+            return alert('Debes seleccionar o escribir la referencia/modelo del equipo.');
+        }
+
+        if (!imei1) {
+            return alert('El IMEI 1 es obligatorio para registrar la retoma.');
+        }
+
+        const imeiDuplicado = retomasLista.some((r, idx) => idx !== editRetomaIndex && r.imei1 === imei1);
+        if (imeiDuplicado) {
+            return alert('Ya has agregado un equipo con este mismo IMEI 1 en las retomas de esta venta.');
+        }
+
+        // Obtener memoria (select o custom)
+        const memCustom = document.getElementById('retoma_memoria_custom');
+        let memVal = document.getElementById('retoma_memoria').value.trim();
+        if (memVal === '__OTRO__' && memCustom) {
+            memVal = memCustom.value.trim();
+        }
+
+        // Obtener color (select o custom)
+        const colCustom = document.getElementById('retoma_color_custom');
+        let colVal = document.getElementById('retoma_color').value.trim();
+        if (colVal === '__OTRO__' && colCustom) {
+            colVal = colCustom.value.trim();
+        }
+
+        const retomaObj = {
+            marca: marca,
+            modelo: modelo,
+            memoria: memVal,
+            color: colVal,
+            bateria: document.getElementById('retoma_bateria').value.trim(),
+            imei1: imei1,
+            imei2: document.getElementById('retoma_imei2').value.trim(),
+            valor_retoma: valor,
+            observaciones: document.getElementById('retoma_observaciones').value.trim()
+        };
+
+        if (editRetomaIndex >= 0 && editRetomaIndex < retomasLista.length) {
+            retomasLista[editRetomaIndex] = retomaObj;
+        } else {
+            retomasLista.push(retomaObj);
+        }
+
+        const modalEl = document.getElementById('modalRetoma');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+
+        renderCart();
+    }
+
+    function eliminarRetoma(index) {
+        if (index >= 0 && index < retomasLista.length) {
+            retomasLista.splice(index, 1);
+            renderCart();
+        }
+    }
+function eliminarRetomaActual() {
+        if (editRetomaIndex >= 0 && editRetomaIndex < retomasLista.length) {
+            retomasLista.splice(editRetomaIndex, 1);
+        }
+        limpiarFormularioRetoma();
+        const modalEl = document.getElementById('modalRetoma');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+        
+        renderCart();
+    }
+
+    // Prevenir que la tecla 'Enter' (enviada por el lector de código de barras al leer el IMEI) cierre los modales de Retoma, Productos Externos o Accesorios Externos
+    document.querySelectorAll('#modalRetoma input, #modalRetoma textarea, #modalProductoExterno input, #modalProductoExterno select, #modalAccesorioExterno input, #modalAccesorioExterno select').forEach(input => {
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const modal = this.closest('.modal');
+                if (!modal) return;
+                const campos = Array.from(modal.querySelectorAll('input:not([type="hidden"]), select, textarea'));
+                const idx = campos.indexOf(this);
+                if (idx > -1 && idx + 1 < campos.length) {
+                    campos[idx + 1].focus();
+                    if (typeof campos[idx + 1].select === 'function') {
+                        campos[idx + 1].select();
+                    }
+                }
+            }
+        });
+    });
+
+
+    async function procesarPagoGlobal(datosCliente = null) {
+        const esBodega = ("{{ 'true' if sucursal_actual and sucursal_actual.tipo == 'bodega' else 'false' }}" === "true");
+        const asesorSelect = document.getElementById('asesor-vendedor');
+        const asesorId = asesorSelect && asesorSelect.value ? asesorSelect.value : null;
+
+        const validacion = validarPagosAntesDeCobrar();
+        if (!validacion.valido) return;
+        const pagosPayload = validacion.pagosPayload;
+
+        const payload = {
+            asesor_id: asesorId ? parseInt(asesorId) : null,
+            provider_id: null,
+            items: carrito.map(item => ({
+                product_id: item.product_id,
+                variant_id: item.variant_id,
+                cantidad: item.cantidad,
+                precio_final: item.precio_final,
+                es_obsequio: item.es_obsequio
+            })),
+            pagos: pagosPayload,
+            fecha_venta: document.getElementById('fecha_venta_input') ? document.getElementById('fecha_venta_input').value : null,
+            cliente: datosCliente,
+            retoma_data: retomasLista
+        };
+
+        const btnProcess = document.getElementById('btn_process_sale');
+        btnProcess.disabled = true;
+        btnProcess.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i> Procesando...';
+
+        // Abrir pestaña emergente INMEDIATAMENTE durante la interacción del usuario para evitar bloqueos en Chrome/Safari
+        let reciboWindow = null;
+        try {
+            reciboWindow = window.open('about:blank', '_blank');
+        } catch(err) {
+            console.warn('Pop-up bloqueado al crear ventana en blanco:', err);
+        }
+
+        try {
+            const response = await fetch('/sales/nueva', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf_token
+                },
+                body: JSON.stringify(payload)
+            });
+
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonErr) {
+                data = { error: `Error en la respuesta del servidor (${response.status} ${response.statusText})` };
+            }
+
+            if (response.ok && data.success && data.sale_id) {
+                const reciboUrl = `/sales/recibo/${data.sale_id}`;
+                if (reciboWindow && !reciboWindow.closed) {
+                    reciboWindow.location.href = reciboUrl;
+                } else {
+                    window.open(reciboUrl, '_blank');
+                }
+
+                // Limpiar la caja en la pestaña principal para seguir facturando inmediatamente
+                carrito = [];
+                retomasLista = [];
+                pagosMixtos = [];
+                
+                if (document.getElementById('cliente_nombre')) document.getElementById('cliente_nombre').value = '';
+                if (document.getElementById('cliente_documento')) document.getElementById('cliente_documento').value = '';
+                if (document.getElementById('cliente_telefono')) document.getElementById('cliente_telefono').value = '';
+                if (document.getElementById('cliente_email')) document.getElementById('cliente_email').value = '';
+
+                limpiarComprobanteUnico();
+                resetPagosMixtos();
+                renderCart();
+
+                btnProcess.disabled = false;
+                btnProcess.innerHTML = '<i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro';
+
+                alert(`✅ ¡Venta #${data.sale_id} Procesada! La factura se abrió en una nueva pestaña para su impresión.`);
+                return;
+            } else {
+                if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
+                alert(`⚠️ Error al procesar la venta: ${data.error || 'Verifica los datos de la venta'}`);
+                btnProcess.disabled = false;
+                btnProcess.innerHTML = '<i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro';
+            }
+        } catch (e) {
+            console.error('Error al procesar cobro:', e);
+            if (reciboWindow && !reciboWindow.closed) reciboWindow.close();
+            alert(`⚠️ Error de conexión o red: ${e.message || e}`);
+            btnProcess.disabled = false;
+            btnProcess.innerHTML = '<i class="fa-solid fa-credit-card me-2"></i> Procesar Cobro';
+        }
+    }
+
+    function actualizarColoresExternoVisual(modelo) {
+        const selColor = document.getElementById('ext_color_visual');
+        poblarColoresEnSelect(selColor, modelo);
+    }
+
+    function actualizarModelosExternoVisual(marca) {
+        const sel = document.getElementById('ext_modelo_visual');
+        const customInput = document.getElementById('ext_modelo_custom');
+        if (!sel) return;
+        sel.innerHTML = '';
+        if (customInput) customInput.classList.add('d-none');
+
+        if (!marca) {
+            sel.innerHTML = '<option value="">-- Primero elige Marca --</option>';
+            actualizarColoresExternoVisual('');
+            return;
+        }
+
+        if (marca === 'Otro' || !CATALOGO_MAESTRO_MODELOS[marca]) {
+            sel.innerHTML = '<option value="__OTRO__">Otro Modelo (Escribir abajo)</option>';
+            if (customInput) {
+                customInput.classList.remove('d-none');
+                customInput.name = 'modelo_celular';
+                sel.removeAttribute('name');
+                customInput.value = '';
+                customInput.focus();
+            }
+            actualizarColoresExternoVisual('');
+            return;
+        }
+
+        sel.name = 'modelo_celular';
+        if (customInput) {
+            customInput.classList.add('d-none');
+            customInput.removeAttribute('name');
+        }
+
+        sel.innerHTML = '<option value="">-- Seleccione Modelo / Referencia --</option>';
+        CATALOGO_MAESTRO_MODELOS[marca].forEach(grp => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = grp.categoria;
+            grp.modelos.forEach(mod => {
+                const opt = document.createElement('option');
+                opt.value = mod;
+                opt.textContent = mod;
+                optgroup.appendChild(opt);
+            });
+            sel.appendChild(optgroup);
+        });
+
+        const optOtro = document.createElement('option');
+        optOtro.value = '__OTRO__';
+        optOtro.textContent = '+ Otro Modelo no listado';
+        sel.appendChild(optOtro);
+
+        actualizarColoresExternoVisual(sel.value);
+
+        sel.onchange = function() {
+            if (this.value === '__OTRO__') {
+                if (customInput) {
+                    customInput.classList.remove('d-none');
+                    customInput.name = 'modelo_celular';
+                    sel.removeAttribute('name');
+                    customInput.focus();
+                }
+            } else {
+                if (customInput) {
+                    customInput.classList.add('d-none');
+                    customInput.removeAttribute('name');
+                }
+                sel.name = 'modelo_celular';
+            }
+            actualizarColoresExternoVisual(this.value);
+        };
+    }
+
+    // Lógica para Producto Externo
+    document.addEventListener('input', function (e) {
+        if (e.target.classList.contains('format-price-ext')) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value !== '') {
+                e.target.value = parseInt(value, 10).toLocaleString('es-CO');
+            } else {
+                e.target.value = '';
+            }
+        }
+    });
+
+    document.getElementById('formProductoExterno').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        let btn = document.getElementById('btnGuardarExterno');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+
+        let formData = new FormData(this);
+        
+        // Limpiar formato de precios
+        ['precio_costo', 'precio_sugerido'].forEach(field => {
+            let val = formData.get(field);
+            if (val) {
+                formData.set(field, val.replace(/\D/g, ''));
+            }
+        });
+
+        fetch("{{ url_for('externos_bp.api_nuevo_desde_caja') }}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let p = data.product;
+                
+                // Agregar al carrito usando la función nativa de caja_visual
+                addToCart(p.id, null, p.nombre, p.sku, p.precio_sugerido, p.stock, null, 'externos');
+                
+                // Cerrar modal y limpiar
+                let modalEl = document.getElementById('modalProductoExterno');
+                let modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                this.reset();
+                
+            } else {
+                alert('Error al guardar externo: ' + data.message);
+            }
+        })
+        .catch(err => {
+            alert('Error de conexión.');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-plus me-1"></i> Guardar y Vender';
+        });
+    });
+
+    // Lógica para Accesorio Externo
+    document.getElementById('formAccesorioExterno').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        let btn = document.getElementById('btnGuardarAccesorioExterno');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+
+        let formData = new FormData(this);
+        
+        // Limpiar formato de precios
+        ['precio_costo', 'precio_sugerido'].forEach(field => {
+            let val = formData.get(field);
+            if (val) {
+                formData.set(field, val.replace(/\D/g, ''));
+            }
+        });
+
+        fetch("{{ url_for('externos_bp.api_nuevo_accesorio_caja') }}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let p = data.product;
+                
+                // Agregar al carrito usando la función nativa de caja_visual
+                addToCart(p.id, null, p.nombre, p.sku, p.precio_sugerido, p.stock, null, 'externos');
+                
+                // Cerrar modal y limpiar
+                let modalEl = document.getElementById('modalAccesorioExterno');
+                let modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                this.reset();
+                
+            } else {
+                alert('Error al guardar accesorio externo: ' + data.message);
+            }
+        })
+        .catch(err => {
+            alert('Error de conexión.');
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-plus me-1"></i> Guardar y Vender';
+        });
+    });
+
+    // Toggle visibilidad del campo Costo
+    document.addEventListener('click', function (e) {
+        let btn = e.target.closest('.btn-toggle-costo');
+        if (btn) {
+            let input = btn.previousElementSibling;
+            let icon = btn.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            }
+        }
+    });
+
+    // Guardar Proveedor Rápido vía AJAX
+    let formProv = document.getElementById('formNuevoProveedorRapido');
+    if (formProv) {
+        formProv.addEventListener('submit', function (e) {
+            e.preventDefault();
+            let btn = document.getElementById('btnGuardarProveedorRapido');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Guardando...';
+
+            let formData = new FormData(this);
+
+            fetch("{{ url_for('providers_bp.create_provider_api') }}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    let p = data.provider;
+                    // Agregar el nuevo proveedor a todos los select de proveedor
+                    let selects = document.querySelectorAll('.select-proveedor-ext, select[name="proveedor"]');
+                    selects.forEach(select => {
+                        let exists = Array.from(select.options).some(opt => opt.value === p.nombre);
+                        if (!exists) {
+                            let opt = new Option(p.nombre, p.nombre, true, true);
+                            select.add(opt);
+                        } else {
+                            select.value = p.nombre;
+                        }
+                    });
+
+                    let modalEl = document.getElementById('modalNuevoProveedorRapido');
+                    let modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    this.reset();
+                } else {
+                    alert('Error al guardar proveedor: ' + (data.message || 'Error desconocido'));
+                }
+            })
+            .catch(err => {
+                alert('Error de conexión al guardar proveedor.');
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Guardar Proveedor';
+            });
+        });
+    }
+
+    // Auto-agregar producto enviado desde el Catálogo Celulares
+    document.addEventListener('DOMContentLoaded', function() {
+        const pendingItemStr = sessionStorage.getItem('catalogo_add_item');
+        if (pendingItemStr) {
+            sessionStorage.removeItem('catalogo_add_item');
+            try {
+                const item = JSON.parse(pendingItemStr);
+                if (item && item.productId && typeof addToCart === 'function') {
+                    addToCart(
+                        item.productId,
+                        item.variantId || null,
+                        item.nombre,
+                        item.sku,
+                        item.precio,
+                        item.maxStock,
+                        item.variantName || null,
+                        item.tipoInventario || 'celulares',
+                        item.imei || null,
+                        item.imei2 || null,
+                        item.inventario || null
+                    );
+                }
+            } catch (e) {
+                console.error('Error al cargar producto desde catálogo:', e);
+            }
+        }
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-5">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <h2 class="fw-bolder m-0" style="color: var(--brand-blue);">
+            <i class="fa-solid fa-users-gear me-2"></i>Gestión de Asesores
+        </h2>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin_bp.nomina') }}" class="btn btn-outline-success rounded-pill px-4 fw-bold shadow-sm">
+                <i class="fa-solid fa-money-check-dollar me-1"></i> Ver Nómina
+            </a>
+            <a href="/admin/dashboard" class="btn btn-light rounded-pill px-4 fw-bold text-muted border shadow-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Panel Principal
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <!-- Columna Izquierda: Registro -->
+    <div class="col-md-4">
+        <div class="card card-custom p-4 h-100">
+            <h5 class="fw-bold text-brand-black mb-4"><i class="fa-solid fa-user-plus me-2 text-brand-pink"></i> Registrar Nuevo Asesor</h5>
+            <form method="POST" action="{{ url_for('admin_bp.asesores') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                
+                <div class="mb-3">
+                    <label class="form-label text-brand-black fw-semibold small">Nombre Completo <span class="text-danger">*</span></label>
+                    <input type="text" name="nombre" class="form-control bg-light border-0 py-2" required placeholder="Ej. Carlos Mendoza">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label text-brand-black fw-semibold small">Salario Base Mensual</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0 fw-bold">$</span>
+                        <input type="number" name="salario_base" class="form-control bg-light border-0 py-2 fw-bold text-success" step="1000" min="0" value="0" placeholder="0">
+                    </div>
+                    <small class="text-muted">Sueldo fijo mensual antes de comisiones y vales.</small>
+                </div>
+                
+                <div class="d-grid mt-auto">
+                    <button type="submit" class="btn btn-blue py-3 fw-bold text-white rounded-3 shadow-sm text-uppercase">
+                        <i class="fa-solid fa-check me-1"></i> Registrar Asesor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Columna Derecha: Tabla -->
+    <div class="col-md-8">
+        <div class="card card-custom p-0 overflow-hidden h-100 table-custom">
+            <div class="bg-light p-4 border-bottom d-flex justify-content-between align-items-center">
+                 <h5 class="fw-bold text-brand-black m-0">Listado de Asesores Globales</h5>
+                 <span class="badge bg-secondary rounded-pill px-3 py-2">{{ asesores|length }} registrados</span>
+            </div>
+            <div class="table-responsive p-0">
+                <table class="table table-hover align-middle m-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">NOMBRE DEL ASESOR</th>
+                            <th class="text-end">SALARIO BASE</th>
+                            <th>FECHA REGISTRO</th>
+                            <th class="text-center">ESTADO</th>
+                            <th class="text-center pe-4">ACCIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asesor in asesores %}
+                        <tr>
+                            <td class="fw-bold text-brand-black ps-4">
+                                <i class="fa-solid fa-user-tie text-muted me-2"></i>{{ asesor.nombre }}
+                            </td>
+                            <td class="text-end fw-bold text-success">
+                                ${{ (asesor.salario_base or 0)|cop }}
+                            </td>
+                            <td class="text-muted small">{{ asesor.created_at.strftime('%d/%m/%Y %I:%M %p') if asesor.created_at else 'N/A' }}</td>
+                            <td class="text-center">
+                                {% if asesor.activo %}
+                                <span class="badge bg-success rounded-pill px-3 py-1">Activo</span>
+                                {% else %}
+                                <span class="badge bg-danger rounded-pill px-3 py-1">Inactivo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center pe-4">
+                                <div class="d-flex justify-content-center align-items-center gap-2">
+                                    <!-- Botón Editar -->
+                                    <button class="btn btn-sm btn-outline-dark rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#editModal{{ asesor.id }}">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i> Editar
+                                    </button>
+                                    
+                                    <!-- Botón Toggle Estado -->
+                                    <form action="{{ url_for('admin_bp.toggle_asesor', id=asesor.id) }}" method="POST" class="d-inline m-0">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        {% if asesor.activo %}
+                                        <button type="submit" class="btn btn-sm btn-danger rounded-pill px-3">
+                                            <i class="fa-solid fa-user-slash me-1"></i> Desactivar
+                                        </button>
+                                        {% else %}
+                                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3">
+                                            <i class="fa-solid fa-user-check me-1"></i> Activar
+                                        </button>
+                                        {% endif %}
+                                    </form>
+                                </div>
+
+                                <!-- Modal Editar Asesor -->
+                                <div class="modal fade text-start text-wrap" id="editModal{{ asesor.id }}" tabindex="-1" aria-hidden="true" style="white-space: normal;">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow-lg">
+                                            <div class="modal-header bg-dark text-white border-0 py-3">
+                                                <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-pen me-2 text-brand-pink"></i> Editar Asesor</h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form action="{{ url_for('admin_bp.editar_asesor', id=asesor.id) }}" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <div class="modal-body p-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Nombre Completo</label>
+                                                        <input type="text" name="nombre" class="form-control bg-light" value="{{ asesor.nombre }}" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Salario Base Mensual ($)</label>
+                                                        <input type="number" name="salario_base" class="form-control bg-light fw-bold text-success" step="1000" min="0" value="{{ (asesor.salario_base or 0)|int }}" required>
+                                                        <small class="text-muted">Valor fijo mensual para liquidación de nómina.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-0 bg-light">
+                                                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-dark rounded-pill px-4 fw-bold"><i class="fa-solid fa-check text-brand-pink me-1"></i> Guardar Cambios</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-folder-open fs-2 mb-2 d-block opacity-50"></i>
+                                No hay asesores registrados en el sistema.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="brand-title mb-1"><i class="fa-solid fa-receipt me-2" style="color: var(--brand-primary);"></i> Detalle de Compra #{{ "%04d"|format(compra.id) }}</h2>
+                <p class="brand-subtitle mb-0">COMPROBANTE DE INGRESO DE MERCANCÍA</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button onclick="window.print()" class="btn btn-outline-secondary rounded-pill px-3">
+                    <i class="fa-solid fa-print me-1"></i> Imprimir
+                </button>
+                <a href="{{ url_for('purchases_bp.index') }}" class="btn btn-pink rounded-pill px-3 fw-bold">
+                    <i class="fa-solid fa-list me-1"></i> Ir al Listado
+                </a>
+            </div>
+        </div>
+
+        <div class="card p-4 p-md-5 shadow-sm mb-4">
+            <!-- Encabezado del comprobante -->
+            <div class="row border-bottom pb-4 mb-4">
+                <div class="col-md-6">
+                    <h5 class="fw-bold mb-1 brand-title" style="letter-spacing: 0.12em; color: #0F172A;">LIFESTORE</h5>
+                    <p class="brand-subtitle small mb-1" style="letter-spacing: 0.25em; color: #64748B;">CELULARES</p>
+                    <p class="text-muted small mb-0"><strong>Registrado por:</strong> {{ compra.usuario.nombre }}</p>
+                    <p class="text-muted small mb-0"><strong>Fecha y Hora:</strong> {{ compra.fecha_compra.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                    <span class="badge rounded-pill px-3 py-2 mb-2 {% if compra.tipo_inventario == 'celulares' %}bg-success bg-opacity-10 text-success border border-success{% else %}bg-primary bg-opacity-10 text-primary border border-primary{% endif %}">
+                        <i class="fa-solid {% if compra.tipo_inventario == 'celulares' %}fa-mobile-screen-button{% else %}fa-headphones{% endif %} me-1"></i>
+                        Inventario: {{ compra.tipo_inventario|capitalize }}
+                    </span>
+                    <h3 class="fw-bold font-mono text-dark mb-1">ORDEN #{{ "%04d"|format(compra.id) }}</h3>
+                    <div class="text-muted small font-mono">Factura Ref: <strong>{{ compra.numero_factura or 'Sin Factura' }}</strong></div>
+                </div>
+            </div>
+
+            <!-- Datos del Proveedor y Observaciones -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 border bg-light h-100">
+                        <small class="text-muted fw-bold text-uppercase d-block mb-1">Proveedor de Mercancía</small>
+                        <h6 class="fw-bold mb-1">{{ compra.proveedor.nombre if compra.proveedor else 'Proveedor Ocasional / Directo' }}</h6>
+                        {% if compra.proveedor and compra.proveedor.empresa %}
+                            <small class="text-muted d-block">Empresa: {{ compra.proveedor.empresa }}</small>
+                        {% endif %}
+                        {% if compra.proveedor and compra.proveedor.telefono %}
+                            <small class="text-muted d-block">Teléfono: {{ compra.proveedor.telefono }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-3 rounded-3 border bg-light h-100">
+                        <small class="text-muted fw-bold text-uppercase d-block mb-1">Observaciones</small>
+                        <p class="mb-0 text-secondary small">
+                            {{ compra.observaciones or 'Sin observaciones registradas para este ingreso.' }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Productos Ingresados -->
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-boxes-stacked text-brand-pink me-2"></i> Mercancía Ingresada al Stock</h5>
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="45%">Producto / Variante</th>
+                            <th width="15%" class="text-center">Cant. Ingresada</th>
+                            <th width="20%" class="text-end">Costo Unitario</th>
+                            <th width="20%" class="text-end">Subtotal Costo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in compra.items %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-dark">{{ item.producto.nombre }}</div>
+                                {% if item.variante %}
+                                    <span class="badge bg-secondary">{{ item.variante.nombre_variante }}</span>
+                                {% endif %}
+                                {% if item.imei %}
+                                    <div class="small font-mono text-muted mt-1">
+                                        <i class="fa-solid fa-barcode me-1"></i> IMEI: {{ item.imei }} {% if item.imei2 %} | IMEI 2: {{ item.imei2 }}{% endif %}
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center font-mono fw-bold fs-6">
+                                +{{ item.cantidad }} uds
+                            </td>
+                            <td class="text-end font-mono">
+                                ${{ (item.costo_unitario)|cop }}
+                            </td>
+                            <td class="text-end font-mono fw-bold price-display">
+                                ${{ (item.subtotal)|cop }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <td colspan="3" class="text-end fw-bold fs-5">TOTAL COMPRA:</td>
+                            <td class="text-end font-mono fw-bold fs-4 price-display">
+                                ${{ (compra.total_costo)|cop }}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="text-center text-muted small pt-3 border-top">
+                Documento generado por el Sistema POS &bull; LifeStore - Celulares
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

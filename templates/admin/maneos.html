@@ -1,0 +1,355 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-brand-black m-0">Consignaciones y Maneos</h2>
+    <a href="{{ url_for('admin_bp.dashboard') if current_user.rol == 'admin' else url_for('sales_bp.procesar_venta') }}" class="btn btn-outline-secondary rounded-pill px-4">
+        <i class="fa-solid fa-arrow-left me-1"></i> Volver al Menú
+    </a>
+</div>
+
+<!-- Formulario para Nuevo Maneo -->
+<div class="card card-custom p-4 mb-4">
+    <h5 class="text-brand-black fw-bold mb-3"><i class="fa-solid fa-handshake text-brand-blue me-2"></i>Registrar Nuevo Maneo (Préstamo a Local Vecino)</h5>
+    <form method="POST" action="{{ url_for('admin_bp.maneos_prestar') }}" id="formNuevoManeo">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+        <input type="hidden" name="variant_id" id="variant_id_hidden" value="">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label class="form-label fw-bold text-brand-black">Producto o Celular a Prestar (SKU o IMEI)</label>
+                <div class="input-group">
+                    <input type="text" name="sku" id="maneo_sku_input" list="listaProductosDisponibles" class="form-control bg-light border-0" autofocus placeholder="Escanea o digita SKU o IMEI..." required autocomplete="off">
+                    <button type="button" class="btn btn-outline-secondary border-0 bg-light" id="btnBuscarManeo"><i class="fa-solid fa-search"></i></button>
+                </div>
+                <datalist id="listaProductosDisponibles">
+                    {% for p in productos %}
+                        <option value="{{ p.imei if p.imei else p.sku }}">{{ p.nombre }} {% if p.imei %}[IMEI: {{ p.imei }}]{% endif %} (Stock: {{ p.cantidad_stock }})</option>
+                    {% endfor %}
+                </datalist>
+                <div id="producto_preview" class="mt-2 p-2 rounded-3 bg-light border d-none small"></div>
+            </div>
+            <!-- Selector de Subcategoría (aparece dinámicamente si es accesorio con variantes) -->
+            <div class="col-md-3" id="variant_selector_col" style="display: none;">
+                <label class="form-label fw-bold text-brand-black"><i class="fa-solid fa-layer-group text-primary me-1"></i>Subcategoría</label>
+                <select id="variant_selector" class="form-select bg-light border-0" onchange="onVariantChange()">
+                    <option value="">— Producto general —</option>
+                </select>
+                <small class="text-muted" id="variant_stock_info"></small>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label fw-bold text-brand-black">Local Vecino / Receptor</label>
+                <input type="text" name="local_vecino" class="form-control bg-light border-0" placeholder="Ej: Fundas Alex / Local 102" required>
+            </div>
+            <div class="col-md-2" id="col_cantidad">
+                <label class="form-label fw-bold text-brand-black">Cantidad</label>
+                <input type="number" name="cantidad" id="maneo_cantidad_input" class="form-control bg-light border-0" min="1" value="1" required>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-blue w-100 rounded-pill"><i class="fa-solid fa-paper-plane me-1"></i> Prestar</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Lista de Maneos -->
+<div class="card card-custom p-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th class="ps-4">FECHA PRÉSTAMO</th>
+                    <th>LOCAL VECINO</th>
+                    <th>ARTÍCULO / CELULAR</th>
+                    <th class="text-center">CANTIDAD</th>
+                    <th class="text-center">ESTADO</th>
+                    <th class="text-center">ACCIONES RÁPIDAS</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in maneos %}
+                <tr>
+                    <td class="ps-4 text-muted"><small>{{ m.fecha_prestamo.strftime('%d/%m/%Y %H:%M') }}</small></td>
+                    <td class="fw-bold text-brand-black"><i class="fa-solid fa-store text-muted me-2"></i>{{ m.local_vecino }}</td>
+                    <td>
+                        {% if m.producto.tipo_inventario == 'celulares' or m.producto.imei %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0 me-1" style="font-size: 0.72rem;">
+                                <i class="fa-solid fa-mobile-screen me-1"></i>Celular
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-0 me-1" style="font-size: 0.72rem;">
+                                <i class="fa-solid fa-cube me-1"></i>Accesorio
+                            </span>
+                        {% endif %}
+                        <span class="text-brand-black fw-bold">{{ m.producto.nombre }}</span>
+                        {% if m.producto.imei %}
+                            <div class="small text-muted mt-1">
+                                <span class="badge bg-dark bg-opacity-10 text-dark border font-monospace px-2 py-0">IMEI: {{ m.producto.imei }}</span>
+                                {% if m.producto.imei2 %}<span class="badge bg-light text-muted border font-monospace px-2 py-0 ms-1">IMEI2: {{ m.producto.imei2 }}</span>{% endif %}
+                            </div>
+                        {% else %}
+                            <small class="text-muted d-block">SKU: {{ m.producto.sku }}</small>
+                        {% endif %}
+                        {% if m.variante %}
+                            <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-2 mt-1" style="font-size: 0.75rem;"><i class="fa-solid fa-layer-group me-1"></i>{{ m.variante.nombre_variante }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center fw-bold">{{ m.cantidad }} uds</td>
+                    <td class="text-center">
+                        {% if m.estado == 'PENDIENTE' %}
+                            <span class="badge bg-warning text-dark border border-warning rounded-pill px-3 py-2">Pendiente</span>
+                        {% elif m.estado == 'FACTURADO' %}
+                            <span class="badge bg-success rounded-pill px-3 py-2">Facturado</span>
+                            <br><small class="text-muted d-block mt-1">{{ m.fecha_resolucion.strftime('%d/%m/%Y %H:%M') }}</small>
+                        {% elif m.estado == 'DEVUELTO' %}
+                            <span class="badge bg-secondary rounded-pill px-3 py-2">Devuelto</span>
+                            <br><small class="text-muted d-block mt-1">{{ m.fecha_resolucion.strftime('%d/%m/%Y %H:%M') }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if m.estado == 'PENDIENTE' %}
+                            <div class="d-flex justify-content-center gap-2">
+                                <!-- Botón Facturar -->
+                                <button type="button" class="btn btn-sm btn-success rounded-pill" data-bs-toggle="modal" data-bs-target="#facturarModal{{ m.id }}" title="Facturar Venta">
+                                    <i class="fa-solid fa-cash-register me-1"></i> Cobrar
+                                </button>
+                                <!-- Modal Facturar -->
+                                <div class="modal fade text-start" id="facturarModal{{ m.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow">
+                                            <form method="POST" action="{{ url_for('admin_bp.maneos_facturar', id=m.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <div class="modal-header border-0 bg-light">
+                                                    <h5 class="modal-title fw-bold text-success"><i class="fa-solid fa-sack-dollar me-2"></i>Facturar Maneo</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body p-4">
+                                                    <p>Registrarás la venta del producto <strong>{{ m.producto.nombre }}</strong>
+                                                        {% if m.variante %}<span class="badge bg-primary bg-opacity-10 text-primary border rounded-pill ms-1">{{ m.variante.nombre_variante }}</span>{% endif %}
+                                                        entregado a <strong>{{ m.local_vecino }}</strong>.</p>
+                                                    
+                                                    <div class="row w-100 g-2 mt-2">
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold">Cantidad</label>
+                                                            <div class="input-group">
+                                                                <input type="number" name="cantidad_vendida" class="form-control bg-light border-0" min="1" max="{{ m.cantidad }}" value="{{ m.cantidad }}" required>
+                                                                <span class="input-group-text border-0 bg-light text-muted">/ {{ m.cantidad }}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <label class="form-label fw-bold">Precio Unitario</label>
+                                                            <div class="input-group">
+                                                                <span class="input-group-text border-0 bg-light text-success fw-bold">$</span>
+                                                                {% if m.variante and m.variante.precio_sugerido %}
+                                                                    <input type="number" step="1" min="{{ "%.0f"|format((m.variante.precio_minimo or m.producto.precio_minimo)|float) }}" class="form-control bg-light border-0" name="precio_venta" value="{{ "%.0f"|format((m.variante.precio_sugerido or m.producto.precio_sugerido)|float) }}" required>
+                                                                {% else %}
+                                                                    <input type="number" step="1" min="{{ "%.0f"|format(m.producto.precio_minimo) }}" class="form-control bg-light border-0" name="precio_venta" value="{{ "%.0f"|format(m.producto.precio_sugerido) }}" required>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mt-3">
+                                                        <label class="form-label fw-bold">Medio de Pago a Recibir</label>
+                                                        <select name="metodo_pago" class="form-select bg-light border-0" required>
+                                                            <option value="efectivo">💵 Efectivo directo a Caja</option>
+                                                            <option value="nequi">📱 Ingresará a Medio Digital (Nequi)</option>
+                                                            <option value="bancolombia">🏦 Ingresará a Medio Digital (Bancolombia)</option>
+                                                            <option value="daviplata">📱 Ingresará a Medio Digital (Daviplata)</option>
+                                                        </select>
+                                                    </div>
+                                                    
+                                                    <small class="text-muted mt-3 d-block">Nota: Si cobras menos de {{ m.cantidad }}, el sistema devolverá automáticamente el resto de unidades al inventario.</small>
+                                                </div>
+                                                <div class="modal-footer border-0">
+                                                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-success rounded-pill fw-bold px-4">Confirmar y Facturar</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Botón Devolver -->
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-bs-toggle="modal" data-bs-target="#devolverModal{{ m.id }}" title="Devolver a Inventario">
+                                    <i class="fa-solid fa-rotate-left"></i> Devolver
+                                </button>
+                                <!-- Modal Devolver -->
+                                <div class="modal fade text-start" id="devolverModal{{ m.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-sm">
+                                        <div class="modal-content border-0 shadow">
+                                            <form method="POST" action="{{ url_for('admin_bp.maneos_devolver', id=m.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <div class="modal-header border-0 bg-light">
+                                                    <h5 class="modal-title fw-bold text-secondary"><i class="fa-solid fa-rotate-left me-2"></i>Devolver Unidades</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body p-4">
+                                                    <p class="mb-3">¿Cuántas unidades de <strong>{{ m.producto.nombre }}</strong>
+                                                        {% if m.variante %}<span class="badge bg-primary bg-opacity-10 text-primary border rounded-pill ms-1">{{ m.variante.nombre_variante }}</span>{% endif %}
+                                                        devuelve <strong>{{ m.local_vecino }}</strong>?
+                                                    </p>
+                                                    <div class="input-group input-group-lg mb-3">
+                                                        <input type="number" name="cantidad_devuelta" class="form-control bg-light border-0 text-center fw-bold" min="1" max="{{ m.cantidad }}" value="{{ m.cantidad }}" required>
+                                                        <span class="input-group-text border-0 bg-light text-muted fw-bold">/ {{ m.cantidad }} uds</span>
+                                                    </div>
+                                                    <div class="alert py-2 px-3 rounded-3 mb-0" style="background: #f0f4ff; border: 1px dashed #b0c4de;">
+                                                        <small class="text-muted"><i class="fa-solid fa-circle-info text-primary me-1"></i>Si devuelves menos de {{ m.cantidad }}, las unidades restantes quedarán <strong>pendientes de cobrar</strong>.</small>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-0">
+                                                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-secondary rounded-pill fw-bold px-4"><i class="fa-solid fa-rotate-left me-1"></i> Confirmar Devolución</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <span class="text-muted small"><i class="fa-solid fa-check text-success"></i> Completado</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-handshake-slash fs-2 mb-3 text-warning opacity-50"></i>
+                        <p class="mb-0">No hay maneos o préstamos registrados.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Script para cargar subcategorías y detalles dinámicamente al digitar o escanear SKU/IMEI -->
+<script>
+    let debounceTimer = null;
+    const skuInput = document.getElementById('maneo_sku_input');
+    const variantCol = document.getElementById('variant_selector_col');
+    const variantSelect = document.getElementById('variant_selector');
+    const variantHidden = document.getElementById('variant_id_hidden');
+    const variantStockInfo = document.getElementById('variant_stock_info');
+    const productoPreview = document.getElementById('producto_preview');
+    const cantidadInput = document.getElementById('maneo_cantidad_input');
+    const btnBuscarManeo = document.getElementById('btnBuscarManeo');
+
+    skuInput.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            const sku = skuInput.value.trim();
+            if (sku.length > 0) {
+                buscarProducto(sku);
+            } else {
+                ocultarVariantes();
+            }
+        }, 350);
+    });
+
+    if (btnBuscarManeo) {
+        btnBuscarManeo.addEventListener('click', () => {
+            const sku = skuInput.value.trim();
+            if (sku) buscarProducto(sku);
+        });
+    }
+
+    // También al presionar Enter (por si usa escáner de código de barras)
+    skuInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const sku = skuInput.value.trim();
+            if (sku.length > 0) {
+                buscarProducto(sku);
+            }
+        }
+    });
+
+    async function buscarProducto(sku) {
+        try {
+            const response = await fetch(`/sales/api/producto/${encodeURIComponent(sku)}`);
+            if (!response.ok) {
+                ocultarVariantes();
+                return;
+            }
+            const producto = await response.json();
+
+            // Preview visual
+            if (productoPreview) {
+                productoPreview.classList.remove('d-none');
+                if (producto.tipo_inventario === 'celulares' || producto.imei) {
+                    productoPreview.innerHTML = `
+                        <div class="alert alert-primary py-2 px-3 mb-0 border-0 rounded-3">
+                            <div class="fw-bold text-primary"><i class="fa-solid fa-mobile-screen me-2"></i>${producto.nombre}</div>
+                            <div class="text-muted font-monospace small mt-1">IMEI: <strong>${producto.imei || 'Sin IMEI'}</strong> ${producto.imei2 ? '| IMEI 2: ' + producto.imei2 : ''}</div>
+                            <div class="small mt-1"><span class="badge bg-success bg-opacity-10 text-success border border-success">Stock: ${producto.cantidad_stock} ud.</span></div>
+                        </div>`;
+                    if (cantidadInput) {
+                        cantidadInput.value = 1;
+                        cantidadInput.max = 1;
+                        cantidadInput.readOnly = true;
+                    }
+                } else {
+                    productoPreview.innerHTML = `
+                        <div class="alert alert-light py-2 px-3 mb-0 border rounded-3">
+                            <div class="fw-bold text-dark"><i class="fa-solid fa-cube me-2 text-secondary"></i>${producto.nombre}</div>
+                            <small class="text-muted">Stock actual: <strong>${producto.cantidad_stock}</strong> uds.</small>
+                        </div>`;
+                    if (cantidadInput) {
+                        cantidadInput.readOnly = false;
+                        cantidadInput.max = producto.cantidad_stock || 999;
+                    }
+                }
+            }
+
+            if (producto.variantes && producto.variantes.length > 0) {
+                mostrarSelectorVariantes(producto.variantes);
+            } else {
+                ocultarVariantes(false);
+            }
+        } catch (err) {
+            ocultarVariantes();
+        }
+    }
+
+    function mostrarSelectorVariantes(variantes) {
+        variantSelect.innerHTML = '<option value="">— Selecciona una subcategoría —</option>';
+        variantes.forEach(v => {
+            const stockLabel = v.stock > 0 ? `(Stock: ${v.stock})` : '(Sin stock)';
+            variantSelect.innerHTML += `<option value="${v.id}" data-stock="${v.stock}">${v.nombre} ${stockLabel}</option>`;
+        });
+        variantCol.style.display = 'block';
+        variantHidden.value = '';
+        variantStockInfo.textContent = '';
+    }
+
+    function ocultarVariantes(limpiarPreview = true) {
+        variantCol.style.display = 'none';
+        variantSelect.innerHTML = '<option value="">— Producto general —</option>';
+        variantHidden.value = '';
+        variantStockInfo.textContent = '';
+        if (limpiarPreview && productoPreview) {
+            productoPreview.classList.add('d-none');
+            productoPreview.innerHTML = '';
+            if (cantidadInput) {
+                cantidadInput.readOnly = false;
+                cantidadInput.max = '';
+            }
+        }
+    }
+
+    function onVariantChange() {
+        const selectedOption = variantSelect.options[variantSelect.selectedIndex];
+        variantHidden.value = variantSelect.value;
+        
+        if (variantSelect.value && selectedOption.dataset.stock) {
+            variantStockInfo.innerHTML = `<i class="fa-solid fa-cubes text-primary me-1"></i> Stock disponible: <strong>${selectedOption.dataset.stock}</strong> uds`;
+            if (cantidadInput) {
+                cantidadInput.max = selectedOption.dataset.stock;
+            }
+        } else {
+            variantStockInfo.textContent = '';
+        }
+    }
+</script>
+{% endblock %}

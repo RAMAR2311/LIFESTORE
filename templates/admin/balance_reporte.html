@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <!-- Navbar y Filtros de Ámbito y Fechas (No imprimible) -->
+    <div class="col-12 d-print-none mb-4">
+         <div class="card card-custom p-4 border-0 shadow-sm">
+             <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                 <div>
+                     <h4 class="fw-bold m-0 text-brand-black">
+                         <i class="fa-solid fa-scale-balanced me-2 text-brand-pink"></i> Balance Financiero y General
+                     </h4>
+                     <small class="text-muted">Estado de Resultados Operativo & Situación Patrimonial</small>
+                 </div>
+                 <div class="d-flex align-items-center gap-2 flex-wrap">
+                     <button onclick="window.print()" class="btn btn-dark rounded-pill fw-bold px-4 shadow-sm btn-sm">
+                         <i class="fa-solid fa-file-pdf me-1 text-brand-pink"></i> Imprimir Reporte Oficial
+                     </button>
+                 </div>
+             </div>
+         </div>
+    </div>
+
+    <!-- Contenido del Reporte -->
+    <div class="col-12 col-xl-10 report-container">
+        <div class="card bg-white p-5 border-0 shadow-sm rounded-4 printable-document">
+            
+            <!-- Cabecera Oficial -->
+            <div class="text-center mb-5 pb-4 border-bottom d-print-block" style="border-color: #CBD5E1 !important;">
+                <h2 class="fw-bold brand-title mb-0" style="font-size: 1.8rem; letter-spacing: 0.12em; color: #0F172A;">LIFESTORE</h2>
+                <p class="brand-subtitle mb-2" style="font-size: 0.72rem; letter-spacing: 0.25em; color: #64748B;">CELULARES</p>
+                <p class="fw-bold mb-2" style="color: #0F172A; margin-top: 2px;">NIT: 1013679035-0</p>
+                <div class="badge px-3 py-2 text-uppercase mb-2" style="background-color: #1A1A1A; color: #fff; letter-spacing: 1px;">
+                    SEDE: TIENDA PRINCIPAL
+                </div>
+                <h4 class="text-brand-black fw-bold mb-1">ESTADO DE RESULTADOS CONTABLE</h4>
+                <p class="mb-0 text-secondary">
+                    Período Auditado: <strong>{{ fecha_inicio }}</strong> hasta <strong>{{ fecha_fin }}</strong><br>
+                    Generado por sistema el: <strong>{{ fecha_generacion }}</strong>
+                </p>
+            </div>
+
+            <!-- Sección 1: Ingresos Operacionales -->
+            <h5 class="fw-bold text-success mb-3 border-bottom pb-2">
+                <i class="fa-solid fa-arrow-trend-up me-2"></i> 1. INGRESOS OPERACIONALES (VENTAS)
+            </h5>
+            <table class="table table-borderless table-sm fw-semibold text-secondary fs-6 mb-5">
+                <tbody>
+                    <tr>
+                        <td width="70%">Ventas Validadas en Efectivo</td>
+                        <td width="30%" class="text-end">${{ (datos.ventas_efectivo)|cop }}</td>
+                    </tr>
+                    <tr>
+                        <td>Ventas por Transferencias Informadas (Nequi, Daviplata, Bancolombia)</td>
+                        <td class="text-end">${{ (datos.ventas_transferencia)|cop }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Ventas Liquidadas con Retomas
+                            <span class="badge bg-secondary bg-opacity-25 text-dark ms-1 small fw-normal">Dación en Pago / Inventario Entrante</span>
+                        </td>
+                        <td class="text-end text-primary fw-bold">+${{ (datos.ventas_retoma)|cop }}</td>
+                    </tr>
+
+                    <tr class="border-top text-brand-black fw-bolder bg-light">
+                        <td class="p-3">Σ TOTAL INGRESOS OPERACIONALES (VENTAS BRUTAS)</td>
+                        <td class="text-end p-3 text-success fs-5">${{ (datos.total_ingresos)|cop }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Sección 2: Costos y Gastos -->
+            <h5 class="fw-bold text-danger mb-3 border-bottom pb-2">
+                <i class="fa-solid fa-arrow-trend-down me-2"></i> 2. COSTOS DE MERCANCÍA Y GASTOS OPERATIVOS
+            </h5>
+            <table class="table table-borderless table-sm fw-semibold text-secondary fs-6 mb-5">
+                <tbody>
+                    <tr>
+                        <td width="70%">
+                            Costos Directos del Producto Vendido (COGS)
+                            <small class="d-block text-muted fw-normal">Costo real de compra de los artículos entregados a clientes</small>
+                        </td>
+                        <td width="30%" class="text-danger text-end">-${{ (datos.costos_directos)|cop }}</td>
+                    </tr>
+                    <tr class="border-top">
+                        <td class="fw-bold text-dark">
+                            Utilidad Bruta de Mercancía (Ingresos - COGS)
+                            <span class="badge bg-info bg-opacity-25 text-dark ms-2">Margen Bruto: {{ "%.1f"|format(datos.margen_bruto_pct) }}%</span>
+                        </td>
+                        <td class="text-end fw-bold text-dark">${{ (datos.utilidad_bruta)|cop }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            Gastos Diarios / Operacionales (Salidas de Caja)
+                            <small class="d-block text-muted fw-normal">Nómina, arriendos, servicios, suministros (sin duplicidad de productos externos)</small>
+                        </td>
+                        <td class="text-danger text-end">-${{ (datos.gastos_operacionales)|cop }}</td>
+                    </tr>
+                    <tr>
+                        <td>Costos Indirectos Permanentes</td>
+                        <td class="text-danger text-end">-${{ (datos.costos_indirectos)|cop }}</td>
+                    </tr>
+                    <tr class="border-top text-brand-black fw-bolder bg-light">
+                        <td class="p-3">Σ TOTAL SALIDAS Y DEDUCCIONES</td>
+                        <td class="text-danger text-end p-3 fs-5">-${{ (datos.total_salidas)|cop }}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- Sección 3: Balance Neto de Resultados -->
+            <h5 class="fw-bold text-brand-black mb-3 border-bottom pb-2">
+                <i class="fa-solid fa-sack-dollar me-2 text-brand-pink"></i> 3. RESULTADO OPERATIVO NETO
+            </h5>
+            {% set balance_positivo = datos.balance_neto >= 0 %}
+            <div class="card p-4 text-center border-0 mt-3 {% if balance_positivo %}bg-success{% else %}bg-danger{% endif %} bg-opacity-10 rounded-4">
+                <small class="text-uppercase fw-bold text-brand-black mb-1 opacity-75">
+                    {% if balance_positivo %}Ganancia Neta / Utilidad del Ejercicio{% else %}Pérdida Neta Registrada{% endif %}
+                    (Margen Neto: {{ "%.1f"|format(datos.margen_neto_pct) }}%)
+                </small>
+                <h1 class="fw-bolder mb-0 {% if balance_positivo %}text-success{% else %}text-danger{% endif %}" style="font-size: 3rem; letter-spacing: -2px;">
+                    ${{ (datos.balance_neto)|cop }}
+                </h1>
+            </div>
+
+            <!-- Sección 4: Balance General Patrimonial (Estado de Situación Financiera) -->
+            <div class="mt-5 pt-3 border-top">
+                <h5 class="fw-bold text-brand-black mb-3 border-bottom pb-2">
+                    <i class="fa-solid fa-building-columns me-2 text-primary"></i> 4. BALANCE GENERAL PATRIMONIAL (SITUACIÓN A LA FECHA)
+                </h5>
+                <p class="text-muted small">Valoración de activos líquidos y comerciales frente a pasivos exigibles.</p>
+
+                <div class="row g-4">
+                    <!-- Columna Activos -->
+                    <div class="col-md-6">
+                        <div class="card p-3 border-0 bg-light rounded-3 h-100">
+                            <h6 class="fw-bold text-primary mb-3"><i class="fa-solid fa-cubes me-2"></i> ACTIVOS COMERCIALES</h6>
+                            <table class="table table-borderless table-sm mb-0">
+                                <tbody>
+                                    <tr>
+                                        <td>Inventario Celulares Propios (Costo en Stock)</td>
+                                        <td class="text-end fw-semibold">${{ (datos.inventario_celulares_propios)|cop }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            Celulares Externos en Tienda (Consignación / Préstamo)
+                                            <small class="d-block text-muted">Equipos registrados que aún no han sido enviados al inventario propio</small>
+                                        </td>
+                                        <td class="text-end fw-semibold text-primary">${{ (datos.inventario_celulares_externos)|cop }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            Inventario Accesorios y Otros (Costo en Stock)
+                                            {% if datos.inventario_valorado_accesorios > 0 %}
+                                            <div class="mt-1 d-print-none">
+                                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill py-0 px-2 fw-semibold" style="font-size: 0.72rem;" data-bs-toggle="modal" data-bs-target="#modalDetalleAccesorios">
+                                                    <i class="fa-solid fa-magnifying-glass me-1"></i> Auditar {{ datos.conteo_accesorios }} productos en stock
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end fw-semibold align-top">${{ (datos.inventario_valorado_accesorios)|cop }}</td>
+                                    </tr>
+                                    <tr class="border-top">
+                                        <td class="fw-bold">Σ Total Inventario Físico en Tienda</td>
+                                        <td class="text-end fw-bold text-primary">${{ (datos.inventario_valorado_activo)|cop }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Cuentas por Cobrar (Cartera Clientes)</td>
+                                        <td class="text-end fw-bold text-primary">${{ (datos.cartera_clientes)|cop }}</td>
+                                    </tr>
+                                    <tr class="border-top bg-white fw-bolder">
+                                        <td class="p-2">TOTAL ACTIVOS REGISTRADOS</td>
+                                        <td class="text-end p-2 text-primary fs-6">${{ (datos.total_activos)|cop }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Columna Pasivos y Patrimonio -->
+                    <div class="col-md-6">
+                        <div class="card p-3 border-0 bg-light rounded-3 h-100">
+                            <h6 class="fw-bold text-danger mb-3"><i class="fa-solid fa-file-invoice-dollar me-2"></i> PASIVOS & PATRIMONIO</h6>
+                            <table class="table table-borderless table-sm mb-0">
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-bold text-danger">Cuentas por Pagar (Proveedores)</td>
+                                        <td class="text-end fw-bold text-danger">-${{ (datos.cuentas_por_pagar_proveedores)|cop }}</td>
+                                    </tr>
+                                    <tr class="border-top bg-white fw-bolder">
+                                        <td class="p-2">TOTAL PASIVOS EXIGIBLES</td>
+                                        <td class="text-end p-2 text-danger fs-6">-${{ (datos.total_pasivos)|cop }}</td>
+                                    </tr>
+                                    <tr class="border-top">
+                                        <td colspan="2" class="pt-3">
+                                            <div class="p-3 bg-white border rounded-3 text-center">
+                                                <small class="text-uppercase fw-bold text-muted d-block">PATRIMONIO NETO ESTIMADO (ACTIVOS - PASIVOS)</small>
+                                                <h3 class="fw-bold mb-0 text-success">${{ (datos.patrimonio_neto)|cop }}</h3>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Firmas Contables -->
+            <div class="row mt-5 pt-4 d-none d-print-flex">
+                <div class="col-8 mx-auto text-center mt-4">
+                    <hr class="w-100 border-dark border-1 opacity-100">
+                    <p class="mb-0 fw-bold">Verificado y Autorizado</p>
+                    <p class="text-muted small mb-0">{{ current_user.nombre }}</p>
+                    <p class="text-muted" style="font-size: 0.7rem;">Administración General - LifeStore</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalle de Productos en Stock de Accesorios -->
+<div class="modal fade d-print-none" id="modalDetalleAccesorios" tabindex="-1" aria-labelledby="modalDetalleAccesoriosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="fw-bold text-brand-black" id="modalDetalleAccesoriosLabel">
+                    <i class="fa-solid fa-boxes-stacked me-2 text-primary"></i> Auditoría de Inventario de Accesorios / Otros
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    El sistema detectó <strong>{{ datos.conteo_accesorios }}</strong> artículos con stock positivo en la base de datos sumando <strong>${{ (datos.inventario_valorado_accesorios)|cop }}</strong>. 
+                    Si estos productos corresponden a datos de prueba cargados al inicializar el software y no a mercancía física real en tu tienda, puedes presionar el botón inferior para <strong>ajustar su stock a 0</strong>.
+                </p>
+
+                <div class="table-responsive" style="max-height: 350px;">
+                    <table class="table table-sm table-hover table-bordered small mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Producto</th>
+                                <th>SKU</th>
+                                <th class="text-center">Local</th>
+                                <th class="text-center">Stock</th>
+                                <th class="text-end">Costo Unit.</th>
+                                <th class="text-end">Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in datos.detalle_accesorios %}
+                            <tr>
+                                <td class="fw-semibold">{{ item.nombre }}</td>
+                                <td class="text-muted font-monospace">{{ item.sku }}</td>
+                                <td class="text-center">{{ item.inventario }}</td>
+                                <td class="text-center fw-bold">{{ item.stock }}</td>
+                                <td class="text-end">${{ (item.costo_u)|cop }}</td>
+                                <td class="text-end fw-bold text-danger">${{ (item.costo_total)|cop }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 d-flex justify-content-between">
+                <button type="button" class="btn btn-light rounded-pill px-4 fw-semibold" data-bs-dismiss="modal">Cerrar</button>
+                <form action="{{ url_for('admin_bp.limpiar_accesorios_prueba') }}" method="POST" onsubmit="return confirm('¿Está seguro de poner en stock 0 todos los productos de accesorios/prueba? Esta acción actualizará el stock a 0 sin borrar ventas anteriores.');">
+                    <input type="hidden" name="fecha_inicio" value="{{ fecha_inicio }}">
+                    <input type="hidden" name="fecha_fin" value="{{ fecha_fin }}">
+                    <input type="hidden" name="ambito" value="{{ datos.ambito }}">
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-broom me-1"></i> Poner Stock de Accesorios a Cero (Limpiar Pruebas)
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ====== Estilos Exclusivos para PDF/Impresión del Reporte Financiero ====== */
+@media print {
+    @page { margin: 1cm; }
+    body, html {
+        background-color: white !important;
+        margin: 0 !important; 
+        padding: 0 !important;
+        font-size: 10pt !important;
+        color: black !important;
+    }
+    
+    .container, main.container, .container-fluid {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    main > nav, header, footer, .d-print-none {
+        display: none !important;
+    }
+
+    .d-print-flex {
+        display: flex !important;
+    }
+
+    .printable-document {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    /* Colores e Impresión Forzada estricta */
+    .text-success { color: #198754 !important; }
+    .text-danger { color: #dc3545 !important; }
+    .text-primary { color: #0d6efd !important; }
+    .text-secondary { color: #555 !important; }
+    .bg-light { background-color: #f8f9fa !important; border: 1px solid #eee !important; }
+    .bg-success { background-color: rgba(25, 135, 84, 0.1) !important; }
+    .bg-danger { background-color: rgba(220, 53, 69, 0.1) !important; }
+
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+</style>
+{% endblock %}

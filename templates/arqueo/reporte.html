@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <!-- Navbar y Filtros: Ocultos en Impresión -->
+    <div class="col-12 d-print-none mb-4">
+        <div class="card card-custom p-4 border-0 shadow-sm d-flex justify-content-between align-items-center flex-row">
+            <h4 class="fw-bold m-0" style="color: #0F172A;">
+                <i class="fa-solid fa-file-invoice me-1" style="color: #64748B;"></i> Reporte Arqueo Caja
+            </h4>
+            
+            {% if current_user.rol == 'admin' %}
+            <form action="{{ url_for('arqueo_bp.reporte') }}" method="GET" class="d-flex align-items-center justify-content-end gap-3 flex-grow-1 mx-4">
+                <label for="fecha_inicio" class="fw-bold text-dark m-0">Desde:</label>
+                <input type="date" name="fecha_inicio" id="fecha_inicio" value="{{ fecha_inicio }}" class="form-control w-auto">
+
+                <label for="fecha_fin" class="fw-bold text-dark m-0 ms-2">Hasta:</label>
+                <input type="date" name="fecha_fin" id="fecha_fin" value="{{ fecha_fin }}" class="form-control w-auto">
+                
+                <button type="submit" class="btn btn-outline-dark rounded-pill px-4 fw-semibold">Filtrar</button>
+            </form>
+            {% else %}
+            <div class="flex-grow-1 mx-4 text-center">
+                <span class="badge bg-white text-secondary border px-3 py-2" style="border-color: #E5E7EB !important;">
+                    <i class="fa-solid fa-calendar-day me-1"></i> Mostrando Arqueo de Hoy ({{ fecha_inicio }})
+                </span>
+            </div>
+            {% endif %}
+
+            <button onclick="window.print()" class="btn px-4 rounded-pill fw-bold text-white shadow-sm" style="background-color: #1A1A1A; border: 1px solid #1A1A1A;">
+                <i class="fa-solid fa-print me-1"></i> Imprimir Tirilla
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenido del Reporte EN PANTALLA e IMPRESIÓN A4 -->
+    <div class="col-12 col-xl-10">
+        <div class="card bg-white p-5 border shadow-sm rounded-4 printable-document" style="border-color: #E5E7EB !important;">
+            
+            <!-- Encabezado Ticket / Documento Contable -->
+            <div class="text-center mb-5 pb-3 border-bottom" style="border-color: #CBD5E1 !important;">
+                <h1 class="fw-bold brand-title mb-0" style="font-size: 1.8rem; letter-spacing: 0.12em; color: #0F172A;">LIFESTORE</h1>
+                <p class="brand-subtitle mb-2" style="font-size: 0.72rem; letter-spacing: 0.25em; color: #64748B;">CELULARES</p>
+                <p class="fw-bold mb-2" style="color: #0F172A; margin-top: 2px;">NIT: 1013679035-0</p>
+                <h4 class="text-secondary fw-semibold">INFORME CONTABLE DE CIERRE DE CAJA (ARQUEO)</h4>
+                <p class="mb-0 text-secondary">
+                    Período: <strong>{{ fecha_inicio }}</strong> hasta <strong>{{ fecha_fin }}</strong>
+                    <br>
+                    Generado el: <strong>{{ fecha_generacion }}</strong>
+                </p>
+                {% if current_user.rol != 'admin' %}
+                    <p class="mb-0 fw-bold" style="color: #0F172A;">Usuario Solicitante: {{ current_user.nombre }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Resumen Consolidado de Totales -->
+            <h5 class="fw-bold mb-3" style="color: #0F172A;">📍 Resumen General del Período Recaudado</h5>
+            <div class="row g-3 mb-4 resumen-totales">
+                <div class="col-12 col-md-3">
+                    <div class="card p-3 border rounded shadow-sm text-center h-100 bg-white" style="border-color: #E5E7EB !important; border-top: 3px solid #1A1A1A !important;">
+                        <small class="fw-bold text-uppercase d-block mb-1 text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">Venta + Banco Neto</small>
+                        <h4 class="mb-0 fw-bold font-mono" style="color: #0F172A;">
+                            ${{ (resumen.total_recaudado_neto)|cop }}
+                        </h4>
+                        <small class="d-block mt-1 text-muted" style="font-size:0.7rem;">Total - Gastos</small>
+                    </div>
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #dc3545 !important;">
+                        <small class="text-secondary fw-bold text-uppercase d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total Gastos Operativos</small>
+                        <h4 class="mb-0 text-danger fw-bold font-mono">$-{{ (resumen.total_gastos)|cop }}</h4>
+                        <small class="text-muted d-block mt-1" style="font-size:0.7rem;">(Efectivo: ${{ (resumen.total_gastos_efectivo)|cop }})</small>
+                    </div>
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #475569 !important;">
+                        <small class="text-secondary fw-bold text-uppercase d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Venta Total</small>
+                        <h4 class="mb-0 fw-bold font-mono" style="font-size: 1.6rem; color: #0F172A;">${{ (resumen.total_recaudado_bruto)|cop }}</h4>
+                        <small class="text-muted d-block mt-1" style="font-size:0.7rem;">Suma de Cash + Bancos</small>
+                    </div>
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #94A3B8 !important;">
+                        <small class="text-secondary fw-bold d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">SOBRANTES ACUMULADOS</small>
+                        <h4 class="mb-0 fw-bold font-mono" style="color: #0F172A;">${{ (resumen.total_sobrantes)|cop }}</h4>
+                        <small class="text-muted d-block mt-1" style="font-size:0.7rem;">Acumulado a favor en cierres</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla Desglosada Registro a Registro -->
+            <h5 class="fw-bold mb-3 border-bottom pb-2" style="color: #0F172A; border-color: #CBD5E1 !important;">📋 Desglose Analítico por Cierres de Día</h5>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm fw-semibold mb-0 table-hover align-middle bg-white" style="border-color: #E5E7EB;">
+                    <thead class="text-center text-uppercase" style="font-size: 0.80rem; background-color: #FFFFFF !important; color: #64748B !important; border-bottom: 2px solid #CBD5E1 !important;">
+                        <tr>
+                            <th width="9%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Fecha</th>
+                            <th width="12%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Cajero(a)</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Base Inicial</th>
+                            <th width="11%" style="color: #0F172A; border-bottom: 2px solid #CBD5E1;">Venta Total</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Ventas Efec</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Bancos</th>
+                            <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Gastos</th>
+                            <th width="11%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Físico Contado</th>
+                            <th width="13%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Diferencia / Sobrante</th>
+                            {% if current_user.rol == 'admin' %}
+                            <th width="8%" class="d-print-none" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Acciones</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody style="font-size: 0.9rem;">
+                        {% for arqueo in arqueos %}
+                        <tr>
+                            <td class="text-center text-secondary">{{ arqueo.fecha_arqueo }}</td>
+                            <td class="text-truncate" style="max-width:130px;" title="{{ arqueo.cajero.nombre }}">{{ arqueo.cajero.nombre }}</td>
+                            <td class="text-end text-primary fw-bold">${{ (arqueo.base_inicial)|cop }}</td>
+                            <td class="text-end text-dark fw-bolder bg-light border-start border-end">${{ (arqueo.total_efectivo_sistema + arqueo.total_transferencia_sistema)|cop }}</td>
+                            <td class="text-end text-success fw-bold">${{ (arqueo.total_efectivo_sistema)|cop }}</td>
+                            <td class="text-end text-info fw-bold">${{ (arqueo.total_transferencia_sistema)|cop }}</td>
+                            <td class="text-end {% if arqueo.gastos_del_dia > 0 %}text-danger{% else %}text-muted{% endif %} fw-bold">
+                                ${{ (arqueo.gastos_del_dia)|cop }}
+                            </td>
+                            <td class="text-end text-dark fw-bold">
+                                ${{ (arqueo.efectivo_fisico or 0)|cop }}
+                            </td>
+                            <td class="text-center">
+                                {% if arqueo.diferencia and arqueo.diferencia > 0 %}
+                                    <span class="badge bg-warning bg-opacity-20 text-dark border border-warning fw-bold" title="{{ arqueo.observacion_diferencia or 'Sobrante en caja' }}">
+                                        +${{ arqueo.diferencia|cop }} (Sobrante)
+                                    </span>
+                                {% elif arqueo.diferencia and arqueo.diferencia < 0 %}
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger fw-bold" title="{{ arqueo.observacion_diferencia or 'Faltante en caja' }}">
+                                        -${{ arqueo.diferencia|abs|cop }} (Faltante)
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-light text-secondary border fw-normal">Cuadrada ($0)</span>
+                                {% endif %}
+                            </td>
+                            {% if current_user.rol == 'admin' %}
+                            <td class="text-center d-print-none">
+                                <div class="d-flex justify-content-center gap-1">
+                                    <a href="{{ url_for('arqueo_bp.imprimir_ticket_arqueo', fecha=arqueo.fecha_arqueo, autoprint=1) }}" target="_blank" class="btn btn-sm btn-outline-dark py-1 px-2 rounded-3 text-nowrap" title="Imprimir Ticket Térmico 80mm">
+                                        <i class="fa-solid fa-receipt"></i>
+                                    </a>
+                                    <form action="{{ url_for('arqueo_bp.revertir_arqueo', id=arqueo.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas revertir este arqueo de caja? Esto eliminará el cierre y permitirá volver a crear/modificar el arqueo para esta fecha.');" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2 rounded-3 text-nowrap" title="Revertir Cierre">
+                                            <i class="fa-solid fa-rotate-left"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center text-muted p-4">No hay datos encontrados en estas fechas.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABLA DE VENTAS DETALLADAS (Pantalla Completa A4) -->
+    <div class="col-12 col-xl-10 mt-4">
+        <div class="card bg-white p-5 border-0 shadow-sm rounded-4 printable-document">
+            <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+                <h5 class="fw-bold text-brand-black m-0">
+                    <i class="fa-solid fa-list-check me-2"></i> Detalle de Ventas y Productos Involucrados
+                </h5>
+                <a href="{{ url_for('arqueo_bp.imprimir_ticket_arqueo', fecha=fecha_inicio, autoprint=1) }}" target="_blank" class="btn btn-sm btn-dark rounded-pill px-3 fw-bold shadow-sm d-print-none">
+                    <i class="fa-solid fa-print me-1"></i> Imprimir Ticket (80mm)
+                </a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm fw-semibold mb-0 table-hover align-middle">
+                    <thead class="table-light text-center text-uppercase" style="font-size: 0.85rem;">
+                        <tr>
+                            <th width="10%">Ticket ID</th>
+                            <th width="12%">Hora</th>
+                            <th width="15%">Método Pago</th>
+                            <th width="35%">Productos y Cantidades</th>
+                            <th width="15%" class="text-end">Total Ticket</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-size: 0.9rem;">
+                        {% for v in ventas_periodo %}
+                        <tr>
+                            <td class="text-center text-secondary fw-bold">
+                                #{{ "%05d"|format(v.id) }}
+                                <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=v.id) }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2 ms-1 rounded-pill d-print-none" title="Ver / Imprimir Factura #{{ v.id }}">
+                                    <i class="fa-solid fa-file-invoice"></i>
+                                </a>
+                            </td>
+                            <td class="text-center text-muted">{{ v.fecha_venta.strftime('%H:%M') }}</td>
+                            <td class="text-center">
+                                {% if v.pagos|length > 1 %}
+                                    <span class="badge bg-light text-dark border rounded-pill px-3 py-1" style="border-color: #fd7e14 !important;">
+                                        Mixto
+                                    </span>
+                                    <div style="font-size: 0.7rem; margin-top: 3px; color: #888;">
+                                        {% for p in v.pagos %}
+                                            {{ p.metodo_pago|capitalize }}: ${{ (p.monto)|cop }}{% if not loop.last %}<br>{% endif %}
+                                        {% endfor %}
+                                    </div>
+                                {% elif v.pagos|length == 1 %}
+                                    <span class="badge bg-light text-dark border rounded-pill px-3 py-1">
+                                        {{ v.pagos[0].metodo_pago|capitalize }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark border rounded-pill px-3 py-1">
+                                        {{ v.metodo_pago|capitalize }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <ul class="mb-0 ps-3" style="font-size: 0.85rem;">
+                                    {% for detalle in v.detalles %}
+                                    <li>
+                                        <strong>{{ detalle.cantidad_vendida }}x</strong> 
+                                        {% if detalle.nombre_manual %}
+                                            {{ detalle.nombre_manual }} <span class="badge bg-primary bg-opacity-10 text-primary border rounded-pill px-1" style="font-size: 0.65rem;">Externo</span>
+                                        {% elif detalle.producto %}
+                                            {{ detalle.producto.nombre }} 
+                                            {% if detalle.variant_id and detalle.variante %}
+                                                <span class="text-muted">(Var: {{ detalle.variante.nombre_variante }})</span>
+                                            {% endif %}
+                                        {% else %}
+                                            Artículo (ID: {{ detalle.product_id or 'S/N' }})
+                                        {% endif %}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                            <td class="text-end fw-bold text-brand-black fs-6">${{ (v.monto_total)|cop }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted p-4">No se registraron ventas en este período.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- DETALLE DE GASTOS DEL PERIODO -->
+            {% if gastos_periodo %}
+            <div class="mt-5 pt-4 border-top">
+                <h4 class="fw-bold text-brand-black mb-3">
+                    <i class="fa-solid fa-money-bill-transfer me-2 text-danger"></i> Detalle de Gastos Registrados
+                </h4>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle table-hover">
+                        <thead class="table-light text-center text-uppercase" style="font-size: 0.8rem;">
+                            <tr>
+                                <th width="12%">Fecha</th>
+                                <th width="15%">Tipo</th>
+                                <th width="15%">Categoría</th>
+                                <th>Descripción</th>
+                                <th width="12%">Método</th>
+                                <th width="15%">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 0.85rem;">
+                            {% for gasto in gastos_periodo %}
+                            <tr>
+                                <td class="text-center text-muted">{{ gasto.fecha_gasto.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td class="text-center">
+                                    {% if gasto.tipo_gasto == 'Gasto Diario' %}
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Diario</span>
+                                    {% else %}
+                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">Indirecto</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold">{{ gasto.categoria }}</td>
+                                <td class="text-muted fst-italic">{{ gasto.descripcion or '—' }}</td>
+                                <td class="text-center">
+                                    {% if gasto.metodo_pago == 'efectivo' %}
+                                        <span class="text-success fw-bold"><i class="fa-solid fa-money-bill-wave me-1"></i> Efectivo</span>
+                                    {% else %}
+                                        <span class="text-info fw-bold"><i class="fa-solid fa-building-columns me-1"></i> {{ gasto.metodo_pago|capitalize }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold {% if gasto.metodo_pago == 'efectivo' %}text-danger{% endif %}">
+                                    ${{ (gasto.monto)|cop }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+
+
+            <!-- Firmas Contables (Solo visibles al imprimir el PDF de tamaño carta) -->
+            <div class="row mt-5 pt-5 d-none d-print-flex">
+                <div class="col-6 text-center">
+                    <hr class="w-75 mx-auto border-dark border-1 opacity-100">
+                    <p class="mb-0 fw-bold">Firma Administrador</p>
+                    <p class="text-muted small">Revisado y Validado</p>
+                </div>
+                <div class="col-6 text-center">
+                    <hr class="w-75 mx-auto border-dark border-1 opacity-100">
+                    <p class="mb-0 fw-bold">Firma Cajero(a)</p>
+                    <p class="text-muted small">Cierre conforme y Entregado</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ====== Estilos Exclusivos para PDF/Impresión Tamaño Carta (A4) ====== */
+@media print {
+    body {
+        background-color: white !important;
+        margin: 0; padding: 0;
+        font-size: 11pt;
+    }
+    
+    /* Ocultar barra de navegación superior si existe en el layout general, y cualquier otro elemento innecesario */
+    main > nav, header, footer, .sidebar, .d-print-none {
+        display: none !important;
+    }
+
+    /* Quitar sombras y reestablecer contenedores principales a 100% de ancho */
+    .printable-document {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin-bottom: 2rem !important;
+        page-break-inside: avoid;
+    }
+    
+    /* Forzar los colores de Bootstrap/Custom para que la impresora los dibuje literalmente */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* Mostrar las firmas explícitamente solo al imprimir */
+    .d-print-flex {
+        display: flex !important;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-brand-black m-0 mb-1"><i class="fa-solid fa-user-circle text-brand-blue me-2"></i> {{ cliente.nombre_o_razon_social }}</h2>
+        <span class="text-muted fw-semibold">NIT/Documento: {{ cliente.documento_o_nit }} &nbsp;|&nbsp; <i class="fa-solid fa-phone me-1"></i> {{ cliente.telefono }}</span>
+    </div>
+    <a href="{{ url_for('bodega_bp.clientes') }}" class="btn btn-light rounded-pill px-4 border shadow-sm"><i class="fa-solid fa-arrow-left me-1"></i> Volver</a>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6 col-lg-3">
+        <div class="card card-custom h-100 p-3 border-0 shadow-sm" style="border-left: 4px solid #00c853 !important;">
+            <p class="text-muted fw-bold text-uppercase mb-1 small">Total Contado</p>
+            <h4 class="fw-bolder m-0 text-success">${{ cliente.total_contado|cop }}</h4>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card card-custom h-100 p-3 border-0 shadow-sm" style="border-left: 4px solid #ffab00 !important;">
+            <p class="text-muted fw-bold text-uppercase mb-1 small">Total Crédito</p>
+            <h4 class="fw-bolder m-0 text-warning">${{ cliente.total_credito|cop }}</h4>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card card-custom h-100 p-3 border-0 shadow-sm" style="border-left: 4px solid #2979ff !important;">
+            <p class="text-muted fw-bold text-uppercase mb-1 small">Total Abonado</p>
+            <h4 class="fw-bolder m-0 text-primary">${{ cliente.total_abonado|cop }}</h4>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <div class="card card-custom h-100 p-3 border-0 shadow-sm" style="border-left: 6px solid var(--brand-pink) !important;">
+            <p class="text-muted fw-bold text-uppercase mb-1 small">Saldo Deudor Actual</p>
+            <h3 class="fw-bolder m-0 {% if cliente.deuda_total > 0 %}text-danger{% else %}text-success{% endif %}">
+                ${{ (cliente.deuda_total)|cop }}
+            </h3>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-end gap-2 mb-4">
+    <button type="button" class="btn btn-outline-warning rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#saldoAnteriorModal">
+        <i class="fa-solid fa-clock-rotate-left me-2"></i>Registrar Saldo Anterior
+    </button>
+    <button type="button" class="btn btn-blue rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#abonoGlobalModal">
+        <i class="fa-solid fa-plus-circle me-2"></i>Registrar Abono a la Cuenta
+    </button>
+</div>
+
+<div class="card card-custom border-0 p-0 shadow-sm overflow-hidden mb-4">
+    <div class="d-flex justify-content-between align-items-center bg-light p-3 border-bottom">
+        <h5 class="fw-bold m-0"><i class="fa-solid fa-list-check text-brand-blue me-2"></i> Facturas y Estados de Pago</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0 align-middle">
+            <thead class="bg-light text-muted">
+                <tr>
+                    <th class="ps-4">FACTURA N°</th>
+                    <th>FECHA EMISIÓN</th>
+                    <th class="text-end">MONTO TOTAL</th>
+                    <th class="text-center">MODALIDAD</th>
+                    <th class="text-center">ESTADO</th>
+                    <th class="text-center">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in cliente.facturas %}
+                <tr>
+                    <td class="ps-4 fw-bold text-brand-black">#{{ f.numero_factura }}</td>
+                    <td class="text-muted"><small>{{ f.fecha_subida.strftime('%d/%m/%Y') if f.fecha_subida else 'Sin fecha' }}</small></td>
+                    <td class="text-end fw-semibold text-brand-black">${{ (f.monto_total)|cop }}</td>
+                    <td class="text-center">
+                        {% if f.modalidad == 'contado' %}
+                            <span class="badge bg-light text-success border border-success rounded-pill px-3 py-2">💵 Contado</span>
+                        {% else %}
+                            <span class="badge bg-light text-warning border border-warning rounded-pill px-3 py-2">⏳ Crédito</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if f.estado == 'Pagado' %}
+                            <span class="badge bg-success rounded-pill px-3 py-2">Pagado</span>
+                        {% elif f.estado == 'Parcial' %}
+                            <span class="badge bg-warning text-dark rounded-pill px-3 py-2">Abono Parcial</span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill px-3 py-2">Pendiente</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex justify-content-center gap-2">
+                            {% if f.archivo_ruta %}
+                            <a href="{{ url_for('static', filename=f.archivo_ruta) }}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill" title="Ver Documento">
+                                <i class="fa-solid fa-file-pdf"></i> Archivo
+                            </a>
+                            {% endif %}
+                            
+                            {% if f.saldo_pendiente > 0 %}
+                            <button type="button" class="btn btn-sm btn-success rounded-pill fw-bold" data-bs-toggle="modal" data-bs-target="#abonoModal{{ f.id }}">
+                                <i class="fa-solid fa-money-bill-transfer"></i> Abonar
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-light rounded-pill text-muted disabled"><i class="fa-solid fa-check-double"></i> Pagado</button>
+                            {% endif %}
+                            
+                            {% if f.abonos|length > 0 %}
+                            <button class="btn btn-sm btn-outline-info rounded-pill" data-bs-toggle="modal" data-bs-target="#historyModal{{ f.id }}">Historial</button>
+                            {% endif %}
+
+                            {% if f.detalles|length > 0 %}
+                            <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-bs-target="#productosModal{{ f.id }}"><i class="fa-solid fa-box-open me-1"></i> Productos</button>
+                            {% endif %}
+
+                            <a href="{{ url_for('bodega_bp.editar_factura', id=f.id) }}" class="btn btn-sm btn-outline-warning rounded-pill" title="Editar Factura">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </a>
+
+                            {% if current_user.rol != 'vendedor_bodega' %}
+                            <form method="POST" action="{{ url_for('bodega_bp.eliminar_factura', id=f.id) }}" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar esta factura? El stock será reintegrado automáticamente y los abonos se perderán.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" title="Eliminar Factura">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">Aún no se han anexado facturas para este cliente.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card card-custom border-0 p-0 shadow-sm overflow-hidden mb-4">
+    <div class="d-flex justify-content-between align-items-center bg-light p-3 border-bottom">
+        <h5 class="fw-bold m-0"><i class="fa-solid fa-timeline text-brand-pink me-2"></i> Historial Completo de Abonos (Cuenta Global)</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-custom mb-0 align-middle">
+            <thead class="bg-light text-muted">
+                <tr>
+                    <th class="ps-4">FECHA Y HORA</th>
+                    <th>REFERENCIA</th>
+                    <th>MÉTODO</th>
+                    <th class="text-end">MONTO</th>
+                    <th>OBSERVACIÓN</th>
+                    <th class="text-center">ACCIONES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for abono in cliente.abonos|sort(attribute='fecha_abono', reverse=True) %}
+                <tr>
+                    <td class="ps-4 text-muted"><small>{{ abono.fecha_abono.strftime('%d/%m/%Y %H:%M') if abono.fecha_abono else 'Sin fecha' }}</small></td>
+                    <td>
+                        {% if abono.factura %}
+                            <span class="badge bg-light text-dark border rounded-pill">Factura #{{ abono.factura.numero_factura }}</span>
+                        {% else %}
+                            <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill">Abono a Cuenta</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-capitalize">{{ abono.metodo_pago }}</td>
+                    <td class="text-end fw-bold text-success">${{ abono.monto|cop }}</td>
+                    <td class="text-muted small">{{ abono.observacion or '-' }}</td>
+                    <td class="text-center">
+                        <div class="d-flex justify-content-center gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-warning rounded-pill" data-bs-toggle="modal" data-bs-target="#editAbonoModal{{ abono.id }}" title="Editar Abono">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                            {% if current_user.rol != 'vendedor_bodega' %}
+                            <form method="POST" action="{{ url_for('bodega_bp.eliminar_abono', abono_id=abono.id) }}" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este abono?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" title="Eliminar Abono">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">No se han registrado abonos en esta cuenta aún.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modales generados fuera del flujo de la tabla DOM -->
+{% for f in cliente.facturas %}
+    {% if f.saldo_pendiente > 0 %}
+    <div class="modal fade" id="abonoModal{{ f.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <form method="POST" action="{{ url_for('bodega_bp.nuevo_abono', factura_id=f.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="modal-header border-0 bg-light">
+                        <h5 class="modal-title fw-bold text-success"><i class="fa-solid fa-money-bill-transfer me-2"></i>Registrar Abono</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body p-4 text-start">
+                        <p>Estás a punto de registrar un pago para la factura <strong>#{{ f.numero_factura }}</strong>.</p>
+                        <h5 class="fw-bold text-danger mb-4">Saldo Restante: ${{ (f.saldo_pendiente)|cop }}</h5>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Monto a Abonar</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-0">$</span>
+                                <input type="text" name="monto_abono" class="form-control border-0 bg-light" required placeholder="0" oninput="formatInputCOP(this)">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Medio de Pago</label>
+                            <select name="metodo_pago" class="form-select bg-light border-0" required>
+                                <option value="addi">🛍️ Addi</option>
+                                <option value="sitecredito">💳 Sitecredito</option>
+                                <option value="bancolombia">🏦 Bancolombia</option>
+                                <option value="davivienda">🏦 Davivienda</option>
+                                <option value="efectivo">💵 Efectivo Físico</option>
+                                <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                                <option value="transferencia">🏦 Otra Transferencia</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Observación <span class="text-muted">(Opcional)</span></label>
+                            <textarea name="observacion" class="form-control border-0 bg-light" rows="2" placeholder="Referencia o nota de pago"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0">
+                        <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success rounded-pill fw-bold px-4">Confirmar Pago</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="modal fade" id="historyModal{{ f.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 bg-light">
+                    <h5 class="modal-title fw-bold text-info"><i class="fa-solid fa-timeline me-2"></i>Historial de Pagos - Factura #{{ f.numero_factura }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-start">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>FECHA Y HORA</th>
+                                <th>METODO</th>
+                                <th>MONTO</th>
+                                <th>USUARIO</th>
+                                <th>OBSERVACIÓN</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for abono in f.abonos %}
+                            <tr>
+                                <td>{{ abono.fecha_abono.strftime('%d/%m/%Y %H:%M') if abono.fecha_abono else 'Sin fecha' }}</td>
+                                <td class="text-capitalize">{{ abono.metodo_pago }}</td>
+                                <td class="fw-bold text-success">${{ (abono.monto)|cop }}</td>
+                                <td>{{ abono.usuario.nombre if abono.usuario else 'Sistema' }}</td>
+                                <td class="small text-muted">{{ abono.observacion or '-' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-muted text-center pt-3">No hay abonos registrados en esta factura.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade" id="productosModal{{ f.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 bg-light">
+                    <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-box-open me-2"></i>Productos Facturados - Factura #{{ f.numero_factura }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-start">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>CÓDIGO (SKU)</th>
+                                <th>PRODUCTO</th>
+                                <th>SUBCATEGORÍA</th>
+                                <th>CANTIDAD</th>
+                                <th>PRECIO VENTA</th>
+                                <th>SUBTOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for det in f.detalles %}
+                            <tr>
+                                <td>{{ det.producto.sku }}</td>
+                                <td>{{ det.producto.nombre }}</td>
+                                <td>{{ det.variante.nombre_variante if det.variante else 'N/A' }}</td>
+                                <td class="fw-bold">{{ det.cantidad }}</td>
+                                <td>${{ (det.precio_venta)|cop }}</td>
+                                <td class="fw-bold text-success">${{ (det.cantidad * (det.precio_venta or 0))|cop }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="text-muted text-center pt-3">No hay productos registrados en esta factura.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+
+<!-- Modal Abono Global a la Cuenta -->
+<div class="modal fade" id="abonoGlobalModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('bodega_bp.abono_global', cliente_id=cliente.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-header border-0 bg-light">
+                    <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-money-bill-trend-up me-2"></i>Abono a la Cuenta del Cliente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-start">
+                    <p>Registra un pago global para la cuenta de <strong>{{ cliente.nombre_o_razon_social }}</strong>. Este monto se restará del saldo deudor total.</p>
+                    <h5 class="fw-bold text-danger mb-4">Saldo Deudor Actual: ${{ (cliente.deuda_total)|cop }}</h5>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Monto a Abonar</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0">$</span>
+                            <input type="text" name="monto_abono" class="form-control border-0 bg-light" required placeholder="0" oninput="formatInputCOP(this)">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Medio de Pago</label>
+                        <select name="metodo_pago" class="form-select bg-light border-0" required>
+                            <option value="addi">🛍️ Addi</option>
+                            <option value="sitecredito">💳 Sitecredito</option>
+                            <option value="bancolombia">🏦 Bancolombia</option>
+                            <option value="davivienda">🏦 Davivienda</option>
+                            <option value="efectivo">💵 Efectivo Físico</option>
+                            <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                            <option value="transferencia">🏦 Otra Transferencia</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observación <span class="text-muted">(Opcional)</span></label>
+                        <textarea name="observacion" class="form-control border-0 bg-light" rows="2" placeholder="Referencia o nota de pago global"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-blue rounded-pill fw-bold px-4">Confirmar Abono a Cuenta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modales para editar cada abono -->
+{% for abono in cliente.abonos %}
+<div class="modal fade" id="editAbonoModal{{ abono.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('bodega_bp.editar_abono', abono_id=abono.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-header border-0 bg-light">
+                    <h5 class="modal-title fw-bold text-warning"><i class="fa-solid fa-pen-to-square me-2"></i>Editar Abono</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-start">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Fecha del Abono</label>
+                        <input type="date" name="fecha_abono" class="form-control border-0 bg-light" value="{{ abono.fecha_abono.strftime('%Y-%m-%d') if abono.fecha_abono else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Monto del Abono</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0">$</span>
+                            <input type="text" name="monto_abono" class="form-control border-0 bg-light" value="{{ abono.monto|cop }}" required placeholder="0" oninput="formatInputCOP(this)">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Medio de Pago</label>
+                        <select name="metodo_pago" class="form-select bg-light border-0" required>
+                            <option value="addi" {% if abono.metodo_pago == 'addi' %}selected{% endif %}>🛍️ Addi</option>
+                            <option value="sitecredito" {% if abono.metodo_pago == 'sitecredito' %}selected{% endif %}>💳 Sitecredito</option>
+                            <option value="bancolombia" {% if abono.metodo_pago == 'bancolombia' %}selected{% endif %}>🏦 Bancolombia</option>
+                            <option value="davivienda" {% if abono.metodo_pago == 'davivienda' %}selected{% endif %}>🏦 Davivienda</option>
+                            <option value="efectivo" {% if abono.metodo_pago == 'efectivo' %}selected{% endif %}>💵 Efectivo Físico</option>
+                            <option value="tarjeta_credito" {% if abono.metodo_pago == 'tarjeta_credito' %}selected{% endif %}>💳 Tarjeta Crédito</option>
+                            <option value="transferencia" {% if abono.metodo_pago == 'transferencia' %}selected{% endif %}>🏦 Otra Transferencia</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Observación <span class="text-muted">(Opcional)</span></label>
+                        <textarea name="observacion" class="form-control border-0 bg-light" rows="2" placeholder="Referencia o nota de pago">{{ abono.observacion or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning rounded-pill fw-bold px-4">Actualizar Abono</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Modal Registrar Saldo Anterior -->
+<div class="modal fade" id="saldoAnteriorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('bodega_bp.registrar_saldo_anterior', cliente_id=cliente.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-header border-0 bg-light">
+                    <h5 class="modal-title fw-bold text-warning"><i class="fa-solid fa-clock-rotate-left me-2"></i>Registrar Saldo Anterior</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 text-start">
+                    <p>Usa esta opción para cargar deudas de facturas viejas que no están en el sistema y no requieren descontar inventario.</p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Fecha del Saldo (Opcional)</label>
+                        <input type="date" name="fecha" class="form-control border-0 bg-light">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Monto del Saldo</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0">$</span>
+                            <input type="text" name="monto" class="form-control border-0 bg-light" required placeholder="0" oninput="formatInputCOP(this)">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nota / Referencia</label>
+                        <textarea name="nota" class="form-control border-0 bg-light" rows="2" placeholder="Ej: Saldo de facturas año 2023"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning rounded-pill fw-bold px-4">Cargar Saldo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

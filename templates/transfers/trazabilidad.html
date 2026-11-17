@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .trazabilidad-header {
+        position: relative;
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        border: 2px solid #475569;
+        border-radius: 20px;
+        padding: 1.75rem 2rem;
+        color: #FFFFFF;
+        box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.3), 0 0 15px rgba(148, 163, 184, 0.15);
+        overflow: hidden;
+    }
+    .trazabilidad-header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #94A3B8 0%, #FFFFFF 30%, #CBD5E1 55%, #FFFFFF 75%, #94A3B8 100%);
+    }
+
+    /* Filtro Preset Pills */
+    .filter-btn-pill {
+        border: 1px solid #CBD5E1;
+        background: #FFFFFF;
+        color: #334155;
+        font-weight: 600;
+        font-size: 0.82rem;
+        padding: 6px 14px;
+        border-radius: 999px;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .filter-btn-pill:hover {
+        background: #F1F5F9;
+        color: #0F172A;
+        border-color: #94A3B8;
+        transform: translateY(-1px);
+    }
+    .filter-btn-pill.active {
+        background: #0F172A !important;
+        color: #FFFFFF !important;
+        border-color: #0F172A !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+    }
+    [data-theme="dark"] .filter-btn-pill {
+        background: #1E293B;
+        color: #E2E8F0;
+        border-color: #475569;
+    }
+    [data-theme="dark"] .filter-btn-pill:hover {
+        background: #334155;
+        color: #FFFFFF;
+    }
+    [data-theme="dark"] .filter-btn-pill.active {
+        background: #FFFFFF !important;
+        color: #0F172A !important;
+        border-color: #FFFFFF !important;
+    }
+
+    /* Tabla Kardex */
+    .kardex-table th {
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: #64748B;
+        background-color: #F8FAFC;
+        border-bottom: 2px solid #E2E8F0;
+        padding-top: 0.9rem;
+        padding-bottom: 0.9rem;
+    }
+    [data-theme="dark"] .kardex-table th {
+        background-color: #1E293B;
+        color: #94A3B8;
+        border-bottom-color: #334155;
+    }
+
+    .badge-diff-positive {
+        background: rgba(16, 185, 129, 0.12);
+        color: #059669;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-diff-negative {
+        background: rgba(239, 68, 68, 0.12);
+        color: #DC2626;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-diff-neutral {
+        background: rgba(100, 116, 139, 0.12);
+        color: #475569;
+        border: 1px solid rgba(100, 116, 139, 0.3);
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+</style>
+
+<div class="container-fluid px-0">
+    <!-- Header Principal con Destellos Metálicos -->
+    <div class="trazabilidad-header mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <span class="badge bg-light text-dark rounded-pill px-3 py-1 mb-2 fw-bold font-mono">
+                    <i class="fa-solid fa-layer-group text-primary me-1"></i> KARDEX MULTI-SEDE
+                </span>
+                <h2 class="fw-bold mb-1" style="letter-spacing: -0.02em;">
+                    Centro de Historial y Trazabilidad Global
+                </h2>
+                <p class="text-white-50 small mb-0">
+                    Bitácora inmutable de movimientos de stock, traslados entre locales, ventas, retomas y compras.
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('transfers_bp.index') }}" class="btn btn-outline-light rounded-pill px-3 shadow-sm">
+                    <i class="fa-solid fa-truck-moving me-1"></i> Módulo Traslados
+                </a>
+                <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" style="color: #0F172A;">
+                    <i class="fa-solid fa-plus me-1"></i> Nuevo Traslado
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Filtros Temporal y Avanzados -->
+    <div class="card card-custom border-0 shadow-sm rounded-4 p-4 mb-4">
+        <form method="GET" action="{{ url_for('transfers_bp.trazabilidad') }}" id="filterForm">
+            <!-- Fila 1: Accesos Rápidos de Rango de Fechas -->
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3 mb-3 border-bottom">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="small fw-bold text-muted text-uppercase me-1" style="font-size: 0.75rem;">
+                        <i class="fa-regular fa-calendar me-1"></i> Período:
+                    </span>
+                    <button type="submit" name="rango" value="hoy" class="filter-btn-pill {% if rango == 'hoy' %}active{% endif %}">
+                        Hoy
+                    </button>
+                    <button type="submit" name="rango" value="7dias" class="filter-btn-pill {% if rango == '7dias' %}active{% endif %}">
+                        Últimos 7 días
+                    </button>
+                    <button type="submit" name="rango" value="quincena" class="filter-btn-pill {% if rango == 'quincena' %}active{% endif %}">
+                        Esta Quincena
+                    </button>
+                    <button type="submit" name="rango" value="mes" class="filter-btn-pill {% if rango == 'mes' %}active{% endif %}">
+                        Este Mes
+                    </button>
+                </div>
+
+                <div class="text-md-end">
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-3 py-1 fw-bold">
+                        <i class="fa-solid fa-clock-rotate-left me-1"></i> {{ label_rango }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Fila 2: Selectores de Rango Personalizado, Sucursal, Tipo y Buscador -->
+            <div class="row g-3 align-items-end">
+                <!-- Desde -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Desde:</label>
+                    <input type="date" name="fecha_inicio" id="fecha_inicio" class="form-control form-control-sm rounded-3" value="{{ fecha_inicio }}">
+                </div>
+
+                <!-- Hasta -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Hasta:</label>
+                    <input type="date" name="fecha_fin" id="fecha_fin" class="form-control form-control-sm rounded-3" value="{{ fecha_fin }}">
+                </div>
+
+                <!-- Sucursal -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Sucursal:</label>
+                    <select name="branch_id" class="form-select form-select-sm rounded-3">
+                        {% if current_user.rol == 'admin' %}
+                            <option value="all" {% if not branch_filter or branch_filter == 'all' %}selected{% endif %}>Todas las Sedes</option>
+                        {% endif %}
+                        {% for b in sucursales %}
+                            {% if current_user.rol == 'admin' or current_user.branch_id == b.id %}
+                                <option value="{{ b.id }}" {% if branch_filter == b.id|string %}selected{% endif %}>
+                                    {{ b.nombre }} ({{ b.codigo }})
+                                </option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Tipo de Movimiento -->
+                <div class="col-12 col-sm-6 col-md-2">
+                    <label class="form-label small fw-bold text-muted mb-1">Tipo Movimiento:</label>
+                    <select name="tipo" class="form-select form-select-sm rounded-3">
+                        <option value="">Todos los tipos</option>
+                        {% for valor, label in tipos_movimiento %}
+                            <option value="{{ valor }}" {% if tipo_filtro == valor %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Buscador de Producto / SKU / IMEI -->
+                <div class="col-12 col-md-3">
+                    <label class="form-label small fw-bold text-muted mb-1">Producto / SKU / IMEI:</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                        <input type="text" name="q" class="form-control border-start-0" placeholder="Ej: iPhone 13, SKU, IMEI..." value="{{ query_busqueda }}">
+                        {% if query_busqueda %}
+                            <a href="{{ url_for('transfers_bp.trazabilidad', rango=rango) }}" class="btn btn-outline-secondary border" title="Limpiar"><i class="fa-solid fa-xmark"></i></a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Botón Aplicar Rango Personalizado -->
+                <div class="col-12 col-md-1 d-grid">
+                    <button type="submit" name="rango" value="custom" class="btn btn-sm btn-dark rounded-3 fw-bold shadow-sm">
+                        <i class="fa-solid fa-filter me-1"></i> Filtrar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla Kardex de Movimientos -->
+    <div class="card card-custom border-0 shadow-sm rounded-4 overflow-hidden mb-4 p-0">
+        <div class="p-3 px-4 d-flex justify-content-between align-items-center border-bottom bg-light">
+            <div>
+                <h6 class="fw-bold m-0 text-dark">
+                    <i class="fa-solid fa-receipt me-1 text-primary"></i> Registros de Auditoría & Kardex
+                </h6>
+                <small class="text-muted">Total registros en el período: <strong>{{ paginacion.total }}</strong> movimientos</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="small text-muted">Ver por página:</span>
+                <div class="btn-group btn-group-sm">
+                    <a href="{{ url_for('transfers_bp.trazabilidad', rango=rango, branch_id=branch_filter, tipo=tipo_filtro, q=query_busqueda, per_page=25, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}" class="btn btn-outline-secondary {% if per_page == 25 %}active{% endif %}">25</a>
+                    <a href="{{ url_for('transfers_bp.trazabilidad', rango=rango, branch_id=branch_filter, tipo=tipo_filtro, q=query_busqueda, per_page=50, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}" class="btn btn-outline-secondary {% if per_page == 50 %}active{% endif %}">50</a>
+                    <a href="{{ url_for('transfers_bp.trazabilidad', rango=rango, branch_id=branch_filter, tipo=tipo_filtro, q=query_busqueda, per_page=100, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}" class="btn btn-outline-secondary {% if per_page == 100 %}active{% endif %}">100</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive p-0">
+            <table class="table table-hover align-middle m-0 kardex-table" style="font-size: 0.88rem;">
+                <thead>
+                    <tr>
+                        <th class="ps-4" width="130">FECHA / HORA</th>
+                        <th width="140">SUCURSAL</th>
+                        <th width="170">TIPO MOVIMIENTO</th>
+                        <th>PRODUCTO / DETALLE</th>
+                        <th class="text-center" width="110">STOCK ANT.</th>
+                        <th class="text-center" width="110">STOCK NUEVO</th>
+                        <th class="text-center" width="90">DIFERENCIA</th>
+                        <th class="pe-4" width="130">RESPONSABLE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in movimientos %}
+                    {% set diff = m.stock_nuevo - m.stock_anterior %}
+                    <tr>
+                        <td class="ps-4">
+                            <span class="font-mono text-dark fw-bold d-block">{{ m.fecha_ajuste.strftime('%d/%m/%Y') }}</span>
+                            <small class="text-muted font-mono">{{ m.fecha_ajuste.strftime('%H:%M:%S') }}</small>
+                        </td>
+                        <td>
+                            {% if m.branch %}
+                                <span class="badge bg-light text-dark border px-2.5 py-1">
+                                    <i class="fa-solid {% if m.branch.tipo == 'bodega' %}fa-boxes-stacked text-purple{% else %}fa-store text-success{% endif %} me-1"></i>
+                                    {{ m.branch.nombre }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-light text-muted border px-2 py-1">Global / N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if 'TRASLADO' in (m.tipo_movimiento or '') %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2.5 py-1">
+                                    <i class="fa-solid fa-truck-ramp-box me-1"></i> Traslado
+                                </span>
+                            {% elif 'VENTA' in (m.tipo_movimiento or '') %}
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2.5 py-1">
+                                    <i class="fa-solid fa-cash-register me-1"></i> Venta POS
+                                </span>
+                            {% elif 'RETOMA' in (m.tipo_movimiento or '') %}
+                                <span class="badge bg-purple bg-opacity-10 text-purple border rounded-pill px-2.5 py-1">
+                                    <i class="fa-solid fa-recycle me-1"></i> Retoma
+                                </span>
+                            {% elif 'COMPRA' in (m.tipo_movimiento or '') or 'INGRESO' in (m.tipo_movimiento or '') %}
+                                <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill px-2.5 py-1">
+                                    <i class="fa-solid fa-cart-flatbed me-1"></i> Ingreso Compra
+                                </span>
+                            {% elif 'GARANTIA' in (m.tipo_movimiento or '') %}
+                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-2.5 py-1">
+                                    <i class="fa-solid fa-shield-halved me-1"></i> Garantía
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border rounded-pill px-2.5 py-1">
+                                    <i class="fa-solid fa-sliders me-1"></i> {{ m.tipo_movimiento or 'Ajuste' }}
+                                </span>
+                            {% endif %}
+                            <small class="d-block text-muted mt-1 text-truncate" style="max-width: 170px;" title="{{ m.tipo_movimiento }}">
+                                {{ m.tipo_movimiento }}
+                            </small>
+                        </td>
+                        <td>
+                            {% if m.producto_rel %}
+                                <div class="fw-bold text-dark">
+                                    {{ m.producto_rel.nombre }}
+                                </div>
+                                <div class="d-flex align-items-center gap-2 mt-0.5">
+                                    <span class="badge bg-light text-muted border font-mono small">SKU: {{ m.producto_rel.sku }}</span>
+                                    {% if m.producto_rel.imei %}
+                                        <a href="{{ url_for('celulares_bp.trazabilidad', q=m.producto_rel.imei) }}" class="badge bg-dark text-white text-decoration-none font-mono small" title="Ver Hoja de Vida IMEI">
+                                            <i class="fa-solid fa-fingerprint me-1"></i> IMEI: {{ m.producto_rel.imei }}
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">Producto ID #{{ m.product_id }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center font-mono fw-semibold text-muted">
+                            {{ m.stock_anterior }}
+                        </td>
+                        <td class="text-center font-mono fw-bold text-dark">
+                            {{ m.stock_nuevo }}
+                        </td>
+                        <td class="text-center">
+                            {% if diff > 0 %}
+                                <span class="badge badge-diff-positive rounded-pill px-2 py-0.5">+{{ diff }}</span>
+                            {% elif diff < 0 %}
+                                <span class="badge badge-diff-negative rounded-pill px-2 py-0.5">{{ diff }}</span>
+                            {% else %}
+                                <span class="badge badge-diff-neutral rounded-pill px-2 py-0.5">0</span>
+                            {% endif %}
+                        </td>
+                        <td class="pe-4">
+                            <span class="fw-semibold text-dark small d-block">{{ m.admin.nombre if m.admin else 'Sistema' }}</span>
+                            <small class="text-muted font-mono" style="font-size: 0.72rem;">{{ m.admin.rol if m.admin else 'Automático' }}</small>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-clock-rotate-left fs-1 mb-3 text-muted opacity-50"></i>
+                            <h6 class="fw-bold mb-1">No se encontraron movimientos en este período</h6>
+                            <p class="small text-muted mb-0">Prueba ajustando los filtros de fecha, sucursal o tipo de movimiento.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación de Registros -->
+        {% if paginacion.pages > 1 %}
+        <div class="p-3 px-4 d-flex justify-content-between align-items-center border-top bg-light">
+            <span class="small text-muted">
+                Página {{ paginacion.page }} de {{ paginacion.pages }} ({{ paginacion.total }} registros totales)
+            </span>
+            <ul class="pagination pagination-sm m-0">
+                {% if paginacion.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('transfers_bp.trazabilidad', page=paginacion.prev_num, rango=rango, branch_id=branch_filter, tipo=tipo_filtro, q=query_busqueda, per_page=per_page, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for p in paginacion.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if p %}
+                        <li class="page-item {% if p == paginacion.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('transfers_bp.trazabilidad', page=p, rango=rango, branch_id=branch_filter, tipo=tipo_filtro, q=query_busqueda, per_page=per_page, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}">{{ p }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">…</span></li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if paginacion.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('transfers_bp.trazabilidad', page=paginacion.next_num, rango=rango, branch_id=branch_filter, tipo=tipo_filtro, q=query_busqueda, per_page=per_page, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

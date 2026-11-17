@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-money-bill-transfer text-brand-blue me-2"></i> Registro Rápido de Abonos</h2>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card card-custom border-0 shadow-sm p-4">
+            <h5 class="fw-bold mb-4 text-muted small text-uppercase"><i class="fa-solid fa-search me-1"></i> 1. Buscar Cliente</h5>
+            
+            <div class="position-relative mb-4">
+                <div class="input-group input-group-lg shadow-sm rounded-pill border">
+                    <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-user text-muted"></i></span>
+                    <input type="text" id="clientesSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por Nombre o Documento..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
+                </div>
+                <!-- Desplegable de resultados -->
+                <div id="searchDropdown" class="dropdown-menu shadow-lg border-0 w-100 p-0 mt-2 d-none" style="max-height: 300px; overflow-y: auto;">
+                </div>
+            </div>
+
+            <div id="abonoFormContainer" class="d-none">
+                <hr class="my-4">
+                <h5 class="fw-bold mb-4 text-muted small text-uppercase"><i class="fa-solid fa-pen-to-square me-1"></i> 2. Datos del Abono</h5>
+                
+                <div class="alert bg-light border-0 rounded-4 p-3 mb-4 d-flex align-items-center">
+                    <div class="bg-brand-blue rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-user text-dark"></i>
+                    </div>
+                    <div>
+                        <p class="mb-0 text-muted small fw-bold">CLIENTE SELECCIONADO</p>
+                        <h5 id="selectedClientName" class="mb-0 fw-bold text-brand-black">---</h5>
+                        <small id="selectedClientDoc" class="text-muted">NIT/Doc: ---</small>
+                    </div>
+                </div>
+
+                <form id="quickAbonoForm" method="POST" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">MONTO DEL ABONO</label>
+                        <div class="input-group input-group-lg shadow-sm rounded-pill border overflow-hidden">
+                            <span class="input-group-text bg-white border-0 ps-4 fw-bold text-success">$</span>
+                            <input type="text" name="monto_abono" class="form-control border-0 bg-white shadow-none ps-2 fw-bold" placeholder="0" oninput="formatInputCOP(this)" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">FECHA</label>
+                            <input type="date" name="fecha" class="form-control form-control-lg rounded-pill border shadow-sm" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">MEDIO DE PAGO</label>
+                            <select name="metodo_pago" class="form-select form-select-lg rounded-pill border shadow-sm" required>
+                                <option value="addi">🛍️ Addi</option>
+                                <option value="sitecredito">💳 Sitecredito</option>
+                                <option value="bancolombia">🏦 Bancolombia</option>
+                                <option value="davivienda">🏦 Davivienda</option>
+                                <option value="efectivo">💵 Efectivo</option>
+                                <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold small text-muted">OBSERVACIÓN (OPCIONAL)</label>
+                        <textarea name="observacion" class="form-control rounded-4 border shadow-sm" rows="2" placeholder="Ej: Pago de cuota semanal..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-blue w-100 rounded-pill py-3 fw-bold shadow">
+                        <i class="fa-solid fa-check-circle me-2"></i> Registrar Abono a la Cuenta
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('clientesSearch');
+    const dropdown = document.getElementById('searchDropdown');
+    const formContainer = document.getElementById('abonoFormContainer');
+    const clientName = document.getElementById('selectedClientName');
+    const clientDoc = document.getElementById('selectedClientDoc');
+    const abonoForm = document.getElementById('quickAbonoForm');
+    
+    // Establecer fecha de hoy por defecto
+    const dateInput = document.querySelector('input[name="fecha"]');
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
+
+    let debounceTimer;
+
+    searchInput.addEventListener('input', function() {
+        const query = searchInput.value.trim();
+        clearTimeout(debounceTimer);
+        
+        if (query.length < 2) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+            return;
+        }
+
+        debounceTimer = setTimeout(() => {
+            fetch(`/bodega/clientes/api/search?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        dropdown.innerHTML = '';
+                        data.forEach(item => {
+                            const btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'dropdown-item p-3 border-bottom d-flex justify-content-between align-items-center text-start';
+                            btn.innerHTML = `
+                                <div>
+                                    <div class="fw-bold text-dark">${item.nombre}</div>
+                                    <small class="text-muted">NIT/Doc: ${item.documento}</small>
+                                </div>
+                                <span class="badge bg-light ${item.deuda > 0 ? 'text-danger' : 'text-success'} border rounded-pill">
+                                    Deuda: $${Math.round(item.deuda).toLocaleString('es-CO')}
+                                </span>
+                            `;
+                            btn.onclick = () => selectClient(item);
+                            dropdown.appendChild(btn);
+                        });
+                        dropdown.classList.remove('d-none');
+                        dropdown.classList.add('show');
+                    } else {
+                        dropdown.classList.add('d-none');
+                        dropdown.classList.remove('show');
+                    }
+                });
+        }, 300);
+    });
+
+    function selectClient(client) {
+        clientName.textContent = client.nombre;
+        clientDoc.textContent = `NIT/Doc: ${client.documento}`;
+        abonoForm.action = `/bodega/clientes/${client.id}/abono_global`;
+        
+        formContainer.classList.remove('d-none');
+        dropdown.classList.add('d-none');
+        dropdown.classList.remove('show');
+        searchInput.value = client.nombre;
+    }
+
+    // Ocultar dropdown al hacer click fuera
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.env
+*.db
+instance/
+static/uploads/
+scratch/
+
+# Variables de entorno (contiene API Keys, NO subir a Git)
+.env

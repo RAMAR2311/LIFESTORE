@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold text-brand-black m-0">
+        <i class="fa-solid fa-cash-register text-brand-blue me-2"></i> Módulo de Arqueo y Cierre Diario
+    </h2>
+    
+    <!-- Seleccionador de Fecha -->
+    <form id="fechaForm" action="{{ url_for('arqueo_bp.nuevo') }}" method="GET" class="d-flex align-items-center bg-white p-2 rounded-pill shadow-sm border gap-1">
+        <label for="fecha" class="fw-bold ms-3 me-1 text-muted small mb-0">Fecha:</label>
+        <input type="date" id="fecha" name="fecha" value="{{ fecha }}" class="form-control form-control-sm border-0 bg-transparent fw-bold text-brand-black" onchange="this.form.submit()" required style="width: 140px; box-shadow: none;">
+    </form>
+</div>
+
+{% if arqueo_existente %}
+<div class="alert alert-warning text-center rounded-3 shadow-sm border-0 d-flex justify-content-between align-items-center p-3 mb-4">
+    <div class="d-flex align-items-center">
+        <i class="fa-solid fa-lock fs-4 me-3 text-warning"></i> 
+        <span class="fs-5">Arqueo cerrado por <strong>{{ arqueo_existente.cajero.nombre }}</strong> el {{ arqueo_existente.fecha_arqueo.strftime('%d/%m/%Y') }}.</span>
+    </div>
+    <a href="{{ url_for('arqueo_bp.imprimir_ticket_arqueo', fecha=fecha, autoprint=1) }}" target="_blank" class="btn btn-dark rounded-pill px-3 fw-bold shadow-sm">
+        <i class="fa-solid fa-print me-1"></i> Imprimir Ticket 80mm
+    </a>
+</div>
+{% endif %}
+
+<form action="{{ url_for('arqueo_bp.nuevo') }}?fecha={{ fecha }}" method="POST" id="formArqueo">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="row g-4">
+        
+        <!-- Columna Izquierda: Detalle Operativo (70%) -->
+        <div class="col-lg-8">
+            
+            <!-- Fila de Indicadores Rápidos (KPI Cards) -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 p-3" style="background-color: #f0fdf4;">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-success bg-opacity-10 text-success rounded-circle p-3 me-3">
+                                <i class="fa-solid fa-money-bill-wave fs-4"></i>
+                            </div>
+                            <div>
+                                <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">EFECTIVO SISTEMA</h6>
+                                <h4 class="fw-bolder text-success mb-0">${{ total_efectivo|cop }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 p-3" style="background-color: #f0f9ff;">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-info bg-opacity-10 text-info rounded-circle p-3 me-3">
+                                <i class="fa-solid fa-mobile-screen fs-4"></i>
+                            </div>
+                            <div>
+                                <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">DINERO DIGITAL</h6>
+                                <h4 class="fw-bolder text-info mb-0">${{ total_transferencia|cop }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 shadow-sm rounded-4 h-100 p-3" style="background-color: #fffbeb;">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-warning bg-opacity-10 text-warning rounded-circle p-3 me-3">
+                                <i class="fa-solid fa-chart-line fs-4"></i>
+                            </div>
+                            <div>
+                                <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">VENTA TOTAL</h6>
+                                <h4 class="fw-bolder text-warning mb-0 text-dark">${{ (total_efectivo + total_transferencia)|cop }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de Ventas (Tirilla Digital) -->
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="fw-bold m-0"><i class="fa-solid fa-receipt text-muted me-2"></i> Tirilla Digital de Ventas</h5>
+                </div>
+                <div class="table-responsive" style="max-height: 55vh; overflow-y: auto;">
+                    <table class="table table-hover align-middle m-0 text-nowrap" style="font-size: 0.9rem;">
+                        <thead class="bg-light sticky-top" style="z-index: 10;">
+                            <tr>
+                                <th class="ps-4">TICKET</th>
+                                <th>HORA</th>
+                                <th>MÉTODO PAGO</th>
+                                <th>PRODUCTOS</th>
+                                <th class="text-end pe-4">TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in ventas_del_dia %}
+                            <tr>
+                                <td class="ps-4 fw-bold text-muted">
+                                    #{{ "{:05d}".format(v.id) }}
+                                    <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=v.id) }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2 ms-1 rounded-pill d-print-none" title="Ver / Imprimir Factura #{{ v.id }}">
+                                        <i class="fa-solid fa-file-invoice"></i>
+                                    </a>
+                                </td>
+                                <td class="text-muted">{{ v.fecha_venta.strftime('%H:%M') }}</td>
+                                <td>
+                                    {% if v.pagos %}
+                                        <div class="d-flex flex-column gap-1">
+                                            <span class="badge bg-warning text-dark border rounded-pill">Mixto</span>
+                                            {% for pago in v.pagos %}
+                                                <small class="text-muted" style="font-size: 0.7rem;">
+                                                    - {{ 'Bold' if pago.metodo_pago in ['bold', 'bolt'] else pago.metodo_pago|capitalize }}: ${{ pago.monto|cop }}
+                                                    {% if pago.comprobante %}
+                                                        <a href="/static/{{ pago.comprobante }}" target="_blank" class="text-warning ms-1" title="Ver Comprobante"><i class="fa-solid fa-image"></i></a>
+                                                    {% endif %}
+                                                </small>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        {% if v.metodo_pago == 'efectivo' %}
+                                            <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3">Efectivo</span>
+                                        {% elif v.metodo_pago in ['transferencia', 'bancolombia', 'davivienda', 'nequi', 'daviplata'] %}
+                                            <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill px-3">{{ v.metodo_pago|capitalize }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-3">{{ v.metodo_pago|capitalize }}</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <ul class="list-unstyled mb-0" style="font-size: 0.8rem; max-width: 250px; white-space: normal;">
+                                        {% for detalle in v.detalles %}
+                                        <li class="text-truncate" title="{{ detalle.cantidad_vendida }}x {{ detalle.producto.nombre if detalle.producto else 'N/A' }}">
+                                            <strong>{{ detalle.cantidad_vendida }}x</strong> {{ detalle.producto.nombre if detalle.producto else 'N/A' }}
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </td>
+                                <td class="text-end pe-4 fw-bold">${{ v.monto_total|cop }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">No se registraron ventas para esta fecha.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="bg-light sticky-bottom">
+                            <tr>
+                                <td colspan="4" class="text-end fw-bold">GRAN TOTAL VENTAS:</td>
+                                <td class="text-end pe-4 fw-bolder fs-5 text-brand-black">${{ (total_efectivo + total_transferencia)|cop }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Columna Derecha: Formulario de Cierre (30%) -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-lg rounded-4 p-4" style="position: sticky; top: 1.5rem; background-color: #fafbfc;">
+                <h5 class="fw-bold mb-4 text-center"><i class="fa-solid fa-scale-balanced text-brand-blue me-2"></i> Conciliación Física</h5>
+                
+                <!-- Cálculos del Sistema -->
+                <div class="mb-4">
+                    <label class="form-label text-muted fw-bold small mb-1">Efectivo Sistema (Esperado)</label>
+                    <div class="input-group mb-2 shadow-sm">
+                        <span class="input-group-text bg-light border-0 text-muted"><i class="fa-solid fa-money-bill-wave"></i></span>
+                        <input type="text" class="form-control border-0 fw-bold bg-light" value="${{ total_efectivo|cop }}" readonly disabled>
+                    </div>
+
+                    <label class="form-label text-muted fw-bold small mb-1 mt-2">Digital Sistema</label>
+                    <div class="input-group mb-3 shadow-sm">
+                        <span class="input-group-text bg-light border-0 text-muted"><i class="fa-solid fa-mobile-screen"></i></span>
+                        <input type="text" class="form-control border-0 fw-bold bg-light" value="${{ total_transferencia|cop }}" readonly disabled>
+                    </div>
+                </div>
+
+                <hr class="text-muted opacity-25">
+
+                <!-- Formulario Físico -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark mb-1">Base Inicial <span class="text-danger">*</span></label>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted">$</span>
+                        <input type="number" id="base_inicial" name="base_inicial" class="form-control border-start-0 ps-0 fw-bold fs-5 calc-input" value="0" min="0" step="100" required {% if arqueo_existente %}disabled{% endif %}>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark mb-1">Gastos del Día</label>
+                    <div class="input-group shadow-sm mb-1">
+                        <span class="input-group-text bg-white border-end-0 text-muted">$</span>
+                        <input type="number" id="gastos_del_dia" name="gastos_del_dia" class="form-control border-start-0 ps-0 fw-bold fs-5 text-danger calc-input" value="{{ gastos_automaticos + gastos_externos }}" min="0" step="100" required {% if arqueo_existente %}disabled{% endif %}>
+                    </div>
+                    <textarea name="observaciones_gastos" class="form-control form-control-sm border-0 shadow-sm mt-2" placeholder="Observaciones de gastos (Opcional)..." rows="1" {% if arqueo_existente %}disabled{% endif %}></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-success mb-1">Efectivo Físico Contado <span class="text-danger">*</span></label>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-success bg-opacity-10 border-success border-end-0 text-success"><i class="fa-solid fa-hand-holding-dollar fs-5"></i></span>
+                        <input type="number" id="efectivo_fisico" name="efectivo_fisico" class="form-control border-success border-start-0 ps-0 fw-bolder fs-3 text-success calc-input" placeholder="0" required {% if arqueo_existente %}disabled{% endif %} style="height: 60px;">
+                    </div>
+                </div>
+
+                <!-- Caja de Diferencia -->
+                <div id="diferencia_box" class="alert rounded-3 text-center shadow-sm py-3 transition-all" style="background-color: #f8f9fa; border: 2px dashed #ced4da;">
+                    <span class="d-block fw-bold text-muted mb-1 small text-uppercase">Diferencia de Caja</span>
+                    <h3 id="diferencia_monto" class="fw-bolder m-0 text-dark">$0</h3>
+                    <span id="diferencia_label" class="badge bg-secondary mt-2">Esperando datos...</span>
+                </div>
+                
+                <textarea id="observacion_diferencia" name="observacion_diferencia" class="form-control mt-3 shadow-sm d-none" placeholder="Justifica el descuadre (Obligatorio si hay diferencia)..." rows="2" {% if arqueo_existente %}disabled{% endif %}></textarea>
+
+                <!-- Acciones -->
+                <div class="mt-4">
+                    {% if arqueo_existente %}
+                    <a href="{{ url_for('arqueo_bp.reporte', fecha_inicio=fecha, fecha_fin=fecha) }}" class="btn btn-dark w-100 py-3 rounded-pill fw-bold shadow-sm">
+                        <i class="fa-solid fa-print me-2"></i> Imprimir Reporte de Cierre
+                    </a>
+                    {% else %}
+                    <button type="submit" id="btn_guardar" class="btn btn-brand-blue w-100 py-3 rounded-pill fw-bold fs-5 shadow-sm">
+                        <i class="fa-solid fa-lock me-2"></i> Guardar y Cerrar Caja
+                    </button>
+                    {% endif %}
+                </div>
+                
+            </div>
+        </div>
+        
+    </div>
+</form>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const inputBase = document.getElementById('base_inicial');
+        const inputGastos = document.getElementById('gastos_del_dia');
+        const inputFisico = document.getElementById('efectivo_fisico');
+        
+        const boxDiferencia = document.getElementById('diferencia_box');
+        const montoDiferencia = document.getElementById('diferencia_monto');
+        const labelDiferencia = document.getElementById('diferencia_label');
+        const obsDiferencia = document.getElementById('observacion_diferencia');
+        const btnGuardar = document.getElementById('btn_guardar');
+
+        // Valores fijos del sistema
+        const efectivoSistema = parseFloat("{{ total_efectivo }}") || 0;
+
+        function formatCurrency(val) {
+            return '$' + Math.abs(val).toLocaleString('es-CO');
+        }
+
+        function calcularDiferencia() {
+            const base = parseFloat(inputBase.value) || 0;
+            const gastos = parseFloat(inputGastos.value) || 0;
+            const fisico = parseFloat(inputFisico.value) || 0;
+
+            // Diferencia = Físico - (Base + Efectivo Sistema - Gastos)
+            const esperado = base + efectivoSistema - gastos;
+            const diferencia = fisico - esperado;
+
+            // Formatear texto
+            montoDiferencia.innerText = (diferencia < 0 ? '-' : '') + formatCurrency(diferencia);
+
+            // Cambiar estilos de la caja
+            boxDiferencia.className = "alert rounded-3 text-center shadow-sm py-3 transition-all";
+            obsDiferencia.classList.add('d-none');
+            
+            // Requerir justificación si != 0
+            obsDiferencia.required = false;
+
+            if (inputFisico.value === "") {
+                // Estado inicial
+                boxDiferencia.style.backgroundColor = "#f8f9fa";
+                boxDiferencia.style.borderColor = "#ced4da";
+                montoDiferencia.className = "fw-bolder m-0 text-muted";
+                labelDiferencia.className = "badge bg-secondary mt-2";
+                labelDiferencia.innerText = "Esperando entrada física...";
+                return;
+            }
+
+            if (diferencia === 0) {
+                // Cuadrada
+                boxDiferencia.style.backgroundColor = "#d4edda";
+                boxDiferencia.style.borderColor = "#c3e6cb";
+                montoDiferencia.className = "fw-bolder m-0 text-success";
+                labelDiferencia.className = "badge bg-success mt-2";
+                labelDiferencia.innerText = "¡Caja Cuadrada Perfectamente!";
+            } else if (diferencia < 0) {
+                // Faltante
+                boxDiferencia.style.backgroundColor = "#f8d7da";
+                boxDiferencia.style.borderColor = "#f5c6cb";
+                montoDiferencia.className = "fw-bolder m-0 text-danger";
+                labelDiferencia.className = "badge bg-danger mt-2";
+                labelDiferencia.innerText = "Faltante (Pérdida)";
+                obsDiferencia.classList.remove('d-none');
+                obsDiferencia.required = true;
+            } else {
+                // Sobrante
+                boxDiferencia.style.backgroundColor = "#fff3cd";
+                boxDiferencia.style.borderColor = "#ffeeba";
+                montoDiferencia.className = "fw-bolder m-0 text-warning text-dark";
+                labelDiferencia.className = "badge bg-warning text-dark mt-2";
+                labelDiferencia.innerText = "Sobrante de Caja";
+                obsDiferencia.classList.remove('d-none');
+                obsDiferencia.required = true;
+            }
+        }
+
+        // Agregar listeners
+        const inputs = document.querySelectorAll('.calc-input');
+        inputs.forEach(input => {
+            input.addEventListener('input', calcularDiferencia);
+        });
+
+        // Calcular inicial
+        calcularDiferencia();
+    });
+</script>
+
+<style>
+    .transition-all {
+        transition: all 0.3s ease;
+    }
+</style>
+{% endblock %}

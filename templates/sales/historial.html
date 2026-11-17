@@ -1,0 +1,929 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center mb-4">
+        <!-- Título Principal -->
+        <h2 class="fw-bolder text-brand-black m-0 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-primary"></i>
+            <span>Historial de Operaciones</span>
+        </h2>
+        <div class="d-flex align-items-center gap-2 d-print-none flex-wrap">
+            {% if current_user.rol == 'admin' %}
+            <a href="{{ url_for('sales_bp.exportar_excel', fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}" class="btn btn-success rounded-pill fw-bold px-4 shadow-sm">
+                <i class="fa-solid fa-file-excel me-1"></i> Exportar a Excel con Costos
+            </a>
+            {% endif %}
+            <button onclick="window.print()" class="btn px-4 rounded-pill fw-bold text-dark border shadow-sm" style="background-color: #F9C8D3; border-color: #ebaebc;">
+                <i class="fa-solid fa-print me-1"></i> Imprimir a PDF
+            </button>
+            <a href="/admin/dashboard" class="btn btn-light rounded-pill px-4 fw-bold text-muted border shadow-sm">
+                <i class="fa-solid fa-arrow-left me-1"></i> Panel 
+            </a>
+        </div>
+    </div>
+
+    <!-- Encabezado de Impresión / PDF -->
+    <div class="col-12 d-none d-print-block text-center mb-4 pb-3 border-bottom">
+        <h1 class="fw-bold text-brand-black mb-1"><i class="fa-solid fa-chart-line me-2"></i> LifeStore</h1>
+        <h4 class="text-muted fw-semibold">REPORTE CONSOLIDADO DE VENTAS</h4>
+        <p class="mb-0 text-secondary">
+            Período Analizado: <strong>{{ fecha_inicio if fecha_inicio else 'Inicios' }}</strong> hasta <strong>{{ fecha_fin if fecha_fin else 'Hoy' }}</strong>
+        </p>
+        {% if current_user.rol != 'admin' %}
+            <p class="mb-0 text-brand-black fw-bold">Usuario Solicitante: {{ current_user.nombre }}</p>
+        {% endif %}
+    </div>
+
+    <!-- UI: Resumen Financiero Dinámico (Tarjetas de Métodos de Pago) -->
+    <style>
+        .finance-card {
+            position: relative;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 1rem 1.1rem;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .finance-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3.5px;
+            background: var(--card-accent, #3b82f6);
+            border-radius: 16px 16px 0 0;
+        }
+        .finance-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+            border-color: #cbd5e1;
+        }
+        .finance-card .icon-chip {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            background: var(--card-bg-subtle, #eff6ff);
+            color: var(--card-accent, #3b82f6);
+            transition: transform 0.2s ease;
+        }
+        .finance-card:hover .icon-chip {
+            transform: scale(1.1);
+        }
+        .finance-card .amount-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #0f172a;
+            line-height: 1.2;
+        }
+        .finance-card .btn-card-action {
+            font-size: 0.73rem;
+            font-weight: 700;
+            color: var(--card-accent, #3b82f6);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin-top: 0.5rem;
+            transition: gap 0.2s ease, opacity 0.2s ease;
+        }
+        .finance-card:hover .btn-card-action {
+            gap: 7px;
+        }
+        
+        /* Dark Theme Support */
+        [data-theme="dark"] .finance-card {
+            background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%) !important;
+            border-color: rgba(255, 255, 255, 0.09) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+        }
+        [data-theme="dark"] .finance-card:hover {
+            border-color: rgba(255, 255, 255, 0.22) !important;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
+        }
+        [data-theme="dark"] .finance-card .amount-display {
+            color: #f8fafc !important;
+        }
+        [data-theme="dark"] .finance-card .text-muted {
+            color: #94a3b8 !important;
+        }
+    </style>
+
+    <!-- 1. Efectivo -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #059669; --card-bg-subtle: #ecfdf5;" onclick="filtrarTabla('efectivo')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Efectivo</span>
+                    <div class="icon-chip"><i class="fa-solid fa-money-bills"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_efectivo)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. Nequi -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #9333ea; --card-bg-subtle: #faf5ff;" onclick="filtrarTabla('nequi')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Nequi</span>
+                    <div class="icon-chip"><i class="fa-solid fa-mobile-screen-button"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_nequi)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- 3. Bancolombia -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #ea580c; --card-bg-subtle: #fff7ed;" onclick="filtrarTabla('bancolombia')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Bancolombia</span>
+                    <div class="icon-chip"><i class="fa-solid fa-building-columns"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_bancolombia)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 4. Davivienda -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #dc2626; --card-bg-subtle: #fef2f2;" onclick="filtrarTabla('davivienda')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Davivienda</span>
+                    <div class="icon-chip"><i class="fa-solid fa-building-columns"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_davivienda)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 5. Daviplata -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #e11d48; --card-bg-subtle: #fff1f2;" onclick="filtrarTabla('daviplata')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Daviplata</span>
+                    <div class="icon-chip"><i class="fa-solid fa-mobile-retro"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_daviplata)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 6. Bold (Datáfono) -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #0d9488; --card-bg-subtle: #f0fdfa;" onclick="filtrarTabla('bold')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Bold (Datáfono)</span>
+                    <div class="icon-chip"><i class="fa-solid fa-bolt"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_bold)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 7. Addi -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #7c3aed; --card-bg-subtle: #f5f3ff;" onclick="filtrarTabla('addi')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Addi</span>
+                    <div class="icon-chip"><i class="fa-solid fa-bag-shopping"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_addi)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 8. Sistecrédito -->
+    <div class="col-6 col-md-3 mb-3">
+        <div class="finance-card h-100" style="--card-accent: #2563eb; --card-bg-subtle: #eff6ff;" onclick="filtrarTabla('sistecredito')">
+            <div>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Sistecrédito</span>
+                    <div class="icon-chip"><i class="fa-solid fa-id-card"></i></div>
+                </div>
+                <div class="amount-display">${{ (total_sistecredito)|cop }}</div>
+            </div>
+            <button class="btn-card-action d-print-none" type="button">
+                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+            </button>
+        </div>
+    </div>
+
+    {% if total_otros > 0 %}
+    <!-- Otros / Históricos -->
+    <div class="col-12 mb-3">
+        <div class="finance-card p-3" style="--card-accent: #64748b; --card-bg-subtle: #f1f5f9;">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-chip"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                    <div>
+                        <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Otros / Pagos Históricos</span>
+                        <div class="amount-display fs-5">${{ (total_otros)|cop }}</div>
+                    </div>
+                </div>
+                <span class="badge rounded-pill bg-light text-muted border px-3 py-1.5 small fw-semibold">
+                    Registros anteriores
+                </span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- UI: Filtro de Fechas Oculto (Collapsible Bootstrap) -->
+    <div class="col-12 mt-1 mb-3 d-print-none text-end">
+        <a href="#" class="text-muted small text-decoration-none opacity-50 text-hover-primary" data-bs-toggle="collapse" data-bs-target="#filtrosCollapse">
+            <i class="fa-solid fa-filter me-1"></i> Mostrar filtros avanzados
+        </a>
+        
+        <div class="collapse show mt-3" id="filtrosCollapse">
+            <div class="card card-custom p-4 bg-light">
+                <form method="GET" action="{{ url_for('sales_bp.historial') }}" class="row align-items-end g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-brand-black small">Desde (Día)</label>
+                        <input type="date" name="fecha_inicio" class="form-control border-0 shadow-sm" value="{{ fecha_inicio or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold text-brand-black small">Hasta (Límite)</label>
+                        <input type="date" name="fecha_fin" class="form-control border-0 shadow-sm" value="{{ fecha_fin or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <!-- El botón manda la alerta GET en color predominante Turquesa -->
+                        <button type="submit" class="btn btn-blue w-100 rounded-3 shadow-sm fw-bold">
+                            <i class="fa-solid fa-magnifying-glass me-2"></i>Aplicar Filtros
+                        </button>
+                        {% if fecha_inicio or fecha_fin %}
+                        <div class="text-center mt-2">
+                            <a href="{{ url_for('sales_bp.historial') }}" class="text-muted small text-decoration-none border-bottom border-secondary">Borrar Rango Analítico</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-custom p-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover table-striped table-custom mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th width="120">N° TIPO</th>
+                    <th>FECHA DE COBRO</th>
+                    <th>VENDEDOR RESPONSABLE</th>
+                    <th>ASESOR</th>
+                    <th class="text-center">VÍA DE PAGO</th>
+                    <th class="text-end">IMPORTE CERRADO</th>
+                    <th class="text-center" width="160">AUDITAR</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for venta in ventas %}
+                {% set metodos_usados = [] %}
+                {% if venta.pagos %}
+                    {% for p in venta.pagos %}
+                        {% set _ = metodos_usados.append(p.metodo_pago) %}
+                    {% endfor %}
+                {% else %}
+                    {% set _ = metodos_usados.append(venta.metodo_pago) %}
+                {% endif %}
+                <tr class="venta-row" data-pagos="{{ metodos_usados|join(',') }}">
+                    <td class="fw-bold text-brand-black align-middle">Ticket #{{ "%05d"|format(venta.id) }}</td>
+                    <td class="align-middle text-muted"><i class="fa-regular fa-calendar text-brand-pink me-1"></i> {{ venta.fecha_venta.strftime('%Y-%m-%d a las %H:%M') }}</td>
+                    <td class="align-middle fw-semibold text-brand-black">
+                        <i class="fa-solid fa-user-circle text-muted me-1"></i> {{ venta.vendedor.nombre }}
+                    </td>
+                    <td class="align-middle fw-semibold text-brand-black">
+                        {% if venta.asesor %}
+                            <i class="fa-solid fa-user-tie text-muted me-1"></i> {{ venta.asesor.nombre }}
+                        {% else %}
+                            <span class="text-muted small">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center align-middle">
+                        {% if venta.pagos|length > 1 %}
+                            <!-- Pago Mixto: solo la pastilla -->
+                            <span class="badge bg-light text-dark border border-warning border-opacity-50 rounded-pill px-3 py-2">
+                                <i class="fa-solid fa-arrows-split-up-and-left me-1" style="color: #fd7e14;"></i> Pago Mixto
+                            </span>
+                        {% elif venta.pagos|length == 1 %}
+                            {% set metodo = venta.pagos[0].metodo_pago %}
+                            {% if metodo == 'efectivo' %}
+                                <span class="badge bg-light text-success border border-success border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-money-bills me-1"></i> Efectivo</span>
+                            {% else %}
+                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ venta.metodo_pago_display }}</span>
+                            {% endif %}
+                        {% else %}
+                            {% if venta.metodo_pago == 'efectivo' %}
+                                <span class="badge bg-light text-success border border-success border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-money-bills me-1"></i> Efectivo</span>
+                            {% elif venta.metodo_pago == 'mixto' %}
+                                <span class="badge bg-light text-dark border border-warning border-opacity-50 rounded-pill px-3 py-2"><i class="fa-solid fa-arrows-split-up-and-left me-1" style="color: #fd7e14;"></i> Pago Mixto</span>
+                            {% else %}
+                                <span class="badge bg-light text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2"><i class="fa-solid fa-building-columns me-1"></i> {{ venta.metodo_pago_display }}</span>
+                            {% endif %}
+                        {% endif %}
+                        {% if venta.pagos %}
+                            {% for p in venta.pagos %}
+                                {% if p.comprobante %}
+                                    <div class="mt-1">
+                                        <a href="/static/{{ p.comprobante }}" target="_blank" class="badge bg-warning bg-opacity-10 text-dark border border-warning text-decoration-none rounded-pill px-2 py-1" title="Ver imagen de comprobante de pago">
+                                            <i class="fa-solid fa-image text-warning me-1"></i> Ver Comprobante
+                                        </a>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    </td>
+                    <td class="text-end align-middle pe-2">
+                        <div class="fw-bolder text-brand-black fs-5">${{ (venta.monto_total)|cop }}</div>
+                        {% if venta.tiene_obsequio %}
+                        <div class="mt-1 d-flex flex-column align-items-end">
+                            {% if current_user.rol == 'admin' %}
+                            <span class="badge bg-warning bg-opacity-10 text-dark border border-warning rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                <i class="fa-solid fa-gift text-warning me-1"></i>Regalo: -${{ (venta.costo_total_obsequios or 0)|cop }}
+                            </span>
+                            <small class="text-muted" style="font-size: 0.72rem;">Neto: ${{ (venta.ingreso_neto_real or venta.monto_total)|cop }}</small>
+                            {% else %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                <i class="fa-solid fa-gift text-success me-1"></i>Obsequio Incluido
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td class="text-center align-middle">
+                        <div class="d-flex flex-column gap-2">
+                            <!-- Botón Secundario Rosa Pastel -->
+                            <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=venta.id) }}" target="_blank" class="btn btn-pink btn-sm rounded-pill px-3 fw-bold shadow-sm w-100">
+                                <i class="fa-solid fa-receipt me-1"></i> Ver Recibo
+                            </a>
+                            
+                            {% if current_user.rol == 'admin' %}
+                            <button type="button" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold shadow-sm w-100" data-bs-toggle="modal" data-bs-target="#costModal{{ venta.id }}">
+                                <i class="fa-solid fa-tags me-1 text-brand-pink"></i> Ver Costos
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm w-100" data-bs-toggle="modal" data-bs-target="#editPaymentModal{{ venta.id }}">
+                                <i class="fa-solid fa-pen-to-square me-1"></i> Editar Venta
+                            </button>
+                            <form action="{{ url_for('sales_bp.eliminar_venta', sale_id=venta.id) }}" method="POST" onsubmit="return confirm('ATENCIÓN: ¿Está seguro de anular esta venta? Esta acción NO se puede deshacer y retornará el stock de los productos vendidos.');" class="m-0 p-0">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold shadow-sm w-100">
+                                    <i class="fa-solid fa-trash me-1"></i> Anular
+                                </button>
+                            </form>
+                            
+                            <!-- Modal Ver Costos y Rentabilidad -->
+                            <div class="modal fade text-start" id="costModal{{ venta.id }}" tabindex="-1" aria-labelledby="costModalLabel{{ venta.id }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered modal-lg">
+                                    <div class="modal-content border-0 shadow rounded-4">
+                                        <div class="modal-header bg-dark text-white">
+                                            <h5 class="modal-title fw-bold" id="costModalLabel{{ venta.id }}">
+                                                <i class="fa-solid fa-file-invoice-dollar me-2 text-brand-pink"></i> Auditoría de Costos - Ticket #{{ "%05d"|format(venta.id) }}
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body p-4">
+                                            <div class="d-flex justify-content-between mb-3 text-muted small border-bottom pb-2 flex-wrap gap-2">
+                                                <span><strong>Fecha:</strong> {{ venta.fecha_venta.strftime('%Y-%m-%d %H:%M') }}</span>
+                                                <span><strong>Vendedor:</strong> {{ venta.vendedor.nombre if venta.vendedor else 'N/A' }}</span>
+                                                <span><strong>Asesor:</strong> {{ venta.asesor.nombre if venta.asesor else 'N/A' }}</span>
+                                            </div>
+                                            
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-bordered align-middle mb-0">
+                                                    <thead class="bg-light text-center small">
+                                                        <tr>
+                                                            <th>Producto</th>
+                                                            <th width="50">Cant.</th>
+                                                            <th width="105">Costo U.</th>
+                                                            <th width="105">Costo Tot.</th>
+                                                            <th width="105">Venta U.</th>
+                                                            <th width="105">Venta Tot.</th>
+                                                            <th width="105">Ganancia</th>
+                                                            <th width="65">Margen</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% set ns = namespace(costo_total_ticket=0, venta_total_ticket=0) %}
+                                                        {% for d in venta.detalles %}
+                                                            {% set cant = d.cantidad_vendida or 1 %}
+                                                            {% set v_tot = d.precio_venta_final * cant %}
+                                                            {% if d.nombre_manual %}
+                                                                {% set c_u = d.precio_costo_manual or 0 %}
+                                                                {% set p_nombre = d.nombre_manual ~ ' (Externo/Manual)' %}
+                                                            {% elif d.variant_id %}
+                                                                {% set vari = d.variante %}
+                                                                {% set prod = d.producto or (vari.producto if vari else none) %}
+                                                                {% set c_u = (vari.precio_costo if (vari and vari.precio_costo is not none) else (prod.precio_costo if prod else 0)) or 0 %}
+                                                                {% set p_nombre = (prod.nombre if prod else 'Producto') ~ ' [' ~ (vari.nombre_variante if vari else '') ~ ']' %}
+                                                            {% elif d.product_id %}
+                                                                {% set prod = d.producto %}
+                                                                {% set c_u = prod.precio_costo if prod else 0 %}
+                                                                {% set p_nombre = prod.nombre ~ (' (IMEI: ' ~ prod.imei ~ ')' if prod and prod.imei else '') if prod else 'Producto ID ' ~ d.product_id %}
+                                                            {% else %}
+                                                                {% set c_u = 0 %}
+                                                                {% set p_nombre = 'Artículo no especificado' %}
+                                                            {% endif %}
+                                                            {% set c_tot = c_u * cant %}
+                                                            {% set ganancia = v_tot - c_tot %}
+                                                            {% set margen = ((ganancia / v_tot) * 100) if v_tot > 0 else 0 %}
+                                                            {% set ns.costo_total_ticket = ns.costo_total_ticket + c_tot %}
+                                                            {% set ns.venta_total_ticket = ns.venta_total_ticket + v_tot %}
+                                                            <tr>
+                                                                <td class="small fw-semibold">{{ p_nombre }}</td>
+                                                                <td class="text-center small">{{ cant }}</td>
+                                                                <td class="text-end small text-muted">${{ (c_u)|cop }}</td>
+                                                                <td class="text-end small text-danger fw-semibold">-${{ (c_tot)|cop }}</td>
+                                                                <td class="text-end small text-muted">${{ (d.precio_venta_final)|cop }}</td>
+                                                                <td class="text-end small text-dark fw-semibold">${{ (v_tot)|cop }}</td>
+                                                                <td class="text-end small fw-bold {% if ganancia >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                                                    ${{ (ganancia)|cop }}
+                                                                </td>
+                                                                <td class="text-center small">
+                                                                    <span class="badge {% if margen >= 15 %}bg-success{% elif margen > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %} rounded-pill">
+                                                                        {{ "%.1f"|format(margen) }}%
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                    <tfoot class="bg-light fw-bold">
+                                                        <tr>
+                                                            <td colspan="3" class="text-end">TOTALES:</td>
+                                                            <td class="text-end text-danger">-${{ (ns.costo_total_ticket)|cop }}</td>
+                                                            <td></td>
+                                                            <td class="text-end text-dark">${{ (ns.venta_total_ticket)|cop }}</td>
+                                                            <td class="text-end {% if (ns.venta_total_ticket - ns.costo_total_ticket) >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                                                ${{ (ns.venta_total_ticket - ns.costo_total_ticket)|cop }}
+                                                            </td>
+                                                            <td class="text-center">
+                                                                {% if ns.venta_total_ticket > 0 %}
+                                                                    {{ "%.1f"|format(((ns.venta_total_ticket - ns.costo_total_ticket) / ns.venta_total_ticket) * 100) }}%
+                                                                {% else %}
+                                                                    0%
+                                                                {% endif %}
+                                                            </td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+
+                                            {% if venta.retomas_asociadas %}
+                                            <div class="alert alert-info mt-3 p-2 small mb-0">
+                                                <strong><i class="fa-solid fa-recycle me-1"></i> Retomas recibidas en este ticket:</strong>
+                                                <ul class="mb-0 ps-3">
+                                                    {% for r in venta.retomas_asociadas %}
+                                                    <li>{{ r.modelo }} (IMEI: {{ r.imei1 }}) - Valor recibido: ${{ (r.valor_retoma)|cop }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="modal-footer border-top-0 pt-0">
+                                            <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Modal Editar Venta / Pago -->
+                            <div class="modal fade text-start" id="editPaymentModal{{ venta.id }}" tabindex="-1" aria-labelledby="editPaymentModalLabel{{ venta.id }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content">
+                                        <div class="modal-header bg-light">
+                                            <h5 class="modal-title text-brand-black fw-bold" id="editPaymentModalLabel{{ venta.id }}">
+                                                <i class="fa-solid fa-pen text-primary me-2"></i> Editar Venta / Pago - Ticket #{{ "%05d"|format(venta.id) }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form action="{{ url_for('sales_bp.editar_pago_venta', sale_id=venta.id) }}" method="POST">
+                                            <div class="modal-body">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <p class="text-muted small mb-0"><i class="fa-solid fa-circle-info text-primary me-1"></i> Modifica o agrega métodos de pago y sus valores:</p>
+                                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold" onclick="agregarFilaPago({{ venta.id }})">
+                                                        <i class="fa-solid fa-plus me-1"></i> Agregar Pago
+                                                    </button>
+                                                </div>
+
+                                                <div id="contenedorPagos{{ venta.id }}">
+                                                    {% if venta.pagos and venta.pagos|length > 0 %}
+                                                        {% for pago in venta.pagos %}
+                                                        <div class="mb-2 p-2 border rounded bg-light bg-opacity-50 fila-pago-edit">
+                                                            <div class="row g-2 align-items-end">
+                                                                <div class="col-5">
+                                                                    <label class="form-label fw-bold small text-muted mb-1">Método</label>
+                                                                    <select name="payment_method[]" class="form-select form-select-sm border-0 bg-white shadow-sm fw-semibold" required>
+                                                                        <option value="efectivo" {% if pago.metodo_pago == 'efectivo' %}selected{% endif %}>Efectivo</option>
+                                                                        <option value="nequi" {% if pago.metodo_pago == 'nequi' %}selected{% endif %}>Nequi</option>
+                                                                        <option value="bancolombia" {% if pago.metodo_pago == 'bancolombia' %}selected{% endif %}>Bancolombia</option>
+                                                                        <option value="davivienda" {% if pago.metodo_pago == 'davivienda' %}selected{% endif %}>Davivienda</option>
+                                                                        <option value="daviplata" {% if pago.metodo_pago == 'daviplata' %}selected{% endif %}>Daviplata</option>
+                                                                        <option value="bold" {% if pago.metodo_pago in ['bold', 'bolt', 'tarjeta_credito'] %}selected{% endif %}>Bold (Datáfono)</option>
+                                                                        <option value="addi" {% if pago.metodo_pago == 'addi' %}selected{% endif %}>Addi</option>
+                                                                        <option value="sistecredito" {% if pago.metodo_pago in ['sistecredito', 'sitecredito'] %}selected{% endif %}>Sistecrédito</option>
+                                                                        <option value="abono_tercero" {% if pago.metodo_pago == 'abono_tercero' %}selected{% endif %}>Abono a Terceros</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="col-5">
+                                                                    <label class="form-label fw-bold small text-muted mb-1">Valor ($)</label>
+                                                                    <input type="text" inputmode="numeric" name="payment_amount[]" class="form-control form-control-sm border-0 bg-white shadow-sm fw-bold text-success text-end input-monto-pago" value="{{ pago.monto|int }}" oninput="formatearMontoInput(this); recalcularTotalModal({{ venta.id }});" required>
+                                                                </div>
+                                                                <div class="col-2 text-end">
+                                                                    <button type="button" class="btn btn-sm btn-outline-danger w-100 rounded" onclick="eliminarFilaPago(this, {{ venta.id }})" title="Eliminar pago">
+                                                                        <i class="fa-solid fa-trash"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <div class="mb-2 p-2 border rounded bg-light bg-opacity-50 fila-pago-edit">
+                                                            <div class="row g-2 align-items-end">
+                                                                <div class="col-5">
+                                                                    <label class="form-label fw-bold small text-muted mb-1">Método</label>
+                                                                    <select name="payment_method[]" class="form-select form-select-sm border-0 bg-white shadow-sm fw-semibold" required>
+                                                                        <option value="efectivo" {% if venta.metodo_pago == 'efectivo' %}selected{% endif %}>Efectivo</option>
+                                                                        <option value="nequi" {% if venta.metodo_pago == 'nequi' %}selected{% endif %}>Nequi</option>
+                                                                        <option value="bancolombia" {% if venta.metodo_pago == 'bancolombia' %}selected{% endif %}>Bancolombia</option>
+                                                                        <option value="davivienda" {% if venta.metodo_pago == 'davivienda' %}selected{% endif %}>Davivienda</option>
+                                                                        <option value="daviplata" {% if venta.metodo_pago == 'daviplata' %}selected{% endif %}>Daviplata</option>
+                                                                        <option value="bold" {% if venta.metodo_pago in ['bold', 'bolt', 'tarjeta_credito'] %}selected{% endif %}>Bold (Datáfono)</option>
+                                                                        <option value="addi" {% if venta.metodo_pago == 'addi' %}selected{% endif %}>Addi</option>
+                                                                        <option value="sistecredito" {% if venta.metodo_pago in ['sistecredito', 'sitecredito'] %}selected{% endif %}>Sistecrédito</option>
+                                                                        <option value="abono_tercero" {% if venta.metodo_pago == 'abono_tercero' %}selected{% endif %}>Abono a Terceros</option>
+                                                                    </select>
+                                                                </div>
+                                                                <div class="col-5">
+                                                                    <label class="form-label fw-bold small text-muted mb-1">Valor ($)</label>
+                                                                    <input type="text" inputmode="numeric" name="payment_amount[]" class="form-control form-control-sm border-0 bg-white shadow-sm fw-bold text-success text-end input-monto-pago" value="{{ venta.monto_total|int }}" oninput="formatearMontoInput(this); recalcularTotalModal({{ venta.id }});" required>
+                                                                </div>
+                                                                <div class="col-2 text-end">
+                                                                    <button type="button" class="btn btn-sm btn-outline-danger w-100 rounded" onclick="eliminarFilaPago(this, {{ venta.id }})" title="Eliminar pago">
+                                                                        <i class="fa-solid fa-trash"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+
+                                                <!-- Total Calculado -->
+                                                <div class="d-flex justify-content-between align-items-center mt-3 p-2 rounded bg-light border">
+                                                    <span class="small fw-bold text-muted text-uppercase">Total Pagos:</span>
+                                                    <span class="fw-bold fs-6 text-primary" id="lblTotalModal{{ venta.id }}">${{ (venta.monto_total)|cop }}</span>
+                                                </div>
+                                                
+                                                <div class="alert alert-warning mt-2 mb-0 border-0 py-2" style="font-size: 0.82rem;">
+                                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Si agregas más de un método, la venta pasará a considerarse <strong>Pago Mixto</strong> y se actualizarán los reportes y cuadres.
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer border-top-0 pt-0">
+                                                <button type="button" class="btn btn-light fw-bold px-4" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary fw-bold px-4"><i class="fa-solid fa-save me-1"></i> Guardar Cambios</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="fa-solid fa-cash-register fs-1 mb-3" style="color: var(--brand-pink);"></i>
+                        <h4 class="text-brand-black fw-bold">Libro de Cajas en Blanco</h4>
+                        <p class="text-muted mb-0">Acualmente no hay facturas ni transacciones emitidas.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Paginación Interactiva -->
+    {% if paginacion and paginacion.pages > 1 %}
+    <nav class="mt-4 d-flex justify-content-center d-print-none">
+        <ul class="pagination pagination-sm shadow-sm mb-1">
+            <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
+                <a class="page-link rounded-start-pill px-3" 
+                   href="{% if paginacion.has_prev %}{{ url_for('sales_bp.historial', page=paginacion.prev_num, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}{% else %}#{% endif %}">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </a>
+            </li>
+            {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+                {% if p_num %}
+                    <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('sales_bp.historial', page=p_num, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}">{{ p_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
+                <a class="page-link rounded-end-pill px-3" 
+                   href="{% if paginacion.has_next %}{{ url_for('sales_bp.historial', page=paginacion.next_num, fecha_inicio=fecha_inicio, fecha_fin=fecha_fin) }}{% else %}#{% endif %}">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </li>
+        </ul>
+    </nav>
+    <div class="text-center text-muted small d-print-none mb-3">
+        Página {{ paginacion.page }} de {{ paginacion.pages }} &nbsp;·&nbsp; Total: {{ paginacion.total }} operaciones (máx. 30 por página)
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* ====== Estilos Exclusivos para PDF/Impresión del Reporte de Ventas ====== */
+@media print {
+    /* 1. Resetear Página y Contenedores Base */
+    @page { margin: 1.5cm; }
+    body, html {
+        background-color: white !important;
+        margin: 0 !important; 
+        padding: 0 !important;
+        font-size: 10pt !important;
+        color: black !important;
+    }
+    
+    .container, main.container, .container-fluid {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* 2. Ocultar Elementos Interactivos Innecesarios */
+    main > nav, header, footer, .d-print-none, #filtrosCollapse {
+        display: none !important;
+    }
+    
+    /* Mostrar cabecera oficial de impresión */
+    .d-print-block {
+        display: block !important;
+    }
+
+    /* 3. Arreglar Tarjetas Superiores (Resumen) para que no se sobrepongan */
+    .row {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 15px !important;
+        margin-bottom: 20px !important;
+    }
+    .col-6 {
+        flex: 1 !important;
+        max-width: 50% !important;
+        padding: 0 !important;
+    }
+    
+    /* Simplificar tarjetas, quitando sombras y rebordes gigantes */
+    .card-custom, .card {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        background-color: transparent !important;
+        border-radius: 4px !important;
+        page-break-inside: avoid;
+    }
+    .card-custom[style] {
+        border-left: 1px solid #ccc !important; /* Sobrescribir borde de color grueso */
+    }
+    .card-body {
+        padding: 10px 15px !important;
+    }
+    .card-body p { margin-bottom: 5px !important; font-size: 9pt !important; }
+    .card-body h2 { font-size: 16pt !important; color: black !important; }
+
+    /* 4. Arreglar la Tabla de Datos para evitar desbordamientos */
+    .table-responsive {
+        overflow: visible !important; /* Desactiva el scroll horizontal */
+    }
+    .table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        table-layout: auto !important; /* Permite adaptación de columnas */
+    }
+    .table th, .table td {
+        padding: 6px !important;
+        font-size: 9pt !important;
+        white-space: normal !important; 
+        word-wrap: break-word !important;
+        border: 1px solid #eee !important;
+        color: black !important;
+    }
+    .table thead th {
+        background-color: #f8f9fa !important;
+        border-bottom: 2px solid #ccc !important;
+        color: black !important;
+    }
+
+    /* Ocultar la columna de botones "Auditar / Ver Recibo" */
+    th:nth-child(6), td:nth-child(6) {
+        display: none !important;
+    }
+
+    /* 5. Limpiar Etiquetas (Badges) */
+    .badge {
+        border: none !important;
+        background: transparent !important;
+        color: black !important;
+        padding: 0 !important;
+        font-size: 9pt !important;
+        font-weight: bold !important;
+    }
+    .badge i {
+        display: none !important; /* Ocultar íconos para ahorrar espacio horizontal */
+    }
+
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+</style>
+
+<!-- Inicializar Tooltips Bootstrap para Desglose de Pagos Mixtos -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (el) {
+            return new bootstrap.Tooltip(el);
+        });
+    });
+
+    function filtrarTabla(metodo) {
+        const filas = document.querySelectorAll('tr.venta-row');
+        let visibles = 0;
+        const equivalentes = {
+            'bold': ['bold', 'bolt', 'tarjeta_credito'],
+            'sistecredito': ['sistecredito', 'sitecredito']
+        };
+        const buscados = equivalentes[metodo] || [metodo];
+        
+        filas.forEach(fila => {
+            const pagosStr = fila.getAttribute('data-pagos') || '';
+            const metodosFila = pagosStr.split(',');
+            
+            if (metodo === 'todos' || buscados.some(m => metodosFila.includes(m))) {
+                fila.style.display = '';
+                visibles++;
+            } else {
+                fila.style.display = 'none';
+            }
+        });
+        
+        let filterBanner = document.getElementById('filter-banner');
+        if (metodo !== 'todos') {
+            if (!filterBanner) {
+                filterBanner = document.createElement('div');
+                filterBanner.id = 'filter-banner';
+                filterBanner.className = 'alert py-2 mb-3 d-flex justify-content-between align-items-center d-print-none shadow-sm';
+                filterBanner.style.backgroundColor = '#e0f7fa';
+                filterBanner.style.border = '1px solid #b2ebf2';
+                filterBanner.style.color = '#006064';
+                
+                const tableContainer = document.querySelector('.table-responsive');
+                tableContainer.parentNode.insertBefore(filterBanner, tableContainer);
+            }
+            filterBanner.innerHTML = `<span><i class="fa-solid fa-filter me-2"></i> Mostrando operaciones que incluyen: <strong class="text-uppercase">${metodo.replace('_', ' ')}</strong> (${visibles} resultados)</span>
+                                      <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold bg-white" onclick="filtrarTabla('todos')"><i class="fa-solid fa-times me-1"></i> Quitar Filtro</button>`;
+            filterBanner.style.display = 'flex';
+        } else if (filterBanner) {
+            filterBanner.style.display = 'none';
+        }
+    }
+
+    // Funciones dinámicas para agregar/editar métodos de pago en el modal de ventas
+    function formatearMontoInput(input) {
+        let val = input.value.replace(/\D/g, '');
+        if (val === '') {
+            input.value = '';
+        } else {
+            input.value = parseInt(val, 10).toLocaleString('es-CO');
+        }
+    }
+
+    // Al cargar la página, dar formato inicial a los inputs de monto
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.input-monto-pago').forEach(input => {
+            formatearMontoInput(input);
+        });
+    });
+
+    function recalcularTotalModal(ventaId) {
+        const contenedor = document.getElementById(`contenedorPagos${ventaId}`);
+        if (!contenedor) return;
+        let total = 0;
+        contenedor.querySelectorAll('.input-monto-pago').forEach(input => {
+            const raw = input.value.replace(/\D/g, '');
+            const num = parseInt(raw, 10);
+            if (!isNaN(num)) total += num;
+        });
+        const lbl = document.getElementById(`lblTotalModal${ventaId}`);
+        if (lbl) {
+            lbl.textContent = '$' + total.toLocaleString('es-CO');
+        }
+    }
+
+    function agregarFilaPago(ventaId) {
+        const contenedor = document.getElementById(`contenedorPagos${ventaId}`);
+        if (!contenedor) return;
+        
+        const nuevaFila = document.createElement('div');
+        nuevaFila.className = 'mb-2 p-2 border rounded bg-light bg-opacity-50 fila-pago-edit';
+        nuevaFila.innerHTML = `
+            <div class="row g-2 align-items-end">
+                <div class="col-5">
+                    <label class="form-label fw-bold small text-muted mb-1">Método</label>
+                    <select name="payment_method[]" class="form-select form-select-sm border-0 bg-white shadow-sm fw-semibold" required>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="nequi" selected>Nequi</option>
+                        <option value="bancolombia">Bancolombia</option>
+                        <option value="davivienda">Davivienda</option>
+                        <option value="daviplata">Daviplata</option>
+                        <option value="bold">Bold (Datáfono)</option>
+                        <option value="addi">Addi</option>
+                        <option value="sistecredito">Sistecrédito</option>
+                        <option value="abono_tercero">Abono a Terceros</option>
+                    </select>
+                </div>
+                <div class="col-5">
+                    <label class="form-label fw-bold small text-muted mb-1">Valor ($)</label>
+                    <input type="text" inputmode="numeric" name="payment_amount[]" class="form-control form-control-sm border-0 bg-white shadow-sm fw-bold text-success text-end input-monto-pago" placeholder="0" oninput="formatearMontoInput(this); recalcularTotalModal(${ventaId});" required>
+                </div>
+                <div class="col-2 text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger w-100 rounded" onclick="eliminarFilaPago(this, ${ventaId})" title="Eliminar pago">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        contenedor.appendChild(nuevaFila);
+        const inputMonto = nuevaFila.querySelector('.input-monto-pago');
+        if (inputMonto) inputMonto.focus();
+    }
+
+    function eliminarFilaPago(btn, ventaId) {
+        const contenedor = document.getElementById(`contenedorPagos${ventaId}`);
+        if (!contenedor) return;
+        const filas = contenedor.querySelectorAll('.fila-pago-edit');
+        if (filas.length <= 1) {
+            alert('⚠️ Debe haber al menos un método de pago en la venta.');
+            return;
+        }
+        const fila = btn.closest('.fila-pago-edit');
+        if (fila) {
+            fila.remove();
+            recalcularTotalModal(ventaId);
+        }
+    }
+</script>
+{% endblock %}

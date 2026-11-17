@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle Cliente - {{ cliente.nombre }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{{ url_for('celulares_bp.clientes') }}" class="btn btn-outline-secondary rounded-pill px-3">
+        <i class="fa-solid fa-arrow-left me-1"></i> Volver
+    </a>
+    <div>
+        <h2 class="fw-bold m-0 text-brand-black"><i class="fa-solid fa-user-circle text-brand-blue me-2"></i>{{ cliente.nombre }}</h2>
+        <span class="text-muted small">
+            <i class="fa-regular fa-id-card me-1"></i> CC: {{ cliente.documento }} &nbsp;·&nbsp; 
+            <i class="fa-solid fa-phone me-1"></i>{{ cliente.telefono }}
+            {% if cliente.email %} &nbsp;·&nbsp; <i class="fa-solid fa-envelope me-1"></i>{{ cliente.email }}{% endif %}
+            {% if cliente.direccion %} &nbsp;·&nbsp; <i class="fa-solid fa-location-dot me-1"></i>{{ cliente.direccion }}{% endif %}
+        </span>
+    </div>
+    <a href="https://wa.me/57{{ cliente.telefono|replace(' ', '') }}" target="_blank" class="btn btn-outline-success rounded-pill px-3 ms-auto">
+        <i class="fa-brands fa-whatsapp me-1"></i> Contactar
+    </a>
+</div>
+
+<!-- Tarjetas resumen -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center">
+            <div class="fs-1 fw-bold text-brand-blue">{{ registros|length }}</div>
+            <div class="text-muted small">Compras Registradas</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center">
+            <div class="fs-1 fw-bold text-success">${{ registros | sum(attribute='venta.monto_total') | cop }}</div>
+            <div class="text-muted small">Total Gastado</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center">
+            <div class="fs-1 fw-bold text-dark">{{ registros[0].venta.fecha_venta.strftime('%d/%m/%Y') }}</div>
+            <div class="text-muted small">Última Compra</div>
+        </div>
+    </div>
+</div>
+
+<!-- Historial de Compras -->
+<div class="card border-0 shadow-sm rounded-4">
+    <div class="card-header bg-white border-0 py-3 ps-4">
+        <h5 class="fw-bold m-0"><i class="fa-solid fa-clock-rotate-left me-2 text-brand-blue"></i>Historial de Facturas</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">Factura</th>
+                    <th>Producto</th>
+                    <th>Fecha</th>
+                    <th class="text-end pe-4">Total</th>
+                    <th class="text-center">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente_rec in registros %}
+                <tr class="fw-semibold">
+                    <td class="ps-4">
+                        <button class="btn btn-sm btn-light rounded-circle me-2 d-inline-flex align-items-center justify-content-center toggle-details-btn" 
+                                type="button" 
+                                data-bs-toggle="collapse" 
+                                data-bs-target="#details-{{ cliente_rec.sale_id }}" 
+                                aria-expanded="false" 
+                                style="width: 28px; height: 28px;">
+                            <i class="fa-solid fa-chevron-down transition-transform" style="font-size: 0.75rem;"></i>
+                        </button>
+                        <span class="badge bg-primary rounded-pill">#{{ cliente_rec.sale_id }}</span>
+                    </td>
+                    <td>
+                        {% if cliente_rec.venta.detalles|length == 1 %}
+                            {{ cliente_rec.venta.detalles[0].producto.nombre if cliente_rec.venta.detalles[0].producto else (cliente_rec.venta.detalles[0].nombre_manual or 'Producto') }}
+                        {% else %}
+                            <span class="text-brand-pink">{{ cliente_rec.venta.detalles|length }} Productos</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div>{{ cliente_rec.venta.fecha_venta.strftime('%d/%m/%Y') }}</div>
+                        <div class="small text-muted">{{ cliente_rec.venta.fecha_venta.strftime('%I:%M %p') }}</div>
+                    </td>
+                    <td class="text-end pe-4 fw-bold text-success">${{ cliente_rec.venta.monto_total|cop }}</td>
+                    <td class="text-center">
+                        <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=cliente_rec.sale_id) }}"
+                           target="_blank"
+                           class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                            <i class="fa-solid fa-receipt me-1"></i> Ver Factura
+                        </a>
+                    </td>
+                </tr>
+                
+                <!-- Fila de colapso con el desglose de productos -->
+                <tr>
+                    <td colspan="5" class="p-0 border-0">
+                        <div class="collapse bg-light bg-opacity-50 px-4 py-3 border-bottom" id="details-{{ cliente_rec.sale_id }}">
+                            <h6 class="fw-bold mb-2 text-secondary small"><i class="fa-solid fa-boxes-stacked me-1"></i> Desglose de Productos Comprados:</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered mb-0 bg-white" style="font-size: 0.82rem;">
+                                    <thead class="table-light text-muted">
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th width="15%" class="text-center">Cantidad</th>
+                                            <th width="25%" class="text-end">Precio Unitario</th>
+                                            <th width="25%" class="text-end">Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for detalle in cliente_rec.venta.detalles %}
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold">
+                                                    {{ detalle.producto.nombre if detalle.producto else (detalle.nombre_manual or 'N/A') }}
+                                                </div>
+                                                {% if detalle.producto and detalle.producto.imei %}
+                                                <div class="small text-muted text-uppercase" style="font-size: 0.72rem;">IMEI: {{ detalle.producto.imei }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">{{ detalle.cantidad_vendida }}</td>
+                                            <td class="text-end">${{ detalle.precio_venta_final|cop }}</td>
+                                            <td class="text-end fw-bold">${{ (detalle.precio_venta_final * detalle.cantidad_vendida)|cop }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center py-5 text-muted">No hay facturas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .toggle-details-btn[aria-expanded="true"] i {
+        transform: rotate(180deg);
+    }
+    .transition-transform {
+        transition: transform 0.2s ease-in-out;
+    }
+</style>
+{% endblock %}

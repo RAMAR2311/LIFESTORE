@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="fw-bold text-brand-black mb-0"><i class="fa-solid fa-handshake me-2" style="color: var(--brand-blue);"></i>Maneos (Préstamos)</h2>
+        <p class="text-muted mb-0">Gestión de mercancía prestada a locales vecinos.</p>
+    </div>
+    <button type="button" class="btn btn-blue rounded-pill fw-bold shadow-sm px-4" data-bs-toggle="modal" data-bs-target="#modalNuevoManeo">
+        <i class="fa-solid fa-plus me-2"></i>Registrar Préstamo
+    </button>
+</div>
+
+<!-- Tarjetas Rápidas -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card card-custom border-0 shadow-sm" style="border-left: 5px solid #ffc107 !important;">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase fw-bold mb-1"><i class="fa-solid fa-clock me-1 text-warning"></i> Pendientes</h6>
+                <h3 class="fw-bolder m-0 text-warning">{{ activos|length }}</h3>
+                <small class="text-muted">Préstamos sin resolver</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pestañas para separar Activos de Historial -->
+<ul class="nav nav-tabs mb-4 border-0" id="maneosTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold border-0 bg-transparent text-brand-black" style="border-bottom: 3px solid var(--brand-pink) !important;" id="activos-tab" data-bs-toggle="tab" data-bs-target="#activos" type="button" role="tab">Activos</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold border-0 bg-transparent text-muted" id="historial-tab" data-bs-toggle="tab" data-bs-target="#historial" type="button" role="tab">Historial (Cerrados)</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="maneosTabsContent">
+    <!-- Tab Activos -->
+    <div class="tab-pane fade show active" id="activos" role="tabpanel">
+        <div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle m-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">FECHA PRÉSTAMO</th>
+                            <th>LOCAL VECINO</th>
+                            <th>PRODUCTO</th>
+                            <th class="text-center">CANTIDAD</th>
+                            <th class="text-center pe-4">ACCIONES (RESOLVER)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for maneo in activos %}
+                        <tr>
+                            <td class="ps-4 text-muted small">{{ maneo.fecha_prestamo.strftime('%Y-%m-%d %H:%M') }}</td>
+                            <td class="fw-bold text-brand-black">{{ maneo.local_vecino }}</td>
+                            <td>
+                                <div class="fw-bold">{{ maneo.producto.nombre }}</div>
+                                <div class="small text-muted">SKU: {{ maneo.producto.sku }}</div>
+                            </td>
+                            <td class="text-center fw-bolder fs-5 text-brand-blue">{{ maneo.cantidad }}</td>
+                            <td class="text-center pe-4">
+                                <div class="d-flex justify-content-center gap-2">
+                                    <!-- Botón Facturar -->
+                                    <button class="btn btn-sm btn-success rounded-pill fw-bold px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalFacturar{{ maneo.id }}">
+                                        <i class="fa-solid fa-file-invoice-dollar me-1"></i> Facturar
+                                    </button>
+                                    
+                                    <!-- Botón Devolver -->
+                                    <form action="{{ url_for('maneos_bp.devolver', id=maneo.id) }}" method="POST" onsubmit="return confirm('¿Confirmas que el local vecino te devolvió el producto intacto?');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill fw-bold px-3 shadow-sm">
+                                            <i class="fa-solid fa-rotate-left me-1"></i> Devolver
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <!-- Modal Facturar -->
+                                <div class="modal fade text-start" id="modalFacturar{{ maneo.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                            <div class="modal-header border-bottom-0 pb-0">
+                                                <h5 class="fw-bold text-brand-black"><i class="fa-solid fa-cash-register me-2 text-success"></i>Facturar Maneo</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form action="{{ url_for('maneos_bp.facturar', id=maneo.id) }}" method="POST">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <div class="modal-body">
+                                                    <div class="alert alert-warning border-0 rounded-3 small">
+                                                        Al facturar, este producto se registrará como una venta oficial y entrará al Arqueo de Caja.
+                                                    </div>
+                                                    <p class="mb-3"><strong>Producto:</strong> {{ maneo.producto.nombre }} 
+                                                        {% if maneo.variante %}
+                                                            <br><small class="text-muted">Subcat: {{ maneo.variante.nombre_variante }}</small>
+                                                        {% endif %}
+                                                        (x{{ maneo.cantidad }})
+                                                    </p>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-muted">Precio Unitario de Venta ($)</label>
+                                                        <input type="number" step="0.01" name="precio_unidad" class="form-control" value="{{ maneo.variante.precio_sugerido if maneo.variante else maneo.producto.precio_sugerido }}" required>
+                                                        <small class="text-muted d-block mt-1">Precio Mínimo permitido: ${{ "{:,.0f}".format(maneo.producto.precio_minimo) }}</small>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-muted">Método de Pago</label>
+                                                        <select name="metodo_pago" class="form-select" required>
+                                                            <option value="addi">🛍️ Addi</option>
+                                                            <option value="sitecredito">💳 Sitecredito</option>
+                                                            <option value="bancolombia">🏦 Bancolombia</option>
+                                                            <option value="davivienda">🏦 Davivienda</option>
+                                                            <option value="efectivo">💵 Efectivo</option>
+                                                            <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <!-- Datos del Cliente -->
+                                                    <div class="border rounded-3 p-3 bg-light mb-3">
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <i class="fa-solid fa-user-check text-primary me-2"></i>
+                                                            <span class="fw-bold small text-uppercase">Datos del Cliente {% if maneo.producto.tipo_inventario == 'celulares' or maneo.producto.imei %}<span class="text-danger">*</span>{% else %}<span class="text-muted fw-normal">(Opcional)</span>{% endif %}</span>
+                                                        </div>
+                                                        <div class="row g-2">
+                                                            <div class="col-12">
+                                                                <label class="form-label small fw-semibold mb-1">Nombre Completo</label>
+                                                                <input type="text" name="cliente_nombre" class="form-control form-control-sm" placeholder="Ej: Juan Pérez" {% if maneo.producto.tipo_inventario == 'celulares' or maneo.producto.imei %}required{% endif %}>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <label class="form-label small fw-semibold mb-1">Cédula / Documento</label>
+                                                                <input type="text" name="cliente_documento" class="form-control form-control-sm" placeholder="Ej: 1020304050" {% if maneo.producto.tipo_inventario == 'celulares' or maneo.producto.imei %}required{% endif %}>
+                                                            </div>
+                                                            <div class="col-6">
+                                                                <label class="form-label small fw-semibold mb-1">Teléfono</label>
+                                                                <input type="text" name="cliente_telefono" class="form-control form-control-sm" placeholder="Ej: 3001234567" {% if maneo.producto.tipo_inventario == 'celulares' or maneo.producto.imei %}required{% endif %}>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-top-0 pt-0">
+                                                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">Confirmar Venta</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-handshake-slash fs-1 mb-3 opacity-25"></i>
+                                <p class="mb-0">No hay préstamos activos en este momento.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Historial -->
+    <div class="tab-pane fade" id="historial" role="tabpanel">
+        <div class="card card-custom p-0 overflow-hidden shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle m-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4">FECHA RESOLUCIÓN</th>
+                            <th>LOCAL VECINO</th>
+                            <th>PRODUCTO</th>
+                            <th class="text-center">CANTIDAD</th>
+                            <th class="text-center pe-4">ESTADO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for maneo in historial %}
+                        <tr>
+                            <td class="ps-4 text-muted small">{{ maneo.fecha_resolucion.strftime('%Y-%m-%d %H:%M') if maneo.fecha_resolucion else '-' }}</td>
+                            <td class="fw-bold text-brand-black">{{ maneo.local_vecino }}</td>
+                            <td class="text-muted">
+                                {{ maneo.producto.nombre }}
+                                {% if maneo.variante %}
+                                    <div class="small text-muted fw-bold">Subcat: {{ maneo.variante.nombre_variante }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center fw-bold">{{ maneo.cantidad }}</td>
+                            <td class="text-center pe-4">
+                                {% if maneo.estado == 'FACTURADO' %}
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2"><i class="fa-solid fa-check me-1"></i> Facturado</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary rounded-pill px-3 py-2"><i class="fa-solid fa-rotate-left me-1"></i> Devuelto</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">No hay historial de maneos.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Registrar Préstamo -->
+<div class="modal fade" id="modalNuevoManeo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="fw-bold text-brand-black"><i class="fa-solid fa-handshake me-2 text-brand-blue"></i>Registrar Maneo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('maneos_bp.prestar') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted small">Nombre del Local Vecino *</label>
+                        <input type="text" name="local_vecino" class="form-control form-control-lg" placeholder="Ej: Celulares Don Pepe" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted small">SKU del Producto *</label>
+                        <div class="input-group">
+                            <input type="text" name="sku_busqueda" id="maneoSkuInput" class="form-control" placeholder="Escanea o digita el SKU" required>
+                            <button type="button" class="btn btn-outline-secondary" id="btnCheckSku"><i class="fa-solid fa-search"></i> Buscar</button>
+                        </div>
+                        <small class="text-muted d-block mt-1" id="maneoSkuStatus"></small>
+                    </div>
+                    <div class="mb-3 d-none" id="variantesManeoContainer">
+                        <label class="form-label fw-bold text-muted small text-brand-pink">Seleccione la Subcategoría *</label>
+                        <select name="variant_id" id="variantesManeoSelect" class="form-select border-brand-pink"></select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted small">Cantidad a prestar *</label>
+                        <input type="number" name="cantidad" class="form-control" min="1" value="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-blue rounded-pill px-4 fw-bold shadow-sm">Confirmar Préstamo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Script simple para cambiar los tabs visualmente
+    document.querySelectorAll('#maneosTabs .nav-link').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('#maneosTabs .nav-link').forEach(t => {
+                t.style.borderBottom = 'none';
+                t.classList.remove('text-brand-black');
+                t.classList.add('text-muted');
+            });
+            this.style.borderBottom = '3px solid var(--brand-pink)';
+            this.classList.remove('text-muted');
+            this.classList.add('text-brand-black');
+        });
+    });
+
+    // Lógica para buscar el producto por SKU y mostrar variantes si existen
+    const btnCheckSku = document.getElementById('btnCheckSku');
+    const maneoSkuInput = document.getElementById('maneoSkuInput');
+    const maneoSkuStatus = document.getElementById('maneoSkuStatus');
+    const variantesManeoContainer = document.getElementById('variantesManeoContainer');
+    const variantesManeoSelect = document.getElementById('variantesManeoSelect');
+
+    function checkSku() {
+        const sku = maneoSkuInput.value.trim();
+        if(!sku) return;
+        
+        maneoSkuStatus.textContent = "Buscando...";
+        maneoSkuStatus.className = "text-info d-block mt-1";
+        
+        fetch(`/sales/api/producto/${encodeURIComponent(sku)}`)
+            .then(res => {
+                if(!res.ok) throw new Error("Producto no encontrado");
+                return res.json();
+            })
+            .then(data => {
+                maneoSkuStatus.textContent = "✓ Producto: " + data.nombre;
+                maneoSkuStatus.className = "text-success d-block mt-1 fw-bold";
+                
+                if(data.variantes && data.variantes.length > 0) {
+                    variantesManeoSelect.innerHTML = '';
+                    data.variantes.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.id;
+                        opt.textContent = `${v.nombre} (Stock: ${v.stock})`;
+                        // Prevenir selección si no hay stock
+                        if(v.stock <= 0) {
+                            opt.disabled = true;
+                            opt.textContent += " - Agotado";
+                        }
+                        variantesManeoSelect.appendChild(opt);
+                    });
+                    variantesManeoContainer.classList.remove('d-none');
+                    variantesManeoSelect.required = true;
+                } else {
+                    variantesManeoContainer.classList.add('d-none');
+                    variantesManeoSelect.innerHTML = '';
+                    variantesManeoSelect.required = false;
+                }
+            })
+            .catch(err => {
+                maneoSkuStatus.textContent = "❌ " + err.message;
+                maneoSkuStatus.className = "text-danger d-block mt-1 fw-bold";
+                variantesManeoContainer.classList.add('d-none');
+                variantesManeoSelect.required = false;
+            });
+    }
+
+    btnCheckSku.addEventListener('click', checkSku);
+    
+    // Auto-buscar al presionar Enter en el input de SKU (preveniendo envío prematuro de form)
+    maneoSkuInput.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter') {
+            e.preventDefault();
+            checkSku();
+        }
+    });
+</script>
+{% endblock %}

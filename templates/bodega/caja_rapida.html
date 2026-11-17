@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row h-100 g-4">
+    <!-- Panel Izquierdo: Catálogo de Productos -->
+    <div class="col-lg-8 d-flex flex-column h-100">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-store text-brand-pink me-2"></i> Caja Rápida Visual</h2>
+        </div>
+
+        <!-- Buscador de productos -->
+        <div class="mb-4">
+            <div class="search-bar-silver">
+                <span class="search-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" id="productSearch" placeholder="Buscar producto por nombre o SKU..." autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Grilla de productos -->
+        <div class="row g-3 overflow-auto pb-4" id="productsGrid" style="max-height: calc(100vh - 250px);">
+            {% for p in productos %}
+            {% set total_stock = p.cantidad_stock %}
+            {% set vars_data = [] %}
+            {% if p.variantes %}
+                {% set total_stock = p.variantes | sum(attribute='cantidad_stock') %}
+                {% for v in p.variantes %}
+                    {% set _ = vars_data.append({"id": v.id, "nombre": v.nombre_variante, "stock": v.cantidad_stock, "precio_sugerido": v.precio_sugerido or p.precio_sugerido or 0, "precio_minimo": v.precio_minimo or p.precio_minimo or 0}) %}
+                {% endfor %}
+            {% endif %}
+            <div class="col-6 col-md-4 col-xl-3 product-card-container" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}">
+                <div class="card h-100 border-0 shadow-sm cursor-pointer product-card" 
+                     data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "precio_minimo": p.precio_minimo or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario}|tojson|safe }}'
+                     data-variants='{{ vars_data|tojson|safe }}'
+                     onclick="handleProductClick(this)">
+                    <div class="ratio ratio-1x1 product-img-box rounded-top">
+                        {% if p.imagen %}
+                            <img src="{{ url_for('static', filename='uploads/' + p.imagen) }}" alt="{{ p.nombre }}" style="object-fit: cover; width: 100%; height: 100%;">
+                        {% else %}
+                            <span class="small text-center pt-2 placeholder-icon"><i class="fa-solid fa-image fa-2x mb-1 d-block opacity-50"></i>Sin Imagen</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-3 text-center d-flex flex-column justify-content-between">
+                        <div>
+                            <h6 class="card-title text-truncate mb-1" title="{{ p.nombre }}">{{ p.nombre }}</h6>
+                            <small class="product-sku d-block mb-2">{{ p.sku }}</small>
+                        </div>
+                        <div>
+                            <h5 class="product-price mb-1">${{ p.precio_sugerido|cop }}</h5>
+                            <small class="product-stock"><i class="fa-solid fa-box me-1"></i> {{ total_stock }} en stock</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12 text-center py-5">
+                <i class="fa-solid fa-box-open fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No hay productos en bodega.</h5>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Panel Derecho: Carrito -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm h-100 bg-white d-flex flex-column">
+            <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold m-0"><i class="fa-solid fa-cart-shopping text-brand-blue me-2"></i> Caja Rápida</h5>
+                <span class="badge bg-secondary rounded-pill" id="itemCount">0 items</span>
+            </div>
+            
+            <div class="card-body p-0 overflow-auto flex-grow-1" id="cartContainer" style="max-height: 40vh;">
+                <!-- Estado Vacío -->
+                <div id="emptyCart" class="text-center py-5 text-muted">
+                    <i class="fa-solid fa-basket-shopping fa-3x mb-3 text-black-50"></i>
+                    <h6>Tu carrito está vacío.</h6>
+                    <small>Selecciona productos del catálogo.</small>
+                </div>
+                <!-- Lista de items -->
+                <ul class="list-group list-group-flush" id="cartItems">
+                    <!-- Javascript inyectará items aquí -->
+                </ul>
+            </div>
+
+            <div class="card-footer bg-light border-top p-4">
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted fw-bold">Total a Cobrar:</span>
+                    <h3 class="fw-bolder m-0 text-brand-black" id="cartTotal">$0</h3>
+                </div>
+
+                <form id="checkoutForm" method="POST" action="{{ url_for('bodega_bp.caja_rapida') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="cart_data" id="cartDataInput">
+                    <input type="hidden" name="total_amount" id="totalAmountInput">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">CLIENTE (OBLIGATORIO)</label>
+                        <select name="cliente_id" class="form-select border-0 shadow-sm" required>
+                            <option value="" disabled selected>-- Selecciona un Cliente --</option>
+                            {% for c in clientes %}
+                            <option value="{{ c.id }}">{{ c.nombre_o_razon_social }} - {{ c.documento_o_nit }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">NÚMERO DE FACTURA (OPCIONAL)</label>
+                        <input type="text" name="numero_factura_manual" class="form-control border-0 shadow-sm" placeholder="Ej: FAC-1234 (Dejar vacío para auto-generar)">
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">FECHA VENTA</label>
+                            <input type="date" name="fecha_venta" class="form-control border-0 shadow-sm" id="fechaVenta" required {% if current_user.rol == 'vendedor_bodega' %}readonly style="pointer-events: none; background-color: #e9ecef;" tabindex="-1" onkeydown="return false;" onclick="return false;"{% endif %}>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-muted">MÉTODO PAGO</label>
+                            <select name="metodo_pago" id="metodoPago" class="form-select border-0 shadow-sm" required onchange="toggleAbonoInput()">
+                                <option value="addi">🛍️ Addi</option>
+                                <option value="sitecredito">💳 Sitecredito</option>
+                                <option value="bancolombia">🏦 Bancolombia</option>
+                                <option value="davivienda">🏦 Davivienda</option>
+                                <option value="efectivo">💵 Efectivo</option>
+                                <option value="tarjeta_credito">💳 Tarjeta Crédito</option>
+                                <option value="credito">⏳ A Crédito (Sin abono)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="abonoContainer">
+                        <label class="form-label fw-bold small text-muted">ABONO INICIAL</label>
+                        <div class="input-group shadow-sm border rounded">
+                            <span class="input-group-text bg-white border-0 fw-bold text-success">$</span>
+                            <input type="text" name="monto_abono" id="montoAbonoInput" class="form-control border-0" placeholder="0" oninput="formatInputCOP(this)">
+                            <button type="button" class="btn btn-light border-start text-muted" onclick="setFullAbono()" title="Abonar el Total">MAX</button>
+                        </div>
+                        <small class="text-muted" style="font-size:0.75rem;">Si dejas el abono vacío o en cero, la venta quedará "A Crédito". Si abonas el total, quedará "Pagada".</small>
+                    </div>
+
+                    <button type="button" class="btn btn-blue w-100 rounded-pill py-3 fw-bold fs-5 shadow-sm mt-2" onclick="processCheckout()">
+                        <i class="fa-solid fa-check-circle me-2"></i> Generar Factura
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Variantes -->
+<div class="modal fade" id="modalVariantes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold text-primary"><i class="fa-solid fa-list-ul me-2"></i>Selecciona Variante</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="modalVariantesBody">
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .product-card { transition: transform 0.2s, box-shadow 0.2s; border: 2px solid transparent !important; }
+    .product-card:hover { transform: translateY(-5px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; border-color: var(--brand-pink) !important; }
+    .cursor-pointer { cursor: pointer; }
+    .cart-item-qty { width: 50px; text-align: center; border: 1px solid #dee2e6; border-radius: 4px; padding: 2px; }
+</style>
+
+<script>
+    const csrf_token = "{{ csrf_token() }}";
+    let carrito = [];
+    let currentTotal = 0;
+    let activeProductData = null;
+    let activeVariantsData = null;
+
+    // Inicializar fecha
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('fechaVenta').value = new Date().toISOString().split('T')[0];
+    });
+
+    // Toggle Abono input if 'credito' is explicitly selected
+    function toggleAbonoInput() {
+        const met = document.getElementById('metodoPago').value;
+        const cont = document.getElementById('abonoContainer');
+        const input = document.getElementById('montoAbonoInput');
+        if (met === 'credito') {
+            input.value = '';
+            cont.style.opacity = '0.5';
+            input.readOnly = true;
+        } else {
+            cont.style.opacity = '1';
+            input.readOnly = false;
+        }
+    }
+
+    function formatoCOP(valor) {
+        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor);
+    }
+    function formatCOP(val) {
+        if (!val && val !== 0) return '';
+        return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+
+    // Buscador de productos
+    document.getElementById('productSearch').addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase();
+        const cards = document.querySelectorAll('.product-card-container');
+        cards.forEach(card => {
+            const name = card.getAttribute('data-name');
+            const sku = card.getAttribute('data-sku');
+            if (name.includes(query) || sku.includes(query)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    function handleProductClick(el) {
+        const pData = JSON.parse(el.dataset.product);
+        const vData = JSON.parse(el.dataset.variants);
+
+        if (vData && vData.length > 0) {
+            activeProductData = pData;
+            activeVariantsData = vData;
+            
+            let html = `<div class="mb-3"><h6 class="fw-bold">${pData.nombre}</h6><small class="text-muted">Stock Total: ${pData.cantidad_stock}</small></div>`;
+            html += `<div class="list-group">`;
+            vData.forEach(v => {
+                let badge = v.stock > 0 ? `<span class="badge bg-success rounded-pill">${v.stock} disp</span>` : `<span class="badge bg-danger rounded-pill">0 disp</span>`;
+                let btnState = v.stock > 0 ? '' : 'disabled';
+                html += `
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" onclick="addVariantToCart(${v.id})" ${btnState}>
+                    <div>
+                        <strong>${v.nombre}</strong><br>
+                        <small class="text-muted">${formatoCOP(v.precio_sugerido)}</small>
+                    </div>
+                    ${badge}
+                </button>
+                `;
+            });
+            html += `</div>`;
+            
+            document.getElementById('modalVariantesBody').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('modalVariantes')).show();
+        } else {
+            if (pData.cantidad_stock <= 0) {
+                alert("¡Producto sin stock en bodega!");
+                return;
+            }
+            addToCart(pData.id, null, pData.nombre, pData.sku, pData.precio_sugerido, pData.cantidad_stock, null, pData.precio_minimo);
+        }
+    }
+
+    window.addVariantToCart = function(variantId) {
+        const vData = activeVariantsData.find(v => v.id === variantId);
+        if (!vData) return;
+        addToCart(activeProductData.id, vData.id, activeProductData.nombre, activeProductData.sku, vData.precio_sugerido, vData.stock, vData.nombre, vData.precio_minimo || activeProductData.precio_minimo);
+        bootstrap.Modal.getInstance(document.getElementById('modalVariantes')).hide();
+    };
+
+    function addToCart(productId, variantId, nombre, sku, precio, maxStock, variantName = null, precioMinimo = 0) {
+        let existingIndex = carrito.findIndex(i => i.product_id === productId && i.variant_id === variantId);
+        
+        if (existingIndex > -1) {
+            if (carrito[existingIndex].cantidad + 1 > maxStock) {
+                alert('No puedes exceder el stock disponible.');
+                return;
+            }
+            carrito[existingIndex].cantidad++;
+        } else {
+            if (maxStock <= 0) {
+                alert('¡Producto sin stock en bodega!');
+                return;
+            }
+            let nombreMostrar = variantName ? `${nombre} - ${variantName}` : nombre;
+            carrito.push({
+                product_id: productId,
+                variant_id: variantId,
+                nombre: nombreMostrar,
+                sku: sku,
+                precio_final: precio,
+                precio_sugerido: precio,
+                precio_minimo: precioMinimo,
+                cantidad: 1,
+                max_stock: maxStock,
+                es_obsequio: false
+            });
+        }
+        renderCart();
+    }
+
+    function updateCartItem(index, qty) {
+        let val = parseInt(qty);
+        if (isNaN(val) || val < 1) val = 1;
+        if (val > carrito[index].max_stock) {
+            alert('Stock insuficiente.');
+            val = carrito[index].max_stock;
+        }
+        carrito[index].cantidad = val;
+        renderCart();
+    }
+
+    function updateCartItemPrice(index, newPrice) {
+        let val = parseFloat(newPrice);
+        if (isNaN(val) || val < 0) val = 0;
+        
+        let item = carrito[index];
+        if (!item.es_obsequio) {
+            const p_min = item.precio_minimo || 0;
+            const p_max = item.precio_sugerido || 0;
+            
+            if (val < p_min) {
+                alert('El precio no puede ser menor al precio mínimo establecido ($' + formatCOP(p_min) + ')');
+                val = p_min;
+            } else if (val > p_max) {
+                alert('El precio no puede ser mayor al precio sugerido ($' + formatCOP(p_max) + ')');
+                val = p_max;
+            }
+        }
+        
+        carrito[index].precio_final = val;
+        renderCart();
+    }
+
+    function toggleObsequio(index) {
+        let item = carrito[index];
+        if (item.es_obsequio) {
+            item.es_obsequio = false;
+            item.precio_final = item.precio_sugerido || 0;
+        } else {
+            item.es_obsequio = true;
+            item.precio_final = 0;
+        }
+        renderCart();
+    }
+
+    function removeCartItem(index) {
+        carrito.splice(index, 1);
+        renderCart();
+    }
+
+    function renderCart() {
+        const tbody = document.getElementById('cartItems');
+        const totalAmountEl = document.getElementById('cartTotal');
+        const countBadge = document.getElementById('itemCount');
+        const emptyState = document.getElementById('emptyCart');
+        
+        tbody.innerHTML = '';
+        currentTotal = 0;
+        let itemsCount = 0;
+
+        if (carrito.length === 0) {
+            emptyState.style.display = 'block';
+            totalAmountEl.innerText = '$0';
+            countBadge.innerText = '0 items';
+            document.getElementById('totalAmountInput').value = 0;
+            return;
+        }
+        emptyState.style.display = 'none';
+
+        carrito.forEach((item, index) => {
+            const subtotal = item.cantidad * item.precio_final;
+            currentTotal += subtotal;
+            itemsCount += item.cantidad;
+
+            const li = document.createElement('li');
+            li.className = 'list-group-item px-3 py-3 border-bottom';
+            let precioInputState = item.es_obsequio ? 'disabled' : '';
+            let isObsequioClass = item.es_obsequio ? 'text-success' : 'text-muted';
+            
+            li.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="fw-bold text-dark text-truncate" style="max-width: 70%;">
+                        ${item.nombre}
+                        <small class="text-muted d-block fw-normal" style="font-size: 0.75rem;">${item.sku}</small>
+                        ${item.es_obsequio ? '<span class="badge bg-success bg-opacity-10 text-success mt-1"><i class="fa-solid fa-gift me-1"></i>Obsequio</span>' : ''}
+                    </div>
+                    <div>
+                        {% if current_user.rol == 'admin' %}
+                        <button type="button" class="btn btn-link ${isObsequioClass} p-0 border-0 me-3" title="Marcar como Obsequio" onclick="toggleObsequio(${index})">
+                            <i class="fa-solid fa-gift fs-5"></i>
+                        </button>
+                        {% endif %}
+                        <button type="button" class="btn btn-link text-danger p-0 border-0" onclick="removeCartItem(${index})">
+                            <i class="fa-solid fa-xmark fs-5"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <div class="input-group input-group-sm flex-grow-1 me-2" style="max-width: 110px;">
+                        <span class="input-group-text bg-light text-muted border-0 px-2">Cant</span>
+                        <input type="number" class="form-control text-center fw-bold border-0 bg-light px-1" value="${item.cantidad}" onchange="updateCartItem(${index}, this.value)">
+                    </div>
+                    <div class="input-group input-group-sm flex-grow-1" style="max-width: 140px;">
+                        <span class="input-group-text bg-light text-muted border-0 px-2">$</span>
+                        <input type="number" class="form-control text-end fw-bold border-0 bg-light px-2 text-brand-black" value="${Math.round(item.precio_final)}" onchange="updateCartItemPrice(${index}, this.value)" ${precioInputState}>
+                    </div>
+                </div>
+            `;
+            tbody.appendChild(li);
+        });
+
+        totalAmountEl.innerText = `$${formatCOP(currentTotal)}`;
+        countBadge.innerText = `${itemsCount} items`;
+        document.getElementById('totalAmountInput').value = currentTotal;
+    }
+
+    function setFullAbono() {
+        if(currentTotal > 0) {
+            document.getElementById('montoAbonoInput').value = formatCOP(currentTotal);
+            document.getElementById('metodoPago').value = 'efectivo';
+            toggleAbonoInput();
+        }
+    }
+
+    function processCheckout() {
+        if (carrito.length === 0) {
+            alert('El carrito está vacío. Selecciona productos primero.');
+            return;
+        }
+
+        const form = document.getElementById('checkoutForm');
+        if (!form.cliente_id.value) {
+            alert('Debes seleccionar un cliente para generar la factura.');
+            return;
+        }
+
+        // Convertir cart a JSON para el hidden input
+        document.getElementById('cartDataInput').value = JSON.stringify(carrito);
+        
+        form.submit();
+    }
+</script>
+{% endblock %}
