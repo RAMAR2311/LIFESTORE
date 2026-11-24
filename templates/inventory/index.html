@@ -188,7 +188,11 @@
                                     class="btn btn-sm {% if p.imagen %}btn-success{% else %}btn-outline-secondary{% endif %} rounded-circle shadow-sm flex-shrink-0"
                                     style="width: 32px; height: 32px; padding: 0; line-height: 30px;"
                                     title="{% if p.imagen %}Ver / Descargar / Cambiar Sticker{% else %}Subir Sticker / Foto QR{% endif %}"
-                                    onclick="abrirModalSticker({{ p.id }}, {{ p.nombre|tojson }}, {{ p.sku|tojson }}, {{ (p.imagen or '')|tojson }})">
+                                    data-prod-id="{{ p.id }}"
+                                    data-prod-nombre="{{ p.nombre }}"
+                                    data-prod-sku="{{ p.sku }}"
+                                    data-prod-imagen="{{ p.imagen or '' }}"
+                                    onclick="abrirModalSticker(this)">
                                 <i class="fa-solid fa-qrcode"></i>
                             </button>
                             {% if p.imagen %}
@@ -472,7 +476,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-function abrirModalSticker(prodId, prodNombre, prodSku, prodImagen) {
+function abrirModalSticker(btn) {
+    const prodId = btn.dataset.prodId;
+    const prodNombre = btn.dataset.prodNombre || '';
+    const prodSku = btn.dataset.prodSku || '';
+    const prodImagen = btn.dataset.prodImagen || '';
+
     document.getElementById('stickerProdNombre').textContent = prodNombre;
     document.getElementById('stickerProdSku').textContent = prodSku;
     const form = document.getElementById('formSubirSticker');
