@@ -702,9 +702,9 @@ def importar_masivo_preview():
             except UnicodeDecodeError:
                 decoded = content.decode('latin1', errors='replace')
             sep = ';' if ';' in decoded[:1000] else ','
-            df = pd.read_csv(io.StringIO(decoded), sep=sep)
+            df = pd.read_csv(io.StringIO(decoded), sep=sep, dtype=str)
         else:
-            df = pd.read_excel(file)
+            df = pd.read_excel(file, dtype=str)
 
         def norm_col(c):
             c = str(c).strip().lower()
@@ -760,14 +760,37 @@ def importar_masivo_preview():
 
         todos_asesores = Asesor.query.filter_by(activo=True).all()
         asesor_by_code = {}
+        asesor_by_id_map = {}
         for a in todos_asesores:
+            asesor_by_id_map[str(a.id)] = a
             if a.codigo:
-                asesor_by_code[a.codigo.strip().upper()] = a
+                cod_clean = a.codigo.strip().upper()
+                asesor_by_code[cod_clean] = a
+                # Fallback con ceros a la izquierda y sin ceros si el código es numérico
+                if cod_clean.isdigit():
+                    num_val = int(cod_clean)
+                    asesor_by_code[str(num_val)] = a
+                    asesor_by_code[str(num_val).zfill(3)] = a
+                    asesor_by_code[str(num_val).zfill(2)] = a
             asesor_by_code[f"ASE-{a.id:03d}"] = a
-            asesor_by_code[str(a.id)] = a
+            asesor_by_code[f"ASE-{a.id}"] = a
+
+        def limpiar_texto(val):
+            if val is None:
+                return ''
+            s = str(val).strip()
+            if s.endswith('.0'):
+                s = s[:-2].strip()
+            return s
+
+        def es_vacio(val):
+            if val is None:
+                return True
+            s = str(val).strip().lower()
+            return s in ('', 'nan', 'none', 'null', 'n/a', 'na')
 
         def limpiar_monto(val):
-            if val is None or val == '':
+            if es_vacio(val):
                 return Decimal('0.00')
             s = str(val).replace('$', '').replace(',', '').replace(' ', '').strip()
             try:
@@ -785,11 +808,10 @@ def importar_masivo_preview():
         for idx, row in df.iterrows():
             fila_num = idx + 2
             
-            raw_imei1 = str(row[col_map['imei1']]).strip()
-            if raw_imei1.endswith('.0'):
-                raw_imei1 = raw_imei1[:-2]
+            # 1. Serial / IMEI 1 preservando formato exacto de texto
+            raw_imei1 = limpiar_texto(row[col_map['imei1']])
             
-            if not raw_imei1:
+            if es_vacio(raw_imei1):
                 alertas.append({'fila': fila_num, 'tipo': 'danger', 'msg': 'Fila omitida por IMEI1/Serial vacío.'})
                 continue
 
@@ -821,31 +843,44 @@ def importar_masivo_preview():
                 except:
                     bateria = raw_bat
 
-            raw_imei2 = str(row.get(col_map.get('imei2', ''), '')).strip()
-            if raw_imei2.endswith('.0'):
-                raw_imei2 = raw_imei2[:-2]
+            raw_imei2 = limpiar_texto(row.get(col_map.get('imei2', ''), ''))
 
-            # Asesor
-            raw_asesor = str(row.get(col_map.get('codigo_asesor', ''), '')).strip()
+            # 3. Asesor con normalización segura y fallback zfill(3)
+            raw_asesor = limpiar_texto(row.get(col_map.get('codigo_asesor', ''), ''))
             asesor_obj = None
-            asesor_nombre = "Sin Asesor (Sin comisión recepción)"
+            asesor_nombre = "Sin asesor / Sin comisión"
             asesor_id = None
 
-            if raw_asesor:
+            if not es_vacio(raw_asesor):
                 cod_lookup = raw_asesor.upper()
                 asesor_obj = asesor_by_code.get(cod_lookup)
+                
+                # Fallback con relleno de ceros zfill(3) si viene sin ceros (ej. "4" -> "004")
                 if not asesor_obj and raw_asesor.isdigit():
-                    asesor_obj = asesor_by_code.get(raw_asesor)
+                    num_int_str = str(int(raw_asesor))
+                    asesor_obj = asesor_by_code.get(raw_asesor.zfill(3)) or \
+                                 asesor_by_code.get(raw_asesor.zfill(2)) or \
+                                 asesor_by_code.get(f"ASE-{raw_asesor.zfill(3)}") or \
+                                 asesor_by_id_map.get(num_int_str)
+
                 if asesor_obj:
                     asesor_nombre = asesor_obj.nombre
                     asesor_id = asesor_obj.id
                 else:
-                    alertas.append({'fila': fila_num, 'tipo': 'warning', 'msg': f'Código de asesor "{raw_asesor}" no encontrado en asesores activos. Quedará sin comisión de recepción.'})
+                    asesor_nombre = f"Código '{raw_asesor}' no encontrado"
+                    alertas.append({
+                        'fila': fila_num, 
+                        'tipo': 'warning', 
+                        'msg': f'Código de asesor "{raw_asesor}" no encontrado en asesores activos. Quedará sin comisión de recepción a menos que se corrija.'
+                    })
+            else:
+                # Si viene vacío/None/NaN: No es un error ni una alerta bloqueante
+                raw_asesor = None
 
             resumen_asesores[asesor_nombre] = resumen_asesores.get(asesor_nombre, 0) + 1
 
-            # Sede
-            raw_sede = str(row.get(col_map.get('sede', ''), '')).strip()
+            # 4. Sede
+            raw_sede = limpiar_texto(row.get(col_map.get('sede', ''), ''))
             branch_obj = None
             if raw_sede:
                 s_lower = raw_sede.lower()
