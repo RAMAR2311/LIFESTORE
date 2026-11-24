@@ -41,10 +41,10 @@
             position: relative;
             background: #ffffff;
             border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 1rem 1.1rem;
+            border-radius: 18px;
+            padding: 1.15rem 1.15rem 0.95rem 1.15rem;
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -58,23 +58,23 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 3.5px;
+            height: 4px;
             background: var(--card-accent, #3b82f6);
-            border-radius: 16px 16px 0 0;
+            border-radius: 18px 18px 0 0;
         }
         .finance-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+            box-shadow: 0 16px 28px -6px rgba(15, 23, 42, 0.12), 0 6px 12px -2px rgba(15, 23, 42, 0.04);
             border-color: #cbd5e1;
         }
         .finance-card .icon-chip {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.95rem;
+            font-size: 1rem;
             background: var(--card-bg-subtle, #eff6ff);
             color: var(--card-accent, #3b82f6);
             transition: transform 0.2s ease;
@@ -84,11 +84,25 @@
         }
         .finance-card .amount-display {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.25rem;
+            font-size: 1.35rem;
             font-weight: 800;
             letter-spacing: -0.02em;
             color: #0f172a;
             line-height: 1.2;
+        }
+        .finance-card .branch-pill {
+            font-size: 0.72rem;
+            padding: 0.28rem 0.55rem;
+            border-radius: 8px;
+            background: #f8fafc;
+            border: 1px solid #f1f5f9;
+            transition: all 0.15s ease;
+        }
+        .finance-card .branch-pill:hover {
+            background: #ffffff;
+            border-color: var(--card-accent, #3b82f6);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         .finance-card .btn-card-action {
             font-size: 0.73rem;
@@ -100,7 +114,7 @@
             border: none;
             background: transparent;
             padding: 0;
-            margin-top: 0.5rem;
+            margin-top: 0.65rem;
             transition: gap 0.2s ease, opacity 0.2s ease;
         }
         .finance-card:hover .btn-card-action {
@@ -114,8 +128,8 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
         }
         [data-theme="dark"] .finance-card:hover {
-            border-color: rgba(255, 255, 255, 0.22) !important;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7) !important;
+            border-color: rgba(255, 255, 255, 0.25) !important;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7) !important;
         }
         [data-theme="dark"] .finance-card .amount-display {
             color: #f8fafc !important;
@@ -123,8 +137,80 @@
         [data-theme="dark"] .finance-card .text-muted {
             color: #94a3b8 !important;
         }
+        [data-theme="dark"] .finance-card .branch-pill {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            color: #e2e8f0 !important;
+        }
+        [data-theme="dark"] .finance-card .branch-pill:hover {
+            background: rgba(255, 255, 255, 0.12) !important;
+            border-color: var(--card-accent, #3b82f6) !important;
+        }
+        [data-theme="dark"] .finance-card .branch-pill .text-dark {
+            color: #f8fafc !important;
+        }
     </style>
 
+    {% if desglose_metodos %}
+    <div class="row g-3 mb-4">
+        {% for m in desglose_metodos.values() %}
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="finance-card h-100" style="--card-accent: {{ m.color }}; --card-bg-subtle: {{ m.bg_subtle }};" onclick="filtrarTabla('{{ m.clave }}')">
+                <div>
+                    <!-- Encabezado con método e ícono -->
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-uppercase fw-bold text-muted" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ m.nombre }}</span>
+                        <div class="icon-chip"><i class="{{ m.icono }}"></i></div>
+                    </div>
+
+                    <!-- Monto Total Grande -->
+                    <div class="amount-display mb-2">${{ m.total|cop }}</div>
+
+                    <!-- Barra de distribución si hay ventas -->
+                    {% if m.tiene_ventas %}
+                    <div class="progress mb-2 rounded-pill overflow-hidden" style="height: 5px; background: rgba(0,0,0,0.06);">
+                        {% for suc in m.lista_sucursales if suc.monto > 0 %}
+                        <div class="progress-bar" style="width: {{ suc.porcentaje }}%; background-color: {{ m.color }}; opacity: {{ [1.0, 0.78, 0.58, 0.4][loop.index0 % 4] }};" title="{{ suc.nombre }}: ${{ suc.monto|cop }} ({{ suc.porcentaje }}%)"></div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Desglose por Sucursal / Tienda -->
+                    <div class="branch-breakdown-list pt-2 border-top border-light-subtle">
+                        {% set con_ventas = m.lista_sucursales | selectattr('monto', 'gt', 0) | list %}
+                        {% if con_ventas %}
+                            <div class="d-flex flex-column gap-1">
+                                {% for suc in con_ventas %}
+                                <div class="branch-pill d-flex justify-content-between align-items-center"
+                                     onclick="event.stopPropagation(); filtrarTabla('{{ m.clave }}', '{{ suc.nombre }}');"
+                                     title="Filtrar ventas de {{ m.nombre }} en {{ suc.nombre }}">
+                                    <span class="text-truncate fw-semibold text-secondary d-flex align-items-center gap-1" style="max-width: 58%;">
+                                        <i class="fa-solid fa-shop text-muted" style="font-size: 0.62rem;"></i>
+                                        <span class="text-truncate">{{ suc.nombre }}</span>
+                                    </span>
+                                    <div class="text-end text-nowrap">
+                                        <span class="fw-bold font-mono text-dark" style="font-size: 0.74rem;">${{ suc.monto|cop }}</span>
+                                        <span class="text-muted ms-1" style="font-size: 0.65rem;">({{ suc.porcentaje }}%)</span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-muted small py-2 fst-italic text-center" style="font-size: 0.72rem; opacity: 0.75;">
+                                <i class="fa-regular fa-folder-open me-1"></i> Sin ventas en el período
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <button class="btn-card-action d-print-none mt-2" type="button">
+                    Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
     <!-- 1. Efectivo -->
     <div class="col-6 col-md-3 mb-3">
         <div class="finance-card h-100" style="--card-accent: #059669; --card-bg-subtle: #ecfdf5;" onclick="filtrarTabla('efectivo')">
@@ -252,6 +338,7 @@
             </button>
         </div>
     </div>
+    {% endif %}
 
     {% if total_otros > 0 %}
     <!-- Otros / Históricos -->
@@ -332,9 +419,14 @@
                 {% else %}
                     {% set _ = metodos_usados.append(venta.metodo_pago) %}
                 {% endif %}
-                <tr class="venta-row" data-pagos="{{ metodos_usados|join(',') }}">
+                <tr class="venta-row" data-pagos="{{ metodos_usados|join(',') }}" data-branch="{{ (venta.branch.nombre if venta.branch else (venta.sucursal or 'Principal'))|lower }}">
                     <td class="fw-bold text-brand-black align-middle">Ticket #{{ "%05d"|format(venta.id) }}</td>
-                    <td class="align-middle text-muted"><i class="fa-regular fa-calendar text-brand-pink me-1"></i> {{ venta.fecha_venta.strftime('%Y-%m-%d a las %H:%M') }}</td>
+                    <td class="align-middle text-muted">
+                        <div><i class="fa-regular fa-calendar text-brand-pink me-1"></i> {{ venta.fecha_venta.strftime('%Y-%m-%d a las %H:%M') }}</div>
+                        <span class="badge bg-light text-secondary border px-2 py-0 mt-1 d-inline-flex align-items-center" style="font-size: 0.68rem;">
+                            <i class="fa-solid fa-shop me-1 text-primary" style="font-size: 0.6rem;"></i>{{ venta.branch.nombre if venta.branch else (venta.sucursal or 'Principal') }}
+                        </span>
+                    </td>
                     <td class="align-middle">
                         {% if venta.canal_venta %}
                             <span class="badge bg-light text-dark border rounded-pill px-2 py-1 small">
@@ -806,7 +898,7 @@
         });
     });
 
-    function filtrarTabla(metodo) {
+    function filtrarTabla(metodo, sucursal = null) {
         const filas = document.querySelectorAll('tr.venta-row');
         let visibles = 0;
         const equivalentes = {
@@ -814,12 +906,17 @@
             'sistecredito': ['sistecredito', 'sitecredito']
         };
         const buscados = equivalentes[metodo] || [metodo];
+        const sucursalTarget = sucursal ? sucursal.trim().toLowerCase() : null;
         
         filas.forEach(fila => {
             const pagosStr = fila.getAttribute('data-pagos') || '';
             const metodosFila = pagosStr.split(',');
+            const filaBranch = (fila.getAttribute('data-branch') || '').trim().toLowerCase();
             
-            if (metodo === 'todos' || buscados.some(m => metodosFila.includes(m))) {
+            const matchMetodo = (metodo === 'todos' || buscados.some(m => metodosFila.includes(m)));
+            const matchBranch = (!sucursalTarget || filaBranch === sucursalTarget);
+
+            if (matchMetodo && matchBranch) {
                 fila.style.display = '';
                 visibles++;
             } else {
@@ -828,7 +925,7 @@
         });
         
         let filterBanner = document.getElementById('filter-banner');
-        if (metodo !== 'todos') {
+        if (metodo !== 'todos' || sucursalTarget) {
             if (!filterBanner) {
                 filterBanner = document.createElement('div');
                 filterBanner.id = 'filter-banner';
@@ -840,7 +937,11 @@
                 const tableContainer = document.querySelector('.table-responsive');
                 tableContainer.parentNode.insertBefore(filterBanner, tableContainer);
             }
-            filterBanner.innerHTML = `<span><i class="fa-solid fa-filter me-2"></i> Mostrando operaciones que incluyen: <strong class="text-uppercase">${metodo.replace('_', ' ')}</strong> (${visibles} resultados)</span>
+            let labelFiltro = `<strong class="text-uppercase">${metodo.replace('_', ' ')}</strong>`;
+            if (sucursal) {
+                labelFiltro += ` en sede <strong class="text-primary">${sucursal}</strong>`;
+            }
+            filterBanner.innerHTML = `<span><i class="fa-solid fa-filter me-2"></i> Mostrando operaciones de ${labelFiltro} (${visibles} resultados)</span>
                                       <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold bg-white" onclick="filtrarTabla('todos')"><i class="fa-solid fa-times me-1"></i> Quitar Filtro</button>`;
             filterBanner.style.display = 'flex';
         } else if (filterBanner) {

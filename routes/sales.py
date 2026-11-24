@@ -804,6 +804,33 @@ def historial():
     paginacion = query.order_by(Sale.fecha_venta.desc()).paginate(page=page, per_page=30, error_out=False)
     ventas = paginacion.items
     
+    # Cargar sucursales activas
+    sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).all()
+
+    # Configuración de Métodos de Pago con Estructura Enriquecida por Sede
+    METODOS_CONFIG = [
+        ('efectivo', 'Efectivo', '#059669', '#ecfdf5', 'fa-solid fa-money-bills'),
+        ('nequi', 'Nequi', '#9333ea', '#faf5ff', 'fa-solid fa-mobile-screen-button'),
+        ('bancolombia', 'Bancolombia', '#ea580c', '#fff7ed', 'fa-solid fa-building-columns'),
+        ('davivienda', 'Davivienda', '#dc2626', '#fef2f2', 'fa-solid fa-building-columns'),
+        ('daviplata', 'Daviplata', '#e11d48', '#fff1f2', 'fa-solid fa-mobile-retro'),
+        ('bold', 'Bold (Datáfono)', '#0d9488', '#f0fdfa', 'fa-solid fa-bolt'),
+        ('addi', 'Addi', '#7c3aed', '#f5f3ff', 'fa-solid fa-bag-shopping'),
+        ('sistecredito', 'Sistecrédito', '#2563eb', '#eff6ff', 'fa-solid fa-id-card'),
+    ]
+
+    desglose_metodos = {}
+    for m_key, m_nombre, m_color, m_bg, m_icono in METODOS_CONFIG:
+        desglose_metodos[m_key] = {
+            'clave': m_key,
+            'nombre': m_nombre,
+            'color': m_color,
+            'bg_subtle': m_bg,
+            'icono': m_icono,
+            'total': Decimal('0'),
+            'sucursales': {b.nombre: Decimal('0') for b in sucursales_activas}
+        }
+
     # Auditar y cruzar sumatorios de métricas de pago
     # Sistema híbrido: usa SalePayment si existe, caso contrario cae al metodo_pago legacy
     total_efectivo = Decimal('0')
@@ -819,59 +846,83 @@ def historial():
     total_retomas = Decimal('0')
     total_mixto = 0  # Contador de ventas con pago mixto
 
+    def registrar_pago_metodo(metodo_raw, monto, branch_nom):
+        nonlocal total_efectivo, total_nequi, total_bancolombia, total_davivienda
+        nonlocal total_daviplata, total_bold, total_addi, total_sistecredito
+        nonlocal total_abono_tercero, total_retomas, total_otros
+
+        monto_dec = Decimal(str(monto or 0))
+        m = (metodo_raw or '').lower().strip()
+        m_key = None
+
+        if m == 'efectivo':
+            total_efectivo += monto_dec
+            m_key = 'efectivo'
+        elif m == 'nequi':
+            total_nequi += monto_dec
+            m_key = 'nequi'
+        elif m == 'bancolombia':
+            total_bancolombia += monto_dec
+            m_key = 'bancolombia'
+        elif m == 'davivienda':
+            total_davivienda += monto_dec
+            m_key = 'davivienda'
+        elif m == 'daviplata':
+            total_daviplata += monto_dec
+            m_key = 'daviplata'
+        elif m in ['bold', 'bolt', 'tarjeta_credito']:
+            total_bold += monto_dec
+            m_key = 'bold'
+        elif m == 'addi':
+            total_addi += monto_dec
+            m_key = 'addi'
+        elif m in ['sistecredito', 'sitecredito']:
+            total_sistecredito += monto_dec
+            m_key = 'sistecredito'
+        elif m == 'abono_tercero':
+            total_abono_tercero += monto_dec
+        elif m == 'retoma':
+            total_retomas += monto_dec
+        else:
+            total_otros += monto_dec
+
+        if m_key and m_key in desglose_metodos:
+            desglose_metodos[m_key]['total'] += monto_dec
+            if branch_nom not in desglose_metodos[m_key]['sucursales']:
+                desglose_metodos[m_key]['sucursales'][branch_nom] = Decimal('0')
+            desglose_metodos[m_key]['sucursales'][branch_nom] += monto_dec
+
     for v in todas_las_ventas:
+        b_nom = v.branch.nombre if v.branch else (v.sucursal or 'Principal')
         if v.pagos:  # Pagos nuevos con tabla sale_payments
             for pago in v.pagos:
-                if pago.metodo_pago == 'efectivo':
-                    total_efectivo += pago.monto
-                elif pago.metodo_pago == 'nequi':
-                    total_nequi += pago.monto
-                elif pago.metodo_pago == 'bancolombia':
-                    total_bancolombia += pago.monto
-                elif pago.metodo_pago == 'davivienda':
-                    total_davivienda += pago.monto
-                elif pago.metodo_pago == 'daviplata':
-                    total_daviplata += pago.monto
-                elif pago.metodo_pago in ['bold', 'bolt', 'tarjeta_credito']:
-                    total_bold += pago.monto
-                elif pago.metodo_pago == 'addi':
-                    total_addi += pago.monto
-                elif pago.metodo_pago in ['sistecredito', 'sitecredito']:
-                    total_sistecredito += pago.monto
-                elif pago.metodo_pago == 'abono_tercero':
-                    total_abono_tercero += pago.monto
-                elif pago.metodo_pago == 'retoma':
-                    total_retomas += pago.monto
-                else:
-                    total_otros += pago.monto
+                registrar_pago_metodo(pago.metodo_pago, pago.monto, b_nom)
             if len(v.pagos) > 1:
                 total_mixto += 1
         else:  # Retrocompatibilidad con ventas antiguas sin SalePayment
-            if v.metodo_pago == 'efectivo':
-                total_efectivo += v.monto_total
-            elif v.metodo_pago == 'nequi':
-                total_nequi += v.monto_total
-            elif v.metodo_pago == 'bancolombia':
-                total_bancolombia += v.monto_total
-            elif v.metodo_pago == 'davivienda':
-                total_davivienda += v.monto_total
-            elif v.metodo_pago == 'daviplata':
-                total_daviplata += v.monto_total
-            elif v.metodo_pago in ['bold', 'bolt', 'tarjeta_credito']:
-                total_bold += v.monto_total
-            elif v.metodo_pago == 'addi':
-                total_addi += v.monto_total
-            elif v.metodo_pago in ['sistecredito', 'sitecredito']:
-                total_sistecredito += v.monto_total
-            elif v.metodo_pago == 'abono_tercero':
-                total_abono_tercero += v.monto_total
-            else:
-                total_otros += v.monto_total
+            registrar_pago_metodo(v.metodo_pago, v.monto_total, b_nom)
+
+    # Calcular porcentajes y listas ordenadas por sucursal
+    for m_key, m_info in desglose_metodos.items():
+        tot = m_info['total']
+        lista_sucursales = []
+        for s_nom, s_monto in m_info['sucursales'].items():
+            pct = round(float(s_monto / tot * 100), 1) if tot > 0 else 0
+            lista_sucursales.append({
+                'nombre': s_nom,
+                'monto': s_monto,
+                'porcentaje': pct
+            })
+        lista_sucursales.sort(key=lambda x: x['monto'], reverse=True)
+        m_info['lista_sucursales'] = lista_sucursales
+        m_info['tiene_ventas'] = tot > 0
 
     # Envío al Engine de HTML
     return render_template('sales/historial.html', 
                            ventas=ventas, 
                            paginacion=paginacion,
+                           desglose_metodos=desglose_metodos,
+                           sucursales_activas=sucursales_activas,
                            total_efectivo=total_efectivo,
                            total_nequi=total_nequi,
                            total_bancolombia=total_bancolombia,
