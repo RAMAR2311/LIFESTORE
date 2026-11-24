@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-recycle text-brand-pink me-2"></i> Registro de Retomas</h2>
+    <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaRetoma">
+        <i class="fa-solid fa-plus me-1"></i> Registrar Retoma Directa
+    </button>
 </div>
 
 <!-- Barra de Búsqueda -->
@@ -836,6 +839,131 @@
                     <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-warning rounded-pill btn-sm px-4 fw-bold shadow-sm">
                         <i class="fa-solid fa-paper-plane me-1"></i> Enviar a Soporte
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL REGISTRAR RETOMA DIRECTA -->
+<div class="modal fade text-start" id="modalNuevaRetoma" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold fs-6">
+                    <i class="fa-solid fa-recycle text-brand-pink me-2"></i> Registrar Nueva Retoma Directa
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('retomas_bp.crear_retoma_directa') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 small rounded-3 mb-3">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        Registra aquí los equipos que ingresan como retoma o compra directa a clientes sin venta asociada previa. Ingresarán en estado <strong>En Evaluación</strong> (Cuarentena).
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold text-dark">Marca *</label>
+                            <input type="text" name="marca" class="form-control form-control-sm" list="marcasList" placeholder="Ej: Apple, Samsung, Xiaomi" required>
+                            <datalist id="marcasList">
+                                <option value="Apple">
+                                <option value="Samsung">
+                                <option value="Xiaomi">
+                                <option value="Motorola">
+                                <option value="Huawei">
+                                <option value="Oppo">
+                                <option value="Realme">
+                            </datalist>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <label class="form-label small fw-bold text-dark">Modelo / Referencia *</label>
+                            <input type="text" name="modelo" class="form-control form-control-sm" placeholder="Ej: iPhone 13 128GB Midnight" required>
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label small fw-bold text-dark">Almacenamiento</label>
+                            <select name="memoria" class="form-select form-select-sm">
+                                <option value="">-- Seleccionar --</option>
+                                <option value="32GB">32GB</option>
+                                <option value="64GB">64GB</option>
+                                <option value="128GB">128GB</option>
+                                <option value="256GB">256GB</option>
+                                <option value="512GB">512GB</option>
+                                <option value="1TB">1TB</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-dark">IMEI 1 (Principal) *</label>
+                            <input type="text" name="imei1" class="form-control form-control-sm font-mono" placeholder="Ej: 356789012345678" required maxlength="20">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small fw-bold text-dark">IMEI 2 (Opcional)</label>
+                            <input type="text" name="imei2" class="form-control form-control-sm font-mono" placeholder="Ej: 356789012345679" maxlength="20">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold text-dark">Color</label>
+                            <input type="text" name="color" class="form-control form-control-sm" placeholder="Ej: Azul, Negro, Blanco">
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold text-dark">Batería (%)</label>
+                            <input type="text" name="bateria" class="form-control form-control-sm" placeholder="Ej: 87% o 100%">
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold text-dark">Valor de Retoma / Compra ($ COP) *</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">$</span>
+                                <input type="text" name="valor_retoma" class="form-control form-control-sm format-price fw-bold" placeholder="0" required onkeyup="formatInputCOP(this)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold text-dark">Sucursal / Sede de Ingreso *</label>
+                            <select name="branch_id" class="form-select form-select-sm" required>
+                                {% if sucursales_disponibles %}
+                                    {% for br in sucursales_disponibles %}
+                                    <option value="{{ br.id }}" {% if current_user.branch_id == br.id %}selected{% endif %}>{{ br.nombre }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="1">Principal</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold text-dark">Asesor que Gestiona</label>
+                            <select name="asesor_retoma_id" class="form-select form-select-sm">
+                                <option value="">-- Sin Asesor Específico --</option>
+                                {% if asesores_disponibles %}
+                                    {% for asr in asesores_disponibles %}
+                                    <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold text-dark">Cliente / Proveedor</label>
+                            <input type="text" name="proveedor" class="form-control form-control-sm" value="Cliente" placeholder="Nombre del cliente">
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-dark">Observaciones / Estado Estético / Detalles</label>
+                        <textarea name="observaciones" class="form-control form-control-sm" rows="2" placeholder="Detalles estéticos, rayones, accesorios entregados con el equipo..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-check me-1"></i> Guardar Retoma
                     </button>
                 </div>
             </form>

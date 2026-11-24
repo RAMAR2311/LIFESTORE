@@ -308,6 +308,7 @@ def create_app():
             "ALTER TABLE sales ADD COLUMN provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL;",
             "ALTER TABLE sales ADD COLUMN asesor_id INTEGER REFERENCES asesores(id) ON DELETE SET NULL;",
             "ALTER TABLE retomas ADD COLUMN arreglos NUMERIC(10, 2) DEFAULT 0.0;",
+            "ALTER TABLE retomas ALTER COLUMN sale_id DROP NOT NULL;",
             "ALTER TABLE retomas ADD COLUMN ok_contabilidad BOOLEAN DEFAULT FALSE;",
             "ALTER TABLE retomas ADD COLUMN ok_venta BOOLEAN DEFAULT FALSE;",
             "ALTER TABLE sale_details ADD COLUMN ok_contabilidad BOOLEAN DEFAULT FALSE;",

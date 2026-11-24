@@ -537,7 +537,7 @@ class Retoma(db.Model):
     __tablename__ = 'retomas'
     
     id = db.Column(db.Integer, primary_key=True)
-    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True)
     modelo = db.Column(db.String(150), nullable=False)
     marca = db.Column(db.String(100), nullable=True)
     proveedor = db.Column(db.String(150), nullable=True, default='Cliente')

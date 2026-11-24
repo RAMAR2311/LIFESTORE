@@ -48,16 +48,104 @@ def cuarentena():
             if prod_previo:
                 r_item.es_reingreso = True
 
-    from models import Technician, Asesor
+    from models import Technician, Asesor, Branch
     tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
     asesores_disponibles = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
+    sucursales_disponibles = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).all()
 
     return render_template('retomas/cuarentena.html',
                            retomas=paginacion.items,
                            paginacion=paginacion,
                            tecnicos_disponibles=tecnicos_disponibles,
                            asesores_disponibles=asesores_disponibles,
+                           sucursales_disponibles=sucursales_disponibles,
                            q=q)
+
+@retomas_bp.route('/crear', methods=['POST'])
+@login_required
+@admin_required
+def crear_retoma_directa():
+    modelo = request.form.get('modelo', '').strip()
+    marca = request.form.get('marca', '').strip()
+    imei1 = request.form.get('imei1', '').strip()
+    imei2 = request.form.get('imei2', '').strip() or None
+    color = request.form.get('color', '').strip() or None
+    bateria = request.form.get('bateria', '').strip() or None
+    memoria = request.form.get('memoria', '').strip() or None
+    proveedor = request.form.get('proveedor', '').strip() or 'Cliente'
+    observaciones = request.form.get('observaciones', '').strip() or None
+    branch_id_input = request.form.get('branch_id', type=int)
+    asesor_id_input = request.form.get('asesor_retoma_id', type=int)
+    valor_retoma_raw = request.form.get('valor_retoma', '0')
+
+    if not modelo or not imei1:
+        flash('El modelo y el IMEI 1 son obligatorios para registrar la retoma.', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    # Limpiar formato de valor de retoma
+    valor_limpio = re.sub(r'[^\d.]', '', str(valor_retoma_raw).replace(',', ''))
+    try:
+        valor_retoma = Decimal(valor_limpio)
+    except:
+        valor_retoma = Decimal('0')
+
+    if valor_retoma <= 0:
+        flash('Debes ingresar un valor de retoma válido mayor a $0.', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    # Validar que el IMEI 1 no exista ya activo en otra retoma no aprobada o producto con stock
+    retoma_existente = Retoma.query.filter_by(imei1=imei1, estado='en_evaluacion').first()
+    if retoma_existente:
+        flash(f'Ya existe una retoma en evaluación con el IMEI {imei1} (ID #{retoma_existente.id}).', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    prod_activo = Product.query.filter_by(imei=imei1).first()
+    if prod_activo and prod_activo.total_stock > 0:
+        flash(f'El IMEI {imei1} ya pertenece a un producto activo en stock ({prod_activo.nombre}).', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    # Determinar sucursal
+    target_branch_id = branch_id_input or current_user.branch_id or 1
+
+    try:
+        nueva_retoma = Retoma(
+            sale_id=None,
+            modelo=modelo,
+            marca=marca,
+            proveedor=proveedor,
+            valor_retoma=valor_retoma,
+            arreglos=Decimal('0.00'),
+            imei1=imei1,
+            imei2=imei2,
+            color=color,
+            bateria=bateria,
+            memoria=memoria,
+            observaciones=observaciones,
+            estado='en_evaluacion',
+            ok_contabilidad=False,
+            ok_venta=False,
+            vendedor_id=current_user.id,
+            branch_id=target_branch_id,
+            asesor_retoma_id=asesor_id_input
+        )
+        db.session.add(nueva_retoma)
+        db.session.commit()
+
+        # Registro en auditoría
+        log = AuditLog(
+            user_id=current_user.id,
+            action='CREAR_RETOMA_DIRECTA',
+            details=f"Retoma directa #{nueva_retoma.id} creada: {marca} {modelo} (IMEI: {imei1}) por valor ${valor_retoma:,.2f}"
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        flash(f'Retoma #{nueva_retoma.id} ({marca} {modelo}) registrada exitosamente en Cuarentena.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al registrar la retoma: {str(e)}', 'danger')
+
+    return redirect(url_for('retomas_bp.cuarentena'))
 
 @retomas_bp.route('/aprobar/<int:id>', methods=['POST'])
 @login_required
