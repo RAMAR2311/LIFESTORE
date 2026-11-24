@@ -96,7 +96,27 @@ def crear_retoma_directa():
     proveedor = request.form.get('proveedor', '').strip() or 'Cliente'
     branch_id_input = request.form.get('branch_id', type=int)
     asesor_id_input = request.form.get('asesor_retoma_id', type=int)
+    codigo_asesor_input = (request.form.get('codigo_asesor') or '').strip().upper()
     target_branch_id = branch_id_input or current_user.branch_id or 1
+
+    # Blindaje de Seguridad: Validación obligatoria del Asesor Responsable y su Código/PIN
+    if not asesor_id_input:
+        flash('Es obligatorio seleccionar el Asesor Responsable de la retoma.', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    asesor_obj = Asesor.query.get(asesor_id_input)
+    if not asesor_obj or not asesor_obj.activo:
+        flash('El asesor seleccionado no es válido o no se encuentra activo.', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    if not codigo_asesor_input:
+        flash(f"Debes ingresar el código/PIN personal del asesor '{asesor_obj.nombre}' para validar y autorizar la retoma.", 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    codigo_esperado = (asesor_obj.codigo or f"ASE-{asesor_obj.id:03d}").strip().upper()
+    if codigo_asesor_input != codigo_esperado:
+        flash(f"Código de Asesor incorrecto para '{asesor_obj.nombre}'. Se requiere su PIN personal para que quede constancia del registro.", 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
 
     # Validar duplicados dentro del mismo lote enviado
     vistos_en_lote = set()
@@ -188,7 +208,7 @@ def crear_retoma_directa():
         db.session.commit()
 
         # Registro en auditoría
-        detalles_log = f"Lote de {len(creados)} retoma(s) directas creado: " + ", ".join([f"#{r.id} ({r.marca} {r.modelo} - IMEI {r.imei1})" for r in creados])
+        detalles_log = f"Lote de {len(creados)} retoma(s) directas creado por Asesor {asesor_obj.nombre} (Código verificado): " + ", ".join([f"#{r.id} ({r.marca} {r.modelo} - IMEI {r.imei1})" for r in creados])
         log = AuditLog(
             user_id=current_user.id,
             action='CREAR_RETOMAS_LOTE',
@@ -198,9 +218,9 @@ def crear_retoma_directa():
         db.session.commit()
 
         if len(creados) == 1:
-            flash(f'Retoma #{creados[0].id} ({creados[0].marca} {creados[0].modelo}) registrada exitosamente en Cuarentena.', 'success')
+            flash(f'Retoma #{creados[0].id} ({creados[0].marca} {creados[0].modelo}) registrada exitosamente en Cuarentena por el asesor {asesor_obj.nombre}.', 'success')
         else:
-            flash(f'¡Se registraron exitosamente {len(creados)} retomas en Cuarentena!', 'success')
+            flash(f'¡Se registraron exitosamente {len(creados)} retomas en Cuarentena a nombre del asesor {asesor_obj.nombre}!', 'success')
 
     except Exception as e:
         db.session.rollback()

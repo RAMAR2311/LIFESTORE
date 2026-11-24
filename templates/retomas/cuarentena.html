@@ -102,7 +102,16 @@
                     <td>{{ r.color or '-' }}</td>
                     <td class="text-muted">{{ r.imei1 or '-' }}</td>
                     <td class="text-muted">{{ r.imei2 or '-' }}</td>
-                    <td class="text-truncate" style="max-width: 100px;" title="{{ r.proveedor or 'Cliente' }}">{{ r.proveedor or 'Cliente' }}</td>
+                    <td class="text-start" style="max-width: 140px;">
+                        <div class="fw-semibold text-dark text-truncate" title="{{ r.proveedor or 'Cliente' }}">{{ r.proveedor or 'Cliente' }}</div>
+                        {% if r.asesor_retoma %}
+                        <div class="text-truncate mt-0.5" style="font-size: 0.72rem;" title="Asesor que recibió la retoma">
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-1.5 py-0">
+                                <i class="fa-solid fa-user-tie me-1"></i>{{ r.asesor_retoma.nombre }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </td>
                     <td>{{ r.fecha_registro.strftime('%d/%m/%Y') }}</td>
                     <td class="text-success fw-bold">${{ r.valor_retoma|cop }}</td>
                     <td class="text-center">
@@ -861,9 +870,11 @@
                 <div class="modal-body p-4">
                     <!-- Datos Generales de la Operación / Sede -->
                     <div class="p-3 bg-light rounded-3 border mb-3">
-                        <div class="row g-3">
-                            <div class="col-12 col-md-4">
-                                <label class="form-label small fw-bold text-dark mb-1">Sucursal / Sede de Ingreso *</label>
+                        <div class="row g-2 align-items-center">
+                            <div class="col-12 col-md-3">
+                                <label class="form-label small fw-bold text-dark mb-1">
+                                    <i class="fa-solid fa-shop text-primary me-1"></i> Sede de Ingreso *
+                                </label>
                                 <select name="branch_id" class="form-select form-select-sm" required>
                                     {% if sucursales_disponibles %}
                                         {% for br in sucursales_disponibles %}
@@ -874,10 +885,12 @@
                                     {% endif %}
                                 </select>
                             </div>
-                            <div class="col-12 col-md-4">
-                                <label class="form-label small fw-bold text-dark mb-1">Asesor Responsable</label>
-                                <select name="asesor_retoma_id" class="form-select form-select-sm">
-                                    <option value="">-- Sin Asesor Específico --</option>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label small fw-bold text-dark mb-1">
+                                    <i class="fa-solid fa-user-tie text-primary me-1"></i> Asesor Responsable *
+                                </label>
+                                <select name="asesor_retoma_id" id="asesorRetomaSelect" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>-- Seleccionar Asesor --</option>
                                     {% if asesores_disponibles %}
                                         {% for asr in asesores_disponibles %}
                                         <option value="{{ asr.id }}">{{ asr.nombre }}</option>
@@ -885,10 +898,28 @@
                                     {% endif %}
                                 </select>
                             </div>
-                            <div class="col-12 col-md-4">
-                                <label class="form-label small fw-bold text-dark mb-1">Cliente / Proveedor</label>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label small fw-bold text-dark mb-1">
+                                    <i class="fa-solid fa-key text-danger me-1"></i> PIN / Código Asesor *
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-dark text-warning border-0"><i class="fa-solid fa-lock"></i></span>
+                                    <input type="password" name="codigo_asesor" id="codigoAsesorRetomaInput" class="form-control form-control-sm" placeholder="PIN obligatorio" required autocomplete="new-password">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePinRetoma(this)" title="Mostrar/ocultar PIN">
+                                        <i class="fa-solid fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label class="form-label small fw-bold text-dark mb-1">
+                                    <i class="fa-solid fa-user text-muted me-1"></i> Cliente / Proveedor
+                                </label>
                                 <input type="text" name="proveedor" class="form-control form-control-sm" value="Cliente" placeholder="Nombre de quien entrega">
                             </div>
+                        </div>
+                        <div class="mt-2 text-muted small d-flex align-items-center gap-1" style="font-size: 0.72rem;">
+                            <i class="fa-solid fa-shield-halved text-success"></i>
+                            <span>Seguridad: El asesor debe digitar su código personal obligatoriamente para certificar la recepción del equipo.</span>
                         </div>
                     </div>
 
@@ -1123,5 +1154,35 @@ function recalcularTotalRetomasLote() {
     const totalEl = document.getElementById('valorTotalLote');
     if (totalEl) totalEl.textContent = total.toLocaleString('es-CO');
 }
+
+function togglePinRetoma(btn) {
+    const input = document.getElementById('codigoAsesorRetomaInput');
+    if (!input) return;
+    const icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) {
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        }
+    } else {
+        input.type = 'password';
+        if (icon) {
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+}
+
+// Limpiar campo de PIN al cerrar el modal
+document.addEventListener('DOMContentLoaded', function() {
+    const modalNuevaRetoma = document.getElementById('modalNuevaRetoma');
+    if (modalNuevaRetoma) {
+        modalNuevaRetoma.addEventListener('hidden.bs.modal', function () {
+            const pinInp = document.getElementById('codigoAsesorRetomaInput');
+            if (pinInp) pinInp.value = '';
+        });
+    }
+});
 </script>
 {% endblock %}
