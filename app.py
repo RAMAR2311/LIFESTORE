@@ -129,6 +129,12 @@ def create_app():
     from routes.support import support_bp
     app.register_blueprint(support_bp, url_prefix='/soporte')
 
+    @app.route('/support', defaults={'subpath': ''}, methods=['GET', 'POST'])
+    @app.route('/support/<path:subpath>', methods=['GET', 'POST'])
+    def redirect_support(subpath):
+        target = f"/soporte/{subpath}" if subpath else "/soporte"
+        return redirect(target, code=307)
+
     # Registro de Blueprint Cambios de Celulares
     from routes.exchanges import exchanges_bp
     app.register_blueprint(exchanges_bp, url_prefix='/cambios-celulares')

@@ -416,6 +416,7 @@ def actualizar_estado(id):
 
 
 @support_bp.route('/<int:id>/eliminar', methods=['POST'])
+@support_bp.route('/eliminar/<int:id>', methods=['POST'])
 @login_required
 def eliminar_servicio(id):
     """Elimina un registro de soporte técnico validando el PIN / Token Secreto."""

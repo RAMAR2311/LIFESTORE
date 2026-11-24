@@ -533,7 +533,8 @@ function abrirModalEliminarServicio(id, equipo, imei) {
     const detalle = document.getElementById('eliminarEquipoDetalle');
     const inputToken = document.getElementById('inputTokenSecretoSoporte');
     
-    form.action = `/support/${id}/eliminar`;
+    const baseUrl = "{{ url_for('support_bp.eliminar_servicio', id=0) }}";
+    form.action = baseUrl.replace('/0', `/${id}`);
     detalle.innerHTML = `<span class="badge bg-secondary mb-1">Orden #${id}</span><br><strong>${equipo}</strong> ${imei ? `<br><span class="badge bg-dark font-mono mt-1">IMEI: ${imei}</span>` : ''}`;
     inputToken.value = '';
     
