@@ -887,27 +887,17 @@
                             </div>
                             <div class="col-12 col-md-3">
                                 <label class="form-label small fw-bold text-dark mb-1">
-                                    <i class="fa-solid fa-user-tie text-primary me-1"></i> Asesor Responsable *
+                                    <i class="fa-solid fa-id-badge text-primary me-1"></i> Código de Asesor *
                                 </label>
-                                <select name="asesor_retoma_id" id="asesorRetomaSelect" class="form-select form-select-sm" required>
-                                    <option value="" disabled selected>-- Seleccionar Asesor --</option>
-                                    {% if asesores_disponibles %}
-                                        {% for asr in asesores_disponibles %}
-                                        <option value="{{ asr.id }}">{{ asr.nombre }}</option>
-                                        {% endfor %}
-                                    {% endif %}
-                                </select>
+                                <input type="text" name="codigo_asesor" id="codigoAsesorRetomaInput" class="form-control form-control-sm font-mono fw-bold" placeholder="Escribe tu código" required autocomplete="off" oninput="buscarAsesorPorCodigo(this.value)">
                             </div>
                             <div class="col-12 col-md-3">
                                 <label class="form-label small fw-bold text-dark mb-1">
-                                    <i class="fa-solid fa-key text-danger me-1"></i> PIN / Código Asesor *
+                                    <i class="fa-solid fa-user-tie text-muted me-1"></i> Asesor Responsable
                                 </label>
-                                <div class="input-group input-group-sm">
-                                    <span class="input-group-text bg-dark text-warning border-0"><i class="fa-solid fa-lock"></i></span>
-                                    <input type="password" name="codigo_asesor" id="codigoAsesorRetomaInput" class="form-control form-control-sm" placeholder="PIN obligatorio" required autocomplete="new-password">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="togglePinRetoma(this)" title="Mostrar/ocultar PIN">
-                                        <i class="fa-solid fa-eye"></i>
-                                    </button>
+                                <input type="hidden" name="asesor_retoma_id" id="asesorRetomaIdHidden">
+                                <div id="asesorDetectadoBox" class="form-control form-control-sm bg-white d-flex align-items-center text-muted fst-italic text-truncate" style="min-height: 31px;">
+                                    <span class="small"><i class="fa-solid fa-arrow-left me-1 text-primary"></i> Ingresa tu código</span>
                                 </div>
                             </div>
                             <div class="col-12 col-md-3">
@@ -919,7 +909,7 @@
                         </div>
                         <div class="mt-2 text-muted small d-flex align-items-center gap-1" style="font-size: 0.72rem;">
                             <i class="fa-solid fa-shield-halved text-success"></i>
-                            <span>Seguridad: El asesor debe digitar su código personal obligatoriamente para certificar la recepción del equipo.</span>
+                            <span>Seguridad: El asesor digita su código y el sistema certifica automáticamente su identidad en la retoma.</span>
                         </div>
                     </div>
 
@@ -1153,32 +1143,87 @@ function recalcularTotalRetomasLote() {
     if (totalEl) totalEl.textContent = total.toLocaleString('es-CO');
 }
 
-function togglePinRetoma(btn) {
-    const input = document.getElementById('codigoAsesorRetomaInput');
-    if (!input) return;
-    const icon = btn.querySelector('i');
-    if (input.type === 'password') {
-        input.type = 'text';
-        if (icon) {
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
+const ASESORES_RETOMA_LISTA = [
+    {% if asesores_disponibles %}
+        {% for asr in asesores_disponibles %}
+        {
+            id: {{ asr.id }},
+            nombre: {{ asr.nombre|tojson }},
+            codigo: {{ (asr.codigo or 'ASE-%03d' % asr.id)|tojson }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    {% endif %}
+];
+
+function buscarAsesorPorCodigo(rawVal) {
+    const val = (rawVal || '').trim().toUpperCase();
+    const box = document.getElementById('asesorDetectadoBox');
+    const hiddenId = document.getElementById('asesorRetomaIdHidden');
+    const inputCodigo = document.getElementById('codigoAsesorRetomaInput');
+    
+    if (!val) {
+        if (box) {
+            box.className = 'form-control form-control-sm bg-white d-flex align-items-center text-muted fst-italic text-truncate';
+            box.innerHTML = '<span class="small"><i class="fa-solid fa-arrow-left me-1 text-primary"></i> Ingresa tu código</span>';
+        }
+        if (hiddenId) hiddenId.value = '';
+        if (inputCodigo) {
+            inputCodigo.classList.remove('is-valid', 'is-invalid');
+        }
+        return;
+    }
+
+    const encontrado = ASESORES_RETOMA_LISTA.find(a => (a.codigo || '').toUpperCase() === val);
+    if (encontrado) {
+        if (box) {
+            box.className = 'form-control form-control-sm bg-success-subtle border-success text-success fw-bold d-flex align-items-center justify-content-between text-truncate';
+            box.innerHTML = `<span><i class="fa-solid fa-circle-check me-1"></i> ${encontrado.nombre}</span> <span class="badge bg-success text-white py-0.5 px-1.5 ms-1" style="font-size:0.65rem;">Verificado</span>`;
+        }
+        if (hiddenId) hiddenId.value = encontrado.id;
+        if (inputCodigo) {
+            inputCodigo.classList.remove('is-invalid');
+            inputCodigo.classList.add('is-valid');
         }
     } else {
-        input.type = 'password';
-        if (icon) {
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
+        if (box) {
+            box.className = 'form-control form-control-sm bg-danger-subtle border-danger text-danger d-flex align-items-center text-truncate';
+            box.innerHTML = '<span class="small"><i class="fa-solid fa-circle-xmark me-1"></i> Código no reconocido</span>';
+        }
+        if (hiddenId) hiddenId.value = '';
+        if (inputCodigo) {
+            inputCodigo.classList.remove('is-valid');
+            inputCodigo.classList.add('is-invalid');
         }
     }
 }
 
-// Limpiar campo de PIN al cerrar el modal
 document.addEventListener('DOMContentLoaded', function() {
+    const formLote = document.getElementById('formRegistroRetomasLote');
+    if (formLote) {
+        formLote.addEventListener('submit', function(e) {
+            const hiddenId = document.getElementById('asesorRetomaIdHidden');
+            const inputCodigo = document.getElementById('codigoAsesorRetomaInput');
+            if (!hiddenId || !hiddenId.value) {
+                e.preventDefault();
+                alert('Debes ingresar un Código de Asesor válido para poder certificar y guardar la retoma.');
+                if (inputCodigo) {
+                    inputCodigo.focus();
+                    inputCodigo.classList.add('is-invalid');
+                }
+            }
+        });
+    }
+
     const modalNuevaRetoma = document.getElementById('modalNuevaRetoma');
     if (modalNuevaRetoma) {
         modalNuevaRetoma.addEventListener('hidden.bs.modal', function () {
-            const pinInp = document.getElementById('codigoAsesorRetomaInput');
-            if (pinInp) pinInp.value = '';
+            const codInp = document.getElementById('codigoAsesorRetomaInput');
+            if (codInp) codInp.value = '';
+            buscarAsesorPorCodigo('');
+        });
+        modalNuevaRetoma.addEventListener('shown.bs.modal', function () {
+            const codInp = document.getElementById('codigoAsesorRetomaInput');
+            if (codInp) codInp.focus();
         });
     }
 });

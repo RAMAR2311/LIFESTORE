@@ -99,24 +99,31 @@ def crear_retoma_directa():
     codigo_asesor_input = (request.form.get('codigo_asesor') or '').strip().upper()
     target_branch_id = branch_id_input or current_user.branch_id or 1
 
-    # Blindaje de Seguridad: Validación obligatoria del Asesor Responsable y su Código/PIN
-    if not asesor_id_input:
-        flash('Es obligatorio seleccionar el Asesor Responsable de la retoma.', 'danger')
-        return redirect(url_for('retomas_bp.cuarentena'))
-
-    asesor_obj = Asesor.query.get(asesor_id_input)
-    if not asesor_obj or not asesor_obj.activo:
-        flash('El asesor seleccionado no es válido o no se encuentra activo.', 'danger')
-        return redirect(url_for('retomas_bp.cuarentena'))
-
+    # Blindaje de Seguridad: Identificación y validación obligatoria mediante Código de Asesor
     if not codigo_asesor_input:
-        flash(f"Debes ingresar el código/PIN personal del asesor '{asesor_obj.nombre}' para validar y autorizar la retoma.", 'danger')
+        flash('Debes ingresar tu Código de Asesor para certificar la retoma.', 'danger')
         return redirect(url_for('retomas_bp.cuarentena'))
 
-    codigo_esperado = (asesor_obj.codigo or f"ASE-{asesor_obj.id:03d}").strip().upper()
-    if codigo_asesor_input != codigo_esperado:
-        flash(f"Código de Asesor incorrecto para '{asesor_obj.nombre}'. Se requiere su PIN personal para que quede constancia del registro.", 'danger')
+    asesor_obj = None
+    asesores_activos = Asesor.query.filter_by(activo=True).all()
+    for asr in asesores_activos:
+        cod_esperado = (asr.codigo or f"ASE-{asr.id:03d}").strip().upper()
+        if codigo_asesor_input == cod_esperado:
+            asesor_obj = asr
+            break
+
+    if not asesor_obj and asesor_id_input:
+        asr_cand = Asesor.query.get(asesor_id_input)
+        if asr_cand and asr_cand.activo:
+            cod_esperado = (asr_cand.codigo or f"ASE-{asr_cand.id:03d}").strip().upper()
+            if codigo_asesor_input == cod_esperado:
+                asesor_obj = asr_cand
+
+    if not asesor_obj:
+        flash(f"Código de asesor '{codigo_asesor_input}' no reconocido o el asesor no se encuentra activo.", 'danger')
         return redirect(url_for('retomas_bp.cuarentena'))
+
+    asesor_id_input = asesor_obj.id
 
     # Validar duplicados dentro del mismo lote enviado
     vistos_en_lote = set()
