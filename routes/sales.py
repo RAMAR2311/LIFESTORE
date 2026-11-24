@@ -975,6 +975,11 @@ def historial():
     # Gran total de ventas del periodo consultado
     gran_total_periodo = sum(s['total_recaudado'] for s in desglose_sucursales.values())
 
+    # Filtrar solo sucursales que tengan ventas en el período consultado (si no tiene ventas no se muestra)
+    desglose_sucursales = {
+        k: v for k, v in desglose_sucursales.items() if v['total_recaudado'] > 0
+    }
+
     # Ordenar sucursales por total recaudado descendente
     desglose_sucursales = dict(sorted(desglose_sucursales.items(), key=lambda item: item[1]['total_recaudado'], reverse=True))
 

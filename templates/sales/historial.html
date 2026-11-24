@@ -242,11 +242,11 @@
                 </div>
             </div>
 
-            <!-- Grid de Tarjetas de Pago INDEPENDIENTES para ESTA Sucursal -->
+            <!-- Grid de Tarjetas de Pago INDEPENDIENTES para ESTA Sucursal (solo métodos con ventas registradas) -->
             <div class="row g-3">
-                {% for m_key, m in suc_info.metodos.items() %}
-                <div class="col-6 col-md-4 col-xl-3">
-                    <div class="finance-card h-100 {% if m.total == 0 %}opacity-75{% endif %}" 
+                {% for m_key, m in suc_info.metodos.items() if m.total > 0 %}
+                <div class="col-12 col-sm-6 col-md-4 col-xl-3">
+                    <div class="finance-card h-100" 
                          style="--card-accent: {{ m.color }}; --card-bg-subtle: {{ m.bg_subtle }}; cursor: pointer;"
                          onclick="filtrarTabla('{{ m.clave }}', '{{ suc_nombre }}')"
                          title="Ver operaciones de {{ m.nombre }} en {{ suc_nombre }}">
@@ -254,8 +254,8 @@
                             <!-- Encabezado con método y badge de la sede -->
                             <div class="d-flex align-items-start justify-content-between mb-2">
                                 <div>
-                                    <span class="text-uppercase fw-bold text-muted d-block" style="font-size: 0.7rem; letter-spacing: 0.04em;">{{ m.nombre }}</span>
-                                    <span class="badge bg-light text-secondary border px-1.5 py-0 mt-0.5 d-inline-flex align-items-center" style="font-size: 0.62rem;">
+                                    <span class="text-uppercase fw-bold text-muted d-block" style="font-size: 0.72rem; letter-spacing: 0.04em;">{{ m.nombre }}</span>
+                                    <span class="badge bg-light text-secondary border px-1.5 py-0 mt-0.5 d-inline-flex align-items-center" style="font-size: 0.63rem;">
                                         <i class="fa-solid fa-shop me-1 text-primary" style="font-size: 0.55rem;"></i>{{ suc_nombre }}
                                     </span>
                                 </div>
@@ -271,12 +271,10 @@
                                     <i class="fa-solid fa-receipt me-1 opacity-75"></i>
                                     {% if m.conteo == 1 %}1 pago{% else %}{{ m.conteo }} pagos{% endif %}
                                 </span>
-                                {% if suc_info.total_recaudado > 0 and m.total > 0 %}
+                                {% if suc_info.total_recaudado > 0 %}
                                 <span class="badge bg-light text-dark border px-1.5 py-0" style="font-size: 0.65rem;">
                                     {{ ((m.total / suc_info.total_recaudado) * 100)|round(1) }}% de la sede
                                 </span>
-                                {% elif m.total == 0 %}
-                                <span class="text-muted fst-italic" style="font-size: 0.65rem;">Sin cobros</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -291,132 +289,12 @@
         </div>
         {% endfor %}
     </div>
-    {% elif desglose_metodos %}
-    <!-- 1. Efectivo -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #059669; --card-bg-subtle: #ecfdf5;" onclick="filtrarTabla('efectivo')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Efectivo</span>
-                    <div class="icon-chip"><i class="fa-solid fa-money-bills"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_efectivo)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- 2. Nequi -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #9333ea; --card-bg-subtle: #faf5ff;" onclick="filtrarTabla('nequi')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Nequi</span>
-                    <div class="icon-chip"><i class="fa-solid fa-mobile-screen-button"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_nequi)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
-        </div>
-    </div>
-    
-    <!-- 3. Bancolombia -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #ea580c; --card-bg-subtle: #fff7ed;" onclick="filtrarTabla('bancolombia')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Bancolombia</span>
-                    <div class="icon-chip"><i class="fa-solid fa-building-columns"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_bancolombia)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- 4. Davivienda -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #dc2626; --card-bg-subtle: #fef2f2;" onclick="filtrarTabla('davivienda')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Davivienda</span>
-                    <div class="icon-chip"><i class="fa-solid fa-building-columns"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_davivienda)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- 5. Daviplata -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #e11d48; --card-bg-subtle: #fff1f2;" onclick="filtrarTabla('daviplata')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Daviplata</span>
-                    <div class="icon-chip"><i class="fa-solid fa-mobile-retro"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_daviplata)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- 6. Bold (Datáfono) -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #0d9488; --card-bg-subtle: #f0fdfa;" onclick="filtrarTabla('bold')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Bold (Datáfono)</span>
-                    <div class="icon-chip"><i class="fa-solid fa-bolt"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_bold)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- 7. Addi -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #7c3aed; --card-bg-subtle: #f5f3ff;" onclick="filtrarTabla('addi')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Addi</span>
-                    <div class="icon-chip"><i class="fa-solid fa-bag-shopping"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_addi)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
-        </div>
-    </div>
-
-    <!-- 8. Sistecrédito -->
-    <div class="col-6 col-md-3 mb-3">
-        <div class="finance-card h-100" style="--card-accent: #2563eb; --card-bg-subtle: #eff6ff;" onclick="filtrarTabla('sistecredito')">
-            <div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="text-uppercase fw-bold text-muted" style="font-size: 0.68rem; letter-spacing: 0.05em;">Sistecrédito</span>
-                    <div class="icon-chip"><i class="fa-solid fa-id-card"></i></div>
-                </div>
-                <div class="amount-display">${{ (total_sistecredito)|cop }}</div>
-            </div>
-            <button class="btn-card-action d-print-none" type="button">
-                Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-            </button>
+    {% else %}
+    <div class="col-12 mb-4 d-print-none">
+        <div class="p-4 rounded-4 border bg-light text-center shadow-sm">
+            <i class="fa-regular fa-folder-open fa-2x text-muted mb-2 d-block opacity-50"></i>
+            <h6 class="fw-bold text-secondary mb-1">Sin cobros registrados en este período</h6>
+            <p class="small text-muted mb-0">No se encontraron movimientos de caja para la fecha o rango de fechas consultado.</p>
         </div>
     </div>
     {% endif %}
