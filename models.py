@@ -575,6 +575,28 @@ class Retoma(db.Model):
     def __init__(self, **kwargs):
         super(Retoma, self).__init__(**kwargs)
 
+class RetomaImportBatch(db.Model):
+    """Registro de lotes de importación masiva de retomas para trazabilidad y rollback."""
+    __tablename__ = 'retoma_import_batches'
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_code = db.Column(db.String(50), unique=True, nullable=False, index=True) # ej. BATCH-RET-20261124-184530
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True)
+    total_equipos = db.Column(db.Integer, default=0, nullable=False)
+    total_costo = db.Column(db.Numeric(14, 2), default=0.0, nullable=False)
+    estado = db.Column(db.String(20), default='COMPLETADO', nullable=False) # 'COMPLETADO', 'REVERTIDO'
+    archivo_nombre = db.Column(db.String(200), nullable=True)
+    detalles_json = db.Column(db.Text, nullable=True) # JSON con {'retoma_ids': [...], 'product_ids': [...], 'resumen_asesores': {...}}
+    fecha_creacion = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False)
+    fecha_reversion = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship('User', foreign_keys=[user_id], lazy=True)
+    branch = db.relationship('Branch', foreign_keys=[branch_id], lazy=True)
+
+    def __init__(self, **kwargs):
+        super(RetomaImportBatch, self).__init__(**kwargs)
+
 class ArqueoCaja(db.Model):
     __tablename__ = 'arqueo_caja'
     

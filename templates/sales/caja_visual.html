@@ -1013,7 +1013,9 @@
         const formData = new FormData();
         formData.append('comprobante_file', file);
 
-        if (label) label.textContent = 'Subiendo...';
+        if (label) {
+            label.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-warning me-1"></i> Subiendo...';
+        }
 
         try {
             const resp = await fetch('{{ url_for("sales_bp.upload_comprobante_abono") }}', {
@@ -1025,15 +1027,25 @@
             });
             const data = await resp.json();
             if (resp.ok && data.success) {
-                actualizarPagoParcial(index, 'comprobante', data.relative_path || data.filename);
+                const ruta = (data.relative_path || data.filename || '').trim();
+                actualizarPagoParcial(index, 'comprobante', ruta);
             } else {
                 alert(data.error || 'Error al subir la imagen del comprobante.');
-                if (label) label.textContent = 'Cargar Imagen';
+                if (label) label.textContent = 'Adjuntar Imagen Comprobante';
             }
         } catch (err) {
             console.error('Error subiendo comprobante:', err);
             alert('Error de conexión al subir la imagen.');
-            if (label) label.textContent = 'Cargar Imagen';
+            if (label) label.textContent = 'Adjuntar Imagen Comprobante';
+        } finally {
+            fileInput.value = '';
+        }
+    }
+
+    function quitarComprobanteMixto(index) {
+        if (pagosMixtos[index]) {
+            pagosMixtos[index].comprobante = '';
+            renderizarPagosMixtos();
         }
     }
 
@@ -1549,6 +1561,7 @@
     }
 
     function actualizarPagoParcial(index, campo, valor) {
+        if (!pagosMixtos[index]) return;
         if (campo === 'metodo_pago') {
             pagosMixtos[index].metodo_pago = valor;
             renderizarPagosMixtos();
@@ -1561,7 +1574,9 @@
             pagosMixtos[index].provider_id = valor ? parseInt(valor) : null;
         }
         if (campo === 'comprobante') {
-            pagosMixtos[index].comprobante = valor.trim();
+            pagosMixtos[index].comprobante = (valor || '').trim();
+            renderizarPagosMixtos();
+            return;
         }
         actualizarSaldoRestante();
     }
@@ -1645,10 +1660,17 @@
                                     <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
                                     <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
                                         <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
-                                        <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen'}</span>
+                                        <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Cambiar Comprobante' : 'Adjuntar Imagen'}</span>
                                         <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
                                     </label>
-                                    ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                                    ${pago.comprobante ? `
+                                        <div class="small text-truncate text-success fw-bold mt-1 d-flex align-items-center justify-content-between p-1 px-2 rounded border border-success bg-white shadow-xs">
+                                            <span class="text-truncate me-1"><i class="fa-solid fa-circle-check text-success me-1"></i>${pago.comprobante.split('/').pop()}</span>
+                                            <button type="button" class="btn btn-sm btn-link text-danger p-0 border-0" onclick="quitarComprobanteMixto(${index})" title="Quitar comprobante">
+                                                <i class="fa-solid fa-xmark fs-6"></i>
+                                            </button>
+                                        </div>
+                                    ` : ''}
                                 </div>
                             </div>
                         </div>
@@ -1661,10 +1683,17 @@
                                 <input type="hidden" id="pago_mixto_comp_${index}" value="${pago.comprobante || ''}">
                                 <label class="btn btn-sm btn-outline-warning w-100 fw-bold rounded-pill text-dark d-flex align-items-center justify-content-center gap-1 shadow-sm" style="cursor: pointer; background: #fff;">
                                     <i class="fa-solid fa-cloud-arrow-up text-warning"></i>
-                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Comprobante Listo' : 'Adjuntar Imagen Comprobante'}</span>
+                                    <span id="label_upload_mixto_${index}">${pago.comprobante ? 'Cambiar Comprobante' : 'Adjuntar Imagen Comprobante'}</span>
                                     <input type="file" accept="image/*,.pdf" style="display: none;" onchange="subirImagenComprobanteMixto(this, ${index})">
                                 </label>
-                                ${pago.comprobante ? `<div class="small text-truncate text-success fw-bold mt-1"><i class="fa-solid fa-check me-1"></i>${pago.comprobante.split('/').pop()}</div>` : ''}
+                                ${pago.comprobante ? `
+                                    <div class="small text-truncate text-success fw-bold mt-1 d-flex align-items-center justify-content-between p-1 px-2 rounded border border-success bg-white shadow-xs">
+                                        <span class="text-truncate me-1"><i class="fa-solid fa-circle-check text-success me-1"></i>${pago.comprobante.split('/').pop()}</span>
+                                        <button type="button" class="btn btn-sm btn-link text-danger p-0 border-0" onclick="quitarComprobanteMixto(${index})" title="Quitar comprobante">
+                                            <i class="fa-solid fa-xmark fs-6"></i>
+                                        </button>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                     `;
