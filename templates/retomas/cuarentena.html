@@ -107,13 +107,16 @@
                     <td>{{ r.color or '-' }}</td>
                     <td class="text-muted">{{ r.imei1 or '-' }}</td>
                     <td class="text-muted">{{ r.imei2 or '-' }}</td>
-                    <td class="text-start" style="max-width: 140px;">
+                    <td class="text-start" style="max-width: 180px;">
                         <div class="fw-semibold text-dark text-truncate" title="{{ r.proveedor or 'Cliente' }}">{{ r.proveedor or 'Cliente' }}</div>
-                        {% if r.asesor_retoma %}
-                        <div class="text-truncate mt-0.5" style="font-size: 0.72rem;" title="Asesor que recibió la retoma">
+                        {% set lista_asr = r.asesores_recepcion_obj %}
+                        {% if lista_asr %}
+                        <div class="d-flex flex-wrap gap-1 mt-1" style="font-size: 0.70rem;" title="Asesores beneficiarios en recepción">
+                            {% for asr in lista_asr %}
                             <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-1.5 py-0">
-                                <i class="fa-solid fa-user-tie me-1"></i>{{ r.asesor_retoma.nombre }}
+                                <i class="fa-solid fa-user-tie me-1"></i>{{ asr.nombre }}
                             </span>
+                            {% endfor %}
                         </div>
                         {% endif %}
                     </td>

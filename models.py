@@ -580,6 +580,15 @@ class Retoma(db.Model):
         return ids
 
     @property
+    def asesores_recepcion_obj(self):
+        ids = self.lista_asesores_recepcion_ids
+        if not ids:
+            return []
+        asesores = Asesor.query.filter(Asesor.id.in_(ids)).all()
+        mapa = {a.id: a for a in asesores}
+        return [mapa[i] for i in ids if i in mapa]
+
+    @property
     def soporte_activo(self):
         if not self.servicios_tecnicos:
             return None
