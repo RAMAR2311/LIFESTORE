@@ -1147,7 +1147,7 @@
         bootstrap.Modal.getInstance(document.getElementById('modalVariantes')).hide();
     };
 
-    const ES_ADMIN_VENTA = {{ 'true' if current_user.rol == 'admin' else 'false' }};
+    const ES_ADMIN_VENTA = ("{{ 'true' if current_user.rol == 'admin' else 'false' }}" === "true");
     const pollingAprobacionesCaja = {};
 
     function addToCart(productId, variantId, nombre, sku, precio, maxStock, variantName = null, tipoInventario = null, imei = null, imei2 = null, inventario = null, precioMinimo = null, memoria = null) {
@@ -2786,26 +2786,26 @@ function eliminarRetomaActual() {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async response => {
+            const data = await response.json().catch(() => ({ success: false, message: `Error del servidor (${response.status})` }));
             if (data.success) {
                 let p = data.product;
                 
                 // Agregar al carrito usando la función nativa de caja_visual
-                addToCart(p.id, null, p.nombre, p.sku, p.precio_sugerido, p.stock, null, 'externos');
+                addToCart(p.id, null, p.nombre, p.sku, p.precio_sugerido, p.stock, null, 'externos', null, null, null, p.precio_minimo);
                 
                 // Cerrar modal y limpiar
                 let modalEl = document.getElementById('modalProductoExterno');
                 let modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
+                if (modal) modal.hide();
                 this.reset();
                 
             } else {
-                alert('Error al guardar externo: ' + data.message);
+                alert('Error al guardar externo: ' + (data.message || 'Verifica los datos ingresados.'));
             }
         })
         .catch(err => {
-            alert('Error de conexión.');
+            alert('Error de conexión: ' + (err.message || err));
         })
         .finally(() => {
             btn.disabled = false;
@@ -2835,26 +2835,26 @@ function eliminarRetomaActual() {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(async response => {
+            const data = await response.json().catch(() => ({ success: false, message: `Error del servidor (${response.status})` }));
             if (data.success) {
                 let p = data.product;
                 
                 // Agregar al carrito usando la función nativa de caja_visual
-                addToCart(p.id, null, p.nombre, p.sku, p.precio_sugerido, p.stock, null, 'externos');
+                addToCart(p.id, null, p.nombre, p.sku, p.precio_sugerido, p.stock, null, 'externos', null, null, null, p.precio_minimo);
                 
                 // Cerrar modal y limpiar
                 let modalEl = document.getElementById('modalAccesorioExterno');
                 let modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
+                if (modal) modal.hide();
                 this.reset();
                 
             } else {
-                alert('Error al guardar accesorio externo: ' + data.message);
+                alert('Error al guardar accesorio externo: ' + (data.message || 'Verifica los datos ingresados.'));
             }
         })
         .catch(err => {
-            alert('Error de conexión.');
+            alert('Error de conexión: ' + (err.message || err));
         })
         .finally(() => {
             btn.disabled = false;

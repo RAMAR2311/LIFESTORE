@@ -1,6 +1,6 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, send_file, session
 from flask_login import login_required, current_user
-from models import db, Product
+from models import db, Product, Branch
 from decorators import admin_required
 from datetime import datetime
 import pytz
@@ -149,6 +149,17 @@ def nuevo_externo():
 
     return render_template('externos/form_externo.html', celular=None)
 
+def _resolve_target_branch_id():
+    """Obtiene el ID de la sucursal destino para el producto externo creado desde caja."""
+    if current_user.rol in ['vendedor', 'bodega'] and current_user.branch_id:
+        return int(current_user.branch_id)
+    active_b = session.get('active_branch_id')
+    if active_b:
+        return int(active_b)
+    b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+    return b_def.id if b_def else 1
+
+
 @externos_bp.route('/api/nuevo_desde_caja', methods=['POST'])
 @login_required
 def api_nuevo_desde_caja():
@@ -167,11 +178,11 @@ def api_nuevo_desde_caja():
         if existente:
             return jsonify({'success': False, 'message': f'El IMEI "{imei}" ya se encuentra registrado en el sistema ({existente.nombre}).'}), 400
 
-    precio_costo_str = request.form.get('precio_costo', '0').replace(',', '')
-    precio_sugerido_str = request.form.get('precio_sugerido', '0').replace(',', '')
+    precio_costo_str = request.form.get('precio_costo', '0').replace(',', '').replace('.', '').strip()
+    precio_sugerido_str = request.form.get('precio_sugerido', '0').replace(',', '').replace('.', '').strip()
     
     nombre_completo = f"Externo {marca} {modelo_celular} {color} {memoria}".strip()
-    sku_base = f"EXT-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    sku_base = f"EXT-{datetime.now().strftime('%Y%m%d%H%M%S%f')[:18]}"
     
     precio_sugerido = float(precio_sugerido_str) if precio_sugerido_str else 0.0
 
@@ -197,7 +208,7 @@ def api_nuevo_desde_caja():
         db.session.add(nuevo)
         db.session.flush()
 
-        target_branch_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else (session.get('active_branch_id') or 1)
+        target_branch_id = _resolve_target_branch_id()
         from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
         bs = get_or_create_branch_stock(int(target_branch_id), nuevo.id, None)
         bs.cantidad = 1
@@ -231,11 +242,11 @@ def api_nuevo_accesorio_caja():
     marca = request.form.get('marca', '').strip()
     proveedor = request.form.get('proveedor', '').strip()
     
-    precio_costo_str = request.form.get('precio_costo', '0').replace(',', '')
-    precio_sugerido_str = request.form.get('precio_sugerido', '0').replace(',', '')
+    precio_costo_str = request.form.get('precio_costo', '0').replace(',', '').replace('.', '').strip()
+    precio_sugerido_str = request.form.get('precio_sugerido', '0').replace(',', '').replace('.', '').strip()
     
     nombre_completo = f"Acc. Externo {marca} {nombre_accesorio}".strip()
-    sku_base = f"EXTACC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    sku_base = f"EXTACC-{datetime.now().strftime('%Y%m%d%H%M%S%f')[:18]}"
     
     precio_sugerido = float(precio_sugerido_str) if precio_sugerido_str else 0.0
 
@@ -255,7 +266,7 @@ def api_nuevo_accesorio_caja():
         db.session.add(nuevo)
         db.session.flush()
 
-        target_branch_id = current_user.branch_id if current_user.rol in ['vendedor', 'bodega'] else (session.get('active_branch_id') or 1)
+        target_branch_id = _resolve_target_branch_id()
         from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
         bs = get_or_create_branch_stock(int(target_branch_id), nuevo.id, None)
         bs.cantidad = 1
