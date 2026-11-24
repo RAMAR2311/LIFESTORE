@@ -184,6 +184,21 @@
                     </td>
                     <td class="text-center">
                         <div class="d-flex justify-content-center align-items-center gap-2 text-nowrap">
+                            <button type="button"
+                                    class="btn btn-sm {% if p.imagen %}btn-success{% else %}btn-outline-secondary{% endif %} rounded-circle shadow-sm flex-shrink-0"
+                                    style="width: 32px; height: 32px; padding: 0; line-height: 30px;"
+                                    title="{% if p.imagen %}Ver / Descargar / Cambiar Sticker{% else %}Subir Sticker / Foto QR{% endif %}"
+                                    onclick="abrirModalSticker({{ p.id }}, {{ p.nombre|tojson }}, {{ p.sku|tojson }}, {{ (p.imagen or '')|tojson }})">
+                                <i class="fa-solid fa-qrcode"></i>
+                            </button>
+                            {% if p.imagen %}
+                            <a href="{{ url_for('inventory_bp.descargar_sticker', id=p.id) }}"
+                               class="btn btn-sm btn-outline-success rounded-circle shadow-sm flex-shrink-0"
+                               style="width: 32px; height: 32px; padding: 0; line-height: 30px;"
+                               title="Descargar Sticker QR">
+                                <i class="fa-solid fa-download"></i>
+                            </a>
+                            {% endif %}
                             <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id) }}" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Trasladar este Producto">
                                 <i class="fa-solid fa-truck-moving"></i>
                             </a>
@@ -456,5 +471,82 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.focus();
     });
 });
+
+function abrirModalSticker(prodId, prodNombre, prodSku, prodImagen) {
+    document.getElementById('stickerProdNombre').textContent = prodNombre;
+    document.getElementById('stickerProdSku').textContent = prodSku;
+    const form = document.getElementById('formSubirSticker');
+    form.action = `/inventory/subir_sticker/${prodId}`;
+
+    const previewBox = document.getElementById('stickerPreviewBox');
+    const emptyBox = document.getElementById('stickerEmptyBox');
+    const previewImg = document.getElementById('stickerPreviewImg');
+    const downloadBtn = document.getElementById('stickerDownloadBtn');
+
+    if (prodImagen && prodImagen.trim() !== '') {
+        previewImg.src = `/static/uploads/${prodImagen}`;
+        downloadBtn.href = `/inventory/descargar_sticker/${prodId}`;
+        previewBox.classList.remove('d-none');
+        emptyBox.classList.add('d-none');
+    } else {
+        previewBox.classList.add('d-none');
+        emptyBox.classList.remove('d-none');
+    }
+
+    const modalEl = document.getElementById('modalStickerAccesorio');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+}
 </script>
+
+<!-- Modal Gestión de Sticker / Foto QR para Accesorios -->
+<div class="modal fade" id="modalStickerAccesorio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold fs-6">
+                    <i class="fa-solid fa-qrcode text-brand-pink me-2"></i> Sticker / Foto del Accesorio
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <h6 class="fw-bold text-dark mb-1" id="stickerProdNombre"></h6>
+                <p class="small text-muted font-mono mb-3">SKU: <strong id="stickerProdSku"></strong></p>
+
+                <!-- Vista previa si ya existe sticker -->
+                <div id="stickerPreviewBox" class="d-none mb-4">
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <img id="stickerPreviewImg" src="" alt="Sticker Accesorio" class="img-fluid rounded shadow-sm" style="max-height: 220px; object-fit: contain;">
+                    </div>
+                    <a id="stickerDownloadBtn" href="#" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-download me-1"></i> Descargar Sticker para Imprimir
+                    </a>
+                </div>
+
+                <!-- Mensaje si no existe -->
+                <div id="stickerEmptyBox" class="p-4 bg-light rounded-3 border border-dashed mb-4 text-muted">
+                    <i class="fa-solid fa-image fs-1 opacity-50 mb-2 d-block"></i>
+                    <span class="small">Este accesorio aún no tiene un sticker o foto cargada.</span>
+                </div>
+
+                <!-- Formulario de subida / reemplazo -->
+                <form id="formSubirSticker" method="POST" enctype="multipart/form-data" class="text-start border-top pt-3">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <label class="form-label small fw-bold text-dark mb-1">
+                        <i class="fa-solid fa-cloud-arrow-up text-primary me-1"></i> Subir o Reemplazar Foto / Sticker *
+                    </label>
+                    <div class="input-group input-group-sm">
+                        <input type="file" name="sticker_file" class="form-control" accept="image/*,.pdf" required>
+                        <button type="submit" class="btn btn-primary fw-bold px-3">
+                            Guardar
+                        </button>
+                    </div>
+                    <div class="form-text extra-small text-muted">
+                        Formatos admitidos: PNG, JPG, WEBP, SVG o PDF.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

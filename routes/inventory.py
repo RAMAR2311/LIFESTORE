@@ -1,6 +1,6 @@
 import os
 from werkzeug.utils import secure_filename
-from flask import current_app, Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, jsonify
+from flask import current_app, Blueprint, render_template, request, redirect, url_for, flash, abort, send_file, send_from_directory, jsonify
 from flask_login import login_required, current_user
 from models import db, Product, StockAdjustment, ProductVariant, Branch, BranchStock
 from services.stock_service import get_or_create_branch_stock, sync_global_product_stock, get_product_stock_distribution
@@ -919,3 +919,55 @@ def api_search():
         })
     
     return jsonify(results)
+
+
+@inventory_bp.route('/subir_sticker/<int:id>', methods=['POST'])
+@login_required
+@admin_or_bodega_required
+def subir_sticker(id):
+    producto = Product.query.get_or_404(id)
+    file = request.files.get('sticker_file') or request.files.get('imagen')
+    if not file or not file.filename:
+        flash('Debes seleccionar una imagen o sticker para subir.', 'warning')
+        return redirect(request.referrer or url_for('inventory_bp.index'))
+
+    allowed_exts = {'.png', '.jpg', '.jpeg', '.webp', '.svg', '.pdf'}
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in allowed_exts:
+        flash('Formato no permitido. Usa PNG, JPG, WEBP, SVG o PDF.', 'danger')
+        return redirect(request.referrer or url_for('inventory_bp.index'))
+
+    os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+    clean_name = secure_filename(file.filename)
+    filename = f"sticker_{producto.id}_{clean_name}"
+    file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+
+    try:
+        file.save(file_path)
+        producto.imagen = filename
+        db.session.commit()
+        flash(f'Sticker / imagen actualizado para "{producto.nombre}".', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al guardar el sticker: {str(e)}', 'danger')
+
+    return redirect(request.referrer or url_for('inventory_bp.index'))
+
+
+@inventory_bp.route('/descargar_sticker/<int:id>', methods=['GET'])
+@login_required
+def descargar_sticker(id):
+    producto = Product.query.get_or_404(id)
+    if not producto.imagen:
+        flash(f'El producto "{producto.nombre}" aún no tiene un sticker o imagen subida.', 'warning')
+        return redirect(request.referrer or url_for('inventory_bp.index'))
+
+    upload_dir = current_app.config['UPLOAD_FOLDER']
+    file_path = os.path.join(upload_dir, producto.imagen)
+    if not os.path.exists(file_path):
+        flash('El archivo del sticker no se encuentra en el servidor.', 'danger')
+        return redirect(request.referrer or url_for('inventory_bp.index'))
+
+    ext = os.path.splitext(producto.imagen)[1].lower() or '.png'
+    dl_name = f"sticker_{secure_filename(producto.sku or str(producto.id))}{ext}"
+    return send_from_directory(upload_dir, producto.imagen, as_attachment=True, download_name=dl_name)

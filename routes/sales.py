@@ -87,8 +87,10 @@ def procesar_venta():
 
         # Validar tipo de venta (Celulares vs General) y evitar mezcla
         tipo_venta_detectado = None
+        aprobaciones_remotas_autorizadas = {}
         for item in items:
             es_manual = item.get('es_manual', False)
+            es_obsequio_chk = item.get('es_obsequio', False)
             precio_venta_final = Decimal(str(item.get('precio_final', '0.00')))
             variant_id = item.get('variant_id')
 
@@ -117,7 +119,13 @@ def procesar_venta():
                     }), 400
                 
                 # Validar precio mínimo y consultar aprobaciones remotas si es menor
-                if current_user.rol != 'admin' and precio_venta_final < producto_check.precio_minimo:
+                precio_min_referencia = producto_check.precio_minimo
+                if variant_id:
+                    var_chk = ProductVariant.query.get(variant_id)
+                    if var_chk and var_chk.precio_minimo is not None:
+                        precio_min_referencia = var_chk.precio_minimo
+
+                if not es_obsequio_chk and current_user.rol != 'admin' and precio_venta_final < precio_min_referencia:
                     aprobacion = PriceApproval.query.filter_by(
                         vendedor_id=current_user.id,
                         product_id=prod_id,
@@ -128,7 +136,8 @@ def procesar_venta():
                     if not aprobacion:
                         return jsonify({'error': f'El precio de {producto_check.nombre} (${precio_venta_final}) es inferior al mínimo permitido y no tiene aprobación remota válida.'}), 400
                     else:
-                        # Marcar la aprobación como 'completada'
+                        # Registrar autorización y marcar la aprobación como 'completada'
+                        aprobaciones_remotas_autorizadas[(prod_id, variant_id)] = Decimal(str(aprobacion.precio_aprobado))
                         aprobacion.estado = 'completada'
                 
                 tipo_item = 'celulares' if producto_check.tipo_inventario == 'celulares' else 'general'
@@ -332,7 +341,9 @@ def procesar_venta():
                     branch_stock.cantidad -= cantidad_vendida
                     sync_global_product_stock(producto.id, variant_id)
 
-                    precio_limite_autorizado = variante.precio_costo if current_user.rol == 'admin' else variante.precio_minimo
+                    precio_limite_autorizado = variante.precio_costo if current_user.rol == 'admin' else (variante.precio_minimo or producto.precio_minimo)
+                    if (producto.id, variant_id) in aprobaciones_remotas_autorizadas:
+                        precio_limite_autorizado = aprobaciones_remotas_autorizadas[(producto.id, variant_id)]
                     
                     from models import StockAdjustment
                     ajuste = StockAdjustment(
@@ -384,6 +395,8 @@ def procesar_venta():
                     sync_global_product_stock(producto.id, None)
 
                     precio_limite_autorizado = producto.precio_costo if current_user.rol == 'admin' else producto.precio_minimo
+                    if (producto.id, variant_id) in aprobaciones_remotas_autorizadas:
+                        precio_limite_autorizado = aprobaciones_remotas_autorizadas[(producto.id, variant_id)]
                     
                     from models import StockAdjustment
                     ajuste = StockAdjustment(
