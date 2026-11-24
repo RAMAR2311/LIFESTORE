@@ -25,6 +25,7 @@
 
         <form action="{{ url_for('retomas_bp.importar_masivo_ejecutar') }}" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="preview_token" value="{{ preview_token }}">
             <button type="submit" class="btn btn-success btn-lg rounded-pill px-4 fw-bold shadow">
                 <i class="fa-solid fa-circle-check me-2"></i> Confirmar y Cargar {{ total_equipos }} Equipos
             </button>
@@ -192,6 +193,7 @@
             </a>
             <form action="{{ url_for('retomas_bp.importar_masivo_ejecutar') }}" method="POST" class="m-0">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="preview_token" value="{{ preview_token }}">
                 <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
                     <i class="fa-solid fa-circle-check me-2"></i> Confirmar y Cargar {{ total_equipos }} Equipos
                 </button>

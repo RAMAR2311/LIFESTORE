@@ -1,9 +1,11 @@
+import os
 import re
 import io
 import json
+import uuid
 from datetime import datetime
 import pandas as pd
-from flask import Blueprint, request, flash, redirect, render_template, url_for, jsonify, session
+from flask import Blueprint, request, flash, redirect, render_template, url_for, jsonify, session, current_app
 from flask_login import login_required, current_user
 from models import (
     db, Product, Retoma, obtener_hora_bogota, AuditLog, TechnicalService, 
@@ -943,15 +945,23 @@ def importar_masivo_preview():
             flash('No se encontraron filas válidas para procesar.', 'danger')
             return redirect(url_for('retomas_bp.importar_masivo'))
 
-        session['import_retomas_preview'] = {
-            'archivo_nombre': file.filename,
-            'filas': filas_procesadas,
-            'default_branch_id': default_branch_id,
-            'total_costo': float(total_costo),
-            'resumen_asesores': resumen_asesores
-        }
+        # Guardar en archivo temporal en disco (evita exceder el límite de cookie de Nginx 502 Bad Gateway)
+        session.pop('import_retomas_preview', None)
+        preview_token = str(uuid.uuid4())
+        tmp_dir = os.path.join(current_app.instance_path, 'tmp_retomas_preview')
+        os.makedirs(tmp_dir, exist_ok=True)
+        tmp_path = os.path.join(tmp_dir, f'{preview_token}.json')
+        with open(tmp_path, 'w', encoding='utf-8') as tf:
+            json.dump({
+                'archivo_nombre': file.filename,
+                'filas': filas_procesadas,
+                'default_branch_id': default_branch_id,
+                'total_costo': float(total_costo),
+                'resumen_asesores': resumen_asesores
+            }, tf, ensure_ascii=False)
 
         return render_template('retomas/importar_masivo_preview.html',
+                               preview_token=preview_token,
                                archivo_nombre=file.filename,
                                filas=filas_procesadas,
                                total_equipos=len(filas_procesadas),
@@ -969,7 +979,23 @@ def importar_masivo_preview():
 @login_required
 @admin_required
 def importar_masivo_ejecutar():
-    preview_data = session.get('import_retomas_preview')
+    preview_token = (request.form.get('preview_token') or '').strip()
+    if not preview_token or not re.match(r'^[a-f0-9\-]+$', preview_token):
+        flash('Sesión de carga inválida o expirada. Por favor sube el archivo nuevamente.', 'warning')
+        return redirect(url_for('retomas_bp.importar_masivo'))
+
+    tmp_path = os.path.join(current_app.instance_path, 'tmp_retomas_preview', f'{preview_token}.json')
+    if not os.path.exists(tmp_path):
+        flash('No hay datos en espera de confirmación o el archivo temporal expiró. Por favor sube el archivo nuevamente.', 'warning')
+        return redirect(url_for('retomas_bp.importar_masivo'))
+
+    try:
+        with open(tmp_path, 'r', encoding='utf-8') as tf:
+            preview_data = json.load(tf)
+    except Exception:
+        flash('Error leyendo los datos temporales de carga. Por favor sube el archivo nuevamente.', 'danger')
+        return redirect(url_for('retomas_bp.importar_masivo'))
+
     if not preview_data or not preview_data.get('filas'):
         flash('No hay datos en espera de confirmación. Por favor sube el archivo nuevamente.', 'warning')
         return redirect(url_for('retomas_bp.importar_masivo'))
@@ -1096,6 +1122,11 @@ def importar_masivo_ejecutar():
 
         db.session.commit()
         session.pop('import_retomas_preview', None)
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
 
         flash(f'¡Carga masiva exitosa! Se importaron y pusieron a la venta {len(retomas_creadas_ids)} equipos de retoma bajo el lote {batch_code}.', 'success')
     except Exception as e:
