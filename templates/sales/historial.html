@@ -149,68 +149,149 @@
         [data-theme="dark"] .finance-card .branch-pill .text-dark {
             color: #f8fafc !important;
         }
+        .branch-header-bar {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+        [data-theme="dark"] .branch-header-bar {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+        }
+        .branch-tab-btn {
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            color: #475569;
+            font-size: 0.8rem;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .branch-tab-btn:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+            color: #0f172a;
+            transform: translateY(-1px);
+        }
+        .branch-tab-btn.active {
+            background: #0f172a !important;
+            color: #ffffff !important;
+            border-color: #0f172a !important;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+        }
+        [data-theme="dark"] .branch-tab-btn {
+            background: #1e293b !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+            color: #cbd5e1 !important;
+        }
+        [data-theme="dark"] .branch-tab-btn.active {
+            background: #38bdf8 !important;
+            color: #0f172a !important;
+            border-color: #38bdf8 !important;
+            font-weight: 700;
+        }
     </style>
 
-    {% if desglose_metodos %}
-    <div class="row g-3 mb-4">
-        {% for m in desglose_metodos.values() %}
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="finance-card h-100" style="--card-accent: {{ m.color }}; --card-bg-subtle: {{ m.bg_subtle }};" onclick="filtrarTabla('{{ m.clave }}')">
-                <div>
-                    <!-- Encabezado con método e ícono -->
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="text-uppercase fw-bold text-muted" style="font-size: 0.7rem; letter-spacing: 0.05em;">{{ m.nombre }}</span>
-                        <div class="icon-chip"><i class="{{ m.icono }}"></i></div>
+    {% if desglose_sucursales %}
+    <!-- Barra Superior de Navegación Rápida por Sede -->
+    <div class="col-12 mb-3 d-print-none">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="text-uppercase fw-bold text-muted small me-1">
+                    <i class="fa-solid fa-store me-1"></i> Ver Sede:
+                </span>
+                <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold branch-tab-btn active" data-branch="todas" onclick="seleccionarPestanaSucursal('todas')">
+                    <i class="fa-solid fa-globe me-1"></i> Todas las Sedes (${{ (gran_total_periodo or 0)|cop }})
+                </button>
+                {% for suc_nombre, suc_info in desglose_sucursales.items() %}
+                <button type="button" class="btn btn-sm rounded-pill px-3 fw-semibold branch-tab-btn" data-branch="{{ suc_nombre|lower }}" onclick="seleccionarPestanaSucursal('{{ suc_nombre|lower }}')">
+                    <i class="fa-solid fa-shop me-1 text-primary"></i> {{ suc_nombre }} (${{ (suc_info.total_recaudado or 0)|cop }})
+                </button>
+                {% endfor %}
+            </div>
+            
+            <div class="d-none d-lg-block text-muted small">
+                <span class="badge bg-light text-dark border px-2.5 py-1.5 rounded-pill">
+                    <i class="fa-solid fa-layer-group text-primary me-1"></i> Tarjetas independientes por cuenta de cada sede
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secciones Agrupadas por Sucursal con sus propias Tarjetas de Pago -->
+    <div class="col-12 mb-2">
+        {% for suc_nombre, suc_info in desglose_sucursales.items() %}
+        <div class="branch-section mb-4" data-branch="{{ suc_nombre|lower }}">
+            <!-- Barra Encabezado de la Sucursal -->
+            <div class="d-flex align-items-center justify-content-between p-3 rounded-4 mb-3 border shadow-sm branch-header-bar flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="icon-chip bg-primary text-white rounded-3 d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; font-size: 1.1rem;">
+                        <i class="fa-solid fa-shop"></i>
                     </div>
-
-                    <!-- Monto Total Grande -->
-                    <div class="amount-display mb-2">${{ m.total|cop }}</div>
-
-                    <!-- Barra de distribución si hay ventas -->
-                    {% if m.tiene_ventas %}
-                    <div class="progress mb-2 rounded-pill overflow-hidden" style="height: 5px; background: rgba(0,0,0,0.06);">
-                        {% for suc in m.lista_sucursales if suc.monto > 0 %}
-                        <div class="progress-bar" style="width: {{ suc.porcentaje }}%; background-color: {{ m.color }}; opacity: {{ [1.0, 0.78, 0.58, 0.4][loop.index0 % 4] }};" title="{{ suc.nombre }}: ${{ suc.monto|cop }} ({{ suc.porcentaje }}%)"></div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    <!-- Desglose por Sucursal / Tienda -->
-                    <div class="branch-breakdown-list pt-2 border-top border-light-subtle">
-                        {% set con_ventas = m.lista_sucursales | selectattr('monto', 'gt', 0) | list %}
-                        {% if con_ventas %}
-                            <div class="d-flex flex-column gap-1">
-                                {% for suc in con_ventas %}
-                                <div class="branch-pill d-flex justify-content-between align-items-center"
-                                     onclick="event.stopPropagation(); filtrarTabla('{{ m.clave }}', '{{ suc.nombre }}');"
-                                     title="Filtrar ventas de {{ m.nombre }} en {{ suc.nombre }}">
-                                    <span class="text-truncate fw-semibold text-secondary d-flex align-items-center gap-1" style="max-width: 58%;">
-                                        <i class="fa-solid fa-shop text-muted" style="font-size: 0.62rem;"></i>
-                                        <span class="text-truncate">{{ suc.nombre }}</span>
-                                    </span>
-                                    <div class="text-end text-nowrap">
-                                        <span class="fw-bold font-mono text-dark" style="font-size: 0.74rem;">${{ suc.monto|cop }}</span>
-                                        <span class="text-muted ms-1" style="font-size: 0.65rem;">({{ suc.porcentaje }}%)</span>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="text-muted small py-2 fst-italic text-center" style="font-size: 0.72rem; opacity: 0.75;">
-                                <i class="fa-regular fa-folder-open me-1"></i> Sin ventas en el período
-                            </div>
-                        {% endif %}
+                    <div>
+                        <h6 class="fw-bold mb-0 text-brand-black d-flex align-items-center gap-2">
+                            <span>Sede {{ suc_nombre }}</span>
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill fw-semibold" style="font-size: 0.72rem;">
+                                {{ suc_info.total_operaciones }} operaciones
+                            </span>
+                        </h6>
+                        <span class="text-muted small" style="font-size: 0.74rem;">Cuentas bancarias y métodos de cobro asignados a {{ suc_nombre }}</span>
                     </div>
                 </div>
+                <div class="text-end">
+                    <span class="text-uppercase fw-bold text-muted d-block" style="font-size: 0.65rem; letter-spacing: 0.05em;">Total Recaudado en {{ suc_nombre }}</span>
+                    <span class="font-mono fw-extrabold fs-5 text-brand-black">${{ (suc_info.total_recaudado or 0)|cop }}</span>
+                </div>
+            </div>
 
-                <button class="btn-card-action d-print-none mt-2" type="button">
-                    Ver operaciones <i class="fa-solid fa-arrow-right-long small"></i>
-                </button>
+            <!-- Grid de Tarjetas de Pago INDEPENDIENTES para ESTA Sucursal -->
+            <div class="row g-3">
+                {% for m_key, m in suc_info.metodos.items() %}
+                <div class="col-6 col-md-4 col-xl-3">
+                    <div class="finance-card h-100 {% if m.total == 0 %}opacity-75{% endif %}" 
+                         style="--card-accent: {{ m.color }}; --card-bg-subtle: {{ m.bg_subtle }}; cursor: pointer;"
+                         onclick="filtrarTabla('{{ m.clave }}', '{{ suc_nombre }}')"
+                         title="Ver operaciones de {{ m.nombre }} en {{ suc_nombre }}">
+                        <div>
+                            <!-- Encabezado con método y badge de la sede -->
+                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                <div>
+                                    <span class="text-uppercase fw-bold text-muted d-block" style="font-size: 0.7rem; letter-spacing: 0.04em;">{{ m.nombre }}</span>
+                                    <span class="badge bg-light text-secondary border px-1.5 py-0 mt-0.5 d-inline-flex align-items-center" style="font-size: 0.62rem;">
+                                        <i class="fa-solid fa-shop me-1 text-primary" style="font-size: 0.55rem;"></i>{{ suc_nombre }}
+                                    </span>
+                                </div>
+                                <div class="icon-chip"><i class="{{ m.icono }}"></i></div>
+                            </div>
+
+                            <!-- Monto Específico de este Método en esta Tienda -->
+                            <div class="amount-display my-1">${{ m.total|cop }}</div>
+
+                            <!-- Conteo y porcentaje respecto a la tienda -->
+                            <div class="d-flex align-items-center justify-content-between text-muted small mt-2" style="font-size: 0.72rem;">
+                                <span>
+                                    <i class="fa-solid fa-receipt me-1 opacity-75"></i>
+                                    {% if m.conteo == 1 %}1 pago{% else %}{{ m.conteo }} pagos{% endif %}
+                                </span>
+                                {% if suc_info.total_recaudado > 0 and m.total > 0 %}
+                                <span class="badge bg-light text-dark border px-1.5 py-0" style="font-size: 0.65rem;">
+                                    {{ ((m.total / suc_info.total_recaudado) * 100)|round(1) }}% de la sede
+                                </span>
+                                {% elif m.total == 0 %}
+                                <span class="text-muted fst-italic" style="font-size: 0.65rem;">Sin cobros</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <button class="btn-card-action d-print-none mt-2" type="button">
+                            Ver pagos <i class="fa-solid fa-arrow-right-long small"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
         {% endfor %}
     </div>
-    {% else %}
+    {% elif desglose_metodos %}
     <!-- 1. Efectivo -->
     <div class="col-6 col-md-3 mb-3">
         <div class="finance-card h-100" style="--card-accent: #059669; --card-bg-subtle: #ecfdf5;" onclick="filtrarTabla('efectivo')">
@@ -897,6 +978,34 @@
             return new bootstrap.Tooltip(el);
         });
     });
+
+    function seleccionarPestanaSucursal(branchKey) {
+        // Actualizar pestañas activas
+        document.querySelectorAll('.branch-tab-btn').forEach(btn => {
+            if (btn.getAttribute('data-branch') === branchKey) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Mostrar u ocultar las secciones de cada sucursal
+        const secciones = document.querySelectorAll('.branch-section');
+        secciones.forEach(sec => {
+            if (branchKey === 'todas' || sec.getAttribute('data-branch') === branchKey) {
+                sec.style.display = '';
+            } else {
+                sec.style.display = 'none';
+            }
+        });
+
+        // Filtrar también las filas de la tabla inferior
+        if (branchKey === 'todas') {
+            filtrarTabla('todos');
+        } else {
+            filtrarTabla('todos', branchKey);
+        }
+    }
 
     function filtrarTabla(metodo, sucursal = null) {
         const filas = document.querySelectorAll('tr.venta-row');

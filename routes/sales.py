@@ -819,6 +819,28 @@ def historial():
         ('sistecredito', 'Sistecrédito', '#2563eb', '#eff6ff', 'fa-solid fa-id-card'),
     ]
 
+    # Estructura por SUCURSAL con tarjetas de pago totalmente independientes por cada local
+    desglose_sucursales = {}
+    for b in sucursales_activas:
+        desglose_sucursales[b.nombre] = {
+            'nombre': b.nombre,
+            'id': b.id,
+            'total_recaudado': Decimal('0'),
+            'total_operaciones': 0,
+            'metodos': {
+                m_key: {
+                    'clave': m_key,
+                    'nombre': m_nombre,
+                    'color': m_color,
+                    'bg_subtle': m_bg,
+                    'icono': m_icono,
+                    'total': Decimal('0'),
+                    'conteo': 0
+                }
+                for m_key, m_nombre, m_color, m_bg, m_icono in METODOS_CONFIG
+            }
+        }
+
     desglose_metodos = {}
     for m_key, m_nombre, m_color, m_bg, m_icono in METODOS_CONFIG:
         desglose_metodos[m_key] = {
@@ -886,6 +908,32 @@ def historial():
         else:
             total_otros += monto_dec
 
+        # Registro en desglose por sucursal
+        if branch_nom not in desglose_sucursales:
+            desglose_sucursales[branch_nom] = {
+                'nombre': branch_nom,
+                'id': None,
+                'total_recaudado': Decimal('0'),
+                'total_operaciones': 0,
+                'metodos': {
+                    k: {
+                        'clave': k,
+                        'nombre': nom,
+                        'color': col,
+                        'bg_subtle': bg,
+                        'icono': ico,
+                        'total': Decimal('0'),
+                        'conteo': 0
+                    }
+                    for k, nom, col, bg, ico in METODOS_CONFIG
+                }
+            }
+
+        desglose_sucursales[branch_nom]['total_recaudado'] += monto_dec
+        if m_key and m_key in desglose_sucursales[branch_nom]['metodos']:
+            desglose_sucursales[branch_nom]['metodos'][m_key]['total'] += monto_dec
+            desglose_sucursales[branch_nom]['metodos'][m_key]['conteo'] += 1
+
         if m_key and m_key in desglose_metodos:
             desglose_metodos[m_key]['total'] += monto_dec
             if branch_nom not in desglose_metodos[m_key]['sucursales']:
@@ -894,6 +942,28 @@ def historial():
 
     for v in todas_las_ventas:
         b_nom = v.branch.nombre if v.branch else (v.sucursal or 'Principal')
+        if b_nom in desglose_sucursales:
+            desglose_sucursales[b_nom]['total_operaciones'] += 1
+        elif b_nom:
+            desglose_sucursales[b_nom] = {
+                'nombre': b_nom,
+                'id': v.branch_id,
+                'total_recaudado': Decimal('0'),
+                'total_operaciones': 1,
+                'metodos': {
+                    k: {
+                        'clave': k,
+                        'nombre': nom,
+                        'color': col,
+                        'bg_subtle': bg,
+                        'icono': ico,
+                        'total': Decimal('0'),
+                        'conteo': 0
+                    }
+                    for k, nom, col, bg, ico in METODOS_CONFIG
+                }
+            }
+
         if v.pagos:  # Pagos nuevos con tabla sale_payments
             for pago in v.pagos:
                 registrar_pago_metodo(pago.metodo_pago, pago.monto, b_nom)
@@ -901,6 +971,12 @@ def historial():
                 total_mixto += 1
         else:  # Retrocompatibilidad con ventas antiguas sin SalePayment
             registrar_pago_metodo(v.metodo_pago, v.monto_total, b_nom)
+
+    # Gran total de ventas del periodo consultado
+    gran_total_periodo = sum(s['total_recaudado'] for s in desglose_sucursales.values())
+
+    # Ordenar sucursales por total recaudado descendente
+    desglose_sucursales = dict(sorted(desglose_sucursales.items(), key=lambda item: item[1]['total_recaudado'], reverse=True))
 
     # Calcular porcentajes y listas ordenadas por sucursal
     for m_key, m_info in desglose_metodos.items():
@@ -921,6 +997,8 @@ def historial():
     return render_template('sales/historial.html', 
                            ventas=ventas, 
                            paginacion=paginacion,
+                           desglose_sucursales=desglose_sucursales,
+                           gran_total_periodo=gran_total_periodo,
                            desglose_metodos=desglose_metodos,
                            sucursales_activas=sucursales_activas,
                            total_efectivo=total_efectivo,
