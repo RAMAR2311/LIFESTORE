@@ -65,85 +65,146 @@ def cuarentena():
 @login_required
 @admin_required
 def crear_retoma_directa():
-    modelo = request.form.get('modelo', '').strip()
-    marca = request.form.get('marca', '').strip()
-    imei1 = request.form.get('imei1', '').strip()
-    imei2 = request.form.get('imei2', '').strip() or None
-    color = request.form.get('color', '').strip() or None
-    bateria = request.form.get('bateria', '').strip() or None
-    memoria = request.form.get('memoria', '').strip() or None
+    # Detectar si viene en lote (arrays) o individual
+    modelos = request.form.getlist('modelo[]')
+    marcas = request.form.getlist('marca[]')
+    imeis1 = request.form.getlist('imei1[]')
+    imeis2 = request.form.getlist('imei2[]')
+    colores = request.form.getlist('color[]')
+    baterias = request.form.getlist('bateria[]')
+    memorias = request.form.getlist('memoria[]')
+    valores_raw = request.form.getlist('valor_retoma[]')
+    observaciones_list = request.form.getlist('observaciones[]')
+
+    # Si no vienen en arrays, tomar valores simples para compatibilidad
+    if not modelos and request.form.get('modelo'):
+        modelos = [request.form.get('modelo')]
+        marcas = [request.form.get('marca')]
+        imeis1 = [request.form.get('imei1')]
+        imeis2 = [request.form.get('imei2')]
+        colores = [request.form.get('color')]
+        baterias = [request.form.get('bateria')]
+        memorias = [request.form.get('memoria')]
+        valores_raw = [request.form.get('valor_retoma')]
+        observaciones_list = [request.form.get('observaciones')]
+
+    if not modelos or not imeis1:
+        flash('Debes ingresar al menos un equipo con modelo e IMEI.', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
+    # Datos compartidos del lote
     proveedor = request.form.get('proveedor', '').strip() or 'Cliente'
-    observaciones = request.form.get('observaciones', '').strip() or None
     branch_id_input = request.form.get('branch_id', type=int)
     asesor_id_input = request.form.get('asesor_retoma_id', type=int)
-    valor_retoma_raw = request.form.get('valor_retoma', '0')
-
-    if not modelo or not imei1:
-        flash('El modelo y el IMEI 1 son obligatorios para registrar la retoma.', 'danger')
-        return redirect(url_for('retomas_bp.cuarentena'))
-
-    # Limpiar formato de valor de retoma
-    valor_limpio = re.sub(r'[^\d.]', '', str(valor_retoma_raw).replace(',', ''))
-    try:
-        valor_retoma = Decimal(valor_limpio)
-    except:
-        valor_retoma = Decimal('0')
-
-    if valor_retoma <= 0:
-        flash('Debes ingresar un valor de retoma válido mayor a $0.', 'danger')
-        return redirect(url_for('retomas_bp.cuarentena'))
-
-    # Validar que el IMEI 1 no exista ya activo en otra retoma no aprobada o producto con stock
-    retoma_existente = Retoma.query.filter_by(imei1=imei1, estado='en_evaluacion').first()
-    if retoma_existente:
-        flash(f'Ya existe una retoma en evaluación con el IMEI {imei1} (ID #{retoma_existente.id}).', 'danger')
-        return redirect(url_for('retomas_bp.cuarentena'))
-
-    prod_activo = Product.query.filter_by(imei=imei1).first()
-    if prod_activo and prod_activo.total_stock > 0:
-        flash(f'El IMEI {imei1} ya pertenece a un producto activo en stock ({prod_activo.nombre}).', 'danger')
-        return redirect(url_for('retomas_bp.cuarentena'))
-
-    # Determinar sucursal
     target_branch_id = branch_id_input or current_user.branch_id or 1
 
+    # Validar duplicados dentro del mismo lote enviado
+    vistos_en_lote = set()
+    equipos_a_crear = []
+
+    for i in range(len(modelos)):
+        mod = (modelos[i] or '').strip()
+        mrc = (marcas[i] or '').strip() if i < len(marcas) else ''
+        im1 = (imeis1[i] or '').strip() if i < len(imeis1) else ''
+        im2 = (imeis2[i] or '').strip() if i < len(imeis2) else ''
+        col = (colores[i] or '').strip() if i < len(colores) else ''
+        bat = (baterias[i] or '').strip() if i < len(baterias) else ''
+        mem = (memorias[i] or '').strip() if i < len(memorias) else ''
+        v_raw = valores_raw[i] if i < len(valores_raw) else '0'
+        obs = (observaciones_list[i] or '').strip() if i < len(observaciones_list) else ''
+
+        if not mod or not im1:
+            continue
+
+        if im1 in vistos_en_lote:
+            flash(f'El IMEI "{im1}" está repetido dentro del mismo lote.', 'danger')
+            return redirect(url_for('retomas_bp.cuarentena'))
+        vistos_en_lote.add(im1)
+
+        # Validar en base de datos
+        retoma_existente = Retoma.query.filter_by(imei1=im1, estado='en_evaluacion').first()
+        if retoma_existente:
+            flash(f'El IMEI "{im1}" ({mod}) ya está registrado en evaluación (Retoma #{retoma_existente.id}).', 'danger')
+            return redirect(url_for('retomas_bp.cuarentena'))
+
+        prod_activo = Product.query.filter_by(imei=im1).first()
+        if prod_activo and prod_activo.total_stock > 0:
+            flash(f'El IMEI "{im1}" ({mod}) ya pertenece a un celular activo en stock ({prod_activo.nombre}).', 'danger')
+            return redirect(url_for('retomas_bp.cuarentena'))
+
+        # Limpiar valor
+        val_clean = re.sub(r'[^\d.]', '', str(v_raw).replace(',', ''))
+        try:
+            val_dec = Decimal(val_clean)
+        except:
+            val_dec = Decimal('0')
+
+        if val_dec <= 0:
+            flash(f'Debes ingresar un valor de retoma válido mayor a $0 para el equipo "{mod}".', 'danger')
+            return redirect(url_for('retomas_bp.cuarentena'))
+
+        equipos_a_crear.append({
+            'modelo': mod,
+            'marca': mrc,
+            'imei1': im1,
+            'imei2': im2 or None,
+            'color': col or None,
+            'bateria': bat or None,
+            'memoria': mem or None,
+            'valor_retoma': val_dec,
+            'observaciones': obs or None
+        })
+
+    if not equipos_a_crear:
+        flash('No se encontraron equipos válidos para registrar.', 'danger')
+        return redirect(url_for('retomas_bp.cuarentena'))
+
     try:
-        nueva_retoma = Retoma(
-            sale_id=None,
-            modelo=modelo,
-            marca=marca,
-            proveedor=proveedor,
-            valor_retoma=valor_retoma,
-            arreglos=Decimal('0.00'),
-            imei1=imei1,
-            imei2=imei2,
-            color=color,
-            bateria=bateria,
-            memoria=memoria,
-            observaciones=observaciones,
-            estado='en_evaluacion',
-            ok_contabilidad=False,
-            ok_venta=False,
-            vendedor_id=current_user.id,
-            branch_id=target_branch_id,
-            asesor_retoma_id=asesor_id_input
-        )
-        db.session.add(nueva_retoma)
+        creados = []
+        for eq in equipos_a_crear:
+            nueva_retoma = Retoma(
+                sale_id=None,
+                modelo=eq['modelo'],
+                marca=eq['marca'],
+                proveedor=proveedor,
+                valor_retoma=eq['valor_retoma'],
+                arreglos=Decimal('0.00'),
+                imei1=eq['imei1'],
+                imei2=eq['imei2'],
+                color=eq['color'],
+                bateria=eq['bateria'],
+                memoria=eq['memoria'],
+                observaciones=eq['observaciones'],
+                estado='en_evaluacion',
+                ok_contabilidad=False,
+                ok_venta=False,
+                vendedor_id=current_user.id,
+                branch_id=target_branch_id,
+                asesor_retoma_id=asesor_id_input
+            )
+            db.session.add(nueva_retoma)
+            creados.append(nueva_retoma)
+
         db.session.commit()
 
         # Registro en auditoría
+        detalles_log = f"Lote de {len(creados)} retoma(s) directas creado: " + ", ".join([f"#{r.id} ({r.marca} {r.modelo} - IMEI {r.imei1})" for r in creados])
         log = AuditLog(
             user_id=current_user.id,
-            action='CREAR_RETOMA_DIRECTA',
-            details=f"Retoma directa #{nueva_retoma.id} creada: {marca} {modelo} (IMEI: {imei1}) por valor ${valor_retoma:,.2f}"
+            action='CREAR_RETOMAS_LOTE',
+            details=detalles_log
         )
         db.session.add(log)
         db.session.commit()
 
-        flash(f'Retoma #{nueva_retoma.id} ({marca} {modelo}) registrada exitosamente en Cuarentena.', 'success')
+        if len(creados) == 1:
+            flash(f'Retoma #{creados[0].id} ({creados[0].marca} {creados[0].modelo}) registrada exitosamente en Cuarentena.', 'success')
+        else:
+            flash(f'¡Se registraron exitosamente {len(creados)} retomas en Cuarentena!', 'success')
+
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al registrar la retoma: {str(e)}', 'danger')
+        flash(f'Error al registrar las retomas: {str(e)}', 'danger')
 
     return redirect(url_for('retomas_bp.cuarentena'))
 
