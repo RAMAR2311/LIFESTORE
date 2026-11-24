@@ -182,9 +182,9 @@
                     {% endif %}
                 {% endfor %}
             {% endif %}
-            <div class="col-6 col-md-4 col-xl-3 product-card-container" data-categoria="{{ 'equipos' if p.tipo_inventario == 'celulares' else 'accesorios' }}" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}" data-imei="{{ p.imei|lower if p.imei else '' }}" data-imei2="{{ p.imei2|lower if p.imei2 else '' }}">
+            <div class="col-6 col-md-4 col-xl-3 product-card-container" data-categoria="{{ 'equipos' if p.tipo_inventario == 'celulares' else 'accesorios' }}" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}" data-imei="{{ p.imei|lower if p.imei else '' }}" data-imei2="{{ p.imei2|lower if p.imei2 else '' }}" data-memoria="{{ p.memoria|lower if p.memoria else '' }}">
                 <div class="card h-100 border-0 shadow-sm cursor-pointer product-card" 
-                     data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "precio_minimo": p.precio_minimo or p.precio_sugerido or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario, "imei": p.imei, "imei2": p.imei2, "inventario": p.inventario}|tojson|safe }}'
+                     data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "precio_minimo": p.precio_minimo or p.precio_sugerido or 0, "memoria": p.memoria or "", "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario, "imei": p.imei, "imei2": p.imei2, "inventario": p.inventario}|tojson|safe }}'
                      data-variants='{{ vars_data|tojson|safe }}'
                      onclick="handleProductClick(this)">
                     <div class="ratio ratio-1x1 product-img-box rounded-top">
@@ -205,9 +205,29 @@
                                 {% endif %}
                             </h6>
                             {% if p.tipo_inventario == 'celulares' and p.imei %}
-                                <small class="product-sku d-block mb-2 font-mono">IMEI: {{ p.imei }}</small>
+                                <small class="product-sku d-block mb-1 font-mono">IMEI: {{ p.imei }}</small>
                             {% else %}
-                                <small class="product-sku d-block mb-2">{{ p.sku }}</small>
+                                <small class="product-sku d-block mb-1">{{ p.sku }}</small>
+                            {% endif %}
+
+                            {% if p.tipo_inventario == 'celulares' and (p.memoria or p.color or p.bateria) %}
+                            <div class="d-flex align-items-center justify-content-center gap-1 flex-wrap mb-2">
+                                {% if p.memoria %}
+                                    <span class="badge bg-dark text-white rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.72rem;">
+                                        <i class="fa-solid fa-microchip me-1 text-warning"></i>{{ p.memoria }}
+                                    </span>
+                                {% endif %}
+                                {% if p.color %}
+                                    <span class="badge bg-light text-secondary border rounded-pill px-2 py-0.5" style="font-size: 0.68rem;">
+                                        {{ p.color }}
+                                    </span>
+                                {% endif %}
+                                {% if p.bateria %}
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-1.5 py-0.5" style="font-size: 0.68rem;" title="Salud de batería">
+                                        <i class="fa-solid fa-battery-three-quarters me-0.5"></i>{{ p.bateria }}%
+                                    </span>
+                                {% endif %}
+                            </div>
                             {% endif %}
                         </div>
                         <div>
@@ -1052,11 +1072,12 @@
             const sku = card.dataset.sku || '';
             const imei = card.dataset.imei || '';
             const imei2 = card.dataset.imei2 || '';
+            const memoria = card.dataset.memoria || '';
             const cat = card.dataset.categoria || '';
 
             if (query.length > 0) {
-                // Si hay texto en la barra de búsqueda, busca en AMBOS (Equipos y Accesorios)
-                if (name.includes(query) || sku.includes(query) || imei.includes(query) || imei2.includes(query)) {
+                // Si hay texto en la barra de búsqueda, busca en AMBOS (Equipos y Accesorios) por nombre, SKU, IMEI o capacidad
+                if (name.includes(query) || sku.includes(query) || imei.includes(query) || imei2.includes(query) || memoria.includes(query)) {
                     card.style.display = 'block';
                 } else {
                     card.style.display = 'none';
@@ -1103,21 +1124,21 @@
                 alert("Este producto no tiene stock disponible.");
                 return;
             }
-            addToCart(pData.id, null, pData.nombre, pData.sku, pData.precio_sugerido, pData.cantidad_stock, null, pData.tipo_inventario, pData.imei, pData.imei2, pData.inventario, pData.precio_minimo);
+            addToCart(pData.id, null, pData.nombre, pData.sku, pData.precio_sugerido, pData.cantidad_stock, null, pData.tipo_inventario, pData.imei, pData.imei2, pData.inventario, pData.precio_minimo, pData.memoria);
         }
     }
 
     window.addVariantToCart = function(variantId) {
         const vData = activeVariantsData.find(v => v.id === variantId);
         if (!vData) return;
-        addToCart(activeProductData.id, vData.id, activeProductData.nombre, activeProductData.sku, vData.precio_sugerido, vData.stock, vData.nombre, activeProductData.tipo_inventario, activeProductData.imei, activeProductData.imei2, activeProductData.inventario, (vData.precio_minimo || activeProductData.precio_minimo));
+        addToCart(activeProductData.id, vData.id, activeProductData.nombre, activeProductData.sku, vData.precio_sugerido, vData.stock, vData.nombre, activeProductData.tipo_inventario, activeProductData.imei, activeProductData.imei2, activeProductData.inventario, (vData.precio_minimo || activeProductData.precio_minimo), activeProductData.memoria);
         bootstrap.Modal.getInstance(document.getElementById('modalVariantes')).hide();
     };
 
     const ES_ADMIN_VENTA = {{ 'true' if current_user.rol == 'admin' else 'false' }};
     const pollingAprobacionesCaja = {};
 
-    function addToCart(productId, variantId, nombre, sku, precio, maxStock, variantName = null, tipoInventario = null, imei = null, imei2 = null, inventario = null, precioMinimo = null) {
+    function addToCart(productId, variantId, nombre, sku, precio, maxStock, variantName = null, tipoInventario = null, imei = null, imei2 = null, inventario = null, precioMinimo = null, memoria = null) {
         let existingIndex = carrito.findIndex(i => i.product_id === productId && i.variant_id === variantId);
         
         if (existingIndex > -1) {
@@ -1141,6 +1162,7 @@
                 precio_final: precio,
                 precio_sugerido: precio,
                 precio_minimo: pMin,
+                memoria: memoria || null,
                 estado_aprobacion: null, // null | 'pendiente' | 'aprobado' | 'rechazado'
                 motivo_rechazo: null,
                 solicitud_id: null,
@@ -1405,10 +1427,12 @@
                 aprobacionHtml = `<div class="mt-1"><span class="badge bg-danger text-white" style="font-size: 0.72rem;"><i class="fa-solid fa-circle-xmark me-1"></i> Descuento No Autorizado</span></div>`;
             }
 
+            let memoriaBadge = item.memoria ? `<span class="badge bg-dark text-white rounded-pill px-1.5 py-0 me-1" style="font-size: 0.68rem;"><i class="fa-solid fa-microchip me-1 text-warning"></i>${item.memoria}</span>` : '';
+
             li.innerHTML = `
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <div class="fw-bold text-brand-black" style="max-width: 78%; word-break: break-word;">
-                        ${displayNombre}
+                        ${displayNombre} ${memoriaBadge}
                         ${imeiHtml}
                         ${aprobacionHtml}
                         ${item.es_obsequio ? '<span class="badge bg-success bg-opacity-10 text-success mt-1"><i class="fa-solid fa-gift me-1"></i>Obsequio</span>' : ''}
