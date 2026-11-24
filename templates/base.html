@@ -2173,6 +2173,16 @@
                 input.value = '';
             }
         }
+
+        // FIX GLOBAL BOOTSTRAP MODALS PWA & MOBILE (Evita solapamiento de backdrop o bloqueo de clics en iOS/Android)
+        document.addEventListener('show.bs.modal', function (event) {
+            const modalEl = event.target;
+            if (modalEl && modalEl.classList && modalEl.classList.contains('modal')) {
+                if (modalEl.parentElement && modalEl.parentElement !== document.body) {
+                    document.body.appendChild(modalEl);
+                }
+            }
+        });
     </script>
 
     <!-- WIDGET DE APROBACIÓN DE PRECIOS PARA ADMIN -->
