@@ -857,17 +857,17 @@
 
 <!-- MODAL REGISTRAR RETOMAS DIRECTAS (SOPORTE PARA MÚLTIPLES EQUIPOS) -->
 <div class="modal fade text-start" id="modalNuevaRetoma" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
-        <div class="modal-content border-0 shadow-lg rounded-4">
-            <div class="modal-header bg-dark text-white py-3">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable" style="max-height: 92vh;">
+        <div class="modal-content border-0 shadow-lg rounded-4 d-flex flex-column" style="max-height: 90vh; overflow: hidden;">
+            <div class="modal-header bg-dark text-white py-3 flex-shrink-0">
                 <h5 class="modal-title fw-bold fs-6">
                     <i class="fa-solid fa-recycle text-brand-pink me-2"></i> Registrar Retomas Directas
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('retomas_bp.crear_retoma_directa') }}" method="POST" id="formRegistroRetomasLote">
+            <form action="{{ url_for('retomas_bp.crear_retoma_directa') }}" method="POST" id="formRegistroRetomasLote" class="d-flex flex-column m-0" style="min-height: 0; flex: 1 1 auto; overflow: hidden;">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="modal-body p-4">
+                <div class="modal-body p-4" style="overflow-y: auto; max-height: calc(88vh - 135px);">
                     <!-- Datos Generales de la Operación / Sede -->
                     <div class="p-3 bg-light rounded-3 border mb-3">
                         <div class="row g-2 align-items-center">
@@ -1018,7 +1018,7 @@
                     </datalist>
                 </div>
 
-                <div class="modal-footer border-top py-2.5 bg-light d-flex justify-content-between align-items-center">
+                <div class="modal-footer border-top py-2.5 bg-light d-flex justify-content-between align-items-center flex-shrink-0 mt-auto">
                     <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
                         <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Retomas
