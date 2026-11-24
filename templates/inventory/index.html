@@ -18,10 +18,34 @@
 
 
 
-<!-- Buscador Rápido de Inventario -->
+<!-- Tarjetas KPI de Inventario de Accesorios -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4 col-12">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #ffffff, #f0f8ff);">
+            <div class="fs-2 fw-bold text-brand-blue">{{ total_unidades_fisicas }}</div>
+            <div class="text-muted small fw-bold">UNIDADES EN STOCK ({{ total_productos }} REFERENCIAS)</div>
+        </div>
+    </div>
+    {% if current_user.rol != 'coordinador' %}
+    <div class="col-md-4 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #ffffff, #fff5f5);">
+            <div class="fs-2 fw-bold text-danger">${{ valor_costo|cop }}</div>
+            <div class="text-muted small fw-bold">COSTO TOTAL MERCANCÍA</div>
+        </div>
+    </div>
+    {% endif %}
+    <div class="col-md-4 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center" style="background: linear-gradient(135deg, #ffffff, #f0fff4);">
+            <div class="fs-2 fw-bold text-success">${{ valor_sugerido|cop }}</div>
+            <div class="text-muted small fw-bold">VALOR ESTIMADO VENTAS</div>
+        </div>
+    </div>
+</div>
+
+<!-- Buscador Rápido de Inventario y Filtro por Sede -->
 <div class="card card-custom p-3 mb-4 border-0 shadow-sm bg-white">
-    <div class="row align-items-center">
-        <div class="col-md-8 col-lg-6 position-relative">
+    <div class="row align-items-center g-2">
+        <div class="col-md-6 col-lg-5 position-relative">
             <div class="input-group input-group-lg shadow-sm rounded-pill border">
                 <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
                 <input type="text" id="inventarioSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por SKU o Nombre del producto..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
@@ -33,7 +57,19 @@
             <div id="searchDropdown" class="dropdown-menu shadow-lg border-0 w-100 p-0 mt-2 d-none" style="max-height: 400px; overflow-y: auto;">
             </div>
         </div>
-        <div class="col-md-4 col-lg-6 text-md-end mt-3 mt-md-0">
+        {% if current_user.rol == 'admin' %}
+        <div class="col-md-3 col-lg-3">
+            <form method="GET" action="{{ url_for('inventory_bp.index') }}" class="m-0">
+                <select name="branch_id" class="form-select shadow-sm fw-semibold rounded-pill py-2 px-3" onchange="this.form.submit()" title="Filtrar por Sede / Local">
+                    <option value="all" {% if not active_b_id %}selected{% endif %}>📍 Todas las Sedes</option>
+                    {% for b in todas_sucursales %}
+                    <option value="{{ b.id }}" {% if active_b_id == b.id %}selected{% endif %}>{{ b.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+        {% endif %}
+        <div class="col-md-3 col-lg-4 text-md-end mt-2 mt-md-0">
             <small class="text-muted fw-bold text-uppercase" style="font-size: 0.75rem;">
                 Mostrando <span id="visibleCount" class="text-brand-pink">{{ productos|length }}</span>
                 de <strong>{{ total_productos }}</strong> productos
@@ -237,7 +273,7 @@
         <!-- Anterior -->
         <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
             <a class="page-link rounded-pill px-3 shadow-sm"
-               href="{% if paginacion.has_prev %}{{ url_for('inventory_bp.index', page=paginacion.prev_num) }}{% else %}#{% endif %}"
+               href="{% if paginacion.has_prev %}{{ url_for('inventory_bp.index', page=paginacion.prev_num, branch_id=(active_b_id or 'all')) }}{% else %}#{% endif %}"
                aria-label="Anterior">
                 <i class="fa-solid fa-chevron-left"></i>
             </a>
@@ -248,7 +284,7 @@
             {% if p_num %}
                 <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
                     <a class="page-link rounded-pill px-3 shadow-sm"
-                       href="{{ url_for('inventory_bp.index', page=p_num) }}">{{ p_num }}</a>
+                       href="{{ url_for('inventory_bp.index', page=p_num, branch_id=(active_b_id or 'all')) }}">{{ p_num }}</a>
                 </li>
             {% else %}
                 <li class="page-item disabled">
@@ -260,7 +296,7 @@
         <!-- Siguiente -->
         <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
             <a class="page-link rounded-pill px-3 shadow-sm"
-               href="{% if paginacion.has_next %}{{ url_for('inventory_bp.index', page=paginacion.next_num) }}{% else %}#{% endif %}"
+               href="{% if paginacion.has_next %}{{ url_for('inventory_bp.index', page=paginacion.next_num, branch_id=(active_b_id or 'all')) }}{% else %}#{% endif %}"
                aria-label="Siguiente">
                 <i class="fa-solid fa-chevron-right"></i>
             </a>

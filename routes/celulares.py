@@ -47,18 +47,43 @@ def inventario():
     page = request.args.get('page', 1, type=int)
     per_page = 20
 
-    # Query for all celulares to calculate KPIs
-    todos_celulares = Product.query.filter_by(tipo_inventario='celulares').all()
-    
+    # Resolver sucursal activa (soporta parámetro directo ?branch_id=... o selector global de sesión)
+    active_b_id = None
+    if current_user.rol == 'admin':
+        branch_param = request.args.get('branch_id', '').strip()
+        if branch_param in ('all', '0'):
+            active_b_id = None
+        elif branch_param.isdigit():
+            active_b_id = int(branch_param)
+        else:
+            active_b_id = session.get('active_branch_id')
+    elif current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
+        active_b_id = current_user.branch_id
+
+    # Calcular KPIs respetando la sucursal filtrada (si aplica)
     stock_activo = 0
     costo_total = 0.0
     ventas_estimadas = 0.0
-    
-    for c in todos_celulares:
-        if c.cantidad_stock > 0:
-            stock_activo += c.cantidad_stock
-            costo_total += float(c.precio_costo) * c.cantidad_stock
-            ventas_estimadas += float(c.precio_sugerido) * c.cantidad_stock
+
+    if active_b_id is not None:
+        kpi_rows = db.session.query(Product, BranchStock.cantidad).join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
+        ).filter(
+            Product.tipo_inventario == 'celulares',
+            BranchStock.cantidad > 0
+        ).all()
+        for c, cant_local in kpi_rows:
+            stock_activo += cant_local
+            costo_total += float(c.precio_costo or 0) * cant_local
+            ventas_estimadas += float(c.precio_sugerido or 0) * cant_local
+    else:
+        todos_celulares = Product.query.filter_by(tipo_inventario='celulares').all()
+        for c in todos_celulares:
+            if c.cantidad_stock > 0:
+                stock_activo += c.cantidad_stock
+                costo_total += float(c.precio_costo or 0) * c.cantidad_stock
+                ventas_estimadas += float(c.precio_sugerido or 0) * c.cantidad_stock
 
     # Obtener lista única y ordenada de referencias para el filtro desplegable
     referencias_query = db.session.query(Product.modelo_celular).filter(
@@ -68,28 +93,20 @@ def inventario():
     ).distinct().order_by(Product.modelo_celular.asc()).all()
     referencias_disponibles = [r[0] for r in referencias_query if r[0]]
 
-    # Celulares actualmente prestados a locales vecinos (Maneo pendiente)
-    celulares_en_maneo = Product.query.filter(
-        Product.tipo_inventario == 'celulares',
-        Product.maneos.any(Maneo.estado == 'PENDIENTE')
-    ).count()
-
+    # Celulares actualmente prestados a locales vecinos (Maneo pendiente), soporte y cambio
     from models import TechnicalService, DeviceExchange, ExchangePartner
-    celulares_en_soporte = Product.query.filter(
-        Product.tipo_inventario == 'celulares',
-        Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
-    ).count()
+    maneo_q = Product.query.filter(Product.tipo_inventario == 'celulares', Product.maneos.any(Maneo.estado == 'PENDIENTE'))
+    soporte_q = Product.query.filter(Product.tipo_inventario == 'celulares', Product.servicios_tecnicos.any(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION'])))
+    cambio_q = Product.query.filter(Product.tipo_inventario == 'celulares', Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE'))
 
-    celulares_en_cambio = Product.query.filter(
-        Product.tipo_inventario == 'celulares',
-        Product.cambios_salida.any(DeviceExchange.estado == 'PENDIENTE')
-    ).count()
+    if active_b_id is not None:
+        maneo_q = maneo_q.join(BranchStock, (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id))
+        soporte_q = soporte_q.join(BranchStock, (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id))
+        cambio_q = cambio_q.join(BranchStock, (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id))
 
-    active_b_id = None
-    if current_user.rol == 'admin':
-        active_b_id = session.get('active_branch_id')
-    elif current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
-        active_b_id = current_user.branch_id
+    celulares_en_maneo = maneo_q.count()
+    celulares_en_soporte = soporte_q.count()
+    celulares_en_cambio = cambio_q.count()
 
     from sqlalchemy.orm import selectinload, joinedload
 
@@ -111,13 +128,17 @@ def inventario():
         base_query = base_query.join(
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
-        ).filter(BranchStock.cantidad > 0)
+        )
+        if estado == 'activos':
+            base_query = base_query.filter(BranchStock.cantidad > 0)
     elif current_user.rol == 'admin' and active_b_id is not None:
         # Si el admin filtró una sucursal específica
         base_query = base_query.join(
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
-        ).filter(BranchStock.cantidad > 0)
+        )
+        if estado == 'activos':
+            base_query = base_query.filter(BranchStock.cantidad > 0)
 
     if estado == 'activos':
         base_query = base_query.filter(Product.cantidad_stock > 0)

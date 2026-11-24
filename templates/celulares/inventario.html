@@ -106,17 +106,28 @@
 </div>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <!-- Barra de Búsqueda y Filtro por Referencia Server-Side -->
-    <form method="GET" action="{{ url_for('celulares_bp.inventario') }}" id="searchForm" class="d-flex flex-wrap gap-2 w-100" style="max-width: 720px;">
-        <div class="input-group shadow-sm" style="flex: 1 1 280px;">
+    <!-- Barra de Búsqueda, Sede y Filtro por Referencia Server-Side -->
+    <form method="GET" action="{{ url_for('celulares_bp.inventario') }}" id="searchForm" class="d-flex flex-wrap gap-2 w-100" style="max-width: 960px;">
+        <div class="input-group shadow-sm" style="flex: 1 1 250px;">
             <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
             <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0 buscador-predictivo"
                    placeholder="Buscar por Marca, Modelo, IMEI, Proveedor..."
                    value="{{ q }}">
             {% if q %}
-            <a href="{{ url_for('celulares_bp.inventario', estado=estado, referencia=referencia) }}" class="btn btn-outline-secondary border-start-0" title="Limpiar texto"><i class="fa-solid fa-xmark"></i></a>
+            <a href="{{ url_for('celulares_bp.inventario', estado=estado, referencia=referencia, branch_id=(active_b_id or 'all')) }}" class="btn btn-outline-secondary border-start-0" title="Limpiar texto"><i class="fa-solid fa-xmark"></i></a>
             {% endif %}
         </div>
+
+        {% if current_user.rol == 'admin' %}
+        <div style="flex: 0 1 210px;">
+            <select name="branch_id" class="form-select shadow-sm fw-semibold" onchange="this.form.submit()" title="Filtrar por Sede / Local">
+                <option value="all" {% if not active_b_id %}selected{% endif %}>📍 Todas las Sedes</option>
+                {% for b in sucursales_activas %}
+                <option value="{{ b.id }}" {% if active_b_id == b.id %}selected{% endif %}>{{ b.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
 
         <!-- Filtro desplegable intuitivo con Selección Múltiple de Referencias -->
         <div class="dropdown shadow-sm" style="flex: 0 1 260px;">
@@ -165,7 +176,7 @@
             </div>
         </div>
         {% if referencias_seleccionadas %}
-        <a href="{{ url_for('celulares_bp.inventario', estado=estado, q=q) }}" class="btn btn-outline-secondary border shadow-sm" title="Quitar filtro de referencias">
+        <a href="{{ url_for('celulares_bp.inventario', estado=estado, q=q, branch_id=(active_b_id or 'all')) }}" class="btn btn-outline-secondary border shadow-sm" title="Quitar filtro de referencias">
             <i class="fa-solid fa-xmark text-danger"></i>
         </a>
         {% endif %}
@@ -174,19 +185,19 @@
     </form>
     
     <div class="btn-group shadow-sm">
-        <a href="{{ url_for('celulares_bp.inventario', estado='activos', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-dark {% if estado == 'activos' %}active fw-bold{% endif %}">
+        <a href="{{ url_for('celulares_bp.inventario', estado='activos', q=q, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}" class="btn btn-outline-dark {% if estado == 'activos' %}active fw-bold{% endif %}">
             <i class="fa-solid fa-boxes-stacked me-1"></i> Activos
         </a>
-        <a href="{{ url_for('celulares_bp.inventario', estado='maneo', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-warning text-dark {% if estado == 'maneo' %}active fw-bold bg-warning text-dark border-warning{% endif %}">
+        <a href="{{ url_for('celulares_bp.inventario', estado='maneo', q=q, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}" class="btn btn-outline-warning text-dark {% if estado == 'maneo' %}active fw-bold bg-warning text-dark border-warning{% endif %}">
             <i class="fa-solid fa-handshake me-1"></i> En Maneo ({{ celulares_en_maneo }})
         </a>
-        <a href="{{ url_for('celulares_bp.inventario', estado='soporte', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-danger {% if estado == 'soporte' %}active fw-bold bg-danger text-white border-danger{% endif %}">
+        <a href="{{ url_for('celulares_bp.inventario', estado='soporte', q=q, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}" class="btn btn-outline-danger {% if estado == 'soporte' %}active fw-bold bg-danger text-white border-danger{% endif %}">
             <i class="fa-solid fa-screwdriver-wrench me-1"></i> En Soporte ({{ celulares_en_soporte }})
         </a>
-        <a href="{{ url_for('celulares_bp.inventario', estado='cambio', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-info text-dark {% if estado == 'cambio' %}active fw-bold bg-info text-dark border-info{% endif %}">
+        <a href="{{ url_for('celulares_bp.inventario', estado='cambio', q=q, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}" class="btn btn-outline-info text-dark {% if estado == 'cambio' %}active fw-bold bg-info text-dark border-info{% endif %}">
             <i class="fa-solid fa-arrow-right-arrow-left me-1"></i> En Cambio ({{ celulares_en_cambio }})
         </a>
-        <a href="{{ url_for('celulares_bp.inventario', estado='vendidos', q=q, referencias=referencias_seleccionadas) }}" class="btn btn-outline-dark {% if estado == 'vendidos' %}active fw-bold{% endif %}">
+        <a href="{{ url_for('celulares_bp.inventario', estado='vendidos', q=q, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}" class="btn btn-outline-dark {% if estado == 'vendidos' %}active fw-bold{% endif %}">
             <i class="fa-solid fa-check me-1"></i> Vendidos
         </a>
     </div>
@@ -572,14 +583,14 @@
     <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
         <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
             <a class="page-link rounded-pill px-3 shadow-sm"
-               href="{% if paginacion.has_prev %}{{ url_for('celulares_bp.inventario', page=paginacion.prev_num, q=q, estado=estado, referencias=referencias_seleccionadas) }}{% else %}#{% endif %}"
+               href="{% if paginacion.has_prev %}{{ url_for('celulares_bp.inventario', page=paginacion.prev_num, q=q, estado=estado, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}{% else %}#{% endif %}"
                aria-label="Anterior"><i class="fa-solid fa-chevron-left"></i></a>
         </li>
         {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
             {% if p_num %}
                 <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
                     <a class="page-link rounded-pill px-3 shadow-sm"
-                       href="{{ url_for('celulares_bp.inventario', page=p_num, q=q, estado=estado, referencias=referencias_seleccionadas) }}">{{ p_num }}</a>
+                       href="{{ url_for('celulares_bp.inventario', page=p_num, q=q, estado=estado, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}">{{ p_num }}</a>
                 </li>
             {% else %}
                 <li class="page-item disabled"><span class="page-link rounded-pill px-3">…</span></li>
@@ -587,7 +598,7 @@
         {% endfor %}
         <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
             <a class="page-link rounded-pill px-3 shadow-sm"
-               href="{% if paginacion.has_next %}{{ url_for('celulares_bp.inventario', page=paginacion.next_num, q=q, estado=estado, referencias=referencias_seleccionadas) }}{% else %}#{% endif %}"
+               href="{% if paginacion.has_next %}{{ url_for('celulares_bp.inventario', page=paginacion.next_num, q=q, estado=estado, referencias=referencias_seleccionadas, branch_id=(active_b_id or 'all')) }}{% else %}#{% endif %}"
                aria-label="Siguiente"><i class="fa-solid fa-chevron-right"></i></a>
         </li>
     </ul>

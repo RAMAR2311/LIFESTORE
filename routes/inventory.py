@@ -42,7 +42,13 @@ def index():
 
     active_b_id = None
     if current_user.rol == 'admin':
-        active_b_id = session.get('active_branch_id')
+        branch_param = request.args.get('branch_id', '').strip()
+        if branch_param in ('all', '0'):
+            active_b_id = None
+        elif branch_param.isdigit():
+            active_b_id = int(branch_param)
+        else:
+            active_b_id = session.get('active_branch_id')
     elif current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
         active_b_id = current_user.branch_id
 
@@ -69,9 +75,11 @@ def index():
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
         ).filter(BranchStock.cantidad > 0)
     elif current_user.rol == 'admin' and active_b_id is not None:
-        # Admin con sucursal seleccionada: muestra todos los productos de tienda,
-        # pero resalta el stock de esa sucursal
-        pass
+        # Admin con sucursal seleccionada: filtrar productos que tengan stock > 0 en esa sede
+        base_query = base_query.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
+        ).filter(BranchStock.cantidad > 0).distinct()
 
     # Paginación del listado principal
     paginacion = base_query.order_by(Product.nombre).paginate(
@@ -119,15 +127,30 @@ def index():
             }
 
     # --- KPIs de Inventario ---
-    # Se calcula sobre los productos visibles según el rol
+    # Se calcula sobre los productos visibles según el rol y sucursal filtrada
     todos = base_query.all()
     total_productos = len(todos)
+
+    if active_b_id is not None:
+        branch_stock_rows = db.session.query(
+            BranchStock.product_id,
+            db.func.coalesce(db.func.sum(BranchStock.cantidad), 0)
+        ).filter(
+            BranchStock.branch_id == active_b_id,
+            BranchStock.cantidad > 0
+        ).group_by(BranchStock.product_id).all()
+        stock_map_branch = {pid: int(qty) for pid, qty in branch_stock_rows}
+    else:
+        stock_map_branch = {}
 
     valor_costo = 0.0
     valor_sugerido = 0.0
     total_unidades_fisicas = 0
     for p in todos:
-        cant_p = stock_por_producto.get(p.id, {}).get('local_stock', p.total_stock) if current_user.rol == 'vendedor' else p.total_stock
+        if active_b_id is not None:
+            cant_p = stock_map_branch.get(p.id, 0)
+        else:
+            cant_p = p.total_stock
         costo = float(p.precio_costo or 0)
         sugerido = float(p.precio_sugerido or 0)
         valor_costo += costo * cant_p
