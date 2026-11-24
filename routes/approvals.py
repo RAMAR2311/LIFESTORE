@@ -112,7 +112,7 @@ def aprobar_solicitud(id):
     AuditLog.registrar(
         action='APROBACION_PRECIO_MINIMO',
         user_id=current_user.id,
-        motivo=f'Aprobación de precio especial ${float(precio_aprobado):,.2f} (Precio Mínimo: ${float(solicitud.precio_minimo):,.2f}) para "{solicitud.producto.nombre if solicitud.producto else "Producto"}". Solicitado por: {solicitud.vendedor.nombre if solicitud.vendedor else "Asesor"}',
+        motivo=f'Aprobación de precio especial ${float(precio_aprobado):,.2f} (Precio Original/Mínimo: ${float(solicitud.precio_original):,.2f}) para "{solicitud.product.nombre if solicitud.product else "Producto"}". Solicitado por: {solicitud.vendedor.nombre if solicitud.vendedor else "Asesor"}',
         target_id=solicitud.id,
         target_type='DISCOUNT_APPROVAL'
     )
@@ -142,7 +142,7 @@ def rechazar_solicitud(id):
     AuditLog.registrar(
         action='RECHAZO_PRECIO_MINIMO',
         user_id=current_user.id,
-        motivo=f'Rechazo de descuento para "{solicitud.producto.nombre if solicitud.producto else "Producto"}". Motivo: {motivo}',
+        motivo=f'Rechazo de descuento para "{solicitud.product.nombre if solicitud.product else "Producto"}". Motivo: {motivo}',
         target_id=solicitud.id,
         target_type='DISCOUNT_APPROVAL'
     )

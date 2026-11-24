@@ -23,7 +23,15 @@ def index():
 def nueva():
     tipo = request.args.get('tipo', 'accesorios')
     proveedores = Provider.query.order_by(Provider.nombre.asc()).all()
-    return render_template('compras/nueva.html', tipo=tipo, proveedores=proveedores)
+    
+    # Obtener todas las referencias registradas en inventario
+    referencias_existentes = [r[0] for r in db.session.query(Product.modelo_celular).filter(
+        Product.tipo_inventario == 'celulares',
+        Product.modelo_celular.isnot(None),
+        Product.modelo_celular != ''
+    ).distinct().order_by(Product.modelo_celular.asc()).all() if r[0]]
+
+    return render_template('compras/nueva.html', tipo=tipo, proveedores=proveedores, referencias_existentes=referencias_existentes)
 
 @purchases_bp.route('/detalle/<int:id>')
 @login_required

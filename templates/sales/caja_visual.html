@@ -178,13 +178,13 @@
                 {% for v in p.variantes %}
                     {% set v_stock = v.stock_local if v.stock_local is defined else v.cantidad_stock %}
                     {% if v_stock > 0 %}
-                        {% set _ = vars_data.append({"id": v.id, "nombre": v.nombre_variante, "stock": v_stock, "precio_sugerido": v.precio_sugerido or p.precio_sugerido or 0}) %}
+                        {% set _ = vars_data.append({"id": v.id, "nombre": v.nombre_variante, "stock": v_stock, "precio_sugerido": v.precio_sugerido or p.precio_sugerido or 0, "precio_minimo": v.precio_minimo or p.precio_minimo or p.precio_sugerido or 0}) %}
                     {% endif %}
                 {% endfor %}
             {% endif %}
             <div class="col-6 col-md-4 col-xl-3 product-card-container" data-categoria="{{ 'equipos' if p.tipo_inventario == 'celulares' else 'accesorios' }}" data-name="{{ p.nombre|lower }}" data-sku="{{ p.sku|lower }}" data-imei="{{ p.imei|lower if p.imei else '' }}" data-imei2="{{ p.imei2|lower if p.imei2 else '' }}">
                 <div class="card h-100 border-0 shadow-sm cursor-pointer product-card" 
-                     data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario, "imei": p.imei, "imei2": p.imei2, "inventario": p.inventario}|tojson|safe }}'
+                     data-product='{{ {"id": p.id, "nombre": p.nombre, "sku": p.sku, "precio_sugerido": p.precio_sugerido or 0, "precio_minimo": p.precio_minimo or p.precio_sugerido or 0, "cantidad_stock": total_stock, "tipo_inventario": p.tipo_inventario, "imei": p.imei, "imei2": p.imei2, "inventario": p.inventario}|tojson|safe }}'
                      data-variants='{{ vars_data|tojson|safe }}'
                      onclick="handleProductClick(this)">
                     <div class="ratio ratio-1x1 product-img-box rounded-top">
@@ -1103,18 +1103,21 @@
                 alert("Este producto no tiene stock disponible.");
                 return;
             }
-            addToCart(pData.id, null, pData.nombre, pData.sku, pData.precio_sugerido, pData.cantidad_stock, null, pData.tipo_inventario, pData.imei, pData.imei2, pData.inventario);
+            addToCart(pData.id, null, pData.nombre, pData.sku, pData.precio_sugerido, pData.cantidad_stock, null, pData.tipo_inventario, pData.imei, pData.imei2, pData.inventario, pData.precio_minimo);
         }
     }
 
     window.addVariantToCart = function(variantId) {
         const vData = activeVariantsData.find(v => v.id === variantId);
         if (!vData) return;
-        addToCart(activeProductData.id, vData.id, activeProductData.nombre, activeProductData.sku, vData.precio_sugerido, vData.stock, vData.nombre, activeProductData.tipo_inventario, activeProductData.imei, activeProductData.imei2, activeProductData.inventario);
+        addToCart(activeProductData.id, vData.id, activeProductData.nombre, activeProductData.sku, vData.precio_sugerido, vData.stock, vData.nombre, activeProductData.tipo_inventario, activeProductData.imei, activeProductData.imei2, activeProductData.inventario, (vData.precio_minimo || activeProductData.precio_minimo));
         bootstrap.Modal.getInstance(document.getElementById('modalVariantes')).hide();
     };
 
-    function addToCart(productId, variantId, nombre, sku, precio, maxStock, variantName = null, tipoInventario = null, imei = null, imei2 = null, inventario = null) {
+    const ES_ADMIN_VENTA = {{ 'true' if current_user.rol == 'admin' else 'false' }};
+    const pollingAprobacionesCaja = {};
+
+    function addToCart(productId, variantId, nombre, sku, precio, maxStock, variantName = null, tipoInventario = null, imei = null, imei2 = null, inventario = null, precioMinimo = null) {
         let existingIndex = carrito.findIndex(i => i.product_id === productId && i.variant_id === variantId);
         
         if (existingIndex > -1) {
@@ -1129,6 +1132,7 @@
                 return;
             }
             let nombreMostrar = variantName ? `${nombre} - ${variantName}` : nombre;
+            let pMin = (precioMinimo !== null && precioMinimo !== undefined && !isNaN(parseFloat(precioMinimo))) ? parseFloat(precioMinimo) : precio;
             carrito.push({
                 product_id: productId,
                 variant_id: variantId,
@@ -1136,6 +1140,10 @@
                 sku: sku,
                 precio_final: precio,
                 precio_sugerido: precio,
+                precio_minimo: pMin,
+                estado_aprobacion: null, // null | 'pendiente' | 'aprobado' | 'rechazado'
+                motivo_rechazo: null,
+                solicitud_id: null,
                 cantidad: 1,
                 max_stock: maxStock,
                 es_obsequio: false,
@@ -1162,8 +1170,98 @@
     function updateCartItemPrice(index, newPrice) {
         let val = parseFloat(String(newPrice).replace(/\D/g, ''));
         if (isNaN(val) || val < 0) val = 0;
-        carrito[index].precio_final = val;
-        renderCart();
+        let item = carrito[index];
+        if (!item) return;
+
+        item.precio_final = val;
+
+        // Si no es admin y el nuevo precio es menor al precio mínimo (y no es obsequio)
+        if (!ES_ADMIN_VENTA && !item.es_obsequio && item.precio_minimo && val < item.precio_minimo) {
+            item.estado_aprobacion = 'pendiente';
+            item.motivo_rechazo = null;
+            renderCart();
+            solicitarAprobacionPrecioCaja(index, item);
+        } else {
+            item.estado_aprobacion = null;
+            if (pollingAprobacionesCaja[index]) {
+                clearInterval(pollingAprobacionesCaja[index]);
+                delete pollingAprobacionesCaja[index];
+            }
+            renderCart();
+        }
+    }
+
+    async function solicitarAprobacionPrecioCaja(index, item) {
+        try {
+            const res = await fetch('/api/precio/solicitar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrf_token
+                },
+                body: JSON.stringify({
+                    product_id: item.product_id,
+                    variant_id: item.variant_id || null,
+                    precio_original: item.precio_minimo,
+                    precio_solicitado: item.precio_final
+                })
+            });
+            const data = await res.json();
+            if (data.success && data.solicitud_id) {
+                item.solicitud_id = data.solicitud_id;
+                iniciarPollingAprobacionCaja(index, data.solicitud_id);
+            } else {
+                item.estado_aprobacion = 'rechazado';
+                item.motivo_rechazo = data.error || 'No se pudo enviar la solicitud de aprobación';
+                renderCart();
+            }
+        } catch(e) {
+            console.error('Error al solicitar aprobación:', e);
+            item.estado_aprobacion = 'rechazado';
+            item.motivo_rechazo = 'Error de conexión con el servidor';
+            renderCart();
+        }
+    }
+
+    function iniciarPollingAprobacionCaja(index, solicitudId) {
+        if (pollingAprobacionesCaja[index]) {
+            clearInterval(pollingAprobacionesCaja[index]);
+        }
+        pollingAprobacionesCaja[index] = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/precio/estado/${solicitudId}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                
+                let item = carrito[index];
+                if (!item) {
+                    clearInterval(pollingAprobacionesCaja[index]);
+                    delete pollingAprobacionesCaja[index];
+                    return;
+                }
+
+                if (data.estado === 'aprobado') {
+                    clearInterval(pollingAprobacionesCaja[index]);
+                    delete pollingAprobacionesCaja[index];
+                    item.estado_aprobacion = 'aprobado';
+                    if (data.precio_aprobado) {
+                        item.precio_final = parseFloat(data.precio_aprobado);
+                    }
+                    renderCart();
+                } else if (data.estado === 'rechazado') {
+                    clearInterval(pollingAprobacionesCaja[index]);
+                    delete pollingAprobacionesCaja[index];
+                    item.estado_aprobacion = 'rechazado';
+                    item.motivo_rechazo = data.motivo_rechazo || 'Rechazado por el Administrador';
+                    alert(`⚠️ Solicitud de Descuento Rechazada:\nEl administrador no autorizó el precio especial para "${item.nombre}".\nMotivo: ${item.motivo_rechazo}\n\nSe restablece el precio sugerido.`);
+                    item.precio_final = item.precio_sugerido;
+                    item.estado_aprobacion = null;
+                    renderCart();
+                }
+            } catch(e) {
+                console.error('Error en polling de aprobación:', e);
+            }
+        }, 2500);
     }
 
     function toggleObsequio(index) {
@@ -1298,11 +1396,21 @@
                 displayNombre = displayNombre.replace(/^Celular\s+\S+\s+/i, '');
             }
 
+            let aprobacionHtml = '';
+            if (item.estado_aprobacion === 'pendiente') {
+                aprobacionHtml = `<div class="mt-1"><span class="badge bg-warning text-dark border border-warning" style="font-size: 0.72rem;"><i class="fa-solid fa-spinner fa-spin me-1"></i> Esperando autorización del Admin...</span></div>`;
+            } else if (item.estado_aprobacion === 'aprobado') {
+                aprobacionHtml = `<div class="mt-1"><span class="badge bg-success text-white" style="font-size: 0.72rem;"><i class="fa-solid fa-circle-check me-1"></i> Descuento Autorizado por Admin ($${formatoCOP(item.precio_final)})</span></div>`;
+            } else if (item.estado_aprobacion === 'rechazado') {
+                aprobacionHtml = `<div class="mt-1"><span class="badge bg-danger text-white" style="font-size: 0.72rem;"><i class="fa-solid fa-circle-xmark me-1"></i> Descuento No Autorizado</span></div>`;
+            }
+
             li.innerHTML = `
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <div class="fw-bold text-brand-black" style="max-width: 78%; word-break: break-word;">
                         ${displayNombre}
                         ${imeiHtml}
+                        ${aprobacionHtml}
                         ${item.es_obsequio ? '<span class="badge bg-success bg-opacity-10 text-success mt-1"><i class="fa-solid fa-gift me-1"></i>Obsequio</span>' : ''}
                     </div>
                     <div>
@@ -1677,6 +1785,20 @@
     document.getElementById('btn_process_sale').addEventListener('click', async function() {
         if (carrito.length === 0) {
             return alert('El carrito está vacío.');
+        }
+
+        // Validar si hay productos con precio por debajo del mínimo que requieren aprobación
+        if (!ES_ADMIN_VENTA) {
+            for (let i = 0; i < carrito.length; i++) {
+                const itm = carrito[i];
+                if (!itm.es_obsequio && itm.precio_minimo && itm.precio_final < itm.precio_minimo) {
+                    if (itm.estado_aprobacion === 'pendiente') {
+                        return alert(`⚠️ El producto "${itm.nombre}" tiene un precio ($${formatoCOP(itm.precio_final)}) inferior al mínimo permitido ($${formatoCOP(itm.precio_minimo)}) y está esperando aprobación del Administrador.\n\nPor favor espera a que sea autorizado para poder procesar la venta.`);
+                    } else if (itm.estado_aprobacion !== 'aprobado') {
+                        return alert(`⚠️ El producto "${itm.nombre}" tiene un precio ($${formatoCOP(itm.precio_final)}) inferior al mínimo permitido ($${formatoCOP(itm.precio_minimo)}) y no ha sido autorizado por el Administrador.`);
+                    }
+                }
+            }
         }
 
         if (!validarCanalVenta()) return;

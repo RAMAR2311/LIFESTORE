@@ -528,7 +528,7 @@
         return Math.round(val).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     }
 
-    // Catálogo específico de Modelos para Apple y Samsung
+    // Catálogo completo de Modelos para Apple, Samsung, Xiaomi, Motorola y otras marcas
     const CATALOGO_PRODUCTOS = {
         'Apple': [
             {
@@ -542,6 +542,15 @@
                     'iPhone 16', 'iPhone 16 Plus', 'iPhone 16 Pro', 'iPhone 16 Pro Max',
                     'iPhone 17', 'iPhone 17 Plus', 'iPhone 17 Pro', 'iPhone 17 Pro Max',
                     'iPhone 18', 'iPhone 18 Plus', 'iPhone 18 Pro', 'iPhone 18 Pro Max'
+                ]
+            },
+            {
+                categoria: 'iPhones Clásicos (X, XR, XS, 8, 7, SE)',
+                modelos: [
+                    'iPhone X', 'iPhone XR', 'iPhone XS', 'iPhone XS Max',
+                    'iPhone SE (2da Gen 2020)', 'iPhone SE (3ra Gen 2022)',
+                    'iPhone 8', 'iPhone 8 Plus', 'iPhone 7', 'iPhone 7 Plus',
+                    'iPhone 6s', 'iPhone 6s Plus'
                 ]
             },
             {
@@ -568,56 +577,176 @@
                 ]
             },
             {
-                categoria: 'AirPods (Últimas Generaciones)',
+                categoria: 'AirPods y Apple Watch',
                 modelos: [
                     'AirPods 3ra Generación',
                     'AirPods 4ta Generación',
                     'AirPods 4ta Generación con ANC',
                     'AirPods Pro 2da Generación (USB-C)',
                     'AirPods Max (Lightning)',
-                    'AirPods Max (USB-C)'
+                    'AirPods Max (USB-C)',
+                    'Apple Watch Series 8', 'Apple Watch Series 9', 'Apple Watch Series 10',
+                    'Apple Watch Ultra', 'Apple Watch Ultra 2', 'Apple Watch SE'
                 ]
             }
         ],
         'Samsung': [
             {
-                categoria: 'Samsung Galaxy Serie S (Desde S24 en adelante)',
+                categoria: 'Samsung Galaxy Serie S (Gama Alta)',
                 modelos: [
+                    'Galaxy S20', 'Galaxy S20 Plus', 'Galaxy S20 Ultra', 'Galaxy S20 FE',
+                    'Galaxy S21', 'Galaxy S21 Plus', 'Galaxy S21 Ultra', 'Galaxy S21 FE',
+                    'Galaxy S22', 'Galaxy S22 Plus', 'Galaxy S22 Ultra',
+                    'Galaxy S23', 'Galaxy S23 Plus', 'Galaxy S23 Ultra', 'Galaxy S23 FE',
                     'Galaxy S24', 'Galaxy S24 Plus', 'Galaxy S24 Ultra', 'Galaxy S24 FE',
-                    'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim',
-                    'Galaxy Z Fold 6', 'Galaxy Z Flip 6',
-                    'Galaxy Z Fold 7', 'Galaxy Z Flip 7',
-                    'Galaxy Tab S9', 'Galaxy Tab S9 Plus', 'Galaxy Tab S9 Ultra', 'Galaxy Tab S9 FE',
-                    'Galaxy Tab S10 Plus', 'Galaxy Tab S10 Ultra',
-                    'Galaxy Buds 3', 'Galaxy Buds 3 Pro'
+                    'Galaxy S25', 'Galaxy S25 Plus', 'Galaxy S25 Ultra', 'Galaxy S25 Slim'
+                ]
+            },
+            {
+                categoria: 'Samsung Galaxy Serie A (Gama Media)',
+                modelos: [
+                    'Galaxy A04', 'Galaxy A05', 'Galaxy A05s',
+                    'Galaxy A14', 'Galaxy A15', 'Galaxy A15 5G',
+                    'Galaxy A24', 'Galaxy A25 5G',
+                    'Galaxy A34 5G', 'Galaxy A35 5G',
+                    'Galaxy A53 5G', 'Galaxy A54 5G', 'Galaxy A55 5G'
+                ]
+            },
+            {
+                categoria: 'Samsung Plegables y Note',
+                modelos: [
+                    'Galaxy Z Fold 4', 'Galaxy Z Fold 5', 'Galaxy Z Fold 6',
+                    'Galaxy Z Flip 4', 'Galaxy Z Flip 5', 'Galaxy Z Flip 6',
+                    'Galaxy Note 10', 'Galaxy Note 10 Plus', 'Galaxy Note 20', 'Galaxy Note 20 Ultra'
+                ]
+            }
+        ],
+        'Xiaomi': [
+            {
+                categoria: 'Xiaomi / Redmi / Poco',
+                modelos: [
+                    'Redmi Note 11', 'Redmi Note 11 Pro', 'Redmi Note 12', 'Redmi Note 12 Pro',
+                    'Redmi Note 13', 'Redmi Note 13 Pro', 'Redmi Note 13 Pro Plus',
+                    'Redmi 12', 'Redmi 13C', 'Poco X5 Pro', 'Poco X6 Pro', 'Poco F5', 'Poco F6'
+                ]
+            }
+        ],
+        'Motorola': [
+            {
+                categoria: 'Moto G y Edge',
+                modelos: [
+                    'Moto G13', 'Moto G14', 'Moto G23', 'Moto G24', 'Moto G53', 'Moto G54', 'Moto G84',
+                    'Motorola Edge 40', 'Motorola Edge 40 Neo', 'Motorola Edge 50 Pro', 'Motorola Edge 50 Ultra'
                 ]
             }
         ]
     };
 
+    // Referencias registradas en la base de datos de LifeStore
+    const REFERENCIAS_BD = {{ (referencias_existentes or [])|tojson|safe }};
+
+    function cambioMarcaSeleccionada(marca) {
+        const inpOtra = document.getElementById('rapido_marca_otra');
+        if (marca === 'OTRA') {
+            if (inpOtra) {
+                inpOtra.style.display = 'block';
+                inpOtra.focus();
+            }
+        } else {
+            if (inpOtra) inpOtra.style.display = 'none';
+        }
+        actualizarModelosSegunMarca(marca);
+    }
+
     function actualizarModelosSegunMarca(marcaSeleccionada) {
         const selectModelo = document.getElementById('rapido_modelo');
         selectModelo.innerHTML = '';
 
-        if (!marcaSeleccionada || !CATALOGO_PRODUCTOS[marcaSeleccionada]) {
-            selectModelo.innerHTML = '<option value="">-- Primero elige Marca --</option>';
-            return;
+        // Opción 1: Placeholder
+        const optDefault = document.createElement('option');
+        optDefault.value = '';
+        optDefault.textContent = '-- Selecciona el Modelo / Referencia --';
+        selectModelo.appendChild(optDefault);
+
+        // Opción 2: Botón directo para crear nueva referencia
+        const optNueva = document.createElement('option');
+        optNueva.value = '__NUEVA__';
+        optNueva.textContent = '✨ + Escribir Nueva Referencia Personalizada...';
+        optNueva.style.fontWeight = 'bold';
+        optNueva.style.color = '#0d6efd';
+        selectModelo.appendChild(optNueva);
+
+        // Referencias de catálogo para esta marca
+        if (CATALOGO_PRODUCTOS[marcaSeleccionada]) {
+            const grupos = CATALOGO_PRODUCTOS[marcaSeleccionada];
+            grupos.forEach(grp => {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = grp.categoria;
+                grp.modelos.forEach(mod => {
+                    const opt = document.createElement('option');
+                    opt.value = mod;
+                    opt.textContent = mod;
+                    optgroup.appendChild(opt);
+                });
+                selectModelo.appendChild(optgroup);
+            });
         }
 
-        selectModelo.innerHTML = '<option value="">-- Selecciona el Modelo / Referencia --</option>';
-        const grupos = CATALOGO_PRODUCTOS[marcaSeleccionada];
+        // Agregar referencias existentes en la base de datos que correspondan o no estén en el catálogo
+        if (REFERENCIAS_BD && REFERENCIAS_BD.length > 0) {
+            const optgroupBD = document.createElement('optgroup');
+            optgroupBD.label = '📦 Referencias Registradas en Inventario';
+            let hayBD = false;
 
-        grupos.forEach(grp => {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = grp.categoria;
-            grp.modelos.forEach(mod => {
-                const opt = document.createElement('option');
-                opt.value = mod;
-                opt.textContent = mod;
-                optgroup.appendChild(opt);
+            REFERENCIAS_BD.forEach(ref => {
+                // Si coincide con la marca o si la marca es otra/desconocida
+                if (!marcaSeleccionada || marcaSeleccionada === 'OTRA' || ref.toLowerCase().includes(marcaSeleccionada.toLowerCase())) {
+                    const opt = document.createElement('option');
+                    opt.value = ref;
+                    opt.textContent = ref;
+                    optgroupBD.appendChild(opt);
+                    hayBD = true;
+                }
             });
-            selectModelo.appendChild(optgroup);
-        });
+
+            if (hayBD) {
+                selectModelo.appendChild(optgroupBD);
+            }
+        }
+    }
+
+    function verificarSiEligioNuevaRef(val) {
+        if (val === '__NUEVA__') {
+            toggleModoNuevaRef(true);
+        }
+    }
+
+    function toggleModoNuevaRef(forzarActivo = null) {
+        const contSelect = document.getElementById('contenedorSelectModelo');
+        const contInput = document.getElementById('contenedorInputModelo');
+        const inpTexto = document.getElementById('rapido_modelo_texto');
+        const btnToggle = document.getElementById('btnToggleRef');
+
+        const activar = (forzarActivo !== null) ? forzarActivo : (contInput.style.display === 'none');
+
+        if (activar) {
+            contSelect.style.display = 'none';
+            contInput.style.display = 'block';
+            if (btnToggle) btnToggle.innerHTML = '<i class="fa-solid fa-list me-1"></i>Ver Lista';
+            if (inpTexto) {
+                inpTexto.focus();
+            }
+        } else {
+            contSelect.style.display = 'block';
+            contInput.style.display = 'none';
+            if (btnToggle) btnToggle.innerHTML = '<i class="fa-solid fa-plus-circle me-1"></i>+ Escribir Nueva';
+            const selectMod = document.getElementById('rapido_modelo');
+            if (selectMod && selectMod.value === '__NUEVA__') selectMod.value = '';
+        }
+    }
+
+    function cancelarNuevaRef() {
+        toggleModoNuevaRef(false);
     }
 
     // Modal Crear Producto Rápido
@@ -638,8 +767,11 @@
             document.getElementById('rapido_imei').value = codigoInicial || '';
             document.getElementById('rapido_imei2').value = '';
             document.getElementById('rapido_marca').value = 'Apple'; // Por defecto Apple
+            if (document.getElementById('rapido_marca_otra')) document.getElementById('rapido_marca_otra').style.display = 'none';
+            cancelarNuevaRef();
             actualizarModelosSegunMarca('Apple');
             document.getElementById('rapido_modelo').value = '';
+            if (document.getElementById('rapido_modelo_texto')) document.getElementById('rapido_modelo_texto').value = '';
             document.getElementById('rapido_color').value = '';
             document.getElementById('rapido_memoria').value = '';
             document.getElementById('rapido_bateria').value = '100';
@@ -692,8 +824,25 @@
         if (esCelular) {
             payload.imei = document.getElementById('rapido_imei').value.trim();
             payload.imei2 = document.getElementById('rapido_imei2').value.trim();
-            payload.marca = document.getElementById('rapido_marca').value.trim();
-            payload.modelo = document.getElementById('rapido_modelo').value.trim();
+            
+            let mVal = document.getElementById('rapido_marca').value.trim();
+            if (mVal === 'OTRA') {
+                mVal = (document.getElementById('rapido_marca_otra')?.value || '').trim();
+            }
+            payload.marca = mVal;
+
+            let modVal = '';
+            const contenedorInput = document.getElementById('contenedorInputModelo');
+            if (contenedorInput && contenedorInput.style.display !== 'none') {
+                modVal = (document.getElementById('rapido_modelo_texto')?.value || '').trim();
+            } else {
+                modVal = (document.getElementById('rapido_modelo')?.value || '').trim();
+                if (modVal === '__NUEVA__') {
+                    modVal = (document.getElementById('rapido_modelo_texto')?.value || '').trim();
+                }
+            }
+            payload.modelo = modVal;
+
             payload.color = document.getElementById('rapido_color').value.trim();
             payload.memoria = document.getElementById('rapido_memoria').value.trim();
             payload.bateria = document.getElementById('rapido_bateria').value.trim();
@@ -702,7 +851,7 @@
             payload.nombre = `${payload.marca} ${payload.modelo}`.trim();
 
             if (!payload.imei || !payload.marca || !payload.modelo) {
-                alertBox.textContent = 'Por favor completa al menos Marca, Modelo e IMEI.';
+                alertBox.textContent = 'Por favor completa Marca, Modelo/Referencia e IMEI.';
                 alertBox.style.display = 'block';
                 return;
             }
@@ -786,17 +935,46 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label small fw-bold text-muted mb-1">Marca *</label>
-                            <select id="rapido_marca" class="form-select fw-bold" onchange="actualizarModelosSegunMarca(this.value)">
+                            <select id="rapido_marca" class="form-select fw-bold" onchange="cambioMarcaSeleccionada(this.value)">
                                 <option value="">-- Seleccionar Marca --</option>
-                                <option value="Apple">Apple</option>
+                                <option value="Apple" selected>Apple</option>
                                 <option value="Samsung">Samsung</option>
+                                <option value="Xiaomi">Xiaomi</option>
+                                <option value="Motorola">Motorola</option>
+                                <option value="Huawei">Huawei</option>
+                                <option value="Honor">Honor</option>
+                                <option value="Oppo">Oppo</option>
+                                <option value="Realme">Realme</option>
+                                <option value="Infinix">Infinix</option>
+                                <option value="Tecno">Tecno</option>
+                                <option value="Google">Google Pixel</option>
+                                <option value="OTRA">+ Otra Marca...</option>
                             </select>
+                            <input type="text" id="rapido_marca_otra" class="form-control mt-1" placeholder="Escribe la marca..." style="display: none;">
                         </div>
                         <div class="col-md-5">
-                            <label class="form-label small fw-bold text-muted mb-1">Modelo / Referencia *</label>
-                            <select id="rapido_modelo" class="form-select fw-bold">
-                                <option value="">-- Primero elige Marca --</option>
-                            </select>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-bold text-muted mb-0">Modelo / Referencia *</label>
+                                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none fw-bold text-primary" style="font-size: 0.75rem;" onclick="toggleModoNuevaRef()" id="btnToggleRef">
+                                    <i class="fa-solid fa-plus-circle me-1"></i>+ Escribir Nueva
+                                </button>
+                            </div>
+                            <div id="contenedorSelectModelo">
+                                <select id="rapido_modelo" class="form-select fw-bold" onchange="verificarSiEligioNuevaRef(this.value)">
+                                    <option value="">-- Selecciona el Modelo / Referencia --</option>
+                                </select>
+                            </div>
+                            <div id="contenedorInputModelo" style="display: none;">
+                                <div class="input-group">
+                                    <input type="text" id="rapido_modelo_texto" class="form-control fw-bold" placeholder="Escribe el modelo / referencia...">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="cancelarNuevaRef()" title="Volver a la lista">
+                                        <i class="fa-solid fa-list"></i>
+                                    </button>
+                                </div>
+                                <small class="text-success d-block mt-1" style="font-size: 0.72rem;">
+                                    <i class="fa-solid fa-check-circle me-1"></i> Esta referencia se guardará en el catálogo.
+                                </small>
+                            </div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small fw-bold text-muted mb-1">Color</label>
