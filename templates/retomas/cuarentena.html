@@ -857,7 +857,7 @@
 
 <!-- MODAL REGISTRAR RETOMAS DIRECTAS (SOPORTE PARA MÚLTIPLES EQUIPOS) -->
 <div class="modal fade text-start" id="modalNuevaRetoma" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
         <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header bg-dark text-white py-3">
                 <h5 class="modal-title fw-bold fs-6">
@@ -935,26 +935,27 @@
                     <!-- Contenedor dinámico de celulares -->
                     <div id="contenedorEquiposRetoma">
                         <!-- Celular #1 -->
-                        <div class="card border rounded-3 mb-3 p-3 shadow-xs equipo-retoma-item bg-white position-relative">
-                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                        <div class="card border rounded-3 mb-2 p-3 shadow-xs equipo-retoma-item bg-white position-relative">
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
                                 <span class="fw-bold text-dark small numero-equipo-titulo">
                                     <i class="fa-solid fa-mobile-screen text-primary me-1"></i> Celular #1
                                 </span>
                                 <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-2 py-0 btn-eliminar-equipo" onclick="eliminarFilaRetoma(this)" style="display: none;" title="Quitar este celular">
-                                    <i class="fa-solid fa-trash-can small"></i> Quitar
+                                    <i class="fa-solid fa-trash-can small me-1"></i> Quitar
                                 </button>
                             </div>
 
+                            <!-- Fila 1: Datos Técnicos -->
                             <div class="row g-2 mb-2">
-                                <div class="col-12 col-md-4">
+                                <div class="col-12 col-sm-6 col-md-2">
                                     <label class="form-label small fw-bold text-muted mb-1">Marca *</label>
                                     <input type="text" name="marca[]" class="form-control form-control-sm" list="marcasList" placeholder="Ej: Apple, Samsung" required>
                                 </div>
-                                <div class="col-12 col-md-5">
+                                <div class="col-12 col-sm-6 col-md-4">
                                     <label class="form-label small fw-bold text-muted mb-1">Modelo / Referencia *</label>
                                     <input type="text" name="modelo[]" class="form-control form-control-sm" placeholder="Ej: iPhone 13 128GB" required>
                                 </div>
-                                <div class="col-12 col-md-3">
+                                <div class="col-6 col-sm-4 col-md-2">
                                     <label class="form-label small fw-bold text-muted mb-1">Almacenamiento</label>
                                     <select name="memoria[]" class="form-select form-select-sm">
                                         <option value="">-- Seleccionar --</option>
@@ -966,49 +967,54 @@
                                         <option value="1TB">1TB</option>
                                     </select>
                                 </div>
-                            </div>
-
-                            <div class="row g-2 mb-2">
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label small fw-bold text-muted mb-1">IMEI 1 (Principal) *</label>
-                                    <input type="text" name="imei1[]" class="form-control form-control-sm font-mono" placeholder="15 dígitos" required maxlength="20">
-                                </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label small fw-bold text-muted mb-1">IMEI 2 (Opcional)</label>
-                                    <input type="text" name="imei2[]" class="form-control form-control-sm font-mono" placeholder="Opcional" maxlength="20">
-                                </div>
-                            </div>
-
-                            <div class="row g-2 mb-2">
-                                <div class="col-12 col-md-4">
+                                <div class="col-6 col-sm-4 col-md-2">
                                     <label class="form-label small fw-bold text-muted mb-1">Color</label>
                                     <input type="text" name="color[]" class="form-control form-control-sm" placeholder="Ej: Azul, Negro">
                                 </div>
-                                <div class="col-12 col-md-4">
+                                <div class="col-12 col-sm-4 col-md-2">
                                     <label class="form-label small fw-bold text-muted mb-1">Batería (%)</label>
                                     <input type="text" name="bateria[]" class="form-control form-control-sm" placeholder="Ej: 85%">
                                 </div>
-                                <div class="col-12 col-md-4">
+                            </div>
+
+                            <!-- Fila 2: Seriales, Valor y Observaciones -->
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-6 col-md-3">
+                                    <label class="form-label small fw-bold text-muted mb-1">IMEI 1 (Principal) *</label>
+                                    <input type="text" name="imei1[]" class="form-control form-control-sm font-mono" placeholder="15 dígitos" required maxlength="20">
+                                </div>
+                                <div class="col-12 col-sm-6 col-md-2">
+                                    <label class="form-label small fw-bold text-muted mb-1">IMEI 2 (Opcional)</label>
+                                    <input type="text" name="imei2[]" class="form-control form-control-sm font-mono" placeholder="Opcional" maxlength="20">
+                                </div>
+                                <div class="col-12 col-sm-6 col-md-3">
                                     <label class="form-label small fw-bold text-muted mb-1">Valor Retoma ($ COP) *</label>
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text">$</span>
                                         <input type="text" name="valor_retoma[]" class="form-control form-control-sm format-price fw-bold input-valor-retoma" placeholder="0" required onkeyup="formatInputCOP(this); recalcularTotalRetomasLote();">
                                     </div>
                                 </div>
-                            </div>
-
-                            <div>
-                                <label class="form-label small fw-bold text-muted mb-1">Observaciones / Detalles</label>
-                                <input type="text" name="observaciones[]" class="form-control form-control-sm" placeholder="Rayones, estado físico, etc.">
+                                <div class="col-12 col-sm-6 col-md-4">
+                                    <label class="form-label small fw-bold text-muted mb-1">Observaciones / Detalles</label>
+                                    <input type="text" name="observaciones[]" class="form-control form-control-sm" placeholder="Rayones, estado físico, etc.">
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Botón para Agregar Otro Celular dinámicamente -->
-                    <div class="text-center mb-3">
-                        <button type="button" class="btn btn-outline-primary rounded-pill btn-sm fw-bold px-4 py-2 w-100 shadow-xs" onclick="agregarFilaRetoma()">
-                            <i class="fa-solid fa-plus-circle me-1"></i> + Añadir Otro Celular a este Registro
-                        </button>
+                    <!-- Botón para Agregar Otro Celular y Resumen -->
+                    <div class="row g-2 align-items-center mb-3">
+                        <div class="col-12 col-md-6">
+                            <button type="button" class="btn btn-outline-primary rounded-pill btn-sm fw-bold px-3 py-2 w-100 shadow-xs" onclick="agregarFilaRetoma()">
+                                <i class="fa-solid fa-plus-circle me-1"></i> + Añadir Otro Celular a este Registro
+                            </button>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <div class="d-flex justify-content-between align-items-center p-2 px-3 bg-light rounded-pill border">
+                                <span class="small text-muted fw-semibold">Total a pagar / registrar:</span>
+                                <span class="font-mono fw-bold text-success fs-5">$<span id="valorTotalLote">0</span></span>
+                            </div>
+                        </div>
                     </div>
 
                     <datalist id="marcasList">
@@ -1020,15 +1026,9 @@
                         <option value="Oppo">
                         <option value="Realme">
                     </datalist>
-
-                    <!-- Resumen del Lote -->
-                    <div class="d-flex justify-content-between align-items-center p-2.5 bg-light rounded-3 border">
-                        <span class="small text-muted">Total a pagar / registrar:</span>
-                        <span class="font-mono fw-bold text-dark fs-6">$<span id="valorTotalLote">0</span></span>
-                    </div>
                 </div>
 
-                <div class="modal-footer border-top py-2 bg-light d-flex justify-content-between align-items-center">
+                <div class="modal-footer border-top py-2.5 bg-light d-flex justify-content-between align-items-center">
                     <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
                         <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Retomas
@@ -1046,27 +1046,28 @@ function agregarFilaRetoma() {
     const nuevoIndex = items.length + 1;
 
     const div = document.createElement('div');
-    div.className = 'card border rounded-3 mb-3 p-3 shadow-xs equipo-retoma-item bg-white position-relative';
+    div.className = 'card border rounded-3 mb-2 p-3 shadow-xs equipo-retoma-item bg-white position-relative';
     div.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+        <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom">
             <span class="fw-bold text-dark small numero-equipo-titulo">
                 <i class="fa-solid fa-mobile-screen text-primary me-1"></i> Celular #${nuevoIndex}
             </span>
             <button type="button" class="btn btn-outline-danger btn-sm rounded-pill px-2 py-0 btn-eliminar-equipo" onclick="eliminarFilaRetoma(this)" title="Quitar este celular">
-                <i class="fa-solid fa-trash-can small"></i> Quitar
+                <i class="fa-solid fa-trash-can small me-1"></i> Quitar
             </button>
         </div>
 
+        <!-- Fila 1: Datos Técnicos -->
         <div class="row g-2 mb-2">
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-sm-6 col-md-2">
                 <label class="form-label small fw-bold text-muted mb-1">Marca *</label>
                 <input type="text" name="marca[]" class="form-control form-control-sm" list="marcasList" placeholder="Ej: Apple, Samsung" required>
             </div>
-            <div class="col-12 col-md-5">
+            <div class="col-12 col-sm-6 col-md-4">
                 <label class="form-label small fw-bold text-muted mb-1">Modelo / Referencia *</label>
                 <input type="text" name="modelo[]" class="form-control form-control-sm" placeholder="Ej: iPhone 13 128GB" required>
             </div>
-            <div class="col-12 col-md-3">
+            <div class="col-6 col-sm-4 col-md-2">
                 <label class="form-label small fw-bold text-muted mb-1">Almacenamiento</label>
                 <select name="memoria[]" class="form-select form-select-sm">
                     <option value="">-- Seleccionar --</option>
@@ -1078,40 +1079,37 @@ function agregarFilaRetoma() {
                     <option value="1TB">1TB</option>
                 </select>
             </div>
-        </div>
-
-        <div class="row g-2 mb-2">
-            <div class="col-12 col-md-6">
-                <label class="form-label small fw-bold text-muted mb-1">IMEI 1 (Principal) *</label>
-                <input type="text" name="imei1[]" class="form-control form-control-sm font-mono" placeholder="15 dígitos" required maxlength="20">
-            </div>
-            <div class="col-12 col-md-6">
-                <label class="form-label small fw-bold text-muted mb-1">IMEI 2 (Opcional)</label>
-                <input type="text" name="imei2[]" class="form-control form-control-sm font-mono" placeholder="Opcional" maxlength="20">
-            </div>
-        </div>
-
-        <div class="row g-2 mb-2">
-            <div class="col-12 col-md-4">
+            <div class="col-6 col-sm-4 col-md-2">
                 <label class="form-label small fw-bold text-muted mb-1">Color</label>
                 <input type="text" name="color[]" class="form-control form-control-sm" placeholder="Ej: Azul, Negro">
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-sm-4 col-md-2">
                 <label class="form-label small fw-bold text-muted mb-1">Batería (%)</label>
                 <input type="text" name="bateria[]" class="form-control form-control-sm" placeholder="Ej: 85%">
             </div>
-            <div class="col-12 col-md-4">
+        </div>
+
+        <!-- Fila 2: Seriales, Valor y Observaciones -->
+        <div class="row g-2">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label small fw-bold text-muted mb-1">IMEI 1 (Principal) *</label>
+                <input type="text" name="imei1[]" class="form-control form-control-sm font-mono" placeholder="15 dígitos" required maxlength="20">
+            </div>
+            <div class="col-12 col-sm-6 col-md-2">
+                <label class="form-label small fw-bold text-muted mb-1">IMEI 2 (Opcional)</label>
+                <input type="text" name="imei2[]" class="form-control form-control-sm font-mono" placeholder="Opcional" maxlength="20">
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
                 <label class="form-label small fw-bold text-muted mb-1">Valor Retoma ($ COP) *</label>
                 <div class="input-group input-group-sm">
                     <span class="input-group-text">$</span>
                     <input type="text" name="valor_retoma[]" class="form-control form-control-sm format-price fw-bold input-valor-retoma" placeholder="0" required onkeyup="formatInputCOP(this); recalcularTotalRetomasLote();">
                 </div>
             </div>
-        </div>
-
-        <div>
-            <label class="form-label small fw-bold text-muted mb-1">Observaciones / Detalles</label>
-            <input type="text" name="observaciones[]" class="form-control form-control-sm" placeholder="Rayones, estado físico, etc.">
+            <div class="col-12 col-sm-6 col-md-4">
+                <label class="form-label small fw-bold text-muted mb-1">Observaciones / Detalles</label>
+                <input type="text" name="observaciones[]" class="form-control form-control-sm" placeholder="Rayones, estado físico, etc.">
+            </div>
         </div>
     `;
     contenedor.appendChild(div);
