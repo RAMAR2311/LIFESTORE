@@ -163,7 +163,15 @@
                                 ${{ '{:,.0f}'.format(f.precio_sugerido) }}
                             </td>
                             <td>
-                                {% if f.asesor_id %}
+                                {% if f.asesores_nombres %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                    {% for nom in f.asesores_nombres %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                            <i class="fa-solid fa-user-check me-1"></i>{{ nom }}
+                                        </span>
+                                    {% endfor %}
+                                    </div>
+                                {% elif f.asesor_id %}
                                 <span class="badge bg-success-subtle text-success border border-success-subtle">
                                     <i class="fa-solid fa-user-check me-1"></i>{{ f.asesor_nombre }}
                                 </span>

@@ -556,12 +556,28 @@ class Retoma(db.Model):
     fecha_registro = db.Column(db.DateTime, default=obtener_hora_bogota)
     vendedor_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     asesor_retoma_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=True, index=True)
+    asesores_recepcion_ids = db.Column(db.Text, nullable=True) # JSON con lista de IDs si recibieron varios asesores
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
 
     venta = db.relationship('Sale', backref='retomas_asociadas', lazy=True)
     vendedor = db.relationship('User', backref='retomas_registradas', lazy=True)
     asesor_retoma = db.relationship('Asesor', foreign_keys=[asesor_retoma_id], backref='retomas_realizadas', lazy=True)
     producto_generado = db.relationship('Product', backref='retoma_origen', lazy=True)
+
+    @property
+    def lista_asesores_recepcion_ids(self):
+        import json
+        ids = []
+        if self.asesores_recepcion_ids:
+            try:
+                parsed = json.loads(self.asesores_recepcion_ids)
+                if isinstance(parsed, list):
+                    ids = [int(x) for x in parsed if str(x).isdigit()]
+            except Exception:
+                ids = [int(x.strip()) for x in str(self.asesores_recepcion_ids).split(',') if x.strip().isdigit()]
+        if self.asesor_retoma_id and self.asesor_retoma_id not in ids:
+            ids.insert(0, self.asesor_retoma_id)
+        return ids
 
     @property
     def soporte_activo(self):

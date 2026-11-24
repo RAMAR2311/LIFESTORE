@@ -347,7 +347,8 @@ def create_app():
             "ALTER TABLE arqueo_caja ADD COLUMN tiene_obsequio BOOLEAN DEFAULT FALSE;",
             "ALTER TABLE arqueo_caja ADD COLUMN costo_total_obsequios NUMERIC(12, 2) DEFAULT 0.0;",
             "ALTER TABLE arqueo_caja ADD COLUMN ingreso_neto_real NUMERIC(12, 2) DEFAULT 0.0;",
-            "ALTER TABLE arqueo_caja ADD COLUMN closed_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL;"
+            "ALTER TABLE arqueo_caja ADD COLUMN closed_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL;",
+            "ALTER TABLE retomas ADD COLUMN asesores_recepcion_ids TEXT;"
         ]
         for q in queries:
             try:

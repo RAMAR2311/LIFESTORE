@@ -847,39 +847,51 @@ def importar_masivo_preview():
 
             raw_imei2 = limpiar_texto(row.get(col_map.get('imei2', ''), ''))
 
-            # 3. Asesor con normalización segura y fallback zfill(3)
-            raw_asesor = limpiar_texto(row.get(col_map.get('codigo_asesor', ''), ''))
-            asesor_obj = None
-            asesor_nombre = "Sin asesor / Sin comisión"
-            asesor_id = None
+            # 3. Asesor(es) con soporte para múltiples códigos separados por coma y fallback zfill(3)
+            raw_asesor_cell = limpiar_texto(row.get(col_map.get('codigo_asesor', ''), ''))
+            asesores_ids = []
+            asesores_nombres = []
 
-            if not es_vacio(raw_asesor):
-                cod_lookup = raw_asesor.upper()
-                asesor_obj = asesor_by_code.get(cod_lookup)
-                
-                # Fallback con relleno de ceros zfill(3) si viene sin ceros (ej. "4" -> "004")
-                if not asesor_obj and raw_asesor.isdigit():
-                    num_int_str = str(int(raw_asesor))
-                    asesor_obj = asesor_by_code.get(raw_asesor.zfill(3)) or \
-                                 asesor_by_code.get(raw_asesor.zfill(2)) or \
-                                 asesor_by_code.get(f"ASE-{raw_asesor.zfill(3)}") or \
-                                 asesor_by_id_map.get(num_int_str)
+            if not es_vacio(raw_asesor_cell):
+                # Separar por coma (soporta uno o varios: ej. "900509, 2009" o "004, 5")
+                partes_codigo = [p.strip() for p in re.split(r'[,;]+', raw_asesor_cell) if not es_vacio(p)]
+                for parte in partes_codigo:
+                    cod_p = limpiar_texto(parte)
+                    if es_vacio(cod_p):
+                        continue
+                    cod_lookup = cod_p.upper()
+                    asesor_obj = asesor_by_code.get(cod_lookup)
 
-                if asesor_obj:
-                    asesor_nombre = asesor_obj.nombre
-                    asesor_id = asesor_obj.id
-                else:
-                    asesor_nombre = f"Código '{raw_asesor}' no encontrado"
-                    alertas.append({
-                        'fila': fila_num, 
-                        'tipo': 'warning', 
-                        'msg': f'Código de asesor "{raw_asesor}" no encontrado en asesores activos. Quedará sin comisión de recepción a menos que se corrija.'
-                    })
+                    # Fallback con relleno de ceros zfill(3) si viene sin ceros (ej. "4" -> "004")
+                    if not asesor_obj and cod_p.isdigit():
+                        num_int_str = str(int(cod_p))
+                        asesor_obj = asesor_by_code.get(cod_p.zfill(3)) or \
+                                     asesor_by_code.get(cod_p.zfill(2)) or \
+                                     asesor_by_code.get(f"ASE-{cod_p.zfill(3)}") or \
+                                     asesor_by_id_map.get(num_int_str)
+
+                    if asesor_obj:
+                        if asesor_obj.id not in asesores_ids:
+                            asesores_ids.append(asesor_obj.id)
+                            asesores_nombres.append(asesor_obj.nombre)
+                            resumen_asesores[asesor_obj.nombre] = resumen_asesores.get(asesor_obj.nombre, 0) + 1
+                    else:
+                        alertas.append({
+                            'fila': fila_num,
+                            'tipo': 'warning',
+                            'msg': f'Código de asesor "{cod_p}" no encontrado en asesores activos.'
+                        })
             else:
-                # Si viene vacío/None/NaN: No es un error ni una alerta bloqueante
-                raw_asesor = None
+                raw_asesor_cell = None
 
-            resumen_asesores[asesor_nombre] = resumen_asesores.get(asesor_nombre, 0) + 1
+            if not asesores_ids:
+                asesor_nombre = "Sin asesor / Sin comisión"
+                if raw_asesor_cell is None:
+                    resumen_asesores["Sin asesor / Sin comisión"] = resumen_asesores.get("Sin asesor / Sin comisión", 0) + 1
+            else:
+                asesor_nombre = ", ".join(asesores_nombres)
+
+            asesor_id = asesores_ids[0] if asesores_ids else None
 
             # 4. Sede
             raw_sede = limpiar_texto(row.get(col_map.get('sede', ''), ''))
@@ -920,8 +932,10 @@ def importar_masivo_preview():
 
             filas_procesadas.append({
                 'fila': fila_num,
-                'codigo_asesor': raw_asesor,
+                'codigo_asesor': raw_asesor_cell,
                 'asesor_id': asesor_id,
+                'asesores_ids': asesores_ids,
+                'asesores_nombres': asesores_nombres,
                 'asesor_nombre': asesor_nombre,
                 'marca': marca,
                 'modelo': modelo,
@@ -1040,7 +1054,8 @@ def importar_masivo_ejecutar():
                 ok_venta=True,
                 vendedor_id=current_user.id,
                 branch_id=f['branch_id'],
-                asesor_retoma_id=f['asesor_id']
+                asesor_retoma_id=f['asesor_id'],
+                asesores_recepcion_ids=json.dumps(f['asesores_ids']) if f.get('asesores_ids') else None
             )
             db.session.add(nueva_retoma)
             db.session.flush()

@@ -1380,6 +1380,8 @@ def ventas_vendedores():
 
                             if shift_recepcion:
                                 asesores_recepcion_ids = shift_recepcion.lista_asesores_ids
+                            elif ret_item.lista_asesores_recepcion_ids:
+                                asesores_recepcion_ids = ret_item.lista_asesores_recepcion_ids
                             elif ret_item.asesor_retoma_id:
                                 asesores_recepcion_ids = [ret_item.asesor_retoma_id]
                             elif venta_origen and venta_origen.asesor_id:
@@ -1717,6 +1719,8 @@ def recibo_comision(payment_id):
 
                 if s_rec:
                     asesores_recepcion_ids = s_rec.lista_asesores_ids
+                elif r.lista_asesores_recepcion_ids:
+                    asesores_recepcion_ids = r.lista_asesores_recepcion_ids
                 elif r.asesor_retoma_id:
                     asesores_recepcion_ids = [r.asesor_retoma_id]
                 elif v_orig and v_orig.asesor_id:
@@ -1949,6 +1953,8 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
 
                 if shift_rec:
                     asesores_recepcion_ids = shift_rec.lista_asesores_ids
+                elif ret_item.lista_asesores_recepcion_ids:
+                    asesores_recepcion_ids = ret_item.lista_asesores_recepcion_ids
                 elif ret_item.asesor_retoma_id:
                     asesores_recepcion_ids = [ret_item.asesor_retoma_id]
                 elif venta_orig and venta_orig.asesor_id:
