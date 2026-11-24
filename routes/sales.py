@@ -1256,41 +1256,54 @@ def eliminar_venta(sale_id):
     venta = Sale.query.get_or_404(sale_id)
     
     try:
-        # Revertir Stock
-        from models import StockAdjustment
+        # Revertir Stock multi-sede (BranchStock + sincronización global)
+        from models import StockAdjustment, Branch
+        from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
+
+        def _resolver_branch_reversion(product_id):
+            ajuste_orig = StockAdjustment.query.filter(
+                StockAdjustment.product_id == product_id,
+                StockAdjustment.tipo_movimiento.ilike(f"%#{venta.id}%"),
+                StockAdjustment.branch_id.isnot(None)
+            ).order_by(StockAdjustment.id.desc()).first()
+            if ajuste_orig and ajuste_orig.branch_id:
+                return ajuste_orig.branch_id
+            if venta.branch_id:
+                return venta.branch_id
+            if venta.sucursal:
+                b_match = Branch.query.filter(Branch.nombre.ilike(venta.sucursal.strip())).first()
+                if b_match:
+                    return b_match.id
+            b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            return b_def.id if b_def else 1
+
         for detalle in venta.detalles:
+            if not detalle.product_id:
+                continue
+            producto = Product.query.with_for_update().get(detalle.product_id)
+            if not producto:
+                continue
+
+            target_branch_id = _resolver_branch_reversion(producto.id)
+            bs = get_or_create_branch_stock(target_branch_id, producto.id, detalle.variant_id, for_update=True)
+            stock_anterior_local = bs.cantidad or 0
+            bs.cantidad = stock_anterior_local + detalle.cantidad_vendida
+            sync_global_product_stock(producto.id, detalle.variant_id)
+
+            tipo_mov = f"Anulación Venta #{venta.id}"
             if detalle.variant_id:
-                variante = ProductVariant.query.with_for_update().get(detalle.variant_id)
+                variante = ProductVariant.query.get(detalle.variant_id)
                 if variante:
-                    stock_anterior = variante.cantidad_stock
-                    variante.cantidad_stock += detalle.cantidad_vendida
-                    
-                    ajuste = StockAdjustment(
-                        product_id=detalle.product_id,
-                        admin_id=current_user.id,
-                        tipo_movimiento=f"Anulación Venta #{venta.id} (Subcat: {variante.nombre_variante})",
-                        stock_anterior=stock_anterior,
-                        stock_nuevo=variante.cantidad_stock
-                    )
-                    db.session.add(ajuste)
-                    
-                producto = Product.query.with_for_update().get(detalle.product_id)
-                if producto:
-                    producto.cantidad_stock += detalle.cantidad_vendida
-            elif detalle.product_id:
-                producto = Product.query.with_for_update().get(detalle.product_id)
-                if producto:
-                    stock_anterior = producto.cantidad_stock
-                    producto.cantidad_stock += detalle.cantidad_vendida
-                    
-                    ajuste = StockAdjustment(
-                        product_id=producto.id,
-                        admin_id=current_user.id,
-                        tipo_movimiento=f"Anulación Venta #{venta.id}",
-                        stock_anterior=stock_anterior,
-                        stock_nuevo=producto.cantidad_stock
-                    )
-                    db.session.add(ajuste)
+                    tipo_mov = f"Anulación Venta #{venta.id} (Subcat: {variante.nombre_variante})"
+
+            db.session.add(StockAdjustment(
+                product_id=producto.id,
+                admin_id=current_user.id,
+                branch_id=target_branch_id,
+                tipo_movimiento=tipo_mov,
+                stock_anterior=stock_anterior_local,
+                stock_nuevo=bs.cantidad
+            ))
                     
         # Verificar y eliminar Retomas asociadas
         if hasattr(venta, 'retomas_asociadas') and venta.retomas_asociadas:
