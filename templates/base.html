@@ -2183,6 +2183,126 @@
                 }
             }
         });
+
+        // ==========================================================
+        // BUSCADOR PREDICTIVO UNIVERSAL LIFESTORE (DESDE 2 LETRAS)
+        // ==========================================================
+        document.addEventListener('DOMContentLoaded', function() {
+            function inicializarBuscadorPredictivo(input) {
+                if (!input || input.dataset.predictivoInit) return;
+                // Excluir inputs que ya tienen su propio manejador personalizado de tarjetas o catálogo
+                if (input.id === 'productSearch' && document.getElementById('productsGrid')) return;
+                input.dataset.predictivoInit = "true";
+
+                // Buscar la tabla objetivo en la página (excluyendo tablas dentro de modales)
+                let tabla = null;
+                const container = input.closest('.card, .container, .container-fluid, main');
+                if (container) {
+                    tabla = container.querySelector('table:not(.modal table)');
+                }
+                if (!tabla) {
+                    tabla = document.querySelector('main table:not(.modal table), .table-responsive table:not(.modal table), table.table:not(.modal table)');
+                }
+                if (!tabla) return;
+
+                function getFilas() {
+                    const tbody = tabla.querySelector(':scope > tbody') || tabla.querySelector('tbody');
+                    if (!tbody) return [];
+                    return Array.from(tbody.children).filter(el => 
+                        el.tagName === 'TR' && 
+                        !el.classList.contains('empty-search-feedback') && 
+                        !el.classList.contains('no-search-row') && 
+                        !el.classList.contains('table-summary')
+                    );
+                }
+
+                function getTextoFila(fila) {
+                    let text = '';
+                    fila.childNodes.forEach(node => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            if (!node.classList.contains('modal')) {
+                                const modales = node.querySelectorAll('.modal');
+                                if (modales.length > 0) {
+                                    const clone = node.cloneNode(true);
+                                    clone.querySelectorAll('.modal').forEach(m => m.remove());
+                                    text += ' ' + clone.textContent;
+                                } else {
+                                    text += ' ' + node.textContent;
+                                }
+                            }
+                        } else {
+                            text += ' ' + node.textContent;
+                        }
+                    });
+                    return text.toLowerCase();
+                }
+
+                const formPadre = input.closest('form');
+
+                input.addEventListener('input', function() {
+                    const rawVal = this.value.trim().toLowerCase();
+                    const filas = getFilas();
+                    if (!filas.length) return;
+
+                    if (rawVal.length >= 2) {
+                        const palabras = rawVal.split(/\s+/).filter(w => w.length > 0);
+                        let visibles = 0;
+
+                        filas.forEach(fila => {
+                            const textoFila = getTextoFila(fila);
+                            const coincide = palabras.every(pal => textoFila.includes(pal));
+                            if (coincide) {
+                                fila.style.display = '';
+                                visibles++;
+                            } else {
+                                fila.style.display = 'none';
+                            }
+                        });
+
+                        // Feedback visual dinámico cuando no hay coincidencias
+                        let msgVacio = tabla.querySelector('.empty-search-feedback');
+                        if (visibles === 0) {
+                            if (!msgVacio) {
+                                msgVacio = document.createElement('tr');
+                                msgVacio.className = 'empty-search-feedback text-center text-muted';
+                                const primerTr = tabla.querySelector('thead tr') || filas[0];
+                                const numCols = primerTr ? primerTr.children.length : 8;
+                                msgVacio.innerHTML = `<td colspan="${numCols}" class="py-4 text-center text-muted">
+                                    <i class="fa-solid fa-magnifying-glass fa-2x mb-2 d-block opacity-25"></i>
+                                    <span class="small fw-semibold">No se encontraron coincidencias para "<strong>${rawVal}</strong>"</span>
+                                </td>`;
+                                const tbody = tabla.querySelector(':scope > tbody') || tabla.querySelector('tbody') || tabla;
+                                tbody.appendChild(msgVacio);
+                            } else {
+                                msgVacio.style.display = '';
+                                const strongEl = msgVacio.querySelector('strong');
+                                if (strongEl) strongEl.textContent = rawVal;
+                            }
+                        } else if (msgVacio) {
+                            msgVacio.style.display = 'none';
+                        }
+                    } else {
+                        // Si hay menos de 2 caracteres, restaurar todas las filas
+                        filas.forEach(fila => fila.style.display = '');
+                        let msgVacio = tabla.querySelector('.empty-search-feedback');
+                        if (msgVacio) msgVacio.style.display = 'none';
+                    }
+                });
+
+                // Si presiona Enter dentro de un form de búsqueda, se ejecuta búsqueda en BD
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && formPadre) {
+                        formPadre.submit();
+                    }
+                });
+            }
+
+            // Activar automáticamente en inputs estándar de búsqueda
+            const selectores = 'input[name="q"], input#searchInput, input.buscador-predictivo, input#historialSearchInput, input#warrantySearchInput';
+            document.querySelectorAll(selectores).forEach(inp => {
+                inicializarBuscadorPredictivo(inp);
+            });
+        });
     </script>
 
     <!-- WIDGET DE APROBACIÓN DE PRECIOS PARA ADMIN -->

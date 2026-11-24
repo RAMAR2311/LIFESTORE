@@ -17,7 +17,7 @@
 <form method="GET" action="{{ url_for('externos_bp.inventario') }}" id="searchForm" class="mb-4">
     <div class="input-group shadow-sm" style="max-width: 480px;">
         <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-        <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0"
+        <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0 buscador-predictivo"
                placeholder="Buscar por IMEI, Marca, Modelo o Proveedor..."
                value="{{ q }}">
         {% if q %}

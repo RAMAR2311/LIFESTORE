@@ -88,7 +88,10 @@
             <div class="col-12 col-md-3">
                 <div class="input-group">
                     <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
-                    <input type="text" name="q" class="form-control bg-light border-start-0" placeholder="Buscar por IMEI, Modelo o Falla..." value="{{ q }}">
+                    <input type="text" name="q" class="form-control bg-light border-start-0 buscador-predictivo" placeholder="Buscar por IMEI, Modelo o Falla..." value="{{ q }}">
+                    {% if q %}
+                    <a href="{{ url_for('support_bp.index') }}" class="btn btn-outline-secondary border-start-0" title="Limpiar"><i class="fa-solid fa-xmark"></i></a>
+                    {% endif %}
                 </div>
             </div>
 

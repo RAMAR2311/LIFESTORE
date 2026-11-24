@@ -110,7 +110,7 @@
     <form method="GET" action="{{ url_for('celulares_bp.inventario') }}" id="searchForm" class="d-flex flex-wrap gap-2 w-100" style="max-width: 720px;">
         <div class="input-group shadow-sm" style="flex: 1 1 280px;">
             <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-            <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0"
+            <input type="text" id="searchInput" name="q" class="form-control border-start-0 ps-0 buscador-predictivo"
                    placeholder="Buscar por Marca, Modelo, IMEI, Proveedor..."
                    value="{{ q }}">
             {% if q %}
@@ -595,20 +595,21 @@
 {% endif %}
 
 <script>
-    let searchTimeout;
     const searchInput = document.getElementById('searchInput');
     const searchForm = document.getElementById('searchForm');
 
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            searchForm.submit();
-        }, 600);
-    });
+    // Envío del formulario al presionar Enter para búsqueda profunda en base de datos
+    if (searchInput && searchForm) {
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                searchForm.submit();
+            }
+        });
+    }
     
     // Enfocar al final del input para que el usuario pueda seguir escribiendo tras el reload
     window.addEventListener('DOMContentLoaded', () => {
-        if(searchInput.value) {
+        if(searchInput && searchInput.value) {
             searchInput.focus();
             searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
         }

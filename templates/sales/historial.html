@@ -353,6 +353,21 @@
     </div>
 </div>
 
+<!-- Buscador Predictivo en Tiempo Real de Operaciones -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 d-print-none">
+    <div class="input-group shadow-sm" style="max-width: 480px;">
+        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+        <input type="text" id="historialSearchInput" class="form-control border-start-0 ps-0 buscador-predictivo"
+               placeholder="Buscar por Ticket #, Fecha, Vendedor, Asesor, Canal, Sede..." autocomplete="off">
+        <button class="btn btn-outline-secondary border-start-0" type="button" onclick="document.getElementById('historialSearchInput').value=''; document.getElementById('historialSearchInput').dispatchEvent(new Event('input'));" title="Limpiar búsqueda">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+    <div class="text-muted small">
+        <i class="fa-solid fa-bolt text-warning me-1"></i> Búsqueda en tiempo real desde 2 letras
+    </div>
+</div>
+
 <div class="card card-custom p-0 overflow-hidden">
     <div class="table-responsive">
         <table class="table table-hover table-striped table-custom mb-0">
