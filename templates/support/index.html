@@ -279,9 +279,12 @@
                         </td>
 
                         <!-- Acciones -->
-                        <td class="text-end pe-4">
-                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalGestionarServicio{{ s.id }}">
+                        <td class="text-end pe-4 text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm fw-bold me-1" data-bs-toggle="modal" data-bs-target="#modalGestionarServicio{{ s.id }}">
                                 <i class="fa-solid fa-pen-to-square me-1"></i> Gestionar
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2 shadow-sm" onclick="abrirModalEliminarServicio('{{ s.id }}', '{{ s.marca or '' }} {{ s.modelo }}', '{{ s.imei or '' }}')" title="Eliminar del Soporte Técnico (Requiere PIN)">
+                                <i class="fa-solid fa-trash-can"></i>
                             </button>
                         </td>
                     </tr>
@@ -371,11 +374,16 @@
                                             <textarea name="solucion_aplicada" class="form-control form-control-sm" rows="2" placeholder="Ej: Se instaló nuevo módulo OLED original y batería...">{{ s.solucion_aplicada or '' }}</textarea>
                                         </div>
                                     </div>
-                                    <div class="modal-footer border-top py-2">
-                                        <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cerrar</button>
-                                        <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
-                                            <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Cambios
+                                    <div class="modal-footer border-top py-2 d-flex justify-content-between align-items-center">
+                                        <button type="button" class="btn btn-outline-danger rounded-pill btn-sm px-3" onclick="abrirModalEliminarServicio('{{ s.id }}', '{{ s.marca or '' }} {{ s.modelo }}', '{{ s.imei or '' }}')">
+                                            <i class="fa-solid fa-trash-can me-1"></i> Eliminar Registro
                                         </button>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cerrar</button>
+                                            <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                                <i class="fa-solid fa-floppy-disk me-1"></i> Guardar Cambios
+                                            </button>
+                                        </div>
                                     </div>
                                 </form>
                             </div>
@@ -476,5 +484,71 @@
         </div>
     </div>
 </div>
+<!-- MODAL ELIMINAR SERVICIO TÉCNICO CON PIN/TOKEN -->
+<div class="modal fade" id="modalEliminarServicio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-danger text-white py-3">
+                <h6 class="modal-title fs-6 fw-bold">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i> Confirmar Eliminación de Soporte Técnico
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="formEliminarServicio" method="POST" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body py-4">
+                    <div class="alert alert-warning border-0 small mb-3 rounded-3">
+                        <i class="fa-solid fa-shield-halved text-warning me-1"></i>
+                        Esta acción eliminará permanentemente el registro de servicio técnico. Si el equipo provenía de retomas o inventario, su estado será restaurado.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Equipo a eliminar:</label>
+                        <div id="eliminarEquipoDetalle" class="fw-bold text-dark fs-6 bg-light p-3 rounded-3 border"></div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold text-dark small">
+                            <i class="fa-solid fa-key text-danger me-1"></i> PIN / Token de Seguridad de Administrador <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="fa-solid fa-lock text-muted"></i></span>
+                            <input type="password" name="token_secreto" id="inputTokenSecretoSoporte" class="form-control" placeholder="Ingrese PIN de seguridad (Ej: 1234)" required autocomplete="off">
+                        </div>
+                        <small class="text-muted">Por seguridad se requiere el PIN de confirmación para eliminar registros.</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-trash-can me-1"></i> Confirmar Eliminación
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalEliminarServicio(id, equipo, imei) {
+    const form = document.getElementById('formEliminarServicio');
+    const detalle = document.getElementById('eliminarEquipoDetalle');
+    const inputToken = document.getElementById('inputTokenSecretoSoporte');
+    
+    form.action = `/support/${id}/eliminar`;
+    detalle.innerHTML = `<span class="badge bg-secondary mb-1">Orden #${id}</span><br><strong>${equipo}</strong> ${imei ? `<br><span class="badge bg-dark font-mono mt-1">IMEI: ${imei}</span>` : ''}`;
+    inputToken.value = '';
+    
+    // Si el modal de gestionar está abierto, cerrarlo primero
+    const modalGestionarEl = document.getElementById(`modalGestionarServicio${id}`);
+    if (modalGestionarEl) {
+        const modalGestionar = bootstrap.Modal.getInstance(modalGestionarEl);
+        if (modalGestionar) {
+            modalGestionar.hide();
+        }
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalEliminarServicio'));
+    modal.show();
+}
+</script>
 {% endblock %}
 

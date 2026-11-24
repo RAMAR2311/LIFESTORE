@@ -5,6 +5,7 @@ from services.stock_service import get_or_create_branch_stock, sync_global_produ
 from datetime import datetime, date
 from decimal import Decimal
 import pytz
+import os
 
 support_bp = Blueprint('support_bp', __name__)
 
@@ -412,4 +413,62 @@ def actualizar_estado(id):
 
     flash('Servicio técnico actualizado correctamente.', 'success')
     return redirect(url_for('support_bp.index'))
+
+
+@support_bp.route('/<int:id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_servicio(id):
+    """Elimina un registro de soporte técnico validando el PIN / Token Secreto."""
+    if current_user.rol not in ['admin', 'coordinador', 'bodega']:
+        flash('No tiene permisos para eliminar registros de soporte técnico.', 'danger')
+        return redirect(url_for('support_bp.index'))
+
+    # Validación estricta de Token Secreto / PIN de Administrador
+    token_esperado = os.environ.get('DELETE_TOKEN', '1234').strip()
+    token_recibido = request.form.get('token_secreto', '').strip()
+
+    if not token_recibido or token_recibido != token_esperado:
+        flash('⚠️ Token secreto / PIN incorrecto o no suministrado. Eliminación rechazada por seguridad.', 'danger')
+        return redirect(url_for('support_bp.index'))
+
+    servicio = TechnicalService.query.get_or_404(id)
+    equipo_info = f"{servicio.marca or ''} {servicio.modelo or 'Dispositivo'} (IMEI: {servicio.imei or 'N/A'})"
+
+    try:
+        # Revertir estado si provenía de Retoma
+        if servicio.retoma_id or servicio.retoma:
+            ret = servicio.retoma or Retoma.query.get(servicio.retoma_id)
+            if ret:
+                if ret.estado == 'en_soporte':
+                    ret.estado = 'en_evaluacion'
+                if ret.observaciones and '[EN TALLER / SOPORTE TÉCNICO]' in ret.observaciones:
+                    partes = ret.observaciones.split('[EN TALLER / SOPORTE TÉCNICO]:')
+                    if len(partes) > 1:
+                        subpartes = partes[1].split('. ', 1)
+                        ret.observaciones = subpartes[1] if len(subpartes) > 1 else ''
+
+        # Revertir observación si provenía de Producto de inventario
+        if servicio.product_id or servicio.producto:
+            prod = servicio.producto or Product.query.get(servicio.product_id)
+            if prod and prod.observacion and '[EN TALLER / SOPORTE TÉCNICO]' in prod.observacion:
+                prod.observacion = None
+
+        db.session.delete(servicio)
+        db.session.commit()
+
+        AuditLog.registrar(
+            action='ELIMINAR_SOPORTE',
+            user_id=current_user.id,
+            motivo=f'Eliminación de servicio técnico #{id} [{equipo_info}] autorizada mediante PIN de seguridad',
+            target_id=id,
+            target_type='TECHNICAL_SERVICE'
+        )
+
+        flash(f'Registro de soporte técnico #{id} ({equipo_info}) eliminado correctamente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar el registro de soporte técnico: {str(e)}', 'danger')
+
+    return redirect(url_for('support_bp.index'))
+
 
