@@ -39,7 +39,7 @@ def index():
     tipo = 'bodega' if current_user.rol in ['bodega', 'vendedor_bodega'] else 'tienda'
     page = request.args.get('page', 1, type=int)
     q = request.args.get('q', '').strip()
-    per_page = 500
+    per_page = 5000
 
     active_b_id = None
     if current_user.rol == 'admin':
@@ -94,44 +94,56 @@ def index():
                     )
                 )
 
-    # Paginación del listado principal
+    from sqlalchemy.orm import selectinload
+    base_query = base_query.options(selectinload(Product.variantes))
+
+    # Paginación del listado principal (per_page alto para permitir filtrado instantáneo sobre todo el catálogo)
     paginacion = base_query.order_by(Product.nombre).paginate(
         page=page, per_page=per_page, error_out=False
     )
     productos = paginacion.items
 
-    # Obtener desglose de stock por sucursal para cada producto en la página
-    # Para vendedor: solo su propia sucursal. Para admin/bodega: todas las sucursales
+    # Obtener desglose de stock por sucursal en 1 sola consulta por lotes (evita N+1 queries)
     stock_por_producto = {}
     todas_sucursales = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
 
+    prod_ids = [p.id for p in productos]
+    bs_all = BranchStock.query.filter(BranchStock.product_id.in_(prod_ids)).all() if prod_ids else []
+
+    # Mapa: (product_id, branch_id, is_variant) -> suma de cantidad
+    bs_sum_map = {}
+    for bs in bs_all:
+        key = (bs.product_id, bs.branch_id, bs.variant_id is not None)
+        bs_sum_map[key] = bs_sum_map.get(key, 0) + (bs.cantidad or 0)
+
     for p in productos:
+        has_vars = bool(p.variantes)
         if current_user.rol == 'vendedor':
-            # Solo stock local
-            bs = BranchStock.query.filter_by(branch_id=active_b_id, product_id=p.id, variant_id=None).first()
-            cant_local = bs.cantidad if bs else 0
-            # Si tiene variantes, sumamos las variantes de su sucursal
-            if p.variantes:
-                sum_var = db.session.query(db.func.coalesce(db.func.sum(BranchStock.cantidad), 0)).filter(
-                    BranchStock.branch_id == active_b_id,
-                    BranchStock.product_id == p.id,
-                    BranchStock.variant_id.isnot(None)
-                ).scalar() or 0
-                cant_local = int(sum_var)
+            cant_local = int(bs_sum_map.get((p.id, active_b_id, has_vars), 0))
             stock_por_producto[p.id] = {
                 'local_stock': cant_local,
-                'distribucion': [{'branch_id': active_b_id, 'branch_name': current_user.branch.nombre if current_user.branch else 'Local', 'cantidad': cant_local}]
+                'distribucion': [{
+                    'branch_id': active_b_id,
+                    'branch_name': current_user.branch.nombre if current_user.branch else 'Local',
+                    'branch_code': current_user.branch.codigo if current_user.branch else 'LOC',
+                    'cantidad': cant_local
+                }]
             }
         else:
-            # Admin o Bodega: Desglose completo
-            distribucion = get_product_stock_distribution(p.id)
+            distribucion = []
             stock_local = 0
-            if active_b_id:
-                for d in distribucion:
-                    if d['branch_id'] == active_b_id:
-                        stock_local = d['cantidad']
-                        break
-            else:
+            for b in todas_sucursales:
+                cant_b = int(bs_sum_map.get((p.id, b.id, has_vars), 0))
+                distribucion.append({
+                    'branch_id': b.id,
+                    'branch_name': b.nombre,
+                    'branch_code': b.codigo,
+                    'tipo': b.tipo,
+                    'cantidad': cant_b
+                })
+                if active_b_id and b.id == active_b_id:
+                    stock_local = cant_b
+            if not active_b_id:
                 stock_local = p.total_stock
 
             stock_por_producto[p.id] = {
@@ -140,8 +152,7 @@ def index():
             }
 
     # --- KPIs de Inventario ---
-    # Se calcula sobre los productos visibles según el rol y sucursal filtrada
-    todos = base_query.all()
+    todos = productos if paginacion.pages <= 1 else base_query.all()
     total_productos = len(todos)
 
     if active_b_id is not None:

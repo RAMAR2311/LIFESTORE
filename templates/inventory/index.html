@@ -206,9 +206,21 @@
                             <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id) }}" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Trasladar este Producto">
                                 <i class="fa-solid fa-truck-moving"></i>
                             </a>
+                            {% if p.variantes %}
                             <button type="button" class="btn btn-sm btn-outline-dark rounded-pill fw-bold shadow-sm" title="Gestionar Subcategorías" data-bs-toggle="modal" data-bs-target="#variantesModal{{ p.id }}">
                                 <i class="fa-solid fa-sitemap me-1"></i> Variantes
                             </button>
+                            {% else %}
+                            <button type="button" class="btn btn-sm btn-outline-dark rounded-pill fw-bold shadow-sm" title="Gestionar Subcategorías"
+                                    data-prod-id="{{ p.id }}"
+                                    data-prod-nombre="{{ p.nombre }}"
+                                    data-prod-costo="{{ '%.0f'|format(p.precio_costo or 0) }}"
+                                    data-prod-minimo="{{ '%.0f'|format(p.precio_minimo or 0) }}"
+                                    data-prod-sugerido="{{ '%.0f'|format(p.precio_sugerido or 0) }}"
+                                    onclick="abrirModalVariantesCompartido(this)">
+                                <i class="fa-solid fa-sitemap me-1"></i> Variantes
+                            </button>
+                            {% endif %}
                             <a href="{{ url_for('inventory_bp.ver_producto', id=p.id) }}" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Ver Detalle">
                                 <i class="fa-solid fa-eye"></i>
                             </a>
@@ -326,10 +338,74 @@
 {% endif %}
 <!-- ═══════════════════════════════════════════════════════════════════════════════════ -->
 
-<!-- Modales de Variantes generados fuera de la tabla para evitar cortes de interfaz -->
+<!-- Modales de Variantes generados solo para productos con variantes activas + 1 modal compartido para los demás -->
 {% for p in productos %}
-    {% include 'inventory/modal_variantes.html' %}
+    {% if p.variantes %}
+        {% include 'inventory/modal_variantes.html' %}
+    {% endif %}
 {% endfor %}
+
+<div class="modal fade" id="variantesModalCompartido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 bg-light">
+                <h5 class="modal-title fw-bold text-brand-black" id="varCompTitulo">Gestión de Subcategorías</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-start bg-light rounded-bottom">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-body p-3">
+                        <h6 class="fw-bold mb-3 text-brand-black"><i class="fa-solid fa-plus-circle text-success me-2"></i>Añadir Subcategoría Nueva</h6>
+                        <form method="POST" id="formAgregarVarianteCompartido" action="">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="row g-2 mb-3">
+                                <div class="col-md-9">
+                                    <label class="form-label small text-muted mb-1 fw-bold">Nombre o Atributo</label>
+                                    <input type="text" name="nombre_variante" class="form-control form-control-sm" placeholder="Ej: Funda Silicona Negra" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted mb-1 fw-bold">Stock Inicial</label>
+                                    <input type="number" name="cantidad_stock" class="form-control form-control-sm" placeholder="0" required min="0">
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                {% if current_user.rol != 'coordinador' %}
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted mb-1 fw-bold">P. Costo (Opcional)</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-light text-muted border-end-0">$</span>
+                                        <input type="number" step="1" name="precio_costo" id="varCompCosto" class="form-control border-start-0 ps-0" placeholder="0">
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <div class="col-md-4">
+                                    <label class="form-label small text-muted mb-1 fw-bold">P. Mínimo (Opcional)</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-light text-muted border-end-0">$</span>
+                                        <input type="number" step="1" name="precio_minimo" id="varCompMinimo" class="form-control border-start-0 ps-0" placeholder="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold mb-1" style="color: var(--brand-pink);">P. Sugerido (Opcional)</label>
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-light text-muted border-end-0">$</span>
+                                        <input type="number" step="1" name="precio_sugerido" id="varCompSugerido" class="form-control border-start-0 ps-0 border-pink border-1" placeholder="0">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm fw-bold w-100 rounded-pill"><i class="fa-solid fa-plus me-1"></i> Registrar Subcategoría</button>
+                        </form>
+                    </div>
+                </div>
+                <h6 class="fw-bold mb-3 text-brand-black"><i class="fa-solid fa-boxes-stacked text-primary me-2"></i>Subcategorías Registradas</h6>
+                <div class="text-center p-4 border rounded bg-white mt-1 shadow-sm">
+                    <i class="fa-solid fa-boxes-stacked fs-3 text-muted mb-2 opacity-50"></i>
+                    <p class="text-muted small mb-0">Este producto actualmente utiliza <strong>stock plano</strong> y tarifas genéricas.<br>Añade variantes arriba para dividir su rango comercial.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal para Importación Masiva -->
 <div class="modal fade" id="importarModal" tabindex="-1" aria-labelledby="importarModalLabel" aria-hidden="true">
@@ -458,6 +534,23 @@ document.addEventListener('DOMContentLoaded', function() {
         searchInput.focus();
     });
 });
+
+function abrirModalVariantesCompartido(btn) {
+    const prodId = btn.dataset.prodId;
+    const prodNombre = btn.dataset.prodNombre || '';
+    document.getElementById('varCompTitulo').textContent = 'Gestión de Subcategorías - ' + prodNombre;
+    document.getElementById('formAgregarVarianteCompartido').action = `/inventory/producto/${prodId}/agregar_variante`;
+    const inpCosto = document.getElementById('varCompCosto');
+    if (inpCosto) inpCosto.placeholder = btn.dataset.prodCosto || '0';
+    const inpMin = document.getElementById('varCompMinimo');
+    if (inpMin) inpMin.placeholder = btn.dataset.prodMinimo || '0';
+    const inpSug = document.getElementById('varCompSugerido');
+    if (inpSug) inpSug.placeholder = btn.dataset.prodSugerido || '0';
+
+    const modalEl = document.getElementById('variantesModalCompartido');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    modal.show();
+}
 
 function abrirModalSticker(btn) {
     const prodId = btn.dataset.prodId;
