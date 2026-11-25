@@ -97,10 +97,10 @@
                                 </h6>
                                 <div class="d-flex gap-2 flex-wrap">
                                     <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50">
-                                        <i class="fa-solid fa-paper-plane text-primary me-1"></i> Despachado por: <strong>{{ t.usuario_despacha.nombre_completo or t.usuario_despacha.username if t.usuario_despacha else 'Desconocido' }}</strong>
+                                        <i class="fa-solid fa-paper-plane text-primary me-1"></i> Despachado por: <strong>{{ (t.usuario_despacha.nombre or t.usuario_despacha.nombre_completo or t.usuario_despacha.username) if t.usuario_despacha else 'Desconocido' }}</strong>
                                     </span>
                                     <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
-                                        <i class="fa-solid fa-user-check me-1"></i> Recibido y verificado por: <strong>{{ t.usuario_recibe.nombre_completo or t.usuario_recibe.username if t.usuario_recibe else 'Pendiente en Destino' }}</strong>
+                                        <i class="fa-solid fa-user-check me-1"></i> Recibido y verificado por: <strong>{{ (t.usuario_recibe.nombre or t.usuario_recibe.nombre_completo or t.usuario_recibe.username) if t.usuario_recibe else 'Pendiente en Destino' }}</strong>
                                     </span>
                                 </div>
                             </div>
@@ -228,7 +228,8 @@
                     <th>FECHA ENVÍO</th>
                     <th class="text-center">ESTADO</th>
                     <th class="text-center">ITEMS</th>
-                    <th class="pe-4">RESOLUCIÓN</th>
+                    <th>RESOLUCIÓN</th>
+                    <th width="90" class="text-center pe-4">DETALLE</th>
                 </tr>
             </thead>
             <tbody>
@@ -248,9 +249,11 @@
                         {% endif %}
                     </td>
                     <td class="text-center">
-                        <span class="badge bg-light text-dark border">{{ t.items|length }} prod.</span>
+                        <button type="button" class="badge bg-light text-dark border rounded-pill px-3 py-1 cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalDetalleTraslado{{ t.id }}" title="Ver productos trasladados">
+                            {{ t.items|length }} prod.
+                        </button>
                     </td>
-                    <td class="pe-4">
+                    <td>
                         {% if t.resolved_at %}
                             <small class="text-muted d-block">{{ t.resolved_at.strftime('%d/%m/%Y %H:%M') }}</small>
                             <small class="fw-semibold">Por: {{ t.received_by.nombre if t.received_by else 'Sistema' }}</small>
@@ -258,10 +261,15 @@
                             <small class="text-muted">En tránsito...</small>
                         {% endif %}
                     </td>
+                    <td class="text-center pe-4">
+                        <button type="button" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" data-bs-toggle="modal" data-bs-target="#modalDetalleTraslado{{ t.id }}" title="Ver productos de este traslado">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
+                    <td colspan="8" class="text-center py-5 text-muted">
                         <i class="fa-solid fa-paper-plane fs-1 mb-3 text-muted opacity-50"></i>
                         <p class="mb-0 fw-semibold">No se registran envíos desde esta sede.</p>
                     </td>
@@ -271,6 +279,116 @@
         </table>
     </div>
 </div>
+
+{% for t in enviados %}
+<div class="modal fade" id="modalDetalleTraslado{{ t.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold fs-6">
+                    <i class="fa-solid fa-truck-moving text-info me-2"></i> Detalle del Traslado #{{ t.id }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-start">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-3 border h-100 small">
+                            <div class="text-muted fw-bold text-uppercase mb-1" style="font-size: 0.72rem;">Ruta del Traslado</div>
+                            <div class="fw-bold text-dark fs-6">
+                                {{ t.origin_branch.nombre }} <i class="fa-solid fa-arrow-right text-primary mx-1"></i> {{ t.destination_branch.nombre }}
+                            </div>
+                            <div class="text-muted mt-1">
+                                <i class="fa-regular fa-calendar me-1"></i> Envío: <strong>{{ t.created_at.strftime('%d/%m/%Y %H:%M') }}</strong>
+                            </div>
+                            <div class="text-muted">
+                                <i class="fa-solid fa-user-pen me-1"></i> Despachado por: <strong>{{ (t.usuario_despacha.nombre or t.usuario_despacha.nombre_completo or t.usuario_despacha.username) if t.usuario_despacha else 'Sistema' }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-3 border h-100 small">
+                            <div class="text-muted fw-bold text-uppercase mb-1" style="font-size: 0.72rem;">Estado y Recepción</div>
+                            <div class="mb-1">
+                                {% if t.status == 'PENDIENTE' %}
+                                    <span class="badge bg-warning text-dark rounded-pill px-3 py-1"><i class="fa-solid fa-hourglass-half me-1"></i> Pendiente por Recibir</span>
+                                {% elif t.status == 'ACEPTADO' %}
+                                    <span class="badge bg-success rounded-pill px-3 py-1"><i class="fa-solid fa-check me-1"></i> Aceptado en Destino</span>
+                                {% else %}
+                                    <span class="badge bg-danger rounded-pill px-3 py-1"><i class="fa-solid fa-xmark me-1"></i> Rechazado</span>
+                                {% endif %}
+                            </div>
+                            {% if t.resolved_at %}
+                                <div class="text-muted">
+                                    <i class="fa-regular fa-clock me-1"></i> Resuelto: <strong>{{ t.resolved_at.strftime('%d/%m/%Y %H:%M') }}</strong>
+                                </div>
+                                <div class="text-muted">
+                                    <i class="fa-solid fa-user-check me-1"></i> Por: <strong>{{ (t.usuario_recibe.nombre or t.usuario_recibe.nombre_completo or t.usuario_recibe.username) if t.usuario_recibe else 'Sistema' }}</strong>
+                                </div>
+                            {% else %}
+                                <div class="text-muted fst-italic">Mercancía actualmente en tránsito.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if t.observaciones_entrega or t.notas %}
+                <div class="alert alert-secondary py-2 px-3 mb-2 small rounded-3">
+                    <i class="fa-solid fa-comment-dots text-primary me-1"></i> <strong>Notas de Envío:</strong> {{ t.observaciones_entrega or t.notas }}
+                </div>
+                {% endif %}
+                {% if t.observaciones_recepcion %}
+                <div class="alert alert-warning py-2 px-3 mb-3 small rounded-3">
+                    <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> <strong>Notas de Recepción:</strong> {{ t.observaciones_recepcion }}
+                </div>
+                {% endif %}
+
+                <h6 class="fw-bold small text-uppercase text-muted border-bottom pb-2 mb-2">
+                    <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> Productos Trasladados ({{ t.items|sum(attribute='cantidad') }} unidades en {{ t.items|length }} ítem(s))
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light small">
+                            <tr>
+                                <th>SKU / Código</th>
+                                <th>Producto / Detalle</th>
+                                <th>IMEI / Serial</th>
+                                <th class="text-center" width="110">Cantidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in t.items %}
+                            <tr>
+                                <td class="font-mono small text-muted fw-bold">{{ item.product.sku if item.product else 'S/N' }}</td>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ item.product.nombre if item.product else 'Producto Eliminado' }}</div>
+                                    {% if item.variant %}
+                                        <span class="badge bg-secondary">{{ item.variant.nombre_variante }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="font-mono small">
+                                    {% if item.product and item.product.imei %}
+                                        <span class="badge bg-dark text-white font-mono">IMEI: {{ item.product.imei }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary rounded-pill px-3 py-1 fw-bold">{{ item.cantidad }} uds.</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light py-2">
+                <button type="button" class="btn btn-secondary rounded-pill btn-sm px-4" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 
 <!-- TAB: HISTORIAL -->
 {% elif tab == 'historial' %}
@@ -283,9 +401,11 @@
                     <th>ORIGEN &amp; DESTINO</th>
                     <th>FECHA</th>
                     <th class="text-center">ESTADO</th>
+                    <th class="text-center">ITEMS</th>
                     <th>DESPACHADO POR</th>
                     <th>RECIBIDO Y VERIFICADO POR</th>
-                    <th class="pe-4">NOVEDADES / NOTAS</th>
+                    <th>NOVEDADES / NOTAS</th>
+                    <th width="90" class="text-center pe-4">DETALLE</th>
                 </tr>
             </thead>
             <tbody>
@@ -303,21 +423,26 @@
                             <span class="badge bg-danger rounded-pill px-3 py-1"><i class="fa-solid fa-xmark me-1"></i> Rechazado</span>
                         {% endif %}
                     </td>
+                    <td class="text-center">
+                        <button type="button" class="badge bg-light text-dark border rounded-pill px-3 py-1 cursor-pointer" data-bs-toggle="modal" data-bs-target="#modalDetalleHistorial{{ t.id }}" title="Ver productos trasladados">
+                            {{ t.items|length }} prod.
+                        </button>
+                    </td>
                     <td>
                         <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50">
-                            <i class="fa-solid fa-user text-primary me-1"></i> {{ t.usuario_despacha.nombre_completo or t.usuario_despacha.username if t.usuario_despacha else 'Desconocido' }}
+                            <i class="fa-solid fa-user text-primary me-1"></i> {{ (t.usuario_despacha.nombre or t.usuario_despacha.nombre_completo or t.usuario_despacha.username) if t.usuario_despacha else 'Desconocido' }}
                         </span>
                     </td>
                     <td>
                         {% if t.usuario_recibe %}
                             <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
-                                <i class="fa-solid fa-user-check me-1"></i> {{ t.usuario_recibe.nombre_completo or t.usuario_recibe.username }}
+                                <i class="fa-solid fa-user-check me-1"></i> {{ t.usuario_recibe.nombre or t.usuario_recibe.nombre_completo or t.usuario_recibe.username }}
                             </span>
                         {% else %}
                             <span class="text-muted small">-</span>
                         {% endif %}
                     </td>
-                    <td class="pe-4">
+                    <td>
                         {% if t.observaciones_recepcion %}
                             <div class="small text-warning fw-semibold"><i class="fa-solid fa-triangle-exclamation me-1"></i>{{ t.observaciones_recepcion }}</div>
                         {% endif %}
@@ -325,10 +450,15 @@
                             <div class="small text-muted">{{ t.observaciones_entrega or t.notas }}</div>
                         {% endif %}
                     </td>
+                    <td class="text-center pe-4">
+                        <button type="button" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" data-bs-toggle="modal" data-bs-target="#modalDetalleHistorial{{ t.id }}" title="Ver productos de este traslado">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
+                    <td colspan="9" class="text-center py-5 text-muted">
                         <i class="fa-solid fa-clock-rotate-left fs-1 mb-3 text-muted opacity-50"></i>
                         <p class="mb-0 fw-semibold">No hay traslados históricos cerrados.</p>
                     </td>
@@ -338,5 +468,111 @@
         </table>
     </div>
 </div>
+
+{% for t in historial %}
+<div class="modal fade" id="modalDetalleHistorial{{ t.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-dark text-white py-3">
+                <h5 class="modal-title fw-bold fs-6">
+                    <i class="fa-solid fa-truck-moving text-info me-2"></i> Detalle del Traslado #{{ t.id }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 text-start">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-3 border h-100 small">
+                            <div class="text-muted fw-bold text-uppercase mb-1" style="font-size: 0.72rem;">Ruta del Traslado</div>
+                            <div class="fw-bold text-dark fs-6">
+                                {{ t.origin_branch.nombre }} <i class="fa-solid fa-arrow-right text-primary mx-1"></i> {{ t.destination_branch.nombre }}
+                            </div>
+                            <div class="text-muted mt-1">
+                                <i class="fa-regular fa-calendar me-1"></i> Envío: <strong>{{ t.created_at.strftime('%d/%m/%Y %H:%M') }}</strong>
+                            </div>
+                            <div class="text-muted">
+                                <i class="fa-solid fa-user-pen me-1"></i> Despachado por: <strong>{{ (t.usuario_despacha.nombre or t.usuario_despacha.nombre_completo or t.usuario_despacha.username) if t.usuario_despacha else 'Sistema' }}</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded-3 border h-100 small">
+                            <div class="text-muted fw-bold text-uppercase mb-1" style="font-size: 0.72rem;">Estado y Recepción</div>
+                            <div class="mb-1">
+                                {% if t.status == 'ACEPTADO' %}
+                                    <span class="badge bg-success rounded-pill px-3 py-1"><i class="fa-solid fa-check me-1"></i> Aceptado en Destino</span>
+                                {% else %}
+                                    <span class="badge bg-danger rounded-pill px-3 py-1"><i class="fa-solid fa-xmark me-1"></i> Rechazado</span>
+                                {% endif %}
+                            </div>
+                            {% if t.resolved_at %}
+                                <div class="text-muted">
+                                    <i class="fa-regular fa-clock me-1"></i> Resuelto: <strong>{{ t.resolved_at.strftime('%d/%m/%Y %H:%M') }}</strong>
+                                </div>
+                                <div class="text-muted">
+                                    <i class="fa-solid fa-user-check me-1"></i> Por: <strong>{{ (t.usuario_recibe.nombre or t.usuario_recibe.nombre_completo or t.usuario_recibe.username) if t.usuario_recibe else 'Sistema' }}</strong>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if t.observaciones_entrega or t.notas %}
+                <div class="alert alert-secondary py-2 px-3 mb-2 small rounded-3">
+                    <i class="fa-solid fa-comment-dots text-primary me-1"></i> <strong>Notas de Envío:</strong> {{ t.observaciones_entrega or t.notas }}
+                </div>
+                {% endif %}
+                {% if t.observaciones_recepcion %}
+                <div class="alert alert-warning py-2 px-3 mb-3 small rounded-3">
+                    <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> <strong>Notas de Recepción:</strong> {{ t.observaciones_recepcion }}
+                </div>
+                {% endif %}
+
+                <h6 class="fw-bold small text-uppercase text-muted border-bottom pb-2 mb-2">
+                    <i class="fa-solid fa-boxes-stacked text-primary me-1"></i> Productos Trasladados ({{ t.items|sum(attribute='cantidad') }} unidades en {{ t.items|length }} ítem(s))
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light small">
+                            <tr>
+                                <th>SKU / Código</th>
+                                <th>Producto / Detalle</th>
+                                <th>IMEI / Serial</th>
+                                <th class="text-center" width="110">Cantidad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in t.items %}
+                            <tr>
+                                <td class="font-mono small text-muted fw-bold">{{ item.product.sku if item.product else 'S/N' }}</td>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ item.product.nombre if item.product else 'Producto Eliminado' }}</div>
+                                    {% if item.variant %}
+                                        <span class="badge bg-secondary">{{ item.variant.nombre_variante }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="font-mono small">
+                                    {% if item.product and item.product.imei %}
+                                        <span class="badge bg-dark text-white font-mono">IMEI: {{ item.product.imei }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-primary rounded-pill px-3 py-1 fw-bold">{{ item.cantidad }} uds.</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light py-2">
+                <button type="button" class="btn btn-secondary rounded-pill btn-sm px-4" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 {% endif %}
 {% endblock %}
