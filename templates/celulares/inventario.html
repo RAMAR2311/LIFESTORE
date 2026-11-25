@@ -663,14 +663,22 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body py-3">
                     <p class="small text-muted mb-3">
-                        Selecciona un modelo o referencia para actualizar los precios (Costo, Mínimo y/o Sugerido) de todos los celulares activos en stock con esa referencia.
+                        Selecciona la referencia y la <strong>capacidad (GB/TB)</strong> para actualizar los precios únicamente de los equipos que coincidan con esa capacidad.
                     </p>
 
                     <!-- Selector de Referencia -->
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted text-uppercase">Referencia / Modelo *</label>
+                        <label class="form-label small fw-bold text-muted text-uppercase">1. Referencia / Modelo *</label>
                         <select name="modelo_celular" id="select_modelo_masivo" class="form-select bg-light border fw-semibold" required onchange="onSelectModeloMasivo(this)">
                             <option value="">-- Cargando referencias... --</option>
+                        </select>
+                    </div>
+
+                    <!-- Selector de Capacidad (Memoria) -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted text-uppercase">2. Capacidad / Memoria *</label>
+                        <select name="memoria_celular" id="select_memoria_masivo" class="form-select bg-light border fw-bold text-primary" required disabled onchange="onSelectMemoriaMasivo()">
+                            <option value="">-- Primero selecciona una referencia --</option>
                         </select>
                         <div id="info_modelo_badge" class="mt-2 small text-primary fw-semibold" style="display: none;"></div>
                     </div>
@@ -751,21 +759,71 @@ async function cargarModelosPrecios() {
 
 function onSelectModeloMasivo(sel) {
     const val = sel.value;
+    const selMem = document.getElementById('select_memoria_masivo');
     const badge = document.getElementById('info_modelo_badge');
     const inputSug = document.getElementById('nuevo_precio_sugerido');
     const inputMin = document.getElementById('nuevo_precio_minimo');
     const inputCos = document.getElementById('nuevo_precio_costo');
 
+    if (!selMem) return;
+    selMem.innerHTML = '';
+    badge.style.display = 'none';
+
     const item = catalogoModelosData.find(m => m.modelo === val);
-    if (item) {
-        badge.style.display = 'block';
-        badge.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i> Equipos en stock: <strong>${item.cantidad}</strong>. Precios actuales aprox: Sugerido $${Math.round(item.precio_sugerido).toLocaleString()} | Mínimo $${Math.round(item.precio_minimo).toLocaleString()}`;
-        if (inputSug) inputSug.value = Math.round(item.precio_sugerido);
-        if (inputMin) inputMin.value = Math.round(item.precio_minimo);
-        if (inputCos) inputCos.value = Math.round(item.precio_costo);
-    } else {
-        badge.style.display = 'none';
+    if (!item) {
+        selMem.disabled = true;
+        selMem.innerHTML = '<option value="">-- Primero selecciona una referencia --</option>';
+        return;
     }
+
+    selMem.disabled = false;
+    const caps = item.capacidades || [];
+
+    if (caps.length > 1) {
+        selMem.innerHTML = '<option value="">-- Selecciona la Capacidad (GB / TB) --</option>';
+        caps.forEach(c => {
+            selMem.innerHTML += `<option value="${c.key}">${c.label} (${c.cantidad} en stock) — Sug: $${Math.round(c.precio_sugerido).toLocaleString()}</option>`;
+        });
+        selMem.innerHTML += `<option value="__TODAS__">⚡ Todas las capacidades de ${item.modelo} (${item.cantidad} equipos)</option>`;
+    } else if (caps.length === 1) {
+        const c = caps[0];
+        selMem.innerHTML = `<option value="${c.key}" selected>${c.label} (${c.cantidad} en stock)</option>`;
+        onSelectMemoriaMasivo();
+    } else {
+        selMem.innerHTML = `<option value="__TODAS__" selected>Todas (${item.cantidad} en stock)</option>`;
+        onSelectMemoriaMasivo();
+    }
+}
+
+function onSelectMemoriaMasivo() {
+    const valMod = document.getElementById('select_modelo_masivo')?.value;
+    const valMem = document.getElementById('select_memoria_masivo')?.value;
+    const badge = document.getElementById('info_modelo_badge');
+    const inputSug = document.getElementById('nuevo_precio_sugerido');
+    const inputMin = document.getElementById('nuevo_precio_minimo');
+    const inputCos = document.getElementById('nuevo_precio_costo');
+
+    const item = catalogoModelosData.find(m => m.modelo === valMod);
+    if (!item || !valMem) {
+        if (badge) badge.style.display = 'none';
+        return;
+    }
+
+    let targetData = item;
+    let labelCap = 'Todas las capacidades';
+    if (valMem !== '__TODAS__' && item.capacidades) {
+        const foundCap = item.capacidades.find(c => c.key === valMem);
+        if (foundCap) {
+            targetData = foundCap;
+            labelCap = foundCap.label;
+        }
+    }
+
+    badge.style.display = 'block';
+    badge.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i> <strong>${item.modelo} [${labelCap}]</strong> — Equipos a modificar: <strong>${targetData.cantidad}</strong>.<br>Precios actuales: Sugerido <strong>$${Math.round(targetData.precio_sugerido).toLocaleString()}</strong> | Mínimo <strong>$${Math.round(targetData.precio_minimo).toLocaleString()}</strong>`;
+    if (inputSug) inputSug.value = Math.round(targetData.precio_sugerido);
+    if (inputMin) inputMin.value = Math.round(targetData.precio_minimo);
+    if (inputCos) inputCos.value = Math.round(targetData.precio_costo);
 }
 
 function toggleInputPrecio(inputId, enabled) {

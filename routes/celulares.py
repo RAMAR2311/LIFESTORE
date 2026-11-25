@@ -719,9 +719,10 @@ def enviar_soporte_lote():
 @celulares_bp.route('/api/referencias-modelos', methods=['GET'])
 @login_required
 def api_referencias_modelos():
-    """Devuelve las referencias de celulares con conteo de equipos activos y precios promedio."""
-    modelos = db.session.query(
+    """Devuelve las referencias de celulares desglosadas por capacidad (memoria) con conteo y precios actuales."""
+    filas = db.session.query(
         Product.modelo_celular,
+        Product.memoria,
         db.func.count(Product.id).label('total'),
         db.func.min(Product.precio_minimo).label('min_p_minimo'),
         db.func.max(Product.precio_minimo).label('max_p_minimo'),
@@ -734,25 +735,65 @@ def api_referencias_modelos():
         Product.modelo_celular != None,
         Product.modelo_celular != '',
         Product.cantidad_stock > 0
-    ).group_by(Product.modelo_celular).order_by(Product.modelo_celular.asc()).all()
+    ).group_by(Product.modelo_celular, Product.memoria).order_by(Product.modelo_celular.asc(), Product.memoria.asc()).all()
 
-    data = []
-    for m in modelos:
-        data.append({
-            'modelo': m.modelo_celular,
-            'cantidad': m.total,
-            'precio_minimo': float(m.max_p_minimo or 0),
-            'precio_sugerido': float(m.max_p_sugerido or 0),
-            'precio_costo': float(m.max_p_costo or 0)
-        })
+    modelos_map = {}
+    for f in filas:
+        mod_name = f.modelo_celular
+        mem_raw = (f.memoria or '').strip()
+        mem_key = mem_raw if (mem_raw and mem_raw.upper() != 'N/A') else '__SIN_MEMORIA__'
+        mem_label = mem_raw if (mem_raw and mem_raw.upper() != 'N/A') else 'Sin capacidad / N/A'
+
+        if mod_name not in modelos_map:
+            modelos_map[mod_name] = {
+                'modelo': mod_name,
+                'cantidad': 0,
+                'precio_minimo': 0.0,
+                'precio_sugerido': 0.0,
+                'precio_costo': 0.0,
+                'capacidades': []
+            }
+
+        entry = modelos_map[mod_name]
+        entry['cantidad'] += f.total
+        p_min = float(f.max_p_minimo or 0)
+        p_sug = float(f.max_p_sugerido or 0)
+        p_cos = float(f.max_p_costo or 0)
+
+        if p_min > entry['precio_minimo']:
+            entry['precio_minimo'] = p_min
+        if p_sug > entry['precio_sugerido']:
+            entry['precio_sugerido'] = p_sug
+        if p_cos > entry['precio_costo']:
+            entry['precio_costo'] = p_cos
+
+        # Unificar si hay dos variantes con el mismo mem_key (ej. None y '')
+        cap_existente = next((c for c in entry['capacidades'] if c['key'].lower() == mem_key.lower()), None)
+        if cap_existente:
+            cap_existente['cantidad'] += f.total
+            cap_existente['precio_minimo'] = max(cap_existente['precio_minimo'], p_min)
+            cap_existente['precio_sugerido'] = max(cap_existente['precio_sugerido'], p_sug)
+            cap_existente['precio_costo'] = max(cap_existente['precio_costo'], p_cos)
+        else:
+            entry['capacidades'].append({
+                'key': mem_key,
+                'label': mem_label,
+                'cantidad': f.total,
+                'precio_minimo': p_min,
+                'precio_sugerido': p_sug,
+                'precio_costo': p_cos
+            })
+
+    data = list(modelos_map.values())
     return jsonify({'success': True, 'modelos': data})
 
 @celulares_bp.route('/editar_precios_masivo', methods=['POST'])
 @login_required
 @admin_required
 def editar_precios_masivo():
-    """Actualiza masivamente los precios (costo, mínimo y sugerido) de una referencia seleccionada."""
+    """Actualiza masivamente los precios (costo, mínimo y sugerido) de una referencia y capacidad seleccionada."""
     modelo_celular = request.form.get('modelo_celular', '').strip()
+    memoria_celular = request.form.get('memoria_celular', '').strip()
     aplicar_costo = request.form.get('aplicar_costo') == 'on'
     aplicar_minimo = request.form.get('aplicar_minimo') == 'on'
     aplicar_sugerido = request.form.get('aplicar_sugerido') == 'on'
@@ -765,19 +806,43 @@ def editar_precios_masivo():
         flash('Debe seleccionar una referencia o modelo.', 'warning')
         return redirect(url_for('celulares_bp.inventario'))
 
+    if not memoria_celular:
+        flash('Debe seleccionar la capacidad (memoria) que desea actualizar.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
+
     if not (aplicar_costo or aplicar_minimo or aplicar_sugerido):
         flash('Debe marcar al menos un precio para actualizar (Costo, Mínimo o Sugerido).', 'warning')
         return redirect(url_for('celulares_bp.inventario'))
 
-    # Buscar celulares con ese modelo
-    celulares = Product.query.filter(
+    # Buscar celulares activos con ese modelo y capacidad
+    query_cel = Product.query.filter(
         Product.tipo_inventario == 'celulares',
         Product.modelo_celular == modelo_celular,
         Product.cantidad_stock > 0
-    ).all()
+    )
+
+    if memoria_celular == '__SIN_MEMORIA__':
+        from sqlalchemy import or_
+        query_cel = query_cel.filter(
+            or_(
+                Product.memoria == None,
+                Product.memoria == '',
+                db.func.upper(db.func.trim(Product.memoria)) == 'N/A'
+            )
+        )
+        cap_desc = 'Sin capacidad / N/A'
+    elif memoria_celular != '__TODAS__':
+        query_cel = query_cel.filter(
+            db.func.lower(db.func.trim(Product.memoria)) == memoria_celular.lower()
+        )
+        cap_desc = memoria_celular
+    else:
+        cap_desc = 'Todas las capacidades'
+
+    celulares = query_cel.all()
 
     if not celulares:
-        flash(f'No se encontraron celulares activos de la referencia "{modelo_celular}".', 'info')
+        flash(f'No se encontraron celulares activos de la referencia "{modelo_celular}" ({cap_desc}).', 'info')
         return redirect(url_for('celulares_bp.inventario'))
 
     count = 0
@@ -793,7 +858,7 @@ def editar_precios_masivo():
     db.session.commit()
 
     from models import AuditLog
-    detalles_cambio = f"Ref: {modelo_celular} | Total: {count} equipos | "
+    detalles_cambio = f"Ref: {modelo_celular} ({cap_desc}) | Total: {count} equipos | "
     if aplicar_sugerido and sugerido_str: detalles_cambio += f"Sugerido: ${sugerido_str} "
     if aplicar_minimo and minimo_str: detalles_cambio += f"Minimo: ${minimo_str} "
     if aplicar_costo and costo_str: detalles_cambio += f"Costo: ${costo_str}"
@@ -801,11 +866,11 @@ def editar_precios_masivo():
     AuditLog.registrar(
         action='ACTUALIZACION_MASIVA_PRECIOS',
         user_id=current_user.id,
-        motivo=f'Edición masiva de precios para la referencia {modelo_celular} ({count} equipos)',
+        motivo=f'Edición masiva de precios para {modelo_celular} [{cap_desc}] ({count} equipos)',
         detalles=detalles_cambio
     )
 
-    flash(f'¡Precios actualizados con éxito en {count} celular(es) de la referencia "{modelo_celular}"!', 'success')
+    flash(f'¡Precios actualizados con éxito en {count} celular(es) de "{modelo_celular}" ({cap_desc})!', 'success')
     return redirect(url_for('celulares_bp.inventario', referencia=modelo_celular))
 
 @celulares_bp.route('/clientes')
