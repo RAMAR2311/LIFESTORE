@@ -4,8 +4,50 @@ import pytz
 from werkzeug.utils import secure_filename
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, session
 from flask_login import login_required, current_user
-from models import db, Provider, ProviderInvoice, ProviderPayment, Branch, Expense, obtener_hora_bogota
+from models import db, Provider, ProviderInvoice, ProviderPayment, Branch, Expense, Sale, CashShift, obtener_hora_bogota
 from decorators import admin_required
+
+def _obtener_locales_con_saldo():
+    """Retorna únicamente los locales comerciales (tipo='tienda', excluyendo bodega) que tengan saldo a favor > 0."""
+    hoy = obtener_hora_bogota().date()
+    locales_tienda = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.nombre.asc()).all()
+    locales_con_saldo = []
+
+    for b in locales_tienda:
+        # 1. Saldo del día / turno actual en el local
+        turno_abierto = CashShift.query.filter_by(branch_id=b.id, estado='ABIERTA').first()
+        base_hoy = float(turno_abierto.base_inicial_efectivo or 0) if turno_abierto else 0.0
+
+        ventas_hoy = db.session.query(db.func.coalesce(db.func.sum(Sale.monto_total), 0)).filter(
+            Sale.branch_id == b.id,
+            db.func.date(Sale.fecha_venta) == hoy
+        ).scalar() or 0
+
+        gastos_hoy = db.session.query(db.func.coalesce(db.func.sum(Expense.monto), 0)).filter(
+            Expense.branch_id == b.id,
+            db.func.date(Expense.fecha_gasto) == hoy
+        ).scalar() or 0
+
+        saldo_hoy = base_hoy + float(ventas_hoy) - float(gastos_hoy)
+
+        # 2. Saldo acumulado histórico de facturación del local
+        ventas_total = db.session.query(db.func.coalesce(db.func.sum(Sale.monto_total), 0)).filter(
+            Sale.branch_id == b.id
+        ).scalar() or 0
+
+        gastos_total = db.session.query(db.func.coalesce(db.func.sum(Expense.monto), 0)).filter(
+            Expense.branch_id == b.id
+        ).scalar() or 0
+
+        saldo_acumulado = float(ventas_total) - float(gastos_total)
+        saldo_disponible = max(saldo_hoy, saldo_acumulado)
+
+        if saldo_disponible > 0:
+            b.saldo_disponible = saldo_disponible
+            b.saldo_hoy = max(0.0, saldo_hoy)
+            locales_con_saldo.append(b)
+
+    return locales_con_saldo
 
 providers_bp = Blueprint('providers_bp', __name__)
 
@@ -146,7 +188,7 @@ def detail(id):
         current_app.logger.error(f"Error cargando celulares del proveedor: {err}", exc_info=True)
         celulares = []
 
-    sucursales = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    sucursales = _obtener_locales_con_saldo()
     active_b_id = session.get('active_branch_id') or current_user.branch_id
 
     return render_template('providers/detail.html', 
@@ -229,24 +271,22 @@ def add_payment(id):
 
     branch_id_raw = request.form.get('branch_id', '').strip()
     if current_user.rol != 'admin':
-        # Si lo registra desde un Local (vendedor / bodega), se asocia automáticamente a su propio Local
+        # Si lo registra desde un Local, se asocia automáticamente a su propio Local
         branch_id = current_user.branch_id
         if not branch_id:
-            b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            b_def = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
             branch_id = b_def.id if b_def else None
     else:
-        # Si es Admin, debe haber escogido explícitamente un Local o 'CAJA_MAYOR'
-        if not branch_id_raw:
-            flash('Debes seleccionar de qué Punto / Local o Caja salió el dinero del abono.', 'danger')
+        # Si es Admin, debe haber escogido obligatoriamente un Local (tipo='tienda') con saldo a favor
+        if not branch_id_raw or not branch_id_raw.isdigit():
+            flash('Debes seleccionar el Local (con saldo a favor) de donde salió el dinero del abono.', 'danger')
             return redirect(url_for('providers_bp.detail', id=id))
-        if branch_id_raw == 'CAJA_MAYOR':
-            branch_id = None
-        elif branch_id_raw.isdigit():
-            branch_id = int(branch_id_raw)
-        else:
-            branch_id = None
+        branch_id = int(branch_id_raw)
 
     branch_obj = Branch.query.get(branch_id) if branch_id else None
+    if not branch_obj or branch_obj.tipo != 'tienda':
+        flash('El abono solo puede salir de un Local comercial que facture (no de Bodega).', 'danger')
+        return redirect(url_for('providers_bp.detail', id=id))
 
     nuevo_pago = ProviderPayment(
         provider_id=id,
@@ -478,13 +518,15 @@ def edit_payment(payment_id):
     if current_user.rol != 'admin' and current_user.branch_id:
         branch_id = current_user.branch_id
     else:
-        if branch_id_raw == 'CAJA_MAYOR' or not branch_id_raw:
-            branch_id = None
-        elif branch_id_raw.isdigit():
-            branch_id = int(branch_id_raw)
-        else:
-            branch_id = None
+        if not branch_id_raw or not branch_id_raw.isdigit():
+            flash('Debes seleccionar el Local de donde salió el dinero del abono.', 'danger')
+            return redirect(url_for('providers_bp.detail', id=provider_id))
+        branch_id = int(branch_id_raw)
+
     branch_obj = Branch.query.get(branch_id) if branch_id else None
+    if not branch_obj or branch_obj.tipo != 'tienda':
+        flash('El abono solo puede asignarse a un Local comercial que facture (no a Bodega).', 'danger')
+        return redirect(url_for('providers_bp.detail', id=provider_id))
 
     pago.monto_abonado = monto_abonado
     pago.observacion = observacion

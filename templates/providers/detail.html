@@ -3,17 +3,17 @@
 {% block title %}Cuenta Corriente - {{ proveedor.nombre }}{% endblock %}
 
 {% block content %}
-<!-- Cabecera de Navegación -->
-<div class="d-flex align-items-center justify-content-between mb-4">
-    <div class="d-flex align-items-center gap-3">
-        <a href="{{ url_for('providers_bp.list_providers') }}" class="btn btn-outline-secondary rounded-pill px-3">
+<!-- Cabecera de Navegación Responsiva (Celular, Tablet, PC y PWA) -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3">
+        <a href="{{ url_for('providers_bp.list_providers') }}" class="btn btn-outline-secondary rounded-pill px-3 btn-sm btn-md-normal">
             <i class="fa-solid fa-arrow-left me-1"></i> Volver a Proveedores
         </a>
         <div>
-            <h2 class="fw-bold m-0 text-brand-black">
+            <h2 class="fw-bold m-0 text-brand-black fs-3">
                 <i class="fa-solid fa-truck-fast text-brand-blue me-2"></i>{{ proveedor.nombre }}
                 {% if proveedor.empresa %}
-                <span class="badge bg-light text-secondary border fs-6 ms-2">{{ proveedor.empresa }}</span>
+                <span class="badge bg-light text-secondary border fs-6 ms-1">{{ proveedor.empresa }}</span>
                 {% endif %}
             </h2>
             <div class="text-muted small mt-1">
@@ -25,10 +25,11 @@
         </div>
     </div>
     
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
         <a href="{{ url_for('bancos_bp.index') }}" class="btn btn-outline-success rounded-pill px-3 shadow-sm fw-bold">
             <i class="fa-solid fa-building-columns me-1"></i> Ir a Bancos
         </a>
+        {% if current_user.rol == 'admin' %}
         <button type="button" class="btn btn-outline-secondary rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalEditarProveedorDetail" title="Editar Proveedor">
             <i class="fa-solid fa-pen-to-square me-1"></i> Editar Proveedor
         </button>
@@ -38,6 +39,7 @@
                 <i class="fa-solid fa-trash-can"></i>
             </button>
         </form>
+        {% endif %}
     </div>
 </div>
 
@@ -284,8 +286,8 @@
                                 </div>
                                 {% else %}
                                 <div class="mt-1">
-                                    <span class="badge bg-light text-muted border rounded-pill px-2 py-0" style="font-size: 0.68rem;">
-                                        Caja Mayor / Global
+                                    <span class="badge bg-warning bg-opacity-10 text-dark border border-warning rounded-pill px-2 py-0" style="font-size: 0.68rem;" title="Edita este abono para asignarle su Local">
+                                        Sin local asignado
                                     </span>
                                 </div>
                                 {% endif %}
@@ -323,22 +325,22 @@
                                                         </div>
                                                     </div>
                                                     <div class="mb-3">
-                                                        <label class="form-label fw-bold">¿De qué Punto / Local salió el dinero? <span class="text-danger">*</span></label>
+                                                        <label class="form-label fw-bold">¿De qué Local salió el dinero? <span class="text-danger">*</span></label>
                                                         {% if current_user.rol != 'admin' and current_user.branch %}
                                                         <input type="hidden" name="branch_id" value="{{ current_user.branch_id }}">
                                                         <input type="text" class="form-control bg-light fw-bold text-primary" value="🏪 {{ current_user.branch.nombre }} ({{ current_user.branch.codigo }})" readonly>
                                                         {% else %}
-                                                        <select name="branch_id" class="form-select bg-light fw-semibold" required>
+                                                        <select name="branch_id" class="form-select bg-light fw-semibold border-primary" required>
+                                                            <option value="" disabled {% if not p.branch_id %}selected{% endif %}>-- Selecciona el Local con saldo a favor --</option>
                                                             {% for b in sucursales %}
                                                             <option value="{{ b.id }}" {% if p.branch_id == b.id %}selected{% endif %}>
-                                                                {% if b.tipo == 'bodega' %}📦{% else %}🏪{% endif %} {{ b.nombre }} ({{ b.codigo }})
+                                                                🏪 {{ b.nombre }} — Saldo a favor: ${{ (b.saldo_disponible or 0)|cop }}
                                                             </option>
                                                             {% endfor %}
-                                                            <option value="CAJA_MAYOR" {% if not p.branch_id %}selected{% endif %}>🏦 Caja Mayor / Bancos Generales (Global)</option>
                                                         </select>
                                                         {% endif %}
                                                         <small class="text-muted d-block mt-1" style="font-size: 0.74rem;">
-                                                            Si eliges un Local (ej. LOCAL 2140), esta salida se verá reflejada en el Arqueo y Cierre de Caja de ese local.
+                                                            Solo se listan los locales que facturan y tienen saldo a favor disponible.
                                                         </small>
                                                     </div>
                                                     <div class="mb-3">
@@ -514,7 +516,7 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">1. ¿De qué Punto / Local sale el dinero? <span class="text-danger">*</span></label>
+                        <label class="form-label fw-bold">1. ¿De qué Local sale el dinero? <span class="text-danger">*</span></label>
                         {% if current_user.rol != 'admin' and current_user.branch %}
                         <input type="hidden" name="branch_id" value="{{ current_user.branch_id }}">
                         <div class="input-group">
@@ -526,16 +528,15 @@
                         </small>
                         {% else %}
                         <select name="branch_id" class="form-select bg-light fw-semibold border-primary" required>
-                            <option value="" disabled selected>-- Selecciona de qué Punto / Local salió el dinero --</option>
+                            <option value="" disabled selected>-- Selecciona el Local de donde salió el dinero --</option>
                             {% for b in sucursales %}
                             <option value="{{ b.id }}">
-                                {% if b.tipo == 'bodega' %}📦{% else %}🏪{% endif %} {{ b.nombre }} ({{ b.codigo }})
+                                🏪 {{ b.nombre }} ({{ b.codigo }}) — Saldo a favor: ${{ (b.saldo_disponible or 0)|cop }}
                             </option>
                             {% endfor %}
-                            <option value="CAJA_MAYOR">🏦 Caja Mayor / Cuentas Generales (Sin descontar de local)</option>
                         </select>
                         <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
-                            <i class="fa-solid fa-shop text-primary me-1"></i> Si seleccionas un Local (ej. <strong>LOCAL 2140</strong>), se descontará automáticamente en el <strong>Arqueo y Cierre de Caja</strong> de ese local sin tener que crearlo aparte como gasto.
+                            <i class="fa-solid fa-shop text-primary me-1"></i> Solo aparecen los <strong>Locales que facturan y tienen saldo a favor</strong>. Se reflejará automáticamente en el <strong>Arqueo y Cierre de Caja</strong> del local elegido.
                         </small>
                         {% endif %}
                     </div>
