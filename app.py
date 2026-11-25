@@ -352,7 +352,9 @@ def create_app():
             "ALTER TABLE device_exchanges ALTER COLUMN product_salida_id DROP NOT NULL;",
             "ALTER TABLE device_exchanges ADD COLUMN tipo_flujo VARCHAR(30) DEFAULT 'SALIDA_PRIMERO';",
             "UPDATE device_exchanges SET tipo_flujo = 'SALIDA_PRIMERO' WHERE tipo_flujo IS NULL;",
-            "UPDATE products SET memoria = UPPER(REPLACE(TRIM(memoria), ' ', '')) WHERE memoria IS NOT NULL AND TRIM(memoria) != '' AND UPPER(TRIM(memoria)) != 'N/A';"
+            "UPDATE products SET memoria = UPPER(REPLACE(TRIM(memoria), ' ', '')) WHERE memoria IS NOT NULL AND TRIM(memoria) != '' AND UPPER(TRIM(memoria)) != 'N/A';",
+            "ALTER TABLE provider_payments ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
+            "ALTER TABLE provider_payments ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;"
         ]
         for q in queries:
             try:

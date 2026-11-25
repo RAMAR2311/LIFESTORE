@@ -2,9 +2,9 @@ import os
 from datetime import datetime
 import pytz
 from werkzeug.utils import secure_filename
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, session
 from flask_login import login_required, current_user
-from models import db, Provider, ProviderInvoice, ProviderPayment
+from models import db, Provider, ProviderInvoice, ProviderPayment, Branch, Expense, obtener_hora_bogota
 from decorators import admin_required
 
 providers_bp = Blueprint('providers_bp', __name__)
@@ -16,14 +16,15 @@ def allowed_file(filename):
 
 @providers_bp.route('/')
 @login_required
-@admin_required
 def list_providers():
+    if current_user.rol == 'coordinador':
+        flash('Tu perfil no tiene acceso a Proveedores.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
     proveedores = Provider.query.order_by(Provider.nombre.asc()).all()
     return render_template('providers/list.html', proveedores=proveedores)
 
 @providers_bp.route('/crear', methods=['POST'])
 @login_required
-@admin_required
 def create_provider():
     nombre = request.form.get('nombre', '').strip()
     empresa = request.form.get('empresa', '').strip()
@@ -80,8 +81,10 @@ def create_provider_api():
 
 @providers_bp.route('/<int:id>')
 @login_required
-@admin_required
 def detail(id):
+    if current_user.rol == 'coordinador':
+        flash('Tu perfil no tiene acceso a Proveedores.', 'warning')
+        return redirect(url_for('celulares_bp.inventario'))
     proveedor = Provider.query.get_or_404(id)
     # The models use @property to calculate totals automatically.
     facturas = ProviderInvoice.query.filter_by(provider_id=id).order_by(ProviderInvoice.fecha_factura.desc()).all()
@@ -143,15 +146,19 @@ def detail(id):
         current_app.logger.error(f"Error cargando celulares del proveedor: {err}", exc_info=True)
         celulares = []
 
+    sucursales = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    active_b_id = session.get('active_branch_id') or current_user.branch_id
+
     return render_template('providers/detail.html', 
                            proveedor=proveedor, 
                            facturas=facturas, 
                            pagos=pagos,
-                           celulares=celulares)
+                           celulares=celulares,
+                           sucursales=sucursales,
+                           active_b_id=active_b_id)
 
 @providers_bp.route('/<int:id>/invoice', methods=['POST'])
 @login_required
-@admin_required
 def add_invoice(id):
     proveedor = Provider.query.get_or_404(id)
     
@@ -202,7 +209,6 @@ def add_invoice(id):
 
 @providers_bp.route('/<int:id>/payment', methods=['POST'])
 @login_required
-@admin_required
 def add_payment(id):
     proveedor = Provider.query.get_or_404(id)
     
@@ -216,10 +222,35 @@ def add_payment(id):
         return redirect(url_for('providers_bp.detail', id=id))
 
     observacion = request.form.get('observacion', '').strip()
-    metodo_pago = request.form.get('metodo_pago', 'efectivo').strip()
-    
+    metodo_pago = request.form.get('metodo_pago', '').strip()
+    if not metodo_pago:
+        flash('Debes seleccionar el método de pago con el que se realizó el abono.', 'danger')
+        return redirect(url_for('providers_bp.detail', id=id))
+
+    branch_id_raw = request.form.get('branch_id', '').strip()
+    if current_user.rol != 'admin':
+        # Si lo registra desde un Local (vendedor / bodega), se asocia automáticamente a su propio Local
+        branch_id = current_user.branch_id
+        if not branch_id:
+            b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+            branch_id = b_def.id if b_def else None
+    else:
+        # Si es Admin, debe haber escogido explícitamente un Local o 'CAJA_MAYOR'
+        if not branch_id_raw:
+            flash('Debes seleccionar de qué Punto / Local o Caja salió el dinero del abono.', 'danger')
+            return redirect(url_for('providers_bp.detail', id=id))
+        if branch_id_raw == 'CAJA_MAYOR':
+            branch_id = None
+        elif branch_id_raw.isdigit():
+            branch_id = int(branch_id_raw)
+        else:
+            branch_id = None
+
+    branch_obj = Branch.query.get(branch_id) if branch_id else None
+
     nuevo_pago = ProviderPayment(
         provider_id=id,
+        branch_id=branch_id,
         monto_abonado=monto_abonado,
         metodo_pago=metodo_pago,
         observacion=observacion
@@ -228,23 +259,48 @@ def add_payment(id):
     db.session.add(nuevo_pago)
     db.session.flush()
 
+    # Si el abono se hizo con dinero de un Local / Sede específica, reflejarlo en los Gastos / Arqueo de ese Local
+    if branch_obj:
+        desc_gasto = f"Abono a Proveedor {proveedor.nombre}"
+        if observacion:
+            desc_gasto += f": {observacion}"
+        desc_gasto += f" (Abono #{nuevo_pago.id})"
+
+        gasto_local = Expense(
+            usuario_id=current_user.id,
+            tipo_gasto='Gasto Diario',
+            categoria='Abono a Proveedor',
+            descripcion=desc_gasto[:255],
+            monto=monto_abonado,
+            metodo_pago=metodo_pago,
+            fecha_gasto=nuevo_pago.fecha_pago or obtener_hora_bogota(),
+            sucursal=branch_obj.nombre,
+            branch_id=branch_obj.id
+        )
+        db.session.add(gasto_local)
+        db.session.flush()
+        nuevo_pago.expense_id = gasto_local.id
+
     # --- INTEGRACIÓN CON BANCOS: DESCONTAR ABONO DEL MÉTODO ESCOGIDO ---
     from services.bank_service import registrar_movimiento_banco
-    proveedor = Provider.query.get(id)
     nombre_prov = proveedor.nombre if proveedor else f'ID {id}'
+    sede_txt = f" [Desde: {branch_obj.nombre}]" if branch_obj else " [Caja Mayor]"
     registrar_movimiento_banco(
         codigo_metodo=metodo_pago,
         monto=monto_abonado,
         tipo_movimiento='EGRESO',
         origen='ABONO_PROVEEDOR',
-        descripcion=f'Abono a Proveedor: {nombre_prov} (Abono #{nuevo_pago.id})',
+        descripcion=f'Abono a Proveedor: {nombre_prov}{sede_txt} (Abono #{nuevo_pago.id})',
         referencia_id=nuevo_pago.id,
         usuario_id=current_user.id
     )
 
     db.session.commit()
     
-    flash(f'Abono registrado correctamente y descontado de Bancos ({metodo_pago.capitalize()}).', 'success')
+    if branch_obj:
+        flash(f'Abono registrado correctamente, descontado de Bancos ({metodo_pago.capitalize()}) y reflejado en el cierre/gastos de {branch_obj.nombre}.', 'success')
+    else:
+        flash(f'Abono registrado correctamente y descontado de Bancos ({metodo_pago.capitalize()}).', 'success')
     return redirect(url_for('providers_bp.detail', id=id))
 
 @providers_bp.route('/eliminar/<int:id>', methods=['POST'])
@@ -307,9 +363,14 @@ def delete_payment(payment_id):
         from services.bank_service import revertir_movimiento_banco
         revertir_movimiento_banco(origen='ABONO_PROVEEDOR', referencia_id=payment_id)
 
+        if pago.expense_id:
+            gasto_asoc = Expense.query.get(pago.expense_id)
+            if gasto_asoc:
+                db.session.delete(gasto_asoc)
+
         db.session.delete(pago)
         db.session.commit()
-        flash('Abono eliminado correctamente y reversado en Bancos.', 'success')
+        flash('Abono eliminado correctamente y reversado en Bancos y en el Local.', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error al eliminar el abono: {str(e)}', 'danger')
@@ -397,10 +458,10 @@ def edit_invoice(invoice_id):
 
 @providers_bp.route('/payment/editar/<int:payment_id>', methods=['POST'])
 @login_required
-@admin_required
 def edit_payment(payment_id):
     pago = ProviderPayment.query.get_or_404(payment_id)
     provider_id = pago.provider_id
+    proveedor = Provider.query.get(provider_id)
 
     try:
         monto_abonado = float(request.form.get('monto_abonado', 0))
@@ -411,12 +472,84 @@ def edit_payment(payment_id):
         flash('El monto del abono debe ser mayor a 0.', 'danger')
         return redirect(url_for('providers_bp.detail', id=provider_id))
 
+    observacion = request.form.get('observacion', '').strip()
+    metodo_pago = request.form.get('metodo_pago', pago.metodo_pago or 'efectivo').strip()
+    branch_id_raw = request.form.get('branch_id', '').strip()
+    if current_user.rol != 'admin' and current_user.branch_id:
+        branch_id = current_user.branch_id
+    else:
+        if branch_id_raw == 'CAJA_MAYOR' or not branch_id_raw:
+            branch_id = None
+        elif branch_id_raw.isdigit():
+            branch_id = int(branch_id_raw)
+        else:
+            branch_id = None
+    branch_obj = Branch.query.get(branch_id) if branch_id else None
+
     pago.monto_abonado = monto_abonado
-    pago.observacion = request.form.get('observacion', '').strip()
+    pago.observacion = observacion
+    pago.metodo_pago = metodo_pago
+    pago.branch_id = branch_id
 
     try:
+        # Sincronizar o crear/eliminar el Gasto del Local asociado para que se refleje en el Arqueo y Cierre de ese Local
+        desc_gasto = f"Abono a Proveedor {proveedor.nombre if proveedor else ''}".strip()
+        if observacion:
+            desc_gasto += f": {observacion}"
+        desc_gasto += f" (Abono #{pago.id})"
+
+        if branch_obj:
+            gasto_local = Expense.query.get(pago.expense_id) if pago.expense_id else None
+            if not gasto_local:
+                gasto_local = Expense(
+                    usuario_id=current_user.id,
+                    tipo_gasto='Gasto Diario',
+                    categoria='Abono a Proveedor',
+                    descripcion=desc_gasto[:255],
+                    monto=monto_abonado,
+                    metodo_pago=metodo_pago,
+                    fecha_gasto=pago.fecha_pago or obtener_hora_bogota(),
+                    sucursal=branch_obj.nombre,
+                    branch_id=branch_obj.id
+                )
+                db.session.add(gasto_local)
+                db.session.flush()
+                pago.expense_id = gasto_local.id
+            else:
+                gasto_local.tipo_gasto = 'Gasto Diario'
+                gasto_local.categoria = 'Abono a Proveedor'
+                gasto_local.descripcion = desc_gasto[:255]
+                gasto_local.monto = monto_abonado
+                gasto_local.metodo_pago = metodo_pago
+                gasto_local.sucursal = branch_obj.nombre
+                gasto_local.branch_id = branch_obj.id
+        else:
+            if pago.expense_id:
+                gasto_local = Expense.query.get(pago.expense_id)
+                if gasto_local:
+                    db.session.delete(gasto_local)
+                pago.expense_id = None
+
+        # Actualizar movimiento en Bancos (revertir anterior y registrar actualizado)
+        from services.bank_service import revertir_movimiento_banco, registrar_movimiento_banco
+        revertir_movimiento_banco(origen='ABONO_PROVEEDOR', referencia_id=pago.id)
+        nombre_prov = proveedor.nombre if proveedor else f'ID {provider_id}'
+        sede_txt = f" [Desde: {branch_obj.nombre}]" if branch_obj else " [Caja Mayor]"
+        registrar_movimiento_banco(
+            codigo_metodo=metodo_pago,
+            monto=monto_abonado,
+            tipo_movimiento='EGRESO',
+            origen='ABONO_PROVEEDOR',
+            descripcion=f'Abono a Proveedor: {nombre_prov}{sede_txt} (Abono #{pago.id})',
+            referencia_id=pago.id,
+            usuario_id=current_user.id
+        )
+
         db.session.commit()
-        flash('Abono actualizado correctamente.', 'success')
+        if branch_obj:
+            flash(f'Abono actualizado y vinculado a {branch_obj.nombre} (se verá reflejado en su Arqueo y Cierre de Caja).', 'success')
+        else:
+            flash('Abono actualizado correctamente (Caja Mayor / Global).', 'success')
     except Exception as e:
         db.session.rollback()
         flash(f'Error al actualizar el abono: {str(e)}', 'danger')

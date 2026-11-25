@@ -151,6 +151,68 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Tabla de Gastos y Abonos a Proveedores realizados desde este Local hoy -->
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden mt-4">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="fw-bold m-0">
+                        <i class="fa-solid fa-money-bill-transfer text-danger me-2"></i> Salidas del Local Hoy: Gastos y Abonos a Proveedores ({{ branch_nombre }})
+                    </h5>
+                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-3">
+                        Efectivo descontado de caja: -${{ (gastos_automaticos + gastos_externos)|cop }}
+                    </span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle m-0" style="font-size: 0.88rem;">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">HORA</th>
+                                <th>CONCEPTO / CATEGORÍA</th>
+                                <th>DETALLE / PROVEEDOR</th>
+                                <th class="text-center">MÉTODO SALIDA</th>
+                                <th class="text-end pe-4">MONTO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for g in gastos_diarios_registros %}
+                            <tr>
+                                <td class="ps-4 text-muted">{{ g.fecha_gasto.strftime('%H:%M') if g.fecha_gasto else '-' }}</td>
+                                <td>
+                                    {% if g.categoria == 'Abono a Proveedor' %}
+                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2 py-1">
+                                            <i class="fa-solid fa-truck-fast me-1"></i> Abono a Proveedor
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary bg-opacity-10 text-secondary border rounded-pill px-2 py-1">
+                                            {{ g.categoria }}
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-semibold text-dark">{{ g.descripcion or g.categoria }}</td>
+                                <td class="text-center">
+                                    {% if (g.metodo_pago or 'efectivo')|lower == 'efectivo' %}
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-2">
+                                            💵 Efectivo (Resta de Caja)
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill px-2">
+                                            🏦 {{ g.metodo_pago|capitalize }} (Digital)
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4 fw-bold text-danger">-${{ g.monto|cop }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    No se registran gastos ni abonos a proveedores desde este local en esta fecha.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             
         </div>
 

@@ -274,8 +274,21 @@
                             </td>
                             <td class="text-center">
                                 <span class="badge bg-light text-dark border text-capitalize">
-                                    <i class="fa-solid fa-building-columns text-success me-1"></i>{{ 'Efectivo Caja Mayor' if (p.metodo_pago == 'efectivo' or not p.metodo_pago) else p.metodo_pago }}
+                                    <i class="fa-solid fa-building-columns text-success me-1"></i>{{ 'Efectivo' if (p.metodo_pago == 'efectivo' or not p.metodo_pago) else p.metodo_pago }}
                                 </span>
+                                {% if p.branch %}
+                                <div class="mt-1">
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary rounded-pill px-2 py-0" style="font-size: 0.7rem;" title="Pagado con dinero de {{ p.branch.nombre }}">
+                                        <i class="fa-solid fa-location-dot me-1"></i>{{ p.branch.nombre }}
+                                    </span>
+                                </div>
+                                {% else %}
+                                <div class="mt-1">
+                                    <span class="badge bg-light text-muted border rounded-pill px-2 py-0" style="font-size: 0.68rem;">
+                                        Caja Mayor / Global
+                                    </span>
+                                </div>
+                                {% endif %}
                             </td>
                             <td class="text-end fw-bold text-success">+${{ p.monto_abonado|cop }}</td>
                             <td class="text-center pe-4 text-nowrap">
@@ -308,6 +321,37 @@
                                                             <span class="input-group-text bg-light">$</span>
                                                             <input type="number" step="0.01" min="0" name="monto_abonado" class="form-control bg-light text-success fw-bold" value="{{ p.monto_abonado }}" required>
                                                         </div>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">¿De qué Punto / Local salió el dinero? <span class="text-danger">*</span></label>
+                                                        {% if current_user.rol != 'admin' and current_user.branch %}
+                                                        <input type="hidden" name="branch_id" value="{{ current_user.branch_id }}">
+                                                        <input type="text" class="form-control bg-light fw-bold text-primary" value="🏪 {{ current_user.branch.nombre }} ({{ current_user.branch.codigo }})" readonly>
+                                                        {% else %}
+                                                        <select name="branch_id" class="form-select bg-light fw-semibold" required>
+                                                            {% for b in sucursales %}
+                                                            <option value="{{ b.id }}" {% if p.branch_id == b.id %}selected{% endif %}>
+                                                                {% if b.tipo == 'bodega' %}📦{% else %}🏪{% endif %} {{ b.nombre }} ({{ b.codigo }})
+                                                            </option>
+                                                            {% endfor %}
+                                                            <option value="CAJA_MAYOR" {% if not p.branch_id %}selected{% endif %}>🏦 Caja Mayor / Bancos Generales (Global)</option>
+                                                        </select>
+                                                        {% endif %}
+                                                        <small class="text-muted d-block mt-1" style="font-size: 0.74rem;">
+                                                            Si eliges un Local (ej. LOCAL 2140), esta salida se verá reflejada en el Arqueo y Cierre de Caja de ese local.
+                                                        </small>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Método de Pago</label>
+                                                        <select name="metodo_pago" class="form-select bg-light" required>
+                                                            <option value="efectivo" {% if p.metodo_pago == 'efectivo' or not p.metodo_pago %}selected{% endif %}>💵 Efectivo</option>
+                                                            <option value="bancolombia" {% if p.metodo_pago == 'bancolombia' %}selected{% endif %}>🏦 Bancolombia</option>
+                                                            <option value="nequi" {% if p.metodo_pago == 'nequi' %}selected{% endif %}>📱 Nequi</option>
+                                                            <option value="daviplata" {% if p.metodo_pago == 'daviplata' %}selected{% endif %}>📲 Daviplata</option>
+                                                            <option value="davivienda" {% if p.metodo_pago == 'davivienda' %}selected{% endif %}>🏦 Davivienda</option>
+                                                            <option value="tarjeta_credito" {% if p.metodo_pago == 'tarjeta_credito' %}selected{% endif %}>💳 Tarjeta de Crédito</option>
+                                                            <option value="transferencia" {% if p.metodo_pago == 'transferencia' %}selected{% endif %}>🔄 Otra Transferencia</option>
+                                                        </select>
                                                     </div>
                                                     <div class="mb-3">
                                                         <label class="form-label fw-bold">Observaciones (Opcional)</label>
@@ -470,17 +514,44 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Método de Pago / Banco <span class="text-danger">*</span></label>
-                        <select name="metodo_pago" class="form-select bg-light" required>
-                            <option value="bancolombia" selected>🏦 Bancolombia</option>
+                        <label class="form-label fw-bold">1. ¿De qué Punto / Local sale el dinero? <span class="text-danger">*</span></label>
+                        {% if current_user.rol != 'admin' and current_user.branch %}
+                        <input type="hidden" name="branch_id" value="{{ current_user.branch_id }}">
+                        <div class="input-group">
+                            <span class="input-group-text bg-primary bg-opacity-10 text-primary border-primary"><i class="fa-solid fa-shop"></i></span>
+                            <input type="text" class="form-control bg-light fw-bold text-primary border-primary" value="{{ current_user.branch.nombre }} ({{ current_user.branch.codigo }})" readonly>
+                        </div>
+                        <small class="text-success fw-semibold d-block mt-1" style="font-size: 0.75rem;">
+                            <i class="fa-solid fa-circle-check me-1"></i> Este abono quedará registrado automáticamente en el cierre de caja de <strong>{{ current_user.branch.nombre }}</strong> (no necesitas registrarlo aparte en Gastos).
+                        </small>
+                        {% else %}
+                        <select name="branch_id" class="form-select bg-light fw-semibold border-primary" required>
+                            <option value="" disabled selected>-- Selecciona de qué Punto / Local salió el dinero --</option>
+                            {% for b in sucursales %}
+                            <option value="{{ b.id }}">
+                                {% if b.tipo == 'bodega' %}📦{% else %}🏪{% endif %} {{ b.nombre }} ({{ b.codigo }})
+                            </option>
+                            {% endfor %}
+                            <option value="CAJA_MAYOR">🏦 Caja Mayor / Cuentas Generales (Sin descontar de local)</option>
+                        </select>
+                        <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                            <i class="fa-solid fa-shop text-primary me-1"></i> Si seleccionas un Local (ej. <strong>LOCAL 2140</strong>), se descontará automáticamente en el <strong>Arqueo y Cierre de Caja</strong> de ese local sin tener que crearlo aparte como gasto.
+                        </small>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">2. ¿Por cuál Método de Pago salió el abono? <span class="text-danger">*</span></label>
+                        <select name="metodo_pago" class="form-select bg-light fw-semibold" required>
+                            <option value="" disabled selected>-- Selecciona el Método de Pago --</option>
+                            <option value="efectivo">💵 Efectivo (Descuenta del efectivo físico en caja)</option>
+                            <option value="bancolombia">🏦 Bancolombia</option>
                             <option value="nequi">📱 Nequi</option>
                             <option value="daviplata">📲 Daviplata</option>
                             <option value="davivienda">🏦 Davivienda</option>
-                            <option value="efectivo">💵 Efectivo Caja Mayor</option>
                             <option value="tarjeta_credito">💳 Tarjeta de Crédito</option>
                             <option value="transferencia">🔄 Otra Transferencia</option>
                         </select>
-                        <small class="text-muted" style="font-size: 0.75rem;">El monto se descontará automáticamente del saldo de este método en Bancos.</small>
+                        <small class="text-muted" style="font-size: 0.75rem;">Elige Efectivo si se pagó con billetes físicos de la caja, o la cuenta digital correspondiente.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Observaciones (Opcional)</label>

@@ -318,28 +318,30 @@ def nuevo():
     ventas_del_dia = ventas_query.order_by(Sale.fecha_venta.asc()).all()
     total_efectivo, total_transferencia, total_retomas = calcular_totales_dia(ventas_del_dia)
 
-    # Calcular gastos del día aislados por sucursal
+    # Calcular gastos del día aislados por sucursal (incluye Gastos Diarios y Abonos a Proveedores hechos desde este local)
     gastos_query = Expense.query.filter(
         db.func.date(Expense.fecha_gasto) == fecha_seleccionada,
         Expense.tipo_gasto == 'Gasto Diario',
         Expense.branch_id == arqueo_branch_id
     )
-    if current_user.rol == 'vendedor':
+    if current_user.rol == 'vendedor' and not arqueo_branch_id:
         gastos_query = gastos_query.filter(Expense.usuario_id == current_user.id)
 
-    gastos_diarios_registros = gastos_query.all()
-    gastos_automaticos = float(sum(g.monto for g in gastos_diarios_registros))
+    gastos_diarios_registros = gastos_query.order_by(Expense.fecha_gasto.asc()).all()
+    # Solo los gastos y abonos en EFECTIVO restan del efectivo físico esperado en la gaveta del local
+    gastos_automaticos = float(sum(g.monto for g in gastos_diarios_registros if (g.metodo_pago or 'efectivo').lower() == 'efectivo'))
+    gastos_digitales = float(sum(g.monto for g in gastos_diarios_registros if (g.metodo_pago or 'efectivo').lower() != 'efectivo'))
 
-    # Gastos externos del día por sucursal
+    # Gastos externos del día por sucursal (solo efectivo para gaveta física)
     gastos_ext_query = Expense.query.filter(
         db.func.date(Expense.fecha_gasto) == fecha_seleccionada,
         Expense.categoria == 'Pago Prod. Externo',
         Expense.branch_id == arqueo_branch_id
     )
-    if current_user.rol == 'vendedor':
+    if current_user.rol == 'vendedor' and not arqueo_branch_id:
         gastos_ext_query = gastos_ext_query.filter(Expense.usuario_id == current_user.id)
     gastos_externos_registros = gastos_ext_query.all()
-    gastos_externos = float(sum(g.monto for g in gastos_externos_registros))
+    gastos_externos = float(sum(g.monto for g in gastos_externos_registros if (g.metodo_pago or 'efectivo').lower() == 'efectivo'))
 
     # Verificar si ya existe un arqueo para esa fecha y sucursal
     arqueo_existente_q = ArqueoCaja.query.filter(
@@ -364,15 +366,15 @@ def nuevo():
         efectivo_fisico_val = float(request.form.get('efectivo_fisico', 0.0) or 0.0)
         observacion_diferencia = request.form.get('observacion_diferencia', '').strip()
         
-        # Recalcular gastos automáticos por seguridad en el backend
+        # Recalcular gastos automáticos en EFECTIVO por seguridad en el backend (incluyendo abonos a proveedores en efectivo desde esta sucursal)
         gastos_recalc_q = Expense.query.filter(
             db.func.date(Expense.fecha_gasto) == fecha_seleccionada,
             Expense.tipo_gasto == 'Gasto Diario',
             Expense.branch_id == arqueo_branch_id
         )
-        if current_user.rol == 'vendedor':
+        if current_user.rol == 'vendedor' and not arqueo_branch_id:
             gastos_recalc_q = gastos_recalc_q.filter(Expense.usuario_id == current_user.id)
-        gastos_del_dia = float(sum(g.monto for g in gastos_recalc_q.all()))
+        gastos_del_dia = float(sum(g.monto for g in gastos_recalc_q.all() if (g.metodo_pago or 'efectivo').lower() == 'efectivo'))
         
         observaciones_gastos = request.form.get('observaciones_gastos', '').strip()
 
@@ -462,7 +464,9 @@ def nuevo():
         total_transferencia=total_transferencia,
         arqueo_existente=arqueo_existente,
         gastos_automaticos=gastos_automaticos,
+        gastos_digitales=gastos_digitales,
         gastos_externos=gastos_externos,
+        gastos_diarios_registros=gastos_diarios_registros,
         ventas_del_dia=ventas_del_dia,
         branch_nombre=arqueo_branch_nombre
     )
@@ -668,6 +672,9 @@ def log_sobrantes():
 @login_required
 def imprimir_ticket_arqueo():
     fecha_str = request.args.get('fecha', obtener_hora_bogota().strftime('%Y-%m-%d'))
+    branch_id = request.args.get('branch_id', type=int) or get_current_branch_id()
+    b_obj = Branch.query.get(branch_id) if branch_id else None
+    sucursal_nombre = b_obj.nombre if b_obj else 'TIENDA PRINCIPAL'
     
     try:
         fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
@@ -675,16 +682,25 @@ def imprimir_ticket_arqueo():
         fecha_obj = obtener_hora_bogota().date()
         fecha_str = fecha_obj.strftime('%Y-%m-%d')
         
-    arqueo = ArqueoCaja.query.filter_by(fecha_arqueo=fecha_obj, tipo_arqueo='general').first()
+    arqueo_q = ArqueoCaja.query.filter_by(fecha_arqueo=fecha_obj, tipo_arqueo='general')
+    if branch_id:
+        arqueo_q = arqueo_q.filter_by(branch_id=branch_id)
+    arqueo = arqueo_q.first()
     
-    ventas = Sale.query.filter(
+    ventas_q = Sale.query.filter(
         db.func.date(Sale.fecha_venta) == fecha_obj,
         Sale.tipo_venta.in_(['general', 'celulares'])
-    ).order_by(Sale.fecha_venta.asc()).all()
+    )
+    if branch_id:
+        ventas_q = ventas_q.filter(Sale.branch_id == branch_id)
+    ventas = ventas_q.order_by(Sale.fecha_venta.asc()).all()
     
-    gastos = Expense.query.filter(
+    gastos_q = Expense.query.filter(
         db.func.date(Expense.fecha_gasto) == fecha_obj
-    ).all()
+    )
+    if branch_id:
+        gastos_q = gastos_q.filter(Expense.branch_id == branch_id)
+    gastos = gastos_q.order_by(Expense.fecha_gasto.asc()).all()
     
     total_efectivo = 0
     total_transferencia = 0
@@ -735,5 +751,5 @@ def imprimir_ticket_arqueo():
         total_transferencia=total_transferencia,
         total_ventas=total_ventas,
         total_gastos=total_gastos,
-        sucursal='TIENDA PRINCIPAL'
+        sucursal=sucursal_nombre
     )

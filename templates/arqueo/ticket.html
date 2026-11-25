@@ -218,7 +218,7 @@
             <div class="subtitle">VENTA DE CELULARES &amp; TECNOLOGÍA</div>
             <div style="font-size: 0.8rem; font-weight: 700; margin: 4px 0;">CIERRE DE CAJA Y DETALLE VENTAS</div>
             <div class="info">FECHA CIERRE: <strong>{{ fecha }}</strong></div>
-            <div class="info">SEDE: <strong>TIENDA PRINCIPAL</strong></div>
+            <div class="info">SEDE: <strong>{{ sucursal }}</strong></div>
             <div class="info">EMISIÓN: {{ fecha_generacion }}</div>
         </div>
 
@@ -294,6 +294,17 @@
             </div>
             {% endif %}
         </div>
+        {% endif %}
+
+        <!-- DETALLE DE GASTOS Y ABONOS A PROVEEDORES DESDE EL LOCAL -->
+        {% if gastos %}
+        <div class="section-title" style="margin-top: 15px;">GASTOS Y ABONOS DESDE EL LOCAL ({{ gastos|length }})</div>
+        {% for g in gastos %}
+        <div class="prod-item" style="margin-bottom: 4px;">
+            <span class="prod-name">• <strong>{{ g.categoria }}:</strong> {{ g.descripcion or '' }} [{{ (g.metodo_pago or 'efectivo')|upper }}]</span>
+            <span class="prod-price">-${{ g.monto|cop }}</span>
+        </div>
+        {% endfor %}
         {% endif %}
 
         <!-- DETALLE DE VENTAS Y PRODUCTOS INVOLUCRADOS -->

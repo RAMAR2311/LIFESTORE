@@ -905,11 +905,16 @@ class ProviderPayment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     provider_id = db.Column(db.Integer, db.ForeignKey('providers.id'), nullable=False)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+    expense_id = db.Column(db.Integer, db.ForeignKey('expenses.id', ondelete='SET NULL'), nullable=True)
     monto_abonado = db.Column(db.Numeric(12, 2), nullable=False)
     metodo_pago = db.Column(db.String(50), nullable=False, default='efectivo')
     observacion = db.Column(db.String(255), nullable=True)
     comprobante = db.Column(db.String(255), nullable=True)
     fecha_pago = db.Column(db.DateTime, default=obtener_hora_bogota)
+
+    branch = db.relationship('Branch', backref=db.backref('abonos_proveedores', lazy=True))
+    expense = db.relationship('Expense', foreign_keys=[expense_id])
 
     def __init__(self, **kwargs):
         super(ProviderPayment, self).__init__(**kwargs)
