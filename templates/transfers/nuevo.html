@@ -157,16 +157,47 @@ function cargarProductosOrigen(branchId) {
         .catch(err => console.error("Error al cargar productos de origen:", err));
 }
 
-function actualizarOpcionesSelect(sel, currentVal = "") {
+function actualizarOpcionesSelect(sel, currentVal = "", filtroQuery = "") {
+    const rawQ = (filtroQuery || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const tokens = rawQ.split(/[\s\-]+/).filter(t => t.length > 0);
+
     sel.innerHTML = '<option value="">-- Seleccionar Accesorio / Producto con Stock --</option>';
-    productosDisponibles.forEach(p => {
+    let filtrados = productosDisponibles;
+    if (rawQ.length >= 2) {
+        filtrados = productosDisponibles.filter(p => {
+            const skuNorm = (p.sku || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const nomNorm = (p.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const combined = `${skuNorm} ${skuNorm.replace(/-/g, '')} ${nomNorm}`;
+            return tokens.every(tok => combined.includes(tok));
+        });
+    }
+
+    filtrados.forEach(p => {
         const opt = document.createElement('option');
-        opt.value = `${p.product_id}|${p.variant_id || ''}`;
+        const valKey = `${p.product_id}|${p.variant_id || ''}`;
+        opt.value = valKey;
         opt.dataset.stock = p.stock_disponible;
-        opt.textContent = `${p.nombre} (Stock: ${p.stock_disponible})`;
-        if (opt.value === currentVal) opt.selected = true;
+        opt.dataset.sku = p.sku || '';
+        opt.dataset.nombre = p.nombre || '';
+        const skuPrefix = p.sku ? `[${p.sku}] ` : '';
+        opt.textContent = `${skuPrefix}${p.nombre} (Stock: ${p.stock_disponible})`;
+        if (valKey === currentVal) opt.selected = true;
         sel.appendChild(opt);
     });
+
+    // Si el valor seleccionado actual quedó fuera del filtro, mantenerlo visible para no perder selección
+    if (currentVal && sel.value !== currentVal) {
+        const prodActual = productosDisponibles.find(p => `${p.product_id}|${p.variant_id || ''}` === currentVal);
+        if (prodActual) {
+            const opt = document.createElement('option');
+            opt.value = currentVal;
+            opt.dataset.stock = prodActual.stock_disponible;
+            const skuPrefix = prodActual.sku ? `[${prodActual.sku}] ` : '';
+            opt.textContent = `${skuPrefix}${prodActual.nombre} (Stock: ${prodActual.stock_disponible})`;
+            opt.selected = true;
+            sel.appendChild(opt);
+        }
+    }
 }
 
 function mostrarFeedbackImei(mensaje, tipo = 'info') {
@@ -292,15 +323,21 @@ function insertarFilaCelular(data) {
     actualizarContadorItems();
 }
 
-// 4. Compatibilidad con Accesorios (Lotes y cantidades múltiples)
+// 4. Compatibilidad con Accesorios (Lotes y cantidades múltiples con buscador predictivo desde 2 letras)
 function agregarFilaProducto() {
     const container = document.getElementById('itemsContainer');
     const row = document.createElement('div');
     row.className = 'card border p-3 shadow-sm item-transfer-row rounded-3 mb-2';
     row.innerHTML = `
         <div class="row g-2 align-items-center">
-            <div class="col-md-7">
+            <div class="col-md-7 position-relative">
                 <label class="form-label small fw-bold checkout-label">Accesorio / Producto por Lote</label>
+                <div class="input-group input-group-sm mb-1">
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                    <input type="text" class="form-control border-start-0 ps-1 buscador-accesorio-traslado" placeholder="Escribe 2+ letras de SKU o nombre para filtrar (ej: PAW, TOK, AirPods...)" autocomplete="off">
+                    <button type="button" class="btn btn-outline-secondary btn-limpiar-filtro-traslado d-none" title="Limpiar búsqueda"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="dropdown-menu w-100 shadow-lg border p-0 resultados-accesorio-traslado d-none" style="max-height: 240px; overflow-y: auto; z-index: 1055;"></div>
                 <select class="form-select form-select-sm producto-select pos-select fw-semibold" onchange="onSelectProducto(this)" required>
                     <option value="">-- Seleccionar Accesorio / Producto con Stock --</option>
                 </select>
@@ -324,8 +361,107 @@ function agregarFilaProducto() {
     container.appendChild(row);
 
     const newSel = row.querySelector('.producto-select');
+    const searchInp = row.querySelector('.buscador-accesorio-traslado');
+    const clearBtn = row.querySelector('.btn-limpiar-filtro-traslado');
+    const dropdownBox = row.querySelector('.resultados-accesorio-traslado');
+
     actualizarOpcionesSelect(newSel);
+
+    function renderSugerencias(query) {
+        const rawQ = (query || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (rawQ.length < 2) {
+            dropdownBox.classList.add('d-none');
+            dropdownBox.classList.remove('show');
+            return;
+        }
+        const tokens = rawQ.split(/[\s\-]+/).filter(t => t.length > 0);
+        const matches = productosDisponibles.filter(p => {
+            const skuNorm = (p.sku || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const nomNorm = (p.nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const combined = `${skuNorm} ${skuNorm.replace(/-/g, '')} ${nomNorm}`;
+            return tokens.every(tok => combined.includes(tok));
+        });
+
+        dropdownBox.innerHTML = '';
+        if (matches.length === 0) {
+            dropdownBox.innerHTML = `<div class="p-2 text-center text-muted small">No se encontraron accesorios con "${query}" en esta sede.</div>`;
+        } else {
+            matches.slice(0, 30).forEach(p => {
+                const valKey = `${p.product_id}|${p.variant_id || ''}`;
+                const itemBtn = document.createElement('button');
+                itemBtn.type = 'button';
+                itemBtn.className = 'dropdown-item py-2 px-3 border-bottom d-flex justify-content-between align-items-center text-wrap';
+                itemBtn.innerHTML = `
+                    <div class="me-2 text-start">
+                        <div class="fw-bold text-dark small">${p.nombre}</div>
+                        <small class="text-muted font-mono">SKU: <strong>${p.sku || 'S/N'}</strong></small>
+                    </div>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill">${p.stock_disponible} disp.</span>
+                `;
+                itemBtn.addEventListener('click', () => {
+                    actualizarOpcionesSelect(newSel, valKey, '');
+                    newSel.value = valKey;
+                    onSelectProducto(newSel);
+                    searchInp.value = `${p.sku ? p.sku + ' - ' : ''}${p.nombre}`;
+                    clearBtn.classList.remove('d-none');
+                    dropdownBox.classList.add('d-none');
+                    dropdownBox.classList.remove('show');
+                    const cantInp = row.querySelector('.input-cantidad');
+                    if (cantInp) {
+                        cantInp.focus();
+                        cantInp.select();
+                    }
+                });
+                dropdownBox.appendChild(itemBtn);
+            });
+        }
+        dropdownBox.classList.remove('d-none');
+        dropdownBox.classList.add('show');
+    }
+
+    searchInp.addEventListener('input', function() {
+        const q = this.value;
+        if (q.trim().length > 0) clearBtn.classList.remove('d-none');
+        else clearBtn.classList.add('d-none');
+
+        actualizarOpcionesSelect(newSel, newSel.value, q);
+        renderSugerencias(q);
+
+        // Si al escribir 2+ letras queda exactamente 1 opción en el select, preseleccionarla
+        if (q.trim().length >= 2 && newSel.options.length === 2) {
+            newSel.selectedIndex = 1;
+            onSelectProducto(newSel);
+        }
+    });
+
+    searchInp.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const firstBtn = dropdownBox.querySelector('button.dropdown-item');
+            if (firstBtn) {
+                firstBtn.click();
+            }
+        }
+    });
+
+    clearBtn.addEventListener('click', function() {
+        searchInp.value = '';
+        clearBtn.classList.add('d-none');
+        dropdownBox.classList.add('d-none');
+        dropdownBox.classList.remove('show');
+        actualizarOpcionesSelect(newSel, newSel.value, '');
+        searchInp.focus();
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!row.contains(e.target)) {
+            dropdownBox.classList.add('d-none');
+            dropdownBox.classList.remove('show');
+        }
+    });
+
     actualizarContadorItems();
+    searchInp.focus();
 }
 
 function onSelectProducto(selectEl) {
@@ -381,7 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const container = document.getElementById('itemsContainer');
             const lastRow = container.querySelector('.item-transfer-row:last-child');
             if (lastRow) {
-                const select = lastRow.querySelector('.select-producto');
+                const select = lastRow.querySelector('.producto-select');
                 if (select) {
                     const expectedVal = preVarId ? `${preProdId}|${preVarId}` : `${preProdId}|`;
                     // Buscar coincidencia exacta o por ID producto

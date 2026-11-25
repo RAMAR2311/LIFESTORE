@@ -38,7 +38,8 @@ def _resolve_target_branch_id(form_branch_id=None):
 def index():
     tipo = 'bodega' if current_user.rol in ['bodega', 'vendedor_bodega'] else 'tienda'
     page = request.args.get('page', 1, type=int)
-    per_page = 20
+    q = request.args.get('q', '').strip()
+    per_page = 500
 
     active_b_id = None
     if current_user.rol == 'admin':
@@ -73,13 +74,25 @@ def index():
         base_query = base_query.join(
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
-        ).filter(BranchStock.cantidad > 0)
+        ).filter(BranchStock.cantidad > 0).distinct()
     elif current_user.rol == 'admin' and active_b_id is not None:
         # Admin con sucursal seleccionada: filtrar productos que tengan stock > 0 en esa sede
         base_query = base_query.join(
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
         ).filter(BranchStock.cantidad > 0).distinct()
+
+    if q:
+        from sqlalchemy import or_
+        for token in q.split():
+            t = token.strip()
+            if t:
+                base_query = base_query.filter(
+                    or_(
+                        Product.sku.ilike(f'%{t}%'),
+                        Product.nombre.ilike(f'%{t}%')
+                    )
+                )
 
     # Paginación del listado principal
     paginacion = base_query.order_by(Product.nombre).paginate(
@@ -167,7 +180,8 @@ def index():
         total_unidades_fisicas=total_unidades_fisicas,
         stock_por_producto=stock_por_producto,
         active_b_id=active_b_id,
-        todas_sucursales=todas_sucursales
+        todas_sucursales=todas_sucursales,
+        q=q
     )
 
 @inventory_bp.route('/nuevo', methods=['GET', 'POST'])
@@ -892,7 +906,6 @@ def importar_inventario():
 
 @inventory_bp.route('/api/search')
 @login_required
-@admin_or_bodega_required
 def api_search():
     query = request.args.get('q', '').strip()
     tipo = 'bodega' if current_user.rol == 'bodega' else 'tienda'
@@ -901,12 +914,17 @@ def api_search():
         return jsonify([])
     
     from sqlalchemy import or_
-    productos = Product.query.filter_by(tipo_inventario=tipo).filter(
-        or_(
-            Product.sku.ilike(f'%{query}%'),
-            Product.nombre.ilike(f'%{query}%')
-        )
-    ).limit(10).all()
+    q_db = Product.query.filter_by(tipo_inventario=tipo)
+    for token in query.split():
+        t = token.strip()
+        if t:
+            q_db = q_db.filter(
+                or_(
+                    Product.sku.ilike(f'%{t}%'),
+                    Product.nombre.ilike(f'%{t}%')
+                )
+            )
+    productos = q_db.order_by(Product.nombre.asc()).limit(25).all()
     
     results = []
     for p in productos:

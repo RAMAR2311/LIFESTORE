@@ -54,14 +54,20 @@ def api_buscar_productos():
         query = query.filter(Product.tipo_inventario.in_(['tienda', 'bodega', 'accesorios']))
 
     if q:
-        query = query.filter(
-            (Product.nombre.ilike(f'%{q}%')) |
-            (Product.sku.ilike(f'%{q}%')) |
-            (Product.imei.ilike(f'%{q}%')) |
-            (Product.imei2.ilike(f'%{q}%')) |
-            (Product.marca.ilike(f'%{q}%')) |
-            (Product.modelo_celular.ilike(f'%{q}%'))
-        )
+        from sqlalchemy import or_
+        for token in q.split():
+            t = token.strip()
+            if t:
+                query = query.filter(
+                    or_(
+                        Product.nombre.ilike(f'%{t}%'),
+                        Product.sku.ilike(f'%{t}%'),
+                        Product.imei.ilike(f'%{t}%'),
+                        Product.imei2.ilike(f'%{t}%'),
+                        Product.marca.ilike(f'%{t}%'),
+                        Product.modelo_celular.ilike(f'%{t}%')
+                    )
+                )
 
     productos = query.order_by(Product.nombre.asc()).limit(30).all()
 

@@ -322,6 +322,9 @@ def api_productos_origen():
     items = []
     for s in stocks:
         if s.product:
+            # Si el producto tiene variantes y esta fila es el registro maestro (variant_id=None), omitir para no duplicar con sus variantes
+            if s.product.variantes and s.variant_id is None:
+                continue
             var_nombre = s.variant.nombre_variante if s.variant else None
             nombre_label = f"{s.product.nombre} ({var_nombre})" if var_nombre else s.product.nombre
             if s.product.imei:
@@ -330,11 +333,13 @@ def api_productos_origen():
             items.append({
                 'product_id': s.product_id,
                 'variant_id': s.variant_id,
-                'sku': s.product.sku,
+                'sku': s.product.sku or '',
                 'nombre': nombre_label,
+                'tipo_inventario': s.product.tipo_inventario or '',
                 'stock_disponible': s.cantidad
             })
 
+    items.sort(key=lambda x: (x['nombre'].lower(), x['sku'].lower()))
     return jsonify(items)
 
 @transfers_bp.route('/api/buscar-imei', methods=['GET'])

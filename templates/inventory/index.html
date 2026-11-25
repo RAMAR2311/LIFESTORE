@@ -97,7 +97,7 @@
             </thead>
             <tbody class="align-middle">
                 {% for p in productos %}
-                <tr>
+                <tr class="product-main-row" data-prod-id="{{ p.id }}" data-sku="{{ (p.sku or '')|lower }}" data-nombre="{{ (p.nombre or '')|lower }}" data-variantes="{% if p.variantes %}{{ p.variantes|map(attribute='nombre_variante')|join(' ')|lower }}{% endif %}">
                     <td class="text-muted text-nowrap">
                         {% if p.variantes %}
                             <button class="btn btn-sm btn-light border me-1 rounded-circle shadow-sm p-1" style="width: 28px; height: 28px;" type="button" data-bs-toggle="collapse" data-bs-target="#collapseVariantes{{ p.id }}" aria-expanded="false" title="Ver Subcategorías">
@@ -387,7 +387,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('inventarioSearch');
     const clearBtn = document.getElementById('clearSearch');
     const dropdown = document.getElementById('searchDropdown');
-    const tableRows = document.querySelectorAll('tbody tr:not(.no-results)');
+    const tableRows = document.querySelectorAll('tr.product-main-row');
     const visibleCount = document.getElementById('visibleCount');
     const tbody = document.querySelector('tbody');
 
@@ -398,80 +398,63 @@ document.addEventListener('DOMContentLoaded', function() {
         <i class="fa-solid fa-magnifying-glass-minus fs-1 mb-3 opacity-25"></i>
         <p class="mb-0">No se encontraron productos que coincidan con tu búsqueda.</p>
     </td>`;
-    tbody.appendChild(noResultsRow);
+    if (tbody) tbody.appendChild(noResultsRow);
 
-    let debounceTimer;
+    function normalizarTexto(str) {
+        return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
 
     function performSearch() {
-        const query = searchInput.value.toLowerCase().trim();
-        
-        // 1. Filtrado local de la tabla (lo que ya está cargado)
+        const rawQuery = searchInput.value.trim();
+        const queryNorm = normalizarTexto(rawQuery);
+        const tokens = queryNorm.split(/[\s\-]+/).filter(t => t.length > 0);
+
         let matches = 0;
         tableRows.forEach(row => {
-            const sku = row.cells[0].textContent.toLowerCase();
-            const nombre = row.cells[1].textContent.toLowerCase();
-            if (sku.includes(query) || nombre.includes(query)) {
+            const prodId = row.dataset.prodId;
+            const collapseRow = prodId ? document.getElementById('collapseVariantes' + prodId) : null;
+
+            // Si tiene menos de 2 letras, mostrar todos (o si está vacío)
+            if (queryNorm.length < 2) {
                 row.classList.remove('d-none');
+                if (collapseRow) collapseRow.classList.remove('d-none');
+                matches++;
+                return;
+            }
+
+            const skuText = normalizarTexto(row.dataset.sku || (row.cells[0] ? row.cells[0].textContent : ''));
+            const nombreText = normalizarTexto(row.dataset.nombre || (row.cells[1] ? row.cells[1].textContent : ''));
+            const varText = normalizarTexto(row.dataset.variantes || '');
+            const combined = `${skuText} ${skuText.replace(/-/g, '')} ${nombreText} ${varText}`;
+
+            const isMatch = tokens.every(tok => combined.includes(tok));
+            if (isMatch) {
+                row.classList.remove('d-none');
+                if (collapseRow) collapseRow.classList.remove('d-none');
                 matches++;
             } else {
                 row.classList.add('d-none');
+                if (collapseRow) collapseRow.classList.add('d-none');
             }
         });
-        visibleCount.textContent = matches;
-        if (matches === 0 && query !== '') noResultsRow.classList.remove('d-none');
-        else noResultsRow.classList.add('d-none');
 
-        // 2. Búsqueda AJAX global para el "despliegue"
-        clearTimeout(debounceTimer);
-        if (query.length < 2) {
-            dropdown.classList.add('d-none');
-            return;
+        if (visibleCount) visibleCount.textContent = matches;
+        if (matches === 0 && queryNorm.length >= 2) {
+            noResultsRow.classList.remove('d-none');
+        } else {
+            noResultsRow.classList.add('d-none');
         }
-
-        debounceTimer = setTimeout(() => {
-            fetch(`/inventory/api/search?q=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.length > 0) {
-                        dropdown.innerHTML = '';
-                        data.forEach(item => {
-                            const btn = document.createElement('a');
-                            btn.href = item.url;
-                            btn.className = 'dropdown-item p-3 border-bottom d-flex justify-content-between align-items-center';
-                            btn.innerHTML = `
-                                <div>
-                                    <div class="fw-bold text-dark text-truncate" style="max-width: 250px;">${item.nombre}</div>
-                                    <small class="text-muted">SKU: ${item.sku}</small>
-                                </div>
-                                <span class="badge bg-light text-dark border rounded-pill">${item.stock} uds</span>
-                            `;
-                            dropdown.appendChild(btn);
-                        });
-                        dropdown.classList.remove('d-none');
-                        dropdown.classList.add('show');
-                    } else {
-                        dropdown.classList.add('d-none');
-                        dropdown.classList.remove('show');
-                    }
-                });
-        }, 300);
     }
 
     searchInput.addEventListener('input', performSearch);
 
-    // Ocultar dropdown al hacer click fuera
-    document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
-            dropdown.classList.add('d-none');
-            dropdown.classList.remove('show');
-        }
-    });
-
     clearBtn.addEventListener('click', () => {
         searchInput.value = '';
         performSearch();
-        dropdown.classList.add('d-none');
-        dropdown.classList.remove('show');
+        if (dropdown) {
+            dropdown.classList.add('d-none');
+            dropdown.classList.remove('show');
+        }
         searchInput.focus();
     });
 });

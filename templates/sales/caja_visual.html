@@ -1078,18 +1078,20 @@
 
     function filtrarProductosCaja() {
         const searchEl = document.getElementById('productSearch');
-        const query = searchEl ? searchEl.value.toLowerCase().trim() : '';
+        const rawQuery = searchEl ? searchEl.value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        const tokens = rawQuery.split(/[\s\-]+/).filter(t => t.length > 0);
         document.querySelectorAll('.product-card-container').forEach(card => {
-            const name = card.dataset.name || '';
-            const sku = card.dataset.sku || '';
-            const imei = card.dataset.imei || '';
-            const imei2 = card.dataset.imei2 || '';
-            const memoria = card.dataset.memoria || '';
+            const name = (card.dataset.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const sku = (card.dataset.sku || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const imei = (card.dataset.imei || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const imei2 = (card.dataset.imei2 || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const memoria = (card.dataset.memoria || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             const cat = card.dataset.categoria || '';
 
-            if (query.length > 0) {
-                // Si hay texto en la barra de búsqueda, busca en AMBOS (Equipos y Accesorios) por nombre, SKU, IMEI o capacidad
-                if (name.includes(query) || sku.includes(query) || imei.includes(query) || imei2.includes(query) || memoria.includes(query)) {
+            if (rawQuery.length > 0) {
+                // Si hay texto en la barra de búsqueda, busca en AMBOS (Equipos y Accesorios) por nombre, SKU (con o sin guiones), IMEI o capacidad
+                const combined = `${name} ${sku} ${sku.replace(/-/g, '')} ${imei} ${imei2} ${memoria}`;
+                if (tokens.every(tok => combined.includes(tok))) {
                     card.style.display = 'block';
                 } else {
                     card.style.display = 'none';
