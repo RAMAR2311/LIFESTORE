@@ -13,7 +13,11 @@
             </h2>
             <p class="text-muted small mb-0 mt-1">Control y trazabilidad de celulares entregados a cambio con terceros o aliados comerciales.</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2">
+            <!-- Botón Entrada a Cambio (Me entregan primero, quedo pendiente) -->
+            <button type="button" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalEntradaCambio">
+                <i class="fa-solid fa-circle-arrow-down me-1"></i> + Recibir Celular a Cambio
+            </button>
             <!-- Botón Crear Aliado -->
             <button type="button" class="btn btn-outline-dark rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCrearAliado">
                 <i class="fa-solid fa-handshake me-1 text-primary"></i> + Registrar Aliado
@@ -31,7 +35,7 @@
             <div class="card card-custom border-0 shadow-sm p-3">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
-                        <div class="text-muted small fw-bold text-uppercase">Pendientes por Recibir</div>
+                        <div class="text-muted small fw-bold text-uppercase">Pendientes (Recibir / Entregar)</div>
                         <div class="fs-4 fw-bolder text-warning">{{ pendientes_count }}</div>
                     </div>
                     <div class="p-3 bg-warning bg-opacity-10 rounded-circle text-warning fs-5">
@@ -155,13 +159,23 @@
 
                         <!-- Equipo Entregado (Salida) -->
                         <td>
-                            <div class="fw-bold text-brand-black">{{ c.modelo_salida }}</div>
-                            {% if c.imei_salida %}
-                                <span class="badge bg-dark text-white font-mono px-2 py-0" style="font-size: 0.72rem;">IMEI: {{ c.imei_salida }}</span>
+                            {% if c.modelo_salida %}
+                                <div class="fw-bold text-brand-black">{{ c.modelo_salida }}</div>
+                                {% if c.imei_salida %}
+                                    <span class="badge bg-dark text-white font-mono px-2 py-0" style="font-size: 0.72rem;">IMEI: {{ c.imei_salida }}</span>
+                                {% endif %}
+                                <div class="text-muted small mt-1">Costo ref: ${{ c.costo_salida|cop }}</div>
+                            {% elif c.estado == 'DEVUELTO' %}
+                                <span class="text-muted small fst-italic">
+                                    <i class="fa-solid fa-rotate-left me-1"></i> Cancelado. No se entregó equipo nuestro.
+                                </span>
+                            {% else %}
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2 py-1 rounded-pill">
+                                    <i class="fa-solid fa-hourglass-half me-1"></i> Pendiente por entregar nuestro equipo
+                                </span>
                             {% endif %}
-                            <div class="text-muted small mt-1">Costo ref: ${{ c.costo_salida|cop }}</div>
                             {% if c.motivo_salida %}
-                                <div class="text-truncate text-muted small" style="max-width: 200px;" title="{{ c.motivo_salida }}">
+                                <div class="text-truncate text-muted small mt-1" style="max-width: 200px;" title="{{ c.motivo_salida }}">
                                     <em>Nota: {{ c.motivo_salida }}</em>
                                 </div>
                             {% endif %}
@@ -169,13 +183,13 @@
 
                         <!-- Equipo Recibido (Entrada) -->
                         <td>
-                            {% if c.estado == 'COMPLETADO' and c.modelo_entrada %}
+                            {% if c.modelo_entrada %}
                                 <div class="fw-bold text-success">{{ c.marca_entrada or '' }} {{ c.modelo_entrada }}</div>
                                 <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 font-mono px-2 py-0" style="font-size: 0.72rem;">
                                     IMEI: {{ c.imei1_entrada }}
                                 </span>
                                 <div class="text-muted small mt-1">
-                                    Nuevo Costo: <strong>${{ c.costo_entrada|cop }}</strong> | Sug: ${{ c.precio_sugerido_entrada|cop }}
+                                    Costo: <strong>${{ c.costo_entrada|cop }}</strong> | Sug: ${{ c.precio_sugerido_entrada|cop }}
                                 </div>
                             {% elif c.estado == 'DEVUELTO' %}
                                 <span class="text-muted small fst-italic">
@@ -209,20 +223,120 @@
                         <td class="text-end pe-4">
                             {% if c.estado == 'PENDIENTE' %}
                                 <div class="d-flex justify-content-end gap-1">
-                                    <!-- Botón Recibir Celular -->
-                                    <button type="button" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalRecibirCambio{{ c.id }}">
-                                        <i class="fa-solid fa-plus-circle me-1"></i> Recibir Celular
-                                    </button>
-                                    <!-- Botón Devolver Celular al Stock -->
-                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDevolverCambio{{ c.id }}" title="Cancelar y devolver celular original al inventario">
-                                        <i class="fa-solid fa-rotate-left me-1"></i> Devolver
-                                    </button>
+                                    {% if c.tipo_flujo == 'ENTRADA_PRIMERO' %}
+                                        <!-- Botón Entregar Nuestro Celular para saldar el cambio -->
+                                        <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalEntregarCambio{{ c.id }}">
+                                            <i class="fa-solid fa-paper-plane me-1"></i> Entregar Mi Celular
+                                        </button>
+                                        <!-- Botón Cancelar y Devolver equipo recibido -->
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalCancelarEntrada{{ c.id }}" title="Cancelar y devolver equipo al aliado">
+                                            <i class="fa-solid fa-rotate-left me-1"></i> Devolver
+                                        </button>
+                                    {% else %}
+                                        <!-- Botón Recibir Celular -->
+                                        <button type="button" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalRecibirCambio{{ c.id }}">
+                                            <i class="fa-solid fa-plus-circle me-1"></i> Recibir Celular
+                                        </button>
+                                        <!-- Botón Devolver Celular al Stock -->
+                                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDevolverCambio{{ c.id }}" title="Cancelar y devolver celular original al inventario">
+                                            <i class="fa-solid fa-rotate-left me-1"></i> Devolver
+                                        </button>
+                                    {% endif %}
                                 </div>
                             {% else %}
                                 <span class="badge bg-light text-muted border px-2 py-1 small">Resuelto</span>
                             {% endif %}
                         </td>
                     </tr>
+
+                    <!-- MODALES PARA CAMBIO ENTRADA_PRIMERO -->
+                    {% if c.estado == 'PENDIENTE' and c.tipo_flujo == 'ENTRADA_PRIMERO' %}
+                    <div class="modal fade text-start" id="modalEntregarCambio{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-header border-bottom py-3">
+                                    <h6 class="modal-title fw-bold text-brand-black">
+                                        <i class="fa-solid fa-paper-plane text-primary me-2"></i>
+                                        Entregar Mi Celular (Saldar Cambio #{{ c.id }})
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('exchanges_bp.entregar_celular_cambio', exchange_id=c.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-body py-3">
+                                        <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <strong>Equipo que recibiste:</strong> {{ c.marca_entrada or '' }} {{ c.modelo_entrada }}
+                                                <span class="badge bg-success text-white font-mono">IMEI: {{ c.imei1_entrada }}</span>
+                                            </div>
+                                            <div class="text-muted">Aliado: <strong>{{ c.partner.nombre if c.partner else 'Tercero' }}</strong> | Costo Entrada: ${{ c.costo_entrada|cop }}</div>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-dark">Seleccionar Celular de Inventario a Entregar *</label>
+                                            <select name="product_salida_id" class="form-select form-select-sm" required>
+                                                <option value="" disabled selected>-- Elige el equipo de tu stock --</option>
+                                                {% for cel in celulares_disponibles %}
+                                                <option value="{{ cel.id }}">
+                                                    {{ cel.nombre }} | IMEI: {{ cel.imei or 'N/A' }} (Costo: ${{ cel.precio_costo|cop }})
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-bold text-dark">Asesor Responsable</label>
+                                            <select name="asesor_id" class="form-select form-select-sm">
+                                                <option value="">-- Igual / Sin especificar --</option>
+                                                {% for a in asesores %}
+                                                <option value="{{ a.id }}" {% if c.asesor_id == a.id %}selected{% endif %}>{{ a.nombre }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label class="form-label small fw-bold text-dark">Observación de Entrega</label>
+                                            <input type="text" name="observacion_resolucion" class="form-control form-control-sm" placeholder="Ej: Entregado en mano, saldado.">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer border-top py-2 bg-light">
+                                        <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                                            <i class="fa-solid fa-check me-1"></i> Confirmar Entrega y Saldar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal fade text-start" id="modalCancelarEntrada{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content border-0 shadow-lg rounded-4">
+                                <div class="modal-header border-bottom py-3">
+                                    <h6 class="modal-title fw-bold text-danger">
+                                        <i class="fa-solid fa-rotate-left me-2"></i> Cancelar Cambio y Devolver Equipo #{{ c.id }}
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <form method="POST" action="{{ url_for('exchanges_bp.cancelar_entrada_cambio', exchange_id=c.id) }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <div class="modal-body py-3">
+                                        <p class="small text-muted mb-2">
+                                            Se retirará de tu inventario el equipo <strong>{{ c.marca_entrada }} {{ c.modelo_entrada }}</strong> (IMEI: <code>{{ c.imei1_entrada }}</code>) porque fue devuelto al aliado.
+                                        </p>
+                                        <label class="form-label small fw-bold">Motivo de devolución</label>
+                                        <input type="text" name="observacion_devolucion" class="form-control form-control-sm" placeholder="Opcional...">
+                                    </div>
+                                    <div class="modal-footer border-top py-2 bg-light">
+                                        <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cerrar</button>
+                                        <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold">Confirmar Devolución</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <!-- MODAL RECIBIR NUEVO CELULAR POR CAMBIO -->
                     {% if c.estado == 'PENDIENTE' %}
@@ -941,5 +1055,119 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
+
+<!-- MODAL ENTRADA DE CELULAR A CAMBIO (ME ENTREGAN PRIMERO, QUEDO PENDIENTE DE ENTREGAR) -->
+<div class="modal fade text-start" id="modalEntradaCambio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-dark text-white py-3">
+                <h6 class="modal-title fw-bold">
+                    <i class="fa-solid fa-circle-arrow-down text-info me-2"></i> Recibir Celular a Cambio (Quedo Pendiente por Entregar)
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('exchanges_bp.registrar_entrada_cambio') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="alert alert-info py-2 px-3 small border-info-subtle mb-3">
+                        <i class="fa-solid fa-info-circle me-1"></i>
+                        El equipo recibido ingresará de inmediato al stock vendible y quedará un registro <strong>PENDIENTE</strong> hasta que entregues tu celular a cambio.
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold">Aliado / Persona que Entrega *</label>
+                            <select name="partner_id" class="form-select form-select-sm">
+                                <option value="">-- Seleccionar Aliado --</option>
+                                {% for p in partners %}
+                                <option value="{{ p.id }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" name="nuevo_partner_nombre" class="form-control form-control-sm mt-1" placeholder="O escribe un aliado nuevo...">
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold">Sede de Ingreso *</label>
+                            <select name="branch_id" class="form-select form-select-sm" required>
+                                {% for br in sucursales %}
+                                <option value="{{ br.id }}" {% if current_user.branch_id == br.id %}selected{% endif %}>{{ br.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold">Asesor Responsable</label>
+                            <select name="asesor_id" class="form-select form-select-sm">
+                                <option value="">-- Sin especificar --</option>
+                                {% for a in asesores %}
+                                <option value="{{ a.id }}">{{ a.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <h6 class="small fw-bold text-uppercase text-muted border-bottom pb-1 mb-2">Datos del Celular Recibido</h6>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label small fw-bold">Marca</label>
+                            <input type="text" name="marca_entrada" class="form-control form-control-sm" placeholder="Ej: Apple, Samsung">
+                        </div>
+                        <div class="col-6 col-md-5">
+                            <label class="form-label small fw-bold">Modelo / Referencia *</label>
+                            <input type="text" name="modelo_entrada" class="form-control form-control-sm" placeholder="Ej: iPhone 14 Pro" required>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-bold">Memoria</label>
+                            <input type="text" name="memoria_entrada" class="form-control form-control-sm" placeholder="128GB">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label small fw-bold">Color</label>
+                            <input type="text" name="color_entrada" class="form-control form-control-sm" placeholder="Negro">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold">IMEI 1 *</label>
+                            <input type="text" name="imei1_entrada" class="form-control form-control-sm font-mono" placeholder="15 dígitos o serial" required>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold">IMEI 2 (Opcional)</label>
+                            <input type="text" name="imei2_entrada" class="form-control form-control-sm font-mono" placeholder="Opcional">
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small fw-bold">Batería (%)</label>
+                            <input type="text" name="bateria_entrada" class="form-control form-control-sm" placeholder="Ej: 90%">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-4">
+                            <label class="form-label small fw-bold">Costo Pactado ($)</label>
+                            <input type="number" name="costo_entrada" class="form-control form-control-sm" placeholder="0" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold">Precio Mínimo ($)</label>
+                            <input type="number" name="precio_minimo_entrada" class="form-control form-control-sm" placeholder="0" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small fw-bold">Precio Sugerido ($)</label>
+                            <input type="number" name="precio_sugerido_entrada" class="form-control form-control-sm" placeholder="0" required>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label small fw-bold">Nota / Acuerdo del Cambio</label>
+                        <input type="text" name="motivo_salida" class="form-control form-control-sm" placeholder="Ej: Quedamos pendientes de entregarle iPhone 13 128GB">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light py-2">
+                    <button type="button" class="btn btn-secondary rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Ingresar Celular y Dejar Pendiente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 

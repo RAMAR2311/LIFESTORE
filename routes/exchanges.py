@@ -63,12 +63,25 @@ def index():
     completados_count = base_counts.filter_by(estado='COMPLETADO').count()
     devueltos_count = base_counts.filter_by(estado='DEVUELTO').count()
 
+    # Celulares disponibles en inventario para entregar al saldar cambios ENTRADA_PRIMERO
+    celulares_disp_q = Product.query.filter(
+        Product.tipo_inventario == 'celulares',
+        Product.cantidad_stock > 0
+    )
+    if current_user.rol == 'vendedor' and current_user.branch_id:
+        celulares_disp_q = celulares_disp_q.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == current_user.branch_id)
+        ).filter(BranchStock.cantidad > 0)
+    celulares_disponibles = celulares_disp_q.order_by(Product.nombre.asc()).all()
+
     return render_template(
         'exchanges/index.html',
         cambios=cambios,
         partners=partners,
         sucursales=sucursales,
         asesores=asesores,
+        celulares_disponibles=celulares_disponibles,
         filtro_estado=filtro_estado,
         filtro_partner=filtro_partner,
         q=q,
@@ -382,5 +395,286 @@ def devolver_al_inventario(exchange_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Error al devolver el equipo al inventario: {str(e)}', 'danger')
+        return redirect(url_for('exchanges_bp.index'))
+
+
+# ==========================================================
+# FLUJO INVERSO: ME ENTREGAN EL CELULAR PRIMERO (QUEDO PENDIENTE DE ENTREGAR)
+# ==========================================================
+
+@exchanges_bp.route('/entrada', methods=['POST'])
+@login_required
+def registrar_entrada_cambio():
+    """Registra un celular que me entregan primero a cambio; entra al stock y deja pendiente mi entrega."""
+    partner_id = request.form.get('partner_id', type=int)
+    nuevo_partner_nombre = request.form.get('nuevo_partner_nombre', '').strip()
+    asesor_id = request.form.get('asesor_id', type=int)
+    dest_branch_id = request.form.get('branch_id', type=int) or current_user.branch_id or (session.get('active_branch_id') or 1)
+    motivo_salida = request.form.get('motivo_salida', '').strip()
+
+    if not partner_id and nuevo_partner_nombre:
+        partner = ExchangePartner(
+            nombre=nuevo_partner_nombre,
+            contacto=request.form.get('nuevo_partner_contacto', '').strip() or None,
+            activo=True
+        )
+        db.session.add(partner)
+        db.session.flush()
+        partner_id = partner.id
+
+    if not partner_id:
+        flash('Debes seleccionar o registrar el aliado/persona que entrega el celular.', 'warning')
+        return redirect(url_for('exchanges_bp.index'))
+
+    marca = request.form.get('marca_entrada', '').strip()
+    modelo = request.form.get('modelo_entrada', '').strip()
+    color = request.form.get('color_entrada', '').strip()
+    memoria = request.form.get('memoria_entrada', '').strip()
+    bateria = request.form.get('bateria_entrada', '').strip()
+    imei1 = request.form.get('imei1_entrada', '').strip()
+    imei2 = request.form.get('imei2_entrada', '').strip() or None
+    inventario = request.form.get('inventario_entrada', 'Usado').strip()
+
+    costo_str = request.form.get('costo_entrada', '0').replace('$', '').replace('.', '').replace(',', '').strip()
+    minimo_str = request.form.get('precio_minimo_entrada', '0').replace('$', '').replace('.', '').replace(',', '').strip()
+    sugerido_str = request.form.get('precio_sugerido_entrada', '0').replace('$', '').replace('.', '').replace(',', '').strip()
+
+    if not modelo or not imei1:
+        flash('El modelo y el IMEI 1 del celular recibido son obligatorios.', 'warning')
+        return redirect(url_for('exchanges_bp.index'))
+
+    existente = Product.query.filter_by(imei=imei1).first()
+    if existente and existente.cantidad_stock > 0:
+        flash(f'El IMEI "{imei1}" ya está activo en inventario ({existente.nombre}).', 'danger')
+        return redirect(url_for('exchanges_bp.index'))
+
+    try:
+        costo_val = Decimal(costo_str or '0')
+        minimo_val = Decimal(minimo_str or '0')
+        sugerido_val = Decimal(sugerido_str or '0')
+
+        partner_obj = ExchangePartner.query.get(partner_id)
+        partner_nombre = partner_obj.nombre if partner_obj else 'Aliado Externo'
+
+        sku_nuevo = f"CAM-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        nombre_nuevo = f"Celular {marca} {modelo} {color} {memoria}".strip()
+
+        nuevo_cel = Product(
+            nombre=nombre_nuevo,
+            sku=sku_nuevo,
+            tipo_inventario='celulares',
+            cantidad_stock=0,
+            precio_costo=costo_val,
+            precio_minimo=minimo_val,
+            precio_sugerido=sugerido_val,
+            imei=imei1,
+            imei2=imei2,
+            marca=marca,
+            modelo_celular=modelo,
+            estado_celular='Usado',
+            color=color or None,
+            bateria=bateria or None,
+            memoria=memoria or None,
+            proveedor=f"Cambio con {partner_nombre}",
+            inventario=inventario,
+            observacion=f"Ingresado por cambio (Pendiente por entregar equipo nuestro a {partner_nombre})."
+        )
+        db.session.add(nuevo_cel)
+        db.session.flush()
+
+        b_stock = get_or_create_branch_stock(dest_branch_id, nuevo_cel.id, None)
+        b_stock.cantidad = 1
+        sync_global_product_stock(nuevo_cel.id, None)
+
+        cambio = DeviceExchange(
+            partner_id=partner_id,
+            user_id=current_user.id,
+            asesor_id=asesor_id,
+            branch_id=dest_branch_id,
+            product_salida_id=None,
+            imei_salida=None,
+            modelo_salida=None,
+            costo_salida=Decimal('0.00'),
+            product_entrada_id=nuevo_cel.id,
+            marca_entrada=marca,
+            modelo_entrada=modelo,
+            color_entrada=color,
+            memoria_entrada=memoria,
+            imei1_entrada=imei1,
+            imei2_entrada=imei2,
+            costo_entrada=costo_val,
+            precio_minimo_entrada=minimo_val,
+            precio_sugerido_entrada=sugerido_val,
+            tipo_flujo='ENTRADA_PRIMERO',
+            estado='PENDIENTE',
+            motivo_salida=motivo_salida or f"Recibido de {partner_nombre}; pendiente entregar equipo nuestro a cambio",
+            fecha_salida=obtener_hora_bogota()
+        )
+        db.session.add(cambio)
+        db.session.flush()
+
+        ajuste = StockAdjustment(
+            product_id=nuevo_cel.id,
+            admin_id=current_user.id,
+            branch_id=dest_branch_id,
+            tipo_movimiento=f'Entrada por Cambio #{cambio.id} (Pendiente entrega a {partner_nombre})',
+            stock_anterior=0,
+            stock_nuevo=1
+        )
+        db.session.add(ajuste)
+
+        AuditLog.registrar(
+            action='ENTRADA_CAMBIO_CELULAR',
+            user_id=current_user.id,
+            motivo=f'Recibido celular {nombre_nuevo} (IMEI {imei1}) de {partner_nombre}, quedando pendiente entregar equipo nuestro.',
+            target_id=cambio.id,
+            target_type='DEVICE_EXCHANGE'
+        )
+
+        db.session.commit()
+        flash(f'Celular "{nombre_nuevo}" ingresado al inventario. El cambio #{cambio.id} quedó PENDIENTE por entregar tu equipo a "{partner_nombre}".', 'success')
+        return redirect(url_for('exchanges_bp.index'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al registrar entrada de cambio: {str(e)}', 'danger')
+        return redirect(url_for('exchanges_bp.index'))
+
+
+@exchanges_bp.route('/entregar/<int:exchange_id>', methods=['POST'])
+@login_required
+def entregar_celular_cambio(exchange_id):
+    """Entrega un celular de nuestro inventario para saldar y completar un cambio ENTRADA_PRIMERO."""
+    cambio = DeviceExchange.query.get_or_404(exchange_id)
+    if cambio.estado != 'PENDIENTE' or cambio.tipo_flujo != 'ENTRADA_PRIMERO':
+        flash('Este cambio no está pendiente de entrega.', 'warning')
+        return redirect(url_for('exchanges_bp.index'))
+
+    product_salida_id = request.form.get('product_salida_id', type=int)
+    asesor_id = request.form.get('asesor_id', type=int)
+    obs_resolucion = request.form.get('observacion_resolucion', '').strip()
+
+    if not product_salida_id:
+        flash('Debes seleccionar el celular de tu inventario que estás entregando.', 'warning')
+        return redirect(url_for('exchanges_bp.index'))
+
+    celular = Product.query.get_or_404(product_salida_id)
+    if celular.cantidad_stock <= 0:
+        flash(f'El equipo "{celular.nombre}" no tiene stock disponible.', 'danger')
+        return redirect(url_for('exchanges_bp.index'))
+
+    # Determinar sede donde está el equipo a entregar
+    branch_salida_id = cambio.branch_id or (current_user.branch_id or 1)
+    for bs in celular.branch_stocks:
+        if bs.cantidad > 0:
+            branch_salida_id = bs.branch_id
+            break
+
+    try:
+        b_stock = get_or_create_branch_stock(branch_salida_id, celular.id, None, for_update=True)
+        if b_stock.cantidad <= 0:
+            flash(f'No hay stock disponible de "{celular.nombre}" en la sede seleccionada.', 'danger')
+            return redirect(url_for('exchanges_bp.index'))
+
+        stock_ant = b_stock.cantidad
+        b_stock.cantidad -= 1
+        sync_global_product_stock(celular.id, None)
+
+        cambio.product_salida_id = celular.id
+        cambio.imei_salida = celular.imei
+        cambio.modelo_salida = celular.modelo_celular or celular.nombre
+        cambio.costo_salida = celular.precio_costo
+        if asesor_id:
+            cambio.asesor_id = asesor_id
+        cambio.estado = 'COMPLETADO'
+        cambio.resolved_by_id = current_user.id
+        cambio.fecha_resolucion = obtener_hora_bogota()
+        cambio.observacion_resolucion = obs_resolucion or f"Entregado {celular.modelo_celular or celular.nombre} (IMEI: {celular.imei}) para saldar cambio"
+
+        partner_nom = cambio.partner.nombre if cambio.partner else 'Aliado'
+        ajuste = StockAdjustment(
+            product_id=celular.id,
+            admin_id=current_user.id,
+            branch_id=branch_salida_id,
+            tipo_movimiento=f'Salida para saldar Cambio #{cambio.id} ({partner_nom})',
+            stock_anterior=stock_ant,
+            stock_nuevo=b_stock.cantidad
+        )
+        db.session.add(ajuste)
+
+        AuditLog.registrar(
+            action='ENTREGAR_CAMBIO_CELULAR',
+            user_id=current_user.id,
+            motivo=f'Saldado cambio #{cambio.id}. Se entregó {celular.nombre} (IMEI {celular.imei}) a {partner_nom}',
+            target_id=cambio.id,
+            target_type='DEVICE_EXCHANGE'
+        )
+
+        db.session.commit()
+        flash(f'¡Cambio #{cambio.id} completado! Se descontó "{celular.nombre}" del inventario y quedó saldado.', 'success')
+        return redirect(url_for('exchanges_bp.index'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al registrar entrega del cambio: {str(e)}', 'danger')
+        return redirect(url_for('exchanges_bp.index'))
+
+
+@exchanges_bp.route('/cancelar-entrada/<int:exchange_id>', methods=['POST'])
+@login_required
+def cancelar_entrada_cambio(exchange_id):
+    """Cancela un cambio ENTRADA_PRIMERO devolviendo el equipo recibido al aliado (si no se ha vendido)."""
+    cambio = DeviceExchange.query.get_or_404(exchange_id)
+    if cambio.estado != 'PENDIENTE' or cambio.tipo_flujo != 'ENTRADA_PRIMERO':
+        flash('Este cambio no se puede cancelar por esta vía.', 'warning')
+        return redirect(url_for('exchanges_bp.index'))
+
+    prod_entrada = cambio.producto_entrada
+    if not prod_entrada or prod_entrada.cantidad_stock <= 0:
+        flash('No se puede devolver el equipo recibido porque ya fue vendido o no tiene stock en inventario. Debes saldar el cambio entregando otro celular.', 'danger')
+        return redirect(url_for('exchanges_bp.index'))
+
+    branch_id = cambio.branch_id or (current_user.branch_id or 1)
+    for bs in prod_entrada.branch_stocks:
+        if bs.cantidad > 0:
+            branch_id = bs.branch_id
+            break
+
+    try:
+        b_stock = get_or_create_branch_stock(branch_id, prod_entrada.id, None, for_update=True)
+        stock_ant = b_stock.cantidad
+        b_stock.cantidad = max(0, b_stock.cantidad - 1)
+        sync_global_product_stock(prod_entrada.id, None)
+
+        cambio.estado = 'DEVUELTO'
+        cambio.resolved_by_id = current_user.id
+        cambio.fecha_resolucion = obtener_hora_bogota()
+        cambio.observacion_resolucion = request.form.get('observacion_devolucion', '').strip() or 'Cambio cancelado. Se devolvió el celular recibido al aliado.'
+
+        ajuste = StockAdjustment(
+            product_id=prod_entrada.id,
+            admin_id=current_user.id,
+            branch_id=branch_id,
+            tipo_movimiento=f'Cancelación de Cambio #{cambio.id} (Devolución a aliado)',
+            stock_anterior=stock_ant,
+            stock_nuevo=b_stock.cantidad
+        )
+        db.session.add(ajuste)
+
+        AuditLog.registrar(
+            action='CANCELAR_ENTRADA_CAMBIO_CELULAR',
+            user_id=current_user.id,
+            motivo=f'Cancelado cambio #{cambio.id}. Se retiró del stock {prod_entrada.nombre} por devolución al aliado.',
+            target_id=cambio.id,
+            target_type='DEVICE_EXCHANGE'
+        )
+
+        db.session.commit()
+        flash(f'Cambio #{cambio.id} cancelado y "{prod_entrada.nombre}" retirado del inventario.', 'success')
+        return redirect(url_for('exchanges_bp.index'))
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al cancelar el cambio: {str(e)}', 'danger')
         return redirect(url_for('exchanges_bp.index'))
 

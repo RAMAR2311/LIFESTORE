@@ -1266,13 +1266,13 @@ class DeviceExchange(db.Model):
     resolved_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
 
-    # Equipo que sale del inventario
-    product_salida_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    # Equipo que sale del inventario (nullable=True para soportar flujo ENTRADA_PRIMERO)
+    product_salida_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True, index=True)
     imei_salida = db.Column(db.String(50), nullable=True, index=True)
     modelo_salida = db.Column(db.String(150), nullable=True)
     costo_salida = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
 
-    # Equipo que se recibe a cambio (cuando se completa)
+    # Equipo que se recibe a cambio (cuando se completa o cuando entra primero)
     product_entrada_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True, index=True)
     marca_entrada = db.Column(db.String(100), nullable=True)
     modelo_entrada = db.Column(db.String(150), nullable=True)
@@ -1284,6 +1284,8 @@ class DeviceExchange(db.Model):
     precio_minimo_entrada = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
     precio_sugerido_entrada = db.Column(db.Numeric(12, 2), nullable=True, default=0.0)
 
+    # Dirección del flujo: 'SALIDA_PRIMERO' | 'ENTRADA_PRIMERO'
+    tipo_flujo = db.Column(db.String(30), nullable=False, default='SALIDA_PRIMERO')
     # Estado y Trazabilidad: 'PENDIENTE', 'COMPLETADO', 'DEVUELTO'
     estado = db.Column(db.String(20), nullable=False, default='PENDIENTE', index=True)
     motivo_salida = db.Column(db.Text, nullable=True)
