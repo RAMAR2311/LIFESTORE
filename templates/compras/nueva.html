@@ -52,8 +52,20 @@
                             </div>
                         </div>
 
+                        <!-- Sede / Bodega Destino -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-uppercase">Sede / Bodega de Ingreso</label>
+                            <select name="branch_id" class="form-select fw-semibold">
+                                {% for b in sucursales %}
+                                    <option value="{{ b.id }}" {% if active_b_id == b.id %}selected{% endif %}>
+                                        {{ b.nombre }} ({{ b.codigo }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
                         <!-- Número de Factura -->
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label fw-bold small text-uppercase">Número de Factura / Remisión</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-white" style="border-color: var(--brand-border);"><i class="fa-solid fa-hashtag text-muted"></i></span>
@@ -62,7 +74,7 @@
                         </div>
 
                         <!-- Observaciones -->
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label fw-bold small text-uppercase">Observaciones de la Entrega</label>
                             <input type="text" name="observaciones" class="form-control" placeholder="Detalles de garantía con proveedor, estado del paquete, etc.">
                         </div>
@@ -444,12 +456,14 @@
                             <div class="row g-2 mt-1">
                                 <div class="col-6">
                                     <input type="text" class="form-control form-control-sm font-mono" 
-                                           placeholder="IMEI 1" value="${it.imei || ''}" 
+                                           placeholder="IMEI 1 / Serial" value="${it.imei || ''}" 
+                                           oninput="actualizarImei(${idx}, 'imei', this.value)"
                                            onchange="actualizarImei(${idx}, 'imei', this.value)">
                                 </div>
                                 <div class="col-6">
                                     <input type="text" class="form-control form-control-sm font-mono" 
                                            placeholder="IMEI 2 (Opcional)" value="${it.imei2 || ''}" 
+                                           oninput="actualizarImei(${idx}, 'imei2', this.value)"
                                            onchange="actualizarImei(${idx}, 'imei2', this.value)">
                                 </div>
                             </div>

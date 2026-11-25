@@ -45,20 +45,20 @@
 
     <!-- Tabla de Historial de Compras -->
     <div class="col-12">
-        <div class="card shadow-sm p-4">
-            <h5 class="fw-bold mb-3"><i class="fa-solid fa-clock-rotate-left me-2" style="color: var(--brand-primary);"></i> Historial de Ingresos de Mercancía</h5>
+        <div class="card shadow-sm p-4 mb-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-clock-rotate-left me-2" style="color: var(--brand-primary);"></i> Historial de Órdenes de Compra (Abastecimiento)</h5>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead>
                         <tr>
                             <th width="8%">ID Compra</th>
                             <th width="12%">Fecha</th>
-                            <th width="12%">Inventario</th>
-                            <th width="20%">Proveedor</th>
-                            <th width="15%">No. Factura</th>
-                            <th width="10%" class="text-center">Items</th>
-                            <th width="13%" class="text-end">Total Costo</th>
-                            <th width="10%" class="text-center">Acciones</th>
+                            <th width="10%">Inventario</th>
+                            <th width="18%">Proveedor</th>
+                            <th width="25%">Productos / Seriales (IMEI)</th>
+                            <th width="8%" class="text-center">Items</th>
+                            <th width="11%" class="text-end">Total Costo</th>
+                            <th width="8%" class="text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -79,9 +79,21 @@
                             </td>
                             <td class="fw-semibold">
                                 {{ c.proveedor.nombre if c.proveedor else 'Sin Proveedor' }}
+                                {% if c.numero_factura %}<small class="d-block font-mono text-muted">Ref: {{ c.numero_factura }}</small>{% endif %}
                             </td>
-                            <td class="font-mono text-muted">
-                                {{ c.numero_factura or 'S/N' }}
+                            <td>
+                                {% for it in c.items[:3] %}
+                                    <div class="small text-dark">
+                                        <strong>{{ it.cantidad }}x</strong> {{ it.producto.nombre if it.producto else 'Producto' }}
+                                        {% set ser = it.imei or (it.producto.imei if it.producto else '') %}
+                                        {% if ser %}
+                                            <span class="badge bg-light text-dark border font-mono ms-1">IMEI/SN: {{ ser|replace('-EXT', '') }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                                {% if c.items|length > 3 %}
+                                    <small class="text-muted">+ {{ c.items|length - 3 }} ítems más...</small>
+                                {% endif %}
                             </td>
                             <td class="text-center font-mono fw-bold">
                                 {{ c.items|sum(attribute='cantidad') }} uds
@@ -97,12 +109,9 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
-                                <i class="fa-solid fa-cart-flatbed fa-3x mb-3 text-secondary opacity-50"></i>
-                                <p class="mb-2">No se han registrado órdenes de compra aún.</p>
-                                <a href="{{ url_for('purchases_bp.nueva') }}" class="btn btn-sm btn-pink rounded-pill px-4">
-                                    Registrar Primera Compra
-                                </a>
+                            <td colspan="8" class="text-center py-4 text-muted">
+                                <i class="fa-solid fa-cart-flatbed fa-2x mb-2 text-secondary opacity-50"></i>
+                                <p class="mb-2">No se han registrado órdenes de compra directas aún.</p>
                             </td>
                         </tr>
                         {% endfor %}
@@ -110,6 +119,55 @@
                 </table>
             </div>
         </div>
+
+        {% if compras_externas %}
+        <div class="card shadow-sm p-4">
+            <h5 class="fw-bold mb-1"><i class="fa-solid fa-truck-ramp-box me-2 text-success"></i> Compras Directas / Equipos y Accesorios Externos (Ingresados en Caja o Proveedor)</h5>
+            <p class="text-muted small mb-3">Equipos y accesorios comprados a proveedores externos desde Caja Visual o módulo Externos con su Serial / IMEI.</p>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Producto / Equipo</th>
+                            <th>Serial / IMEI</th>
+                            <th>Proveedor</th>
+                            <th class="text-end">Costo Compra</th>
+                            <th class="text-end">P. Venta</th>
+                            <th class="text-center">Factura Venta</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ext in compras_externas %}
+                        <tr>
+                            <td class="text-muted small">{{ ext.fecha_creacion.strftime('%d/%m/%Y %H:%M') if ext.fecha_creacion else '-' }}</td>
+                            <td class="fw-bold text-dark">{{ ext.nombre|replace('Externo ', '')|replace('Acc. Externo ', '') }}</td>
+                            <td class="font-mono">
+                                {% if ext.imei %}
+                                    <span class="badge bg-dark text-white font-mono">{{ ext.imei|replace('-EXT', '') }}</span>
+                                {% else %}
+                                    <span class="text-muted small">S/N</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-semibold">{{ ext.proveedor or 'Directo' }}</td>
+                            <td class="text-end font-mono text-danger fw-bold">${{ (ext.precio_costo or 0)|cop }}</td>
+                            <td class="text-end font-mono text-success fw-bold">${{ (ext.precio_sugerido or 0)|cop }}</td>
+                            <td class="text-center">
+                                {% if ext.detalles_venta %}
+                                    <a href="{{ url_for('sales_bp.imprimir_ticket', sale_id=ext.detalles_venta[0].sale_id) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                                        <i class="fa-solid fa-file-invoice me-1"></i> Ver Factura
+                                    </a>
+                                {% else %}
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill">En Stock</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

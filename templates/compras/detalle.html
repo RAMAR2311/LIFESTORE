@@ -81,9 +81,11 @@
                                 {% if item.variante %}
                                     <span class="badge bg-secondary">{{ item.variante.nombre_variante }}</span>
                                 {% endif %}
-                                {% if item.imei %}
+                                {% set ser_imei = item.imei or (item.producto.imei if item.producto else '') %}
+                                {% set ser_imei2 = item.imei2 or (item.producto.imei2 if item.producto else '') %}
+                                {% if ser_imei %}
                                     <div class="small font-mono text-muted mt-1">
-                                        <i class="fa-solid fa-barcode me-1"></i> IMEI: {{ item.imei }} {% if item.imei2 %} | IMEI 2: {{ item.imei2 }}{% endif %}
+                                        <i class="fa-solid fa-barcode me-1"></i> IMEI / Serial: <strong>{{ ser_imei|replace('-EXT', '') }}</strong> {% if ser_imei2 %} | IMEI 2: {{ ser_imei2|replace('-EXT', '') }}{% endif %}
                                     </div>
                                 {% endif %}
                             </td>
