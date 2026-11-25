@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
-from models import db, ExchangePartner, DeviceExchange, Product, Branch, StockAdjustment, AuditLog
+from models import db, ExchangePartner, DeviceExchange, Product, Branch, StockAdjustment, AuditLog, BranchStock, Asesor
 from services.stock_service import get_or_create_branch_stock, sync_global_product_stock
 from datetime import datetime
 from decimal import Decimal
@@ -49,7 +49,6 @@ def index():
     cambios = query.order_by(DeviceExchange.fecha_salida.desc()).all()
     partners = ExchangePartner.query.filter_by(activo=True).order_by(ExchangePartner.nombre.asc()).all()
     sucursales = Branch.query.order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
-    from models import Asesor
     asesores = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
 
     # Conteos para métricas
@@ -72,6 +71,11 @@ def index():
         celulares_disp_q = celulares_disp_q.join(
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == current_user.branch_id)
+        ).filter(BranchStock.cantidad > 0)
+    elif session.get('active_branch_id'):
+        celulares_disp_q = celulares_disp_q.join(
+            BranchStock,
+            (BranchStock.product_id == Product.id) & (BranchStock.branch_id == int(session.get('active_branch_id')))
         ).filter(BranchStock.cantidad > 0)
     celulares_disponibles = celulares_disp_q.order_by(Product.nombre.asc()).all()
 
