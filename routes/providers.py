@@ -7,6 +7,18 @@ from flask_login import login_required, current_user
 from models import db, Provider, ProviderInvoice, ProviderPayment, Branch, Expense, Sale, CashShift, obtener_hora_bogota
 from decorators import admin_required
 
+def _parse_monto_moneda(raw_val):
+    """Convierte un valor formateado con puntos o comas de miles (ej. '1.550.000' o '1550000,00') a float entero limpio."""
+    if not raw_val:
+        return 0.0
+    s = str(raw_val).replace('$', '').strip()
+    # Si termina en ,00 o .00 (decimales de Numeric(12,2)), remover esa parte decimal primero
+    import re
+    s = re.sub(r'[,\.]00$', '', s)
+    # Quitar todos los separadores de miles (puntos, comas, espacios)
+    digits = re.sub(r'[^\d]', '', s)
+    return float(digits) if digits else 0.0
+
 def _obtener_locales_con_saldo():
     """Retorna únicamente los locales comerciales (tipo='tienda', excluyendo bodega) que tengan saldo a favor > 0."""
     hoy = obtener_hora_bogota().date()
@@ -204,10 +216,7 @@ def detail(id):
 def add_invoice(id):
     proveedor = Provider.query.get_or_404(id)
     
-    try:
-        monto_total = float(request.form.get('monto_total', 0))
-    except ValueError:
-        monto_total = 0.0
+    monto_total = _parse_monto_moneda(request.form.get('monto_total', '0'))
 
     if monto_total <= 0:
         flash('El monto de la factura debe ser mayor a 0.', 'danger')
@@ -254,10 +263,7 @@ def add_invoice(id):
 def add_payment(id):
     proveedor = Provider.query.get_or_404(id)
     
-    try:
-        monto_abonado = float(request.form.get('monto_abonado', 0))
-    except ValueError:
-        monto_abonado = 0.0
+    monto_abonado = _parse_monto_moneda(request.form.get('monto_abonado', '0'))
 
     if monto_abonado <= 0:
         flash('El monto del abono debe ser mayor a 0.', 'danger')
@@ -449,10 +455,7 @@ def edit_invoice(invoice_id):
     factura = ProviderInvoice.query.get_or_404(invoice_id)
     provider_id = factura.provider_id
 
-    try:
-        monto_total = float(request.form.get('monto_total', 0))
-    except ValueError:
-        monto_total = 0.0
+    monto_total = _parse_monto_moneda(request.form.get('monto_total', '0'))
 
     if monto_total <= 0:
         flash('El monto de la factura debe ser mayor a 0.', 'danger')
@@ -503,10 +506,7 @@ def edit_payment(payment_id):
     provider_id = pago.provider_id
     proveedor = Provider.query.get(provider_id)
 
-    try:
-        monto_abonado = float(request.form.get('monto_abonado', 0))
-    except ValueError:
-        monto_abonado = 0.0
+    monto_abonado = _parse_monto_moneda(request.form.get('monto_abonado', '0'))
 
     if monto_abonado <= 0:
         flash('El monto del abono debe ser mayor a 0.', 'danger')
