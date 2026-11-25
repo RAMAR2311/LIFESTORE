@@ -351,7 +351,8 @@ def create_app():
             "ALTER TABLE retomas ADD COLUMN asesores_recepcion_ids TEXT;",
             "ALTER TABLE device_exchanges ALTER COLUMN product_salida_id DROP NOT NULL;",
             "ALTER TABLE device_exchanges ADD COLUMN tipo_flujo VARCHAR(30) DEFAULT 'SALIDA_PRIMERO';",
-            "UPDATE device_exchanges SET tipo_flujo = 'SALIDA_PRIMERO' WHERE tipo_flujo IS NULL;"
+            "UPDATE device_exchanges SET tipo_flujo = 'SALIDA_PRIMERO' WHERE tipo_flujo IS NULL;",
+            "UPDATE products SET memoria = UPPER(REPLACE(TRIM(memoria), ' ', '')) WHERE memoria IS NOT NULL AND TRIM(memoria) != '' AND UPPER(TRIM(memoria)) != 'N/A';"
         ]
         for q in queries:
             try:

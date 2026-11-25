@@ -716,10 +716,25 @@ def enviar_soporte_lote():
 
     return redirect(url_for('celulares_bp.inventario'))
 
+def _normalizar_capacidad_memoria(val):
+    """Normaliza capacidades quitando espacios y estandarizando mayúsculas (ej. '256 GB' -> '256GB', '1 TB' -> '1T')."""
+    if not val:
+        return ''
+    clean = ''.join(str(val).split()).upper()
+    if clean in ('', 'N/A', 'NA', 'NONE', '-'):
+        return ''
+    if clean in ('1TB', '1000GB', '1024GB'):
+        return '1T'
+    if clean in ('2TB', '2000GB', '2048GB'):
+        return '2T'
+    if clean.isdigit() and clean in ('32', '64', '128', '256', '512'):
+        return f'{clean}GB'
+    return clean
+
 @celulares_bp.route('/api/referencias-modelos', methods=['GET'])
 @login_required
 def api_referencias_modelos():
-    """Devuelve las referencias de celulares desglosadas por capacidad (memoria) con conteo y precios actuales."""
+    """Devuelve las referencias de celulares desglosadas por capacidad normalizada (ej. '256 GB' y '256GB' unificados)."""
     filas = db.session.query(
         Product.modelo_celular,
         Product.memoria,
@@ -740,9 +755,9 @@ def api_referencias_modelos():
     modelos_map = {}
     for f in filas:
         mod_name = f.modelo_celular
-        mem_raw = (f.memoria or '').strip()
-        mem_key = mem_raw if (mem_raw and mem_raw.upper() != 'N/A') else '__SIN_MEMORIA__'
-        mem_label = mem_raw if (mem_raw and mem_raw.upper() != 'N/A') else 'Sin capacidad / N/A'
+        mem_norm = _normalizar_capacidad_memoria(f.memoria)
+        mem_key = mem_norm if mem_norm else '__SIN_MEMORIA__'
+        mem_label = mem_norm if mem_norm else 'Sin capacidad / N/A'
 
         if mod_name not in modelos_map:
             modelos_map[mod_name] = {
@@ -767,8 +782,8 @@ def api_referencias_modelos():
         if p_cos > entry['precio_costo']:
             entry['precio_costo'] = p_cos
 
-        # Unificar si hay dos variantes con el mismo mem_key (ej. None y '')
-        cap_existente = next((c for c in entry['capacidades'] if c['key'].lower() == mem_key.lower()), None)
+        # Unificar capacidades equivalentes (ej. '256 GB' y '256GB' comparten mem_key == '256GB')
+        cap_existente = next((c for c in entry['capacidades'] if c['key'] == mem_key), None)
         if cap_existente:
             cap_existente['cantidad'] += f.total
             cap_existente['precio_minimo'] = max(cap_existente['precio_minimo'], p_min)
@@ -814,32 +829,23 @@ def editar_precios_masivo():
         flash('Debe marcar al menos un precio para actualizar (Costo, Mínimo o Sugerido).', 'warning')
         return redirect(url_for('celulares_bp.inventario'))
 
-    # Buscar celulares activos con ese modelo y capacidad
-    query_cel = Product.query.filter(
+    # Buscar celulares activos de ese modelo y filtrar por capacidad normalizada (incluye con o sin espacio)
+    todos_modelo = Product.query.filter(
         Product.tipo_inventario == 'celulares',
         Product.modelo_celular == modelo_celular,
         Product.cantidad_stock > 0
-    )
+    ).all()
 
     if memoria_celular == '__SIN_MEMORIA__':
-        from sqlalchemy import or_
-        query_cel = query_cel.filter(
-            or_(
-                Product.memoria == None,
-                Product.memoria == '',
-                db.func.upper(db.func.trim(Product.memoria)) == 'N/A'
-            )
-        )
+        celulares = [c for c in todos_modelo if not _normalizar_capacidad_memoria(c.memoria)]
         cap_desc = 'Sin capacidad / N/A'
     elif memoria_celular != '__TODAS__':
-        query_cel = query_cel.filter(
-            db.func.lower(db.func.trim(Product.memoria)) == memoria_celular.lower()
-        )
-        cap_desc = memoria_celular
+        target_norm = _normalizar_capacidad_memoria(memoria_celular)
+        celulares = [c for c in todos_modelo if _normalizar_capacidad_memoria(c.memoria) == target_norm]
+        cap_desc = target_norm
     else:
+        celulares = todos_modelo
         cap_desc = 'Todas las capacidades'
-
-    celulares = query_cel.all()
 
     if not celulares:
         flash(f'No se encontraron celulares activos de la referencia "{modelo_celular}" ({cap_desc}).', 'info')
@@ -847,6 +853,10 @@ def editar_precios_masivo():
 
     count = 0
     for cel in celulares:
+        # Aprovechar para dejar estandarizada la memoria sin espacios (ej. '256 GB' -> '256GB')
+        mem_estandar = _normalizar_capacidad_memoria(cel.memoria)
+        if mem_estandar and cel.memoria != mem_estandar:
+            cel.memoria = mem_estandar
         if aplicar_costo and costo_str:
             cel.precio_costo = float(costo_str)
         if aplicar_minimo and minimo_str:
