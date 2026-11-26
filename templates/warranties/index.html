@@ -13,89 +13,129 @@
     </div>
 </div>
 
-<div class="card card-custom p-0 shadow-sm border-0">
-    <div class="card-header bg-white border-0 py-3 ps-4 pe-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h5 class="fw-bold m-0 text-muted">Historial de Garantías Registradas</h5>
-        <div class="input-group shadow-sm" style="max-width: 420px;">
-            <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
-            <input type="text" id="warrantySearchInput" class="form-control bg-light border-start-0 ps-0 buscador-predictivo"
+{% set total_gar = warranties|length %}
+{% set pend_gar = warranties|selectattr('resolution', 'equalto', 'Pendiente')|list|length %}
+{% set cel_gar = warranties|selectattr('es_celular')|list|length %}
+{% set acc_gar = total_gar - cel_gar %}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #f8fafc);">
+            <div class="fs-2 fw-bold text-brand-black">{{ total_gar }}</div>
+            <div class="text-muted small fw-bold text-uppercase">Total Garantías</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #fffbeb);">
+            <div class="fs-2 fw-bold text-warning-emphasis">{{ pend_gar }}</div>
+            <div class="text-muted small fw-bold text-uppercase">Pendientes por Resolver</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #eff6ff);">
+            <div class="fs-2 fw-bold text-primary">{{ cel_gar }}</div>
+            <div class="text-muted small fw-bold text-uppercase">Equipos Celulares (Taller)</div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #fff5f5);">
+            <div class="fs-2 fw-bold text-danger">{{ acc_gar }}</div>
+            <div class="text-muted small fw-bold text-uppercase">Accesorios (Reposición / Pérdida)</div>
+        </div>
+    </div>
+</div>
+
+<div class="card card-custom p-0 shadow-sm border-0 overflow-hidden">
+    <div class="card-header bg-white border-bottom py-3 ps-4 pe-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold m-0 text-brand-black">Historial de Garantías Registradas</h5>
+            <small class="text-muted">Los celulares se derivan a <strong>Soporte Técnico</strong>; los accesorios se envían a <strong>Pérdidas con Reposición de Stock</strong>.</small>
+        </div>
+        <div class="input-group shadow-sm rounded-pill border overflow-hidden" style="max-width: 420px;">
+            <span class="input-group-text bg-white border-0 text-muted ps-3"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <input type="text" id="warrantySearchInput" class="form-control bg-white border-0 shadow-none ps-2 buscador-predictivo"
                    placeholder="Buscar factura, cliente, artículo, IMEI o estado..." autocomplete="off">
-            <button class="btn btn-outline-secondary border-start-0" type="button" onclick="document.getElementById('warrantySearchInput').value=''; document.getElementById('warrantySearchInput').dispatchEvent(new Event('input'));" title="Limpiar">
+            <button class="btn btn-white bg-white border-0 text-muted pe-3" type="button" onclick="document.getElementById('warrantySearchInput').value=''; document.getElementById('warrantySearchInput').dispatchEvent(new Event('input'));" title="Limpiar">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
     </div>
     <div class="table-responsive" style="overflow: visible;">
-        <table class="table table-hover align-middle mb-0 text-center w-100" style="font-size: 0.9rem;">
-            <thead class="bg-light text-nowrap">
+        <table class="table table-hover align-middle mb-0 text-center w-100" style="font-size: 0.88rem;">
+            <thead class="bg-dark text-white text-nowrap">
                 <tr>
-                    <th class="ps-4 text-start">FECHA / INGRESO</th>
-                    <th class="text-start">FACTURA / CLIENTE</th>
-                    <th>ARTÍCULO / IMEI</th>
-                    <th>CUSTODIA (RECEPCIÓN / ENTREGA)</th>
-                    <th>ESTADO</th>
-                    <th class="text-end pe-4">ACCIONES</th>
+                    <th class="ps-4 py-3 text-start">ID / FECHA INGRESO</th>
+                    <th class="py-3 text-start">FACTURA / CLIENTE</th>
+                    <th class="py-3 text-start">ARTÍCULO &amp; FALLA REPORTADA</th>
+                    <th class="py-3 text-start">TRAZABILIDAD / CUSTODIA</th>
+                    <th class="py-3">ESTADO</th>
+                    <th class="text-end pe-4 py-3">ACCIONES</th>
                 </tr>
             </thead>
-            <tbody class="text-nowrap">
+            <tbody>
                 {% for w in warranties %}
                 <tr>
-                    <td class="ps-4 text-start">
-                        <div class="fw-bold text-dark">{{ w.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
-                        <div class="small text-muted">{{ w.tiempo_transcurrido }}</div>
+                    <td class="ps-4 text-start text-nowrap">
+                        <div class="fw-bold text-brand-black">#{{ w.id }} · {{ w.created_at.strftime('%d/%m/%Y') }}</div>
+                        <div class="small text-muted">{{ w.created_at.strftime('%I:%M %p') }} · <span class="text-primary fw-semibold">{{ w.tiempo_transcurrido }}</span></div>
+                        {% if w.branch %}
+                        <span class="badge bg-light text-dark border mt-1" style="font-size: 0.68rem;">📍 {{ w.branch.nombre }}</span>
+                        {% endif %}
                     </td>
-                    <td class="text-start">
-                        <div class="fw-bold">Fac #{{ w.sale_id }}</div>
-                        <div class="small text-muted">{{ w.sale.cliente.nombre if w.sale and w.sale.cliente else 'Sin cliente' }}</div>
+                    <td class="text-start text-nowrap">
+                        <div class="fw-bold text-dark">
+                            <i class="fa-solid fa-file-invoice text-muted me-1"></i>
+                            {{ w.sale.numero_factura if (w.sale and w.sale.numero_factura) else ('Fac #' ~ w.sale_id) }}
+                        </div>
+                        <div class="small fw-semibold text-secondary">{{ w.sale.cliente.nombre if w.sale and w.sale.cliente else 'Consumidor Final' }}</div>
+                        {% if w.sale and w.sale.cliente and w.sale.cliente.documento %}
+                        <div class="extra-small text-muted font-mono">CC: {{ w.sale.cliente.documento }}</div>
+                        {% endif %}
                     </td>
-                    <td class="text-start" style="max-width: 240px;">
-                        <div class="d-flex align-items-center gap-1 mb-1">
+                    <td class="text-start" style="min-width: 250px; max-width: 310px;">
+                        <div class="d-flex align-items-center flex-wrap gap-1 mb-1">
                             {% if w.es_celular %}
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.68rem;">
+                                <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5" style="font-size: 0.68rem;">
                                     <i class="fa-solid fa-mobile-screen-button me-1"></i>CELULAR
                                 </span>
                             {% else %}
-                                <span class="badge bg-warning-subtle text-dark border border-warning" style="font-size: 0.68rem;">
+                                <span class="badge rounded-pill bg-warning-subtle text-dark border border-warning px-2 py-0.5" style="font-size: 0.68rem;">
                                     <i class="fa-solid fa-plug me-1"></i>ACCESORIO
                                 </span>
                             {% endif %}
                             {% if w.product and w.product.sku %}
-                                <small class="text-muted font-mono" style="font-size: 0.72rem;">{{ w.product.sku }}</small>
+                                <span class="badge bg-light text-secondary border font-mono" style="font-size: 0.68rem;">{{ w.product.sku }}</span>
+                            {% endif %}
+                            {% if w.product and w.product.imei %}
+                                <span class="badge bg-dark text-white font-mono" style="font-size: 0.68rem;">IMEI: {{ w.product.imei }}</span>
                             {% endif %}
                         </div>
-                        <div class="text-truncate fw-semibold" title="{{ w.product.nombre if w.product else w.nombre_manual }}">
+                        <div class="fw-bold text-brand-black text-wrap" style="line-height: 1.25;">
                             {{ w.product.nombre if w.product else w.nombre_manual }}
                             {% if w.variant %}
-                                <span class="text-muted small">({{ w.variant.nombre_variante }})</span>
+                                <span class="badge bg-secondary-subtle text-dark border ms-1">{{ w.variant.nombre_variante }}</span>
                             {% endif %}
                         </div>
-                        {% if w.product and w.product.imei %}
-                            <small class="badge bg-dark text-white font-mono px-2 py-0">IMEI: {{ w.product.imei }}</small>
-                        {% endif %}
-                        <div class="text-truncate text-muted small mt-1" title="{{ w.motivo_reportado or w.reason }}">
+                        <div class="text-muted small mt-1 text-wrap" style="font-size: 0.78rem; line-height: 1.25;">
                             <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>{{ w.motivo_reportado or w.reason }}
                         </div>
                     </td>
-                    <td class="text-start">
-                        <div>
-                            <span class="badge bg-secondary bg-opacity-25 text-brand-black border border-secondary border-opacity-50 small">
-                                <i class="fa-solid fa-user-shield text-primary me-1"></i> Recibió: <strong>{{ w.recibido_por.nombre_completo or w.recibido_por.username if w.recibido_por else 'Asesor Tienda' }}</strong>
+                    <td class="text-start text-nowrap">
+                        <div class="d-flex flex-column gap-1">
+                            <span class="badge bg-light text-dark border text-start fw-normal px-2 py-1">
+                                <i class="fa-solid fa-user-shield text-primary me-1"></i> Recibió: <strong>{{ w.recibido_por.nombre if w.recibido_por else 'Tienda' }}</strong>
                             </span>
+                            {% if w.asesor %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle text-start fw-normal px-2 py-1">
+                                <i class="fa-solid fa-user-tie me-1"></i> Asesor: <strong>{{ w.asesor.nombre }}</strong>
+                            </span>
+                            {% endif %}
+                            {% if w.entregado_por %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle text-start fw-normal px-2 py-1">
+                                <i class="fa-solid fa-circle-check me-1"></i> Resolvió: <strong>{{ w.entregado_por.nombre }}</strong>
+                            </span>
+                            {% endif %}
                         </div>
-                        {% if w.asesor %}
-                            <div class="mt-1">
-                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 small">
-                                    <i class="fa-solid fa-user-tie me-1"></i> Asesor: <strong>{{ w.asesor.nombre }}</strong>
-                                </span>
-                            </div>
-                        {% endif %}
-                        {% if w.entregado_por %}
-                            <div class="mt-1">
-                                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-50 small">
-                                    <i class="fa-solid fa-circle-check me-1"></i> Entregó: <strong>{{ w.entregado_por.nombre_completo or w.entregado_por.username }}</strong>
-                                </span>
-                            </div>
-                        {% endif %}
                     </td>
                     <td>
                         {% set estado = w.estado_actual %}
@@ -511,6 +551,107 @@
         }
     }
 
+    const ACCESORIOS_CATALOGO = [
+        {% for acc in accesorios_disponibles %}
+        {
+            id: {{ acc.id }},
+            sku: {{ (acc.sku or '')|tojson }},
+            nombre: {{ (acc.nombre or '')|tojson }},
+            costo: {{ (acc.precio_costo or 0)|float }},
+            stock_global: {{ (acc.total_stock or 0)|int }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    function normAccStr(s) {
+        return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    }
+
+    ACCESORIOS_CATALOGO.forEach(a => {
+        a._search = normAccStr(`${a.sku} ${a.sku.replace(/-/g, '')} ${a.nombre}`);
+    });
+
+    function seleccionarAccesorioReposicion(id, labelText) {
+        const hiddenInput = document.getElementById('garPerdidaProductId');
+        const searchInp = document.getElementById('garPerdidaSearchInput');
+        const dropdown = document.getElementById('garPerdidaDropdown');
+        const selBranch = document.getElementById('garPerdidaBranchId');
+
+        if (hiddenInput) hiddenInput.value = id || '';
+        if (searchInp) searchInp.value = labelText || '';
+        if (dropdown) dropdown.classList.add('d-none');
+
+        if (id) {
+            cargarVariantesEnModalGarantia(id, '', selBranch ? selBranch.value : '');
+        }
+    }
+
+    function filtrarDropdownReposicionGarantia(rawVal) {
+        const dropdown = document.getElementById('garPerdidaDropdown');
+        if (!dropdown) return;
+        const q = normAccStr(rawVal).trim();
+        if (q.length < 2) {
+            dropdown.classList.add('d-none');
+            dropdown.innerHTML = '';
+            return;
+        }
+        const tokens = q.split(/[\s\-]+/).filter(t => t.length > 0);
+        const matches = [];
+        for (let i = 0; i < ACCESORIOS_CATALOGO.length; i++) {
+            const item = ACCESORIOS_CATALOGO[i];
+            if (tokens.every(tok => item._search.includes(tok))) {
+                matches.push(item);
+                if (matches.length >= 30) break;
+            }
+        }
+
+        if (matches.length === 0) {
+            dropdown.innerHTML = `<div class="p-3 text-center text-muted small">
+                <i class="fa-solid fa-magnifying-glass-minus me-1"></i> No se encontraron accesorios para "<strong>${rawVal}</strong>"
+            </div>`;
+            dropdown.classList.remove('d-none');
+            return;
+        }
+
+        let html = '';
+        matches.forEach(m => {
+            const label = `[${m.sku}] ${m.nombre}`;
+            const costoFmt = Math.round(m.costo).toLocaleString('es-CO');
+            html += `
+                <button type="button" class="list-group-item list-group-item-action py-2 px-3 text-start border-bottom"
+                        onclick='seleccionarAccesorioReposicion(${m.id}, ${JSON.stringify(label)})'>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-dark small">${m.nombre}</span>
+                        <span class="badge bg-light text-dark border font-mono" style="font-size: 0.7rem;">${m.sku}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-1" style="font-size: 0.74rem;">
+                        <span class="text-muted">Stock Global: <strong>${m.stock_global} uds.</strong></span>
+                        <span class="text-danger fw-semibold">Costo: $${costoFmt}</span>
+                    </div>
+                </button>
+            `;
+        });
+        dropdown.innerHTML = html;
+        dropdown.classList.remove('d-none');
+    }
+
+    function limpiarBuscadorReposicionGarantia() {
+        const searchInp = document.getElementById('garPerdidaSearchInput');
+        const hiddenInput = document.getElementById('garPerdidaProductId');
+        const dropdown = document.getElementById('garPerdidaDropdown');
+        const stockInfoEl = document.getElementById('garPerdidaStockInfo');
+        const contVar = document.getElementById('garPerdidaVarianteBox');
+
+        if (searchInp) {
+            searchInp.value = '';
+            searchInp.focus();
+        }
+        if (hiddenInput) hiddenInput.value = '';
+        if (dropdown) dropdown.classList.add('d-none');
+        if (stockInfoEl) stockInfoEl.innerHTML = '<span class="text-muted">Escribe 2 o más letras arriba para elegir el accesorio de reposición.</span>';
+        if (contVar) contVar.style.display = 'none';
+    }
+
     function abrirModalPerdidaGarantia(btn) {
         const wId = btn.dataset.warrantyId;
         const saleId = btn.dataset.saleId;
@@ -527,10 +668,20 @@
         document.getElementById('garPerdidaLblNombre').textContent = nombre;
         document.getElementById('garPerdidaLblFalla').textContent = falla;
 
-        const selProd = document.getElementById('garPerdidaProductId');
-        if (selProd) {
-            selProd.value = prodId;
+        const hiddenProd = document.getElementById('garPerdidaProductId');
+        const searchInp = document.getElementById('garPerdidaSearchInput');
+        const dropdown = document.getElementById('garPerdidaDropdown');
+        if (dropdown) dropdown.classList.add('d-none');
+
+        const foundAcc = ACCESORIOS_CATALOGO.find(a => String(a.id) === String(prodId));
+        if (foundAcc) {
+            if (hiddenProd) hiddenProd.value = foundAcc.id;
+            if (searchInp) searchInp.value = `[${foundAcc.sku}] ${foundAcc.nombre}`;
+        } else {
+            if (hiddenProd) hiddenProd.value = prodId;
+            if (searchInp) searchInp.value = nombre;
         }
+
         const selBranch = document.getElementById('garPerdidaBranchId');
         if (selBranch && branchId) {
             selBranch.value = branchId;
@@ -612,25 +763,52 @@
             <form method="POST" id="formGarantiaAPerdida" action="">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body p-4 text-start">
-                    <div class="p-3 bg-light rounded-3 border mb-3 small">
+                    <!-- 1. Lo que entra dañado a Pérdidas -->
+                    <div class="p-3 bg-danger-subtle bg-opacity-25 rounded-3 border border-danger-subtle mb-3 small">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="badge bg-warning text-dark fw-bold">GARANTÍA DE ACCESORIO</span>
+                            <span class="badge bg-danger text-white fw-bold">
+                                <i class="fa-solid fa-arrow-right-to-bracket me-1"></i>1. ENTRA DAÑADO A PÉRDIDAS
+                            </span>
                             <span class="fw-bold text-muted" id="garPerdidaLblId"></span>
                         </div>
-                        <div class="fw-bold fs-6 text-dark" id="garPerdidaLblNombre"></div>
+                        <div class="fw-bold fs-6 text-dark mt-1" id="garPerdidaLblNombre"></div>
                         <div class="text-muted mt-1"><strong>Falla reportada:</strong> <span id="garPerdidaLblFalla"></span></div>
+                        <div class="extra-small text-danger fw-semibold mt-1">
+                            <i class="fa-solid fa-circle-info me-1"></i>Este artículo dañado NO vuelve al stock bueno; queda registrado en el Historial de Pérdidas.
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-dark">Accesorio en Inventario (Solo Accesorios) *</label>
-                        <select name="product_id" id="garPerdidaProductId" class="form-select form-select-sm fw-semibold" required
-                                onchange="cargarVariantesEnModalGarantia(this.value, '', document.getElementById('garPerdidaBranchId')?.value)">
-                            <option value="">-- Seleccionar Accesorio del Inventario --</option>
-                            {% for acc in accesorios_disponibles %}
-                            <option value="{{ acc.id }}">[{{ acc.sku }}] {{ acc.nombre }} (Costo: ${{ (acc.precio_costo or 0)|cop }})</option>
-                            {% endfor %}
-                        </select>
-                        <div id="garPerdidaStockInfo" class="small mt-1 text-muted"></div>
+                    <!-- 2. Lo que sale nuevo del Stock en reposición (Buscador desde 2 letras) -->
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label small fw-bold text-dark mb-0">
+                                <span class="badge bg-success text-white me-1"><i class="fa-solid fa-arrow-right-from-bracket me-1"></i>2. SALE NUEVO DE STOCK</span>
+                                Accesorio por el cual se va a reponer *
+                            </label>
+                        </div>
+                        <input type="hidden" name="product_id" id="garPerdidaProductId" required>
+                        <div class="position-relative">
+                            <div class="input-group input-group-sm shadow-sm">
+                                <span class="input-group-text bg-white border-end-0 text-muted">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </span>
+                                <input type="text" id="garPerdidaSearchInput" data-custom-search="true"
+                                       class="form-control border-start-0 border-end-0 fw-semibold"
+                                       placeholder="Escribe 2+ letras para buscar accesorio de reposición (SKU o nombre)..."
+                                       autocomplete="off"
+                                       oninput="filtrarDropdownReposicionGarantia(this.value)"
+                                       onfocus="if(this.value.trim().length >= 2) filtrarDropdownReposicionGarantia(this.value)">
+                                <button class="btn btn-white bg-white border border-start-0 text-muted px-2" type="button"
+                                        onclick="limpiarBuscadorReposicionGarantia()" title="Limpiar para buscar otro accesorio">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <!-- Lista desplegable instantánea desde 2 letras -->
+                            <div id="garPerdidaDropdown" class="list-group position-absolute w-100 shadow-lg border rounded-3 mt-1 d-none"
+                                 style="z-index: 1065; max-height: 230px; overflow-y: auto; background: #fff;">
+                            </div>
+                        </div>
+                        <div id="garPerdidaStockInfo" class="small mt-2 text-muted"></div>
                     </div>
 
                     <div class="mb-3" id="garPerdidaVarianteBox" style="display: none;">

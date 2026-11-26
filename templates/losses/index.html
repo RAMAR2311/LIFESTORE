@@ -281,26 +281,31 @@
                         </div>
                     </div>
 
-                    <!-- Buscador rápido y Selector de Accesorio -->
+                    <!-- Buscador Predictivo Desplegable desde 2 letras para Accesorio -->
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-dark">3. Seleccionar Accesorio Dañado *</label>
-                        <div class="input-group input-group-sm mb-2">
-                            <span class="input-group-text bg-light"><i class="fa-solid fa-filter text-muted"></i></span>
-                            <input type="text" id="filterAccLossInput" class="form-control bg-light"
-                                   placeholder="Escribe 2+ letras para filtrar la lista por SKU o nombre (ej: vidrio, cable, 20w)..."
-                                   autocomplete="off" oninput="filtrarSelectorAccesorios(this.value)">
+                        <label class="form-label small fw-bold text-dark">3. Buscar Accesorio Dañado (escribe 2 o más letras) *</label>
+                        <input type="hidden" name="product_id" id="lossProductSelect" value="{{ preselect_product_id or '' }}" required>
+                        <div class="position-relative">
+                            <div class="input-group shadow-sm">
+                                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                                <input type="text" id="filterAccLossInput" data-custom-search="true"
+                                       class="form-control border-start-0 border-end-0 fw-semibold"
+                                       placeholder="Escribe 2+ letras por SKU o nombre (ej: vidrio, cable, 20w, funda)..."
+                                       autocomplete="off"
+                                       oninput="filtrarSelectorAccesorios(this.value)"
+                                       onfocus="if(this.value.trim().length >= 2) filtrarSelectorAccesorios(this.value)">
+                                <button class="btn btn-white bg-white border border-start-0 text-muted px-3" type="button"
+                                        onclick="limpiarBuscadorPerdidaDirecta()" title="Limpiar búsqueda">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <div id="lossAccDropdown" class="list-group position-absolute w-100 shadow-lg border rounded-3 mt-1 d-none"
+                                 style="z-index: 1065; max-height: 240px; overflow-y: auto; background: #fff;">
+                            </div>
                         </div>
-                        <select name="product_id" id="lossProductSelect" class="form-select fw-semibold border-danger" size="5" required onchange="onLossProductChange()">
-                            {% for acc in accesorios %}
-                            {% set st_local = stocks_local.get(acc.id ~ '_total') if acc.variantes else stocks_local.get(acc.id ~ '_0', 0) %}
-                            <option value="{{ acc.id }}"
-                                    data-search="{{ (acc.sku or '')|lower }} {{ (acc.nombre or '')|lower }}"
-                                    {% if preselect_product_id and preselect_product_id == acc.id %}selected{% endif %}>
-                                [{{ acc.sku }}] {{ acc.nombre }} — Stock sede: {{ st_local or 0 }} uds. (Global: {{ acc.total_stock }} uds.) | Costo: ${{ (acc.precio_costo or 0)|cop }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                        <div id="lossStockFeedback" class="small mt-2"></div>
+                        <div id="lossStockFeedback" class="small mt-2">
+                            <span class="text-muted"><i class="fa-solid fa-circle-info me-1"></i>Escribe al menos 2 letras arriba para desplegar los accesorios coincidentes.</span>
+                        </div>
                     </div>
 
                     <!-- Selector dinámico de Variante si el accesorio tiene subcategorías -->
@@ -347,17 +352,104 @@
 <script>
 const URL_API_VAR_ACC = "{{ url_for('losses_bp.api_variantes_accesorio', product_id=999999999) }}";
 
+const CATALOGO_ACC_LOSS = [
+    {% for acc in accesorios %}
+    {% set st_local = stocks_local.get(acc.id ~ '_total') if acc.variantes else stocks_local.get(acc.id ~ '_0', 0) %}
+    {
+        id: {{ acc.id }},
+        sku: {{ (acc.sku or '')|tojson }},
+        nombre: {{ (acc.nombre or '')|tojson }},
+        stock_sede: {{ (st_local or 0)|int }},
+        stock_global: {{ (acc.total_stock or 0)|int }},
+        costo: {{ (acc.precio_costo or 0)|float }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+function normLossStr(s) {
+    return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+CATALOGO_ACC_LOSS.forEach(a => {
+    a._search = normLossStr(`${a.sku} ${a.sku.replace(/-/g, '')} ${a.nombre}`);
+});
+
+function seleccionarAccesorioPerdida(id, label) {
+    const hiddenEl = document.getElementById('lossProductSelect');
+    const inputEl = document.getElementById('filterAccLossInput');
+    const dropdown = document.getElementById('lossAccDropdown');
+    if (hiddenEl) hiddenEl.value = id;
+    if (inputEl) inputEl.value = label;
+    if (dropdown) dropdown.classList.add('d-none');
+    onLossProductChange();
+}
+
+function limpiarBuscadorPerdidaDirecta() {
+    const hiddenEl = document.getElementById('lossProductSelect');
+    const inputEl = document.getElementById('filterAccLossInput');
+    const dropdown = document.getElementById('lossAccDropdown');
+    const varCont = document.getElementById('lossVariantContainer');
+    const feedback = document.getElementById('lossStockFeedback');
+    if (hiddenEl) hiddenEl.value = '';
+    if (inputEl) {
+        inputEl.value = '';
+        inputEl.focus();
+    }
+    if (dropdown) dropdown.classList.add('d-none');
+    if (varCont) varCont.style.display = 'none';
+    if (feedback) feedback.innerHTML = '<span class="text-muted"><i class="fa-solid fa-circle-info me-1"></i>Escribe al menos 2 letras arriba para desplegar los accesorios coincidentes.</span>';
+}
+
 function filtrarSelectorAccesorios(query) {
-    const q = (query || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    const sel = document.getElementById('lossProductSelect');
-    if (!sel) return;
-    const tokens = q.split(/\s+/).filter(t => t.length > 0);
-    Array.from(sel.options).forEach(opt => {
-        const text = (opt.dataset.search || opt.textContent || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const match = tokens.length === 0 || tokens.every(tok => text.includes(tok));
-        opt.hidden = !match;
-        opt.style.display = match ? '' : 'none';
+    const dropdown = document.getElementById('lossAccDropdown');
+    if (!dropdown) return;
+    const q = normLossStr(query).trim();
+    if (q.length < 2) {
+        dropdown.classList.add('d-none');
+        dropdown.innerHTML = '';
+        return;
+    }
+    const tokens = q.split(/[\s\-]+/).filter(t => t.length > 0);
+    const matches = [];
+    for (let i = 0; i < CATALOGO_ACC_LOSS.length; i++) {
+        const item = CATALOGO_ACC_LOSS[i];
+        if (tokens.every(tok => item._search.includes(tok))) {
+            matches.push(item);
+            if (matches.length >= 30) break;
+        }
+    }
+
+    if (matches.length === 0) {
+        dropdown.innerHTML = `<div class="p-3 text-center text-muted small">
+            <i class="fa-solid fa-magnifying-glass-minus me-1"></i> No se encontraron accesorios para "<strong>${query}</strong>"
+        </div>`;
+        dropdown.classList.remove('d-none');
+        return;
+    }
+
+    let html = '';
+    matches.forEach(m => {
+        const label = `[${m.sku}] ${m.nombre}`;
+        const costoFmt = Math.round(m.costo).toLocaleString('es-CO');
+        const stockBadge = m.stock_sede > 0
+            ? `<span class="badge bg-success-subtle text-success border border-success-subtle">Stock sede: ${m.stock_sede} uds.</span>`
+            : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Stock sede: 0 uds.</span>`;
+        html += `
+            <button type="button" class="list-group-item list-group-item-action py-2 px-3 text-start border-bottom"
+                    onclick='seleccionarAccesorioPerdida(${m.id}, ${JSON.stringify(label)})'>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold text-dark small">${m.nombre}</span>
+                    <span class="badge bg-light text-dark border font-mono" style="font-size: 0.7rem;">${m.sku}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-1" style="font-size: 0.75rem;">
+                    <span>${stockBadge} <span class="text-muted ms-1">(Global: ${m.stock_global})</span></span>
+                    <span class="text-danger fw-bold">Costo: $${costoFmt}</span>
+                </div>
+            </button>
+        `;
     });
+    dropdown.innerHTML = html;
+    dropdown.classList.remove('d-none');
 }
 
 async function onLossProductChange() {
@@ -405,7 +497,19 @@ async function onLossProductChange() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('click', function(e) {
+        const dd = document.getElementById('lossAccDropdown');
+        const inp = document.getElementById('filterAccLossInput');
+        if (dd && inp && !dd.contains(e.target) && e.target !== inp) {
+            dd.classList.add('d-none');
+        }
+    });
     {% if preselect_product_id %}
+    const preFound = CATALOGO_ACC_LOSS.find(a => a.id === {{ preselect_product_id }});
+    if (preFound) {
+        const inp = document.getElementById('filterAccLossInput');
+        if (inp) inp.value = `[${preFound.sku}] ${preFound.nombre}`;
+    }
     const modalEl = document.getElementById('modalRegistrarPerdida');
     if (modalEl) {
         bootstrap.Modal.getOrCreateInstance(modalEl).show();

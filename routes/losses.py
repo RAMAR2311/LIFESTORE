@@ -313,8 +313,8 @@ def registrar_desde_garantia(warranty_id):
     """Envía un accesorio recibido por garantía al módulo de Pérdidas y descuenta del stock la unidad nueva entregada en reposición."""
     warranty = Warranty.query.get_or_404(warranty_id)
 
-    # Resolver producto (de la garantía o seleccionado en el modal si la garantía era manual)
-    product_id = warranty.product_id or request.form.get('product_id', type=int)
+    # Producto que sale de stock en reposición (puede ser el mismo de la garantía u otro accesorio elegido en el buscador)
+    reponer_product_id = request.form.get('product_id', type=int) or warranty.product_id
     variant_id = request.form.get('variant_id', type=int) or warranty.variant_id or None
     branch_id = _resolver_sucursal_operacion(request.form.get('branch_id') or warranty.branch_id)
     asesor_id = request.form.get('asesor_id', type=int) or warranty.asesor_id
@@ -323,44 +323,51 @@ def registrar_desde_garantia(warranty_id):
     notas_resolucion = request.form.get('notas_resolucion', '').strip()
     soporte_entrega = request.form.get('soporte_entrega', '').strip() or 'Reposición de accesorio nuevo por garantía'
 
-    if not product_id:
-        flash('Selecciona el accesorio del inventario para procesar la baja y reposición.', 'danger')
+    if not reponer_product_id:
+        flash('Selecciona en el buscador el accesorio del inventario para procesar la baja y reposición.', 'danger')
         return redirect(url_for('warranties_bp.index'))
 
-    producto = Product.query.get_or_404(product_id)
+    producto_reposicion = Product.query.get_or_404(reponer_product_id)
+    producto_danado = warranty.product if warranty.product else producto_reposicion
 
     # CANDADO ESTRICTO: Si el producto es del inventario de celulares, bloquear envío a pérdidas
-    if producto.tipo_inventario == 'celulares' or (producto.imei and producto.imei.strip()):
+    if producto_reposicion.tipo_inventario == 'celulares' or (producto_reposicion.imei and producto_reposicion.imei.strip()):
         flash('🚫 Operación Bloqueada: Los equipos del Inventario de Celulares NO pueden enviarse a Pérdidas. Deben derivarse a Soporte Técnico.', 'danger')
+        return redirect(url_for('warranties_bp.index'))
+    if producto_danado and (producto_danado.tipo_inventario == 'celulares' or (producto_danado.imei and producto_danado.imei.strip())):
+        flash('🚫 Operación Bloqueada: Esta garantía corresponde a un Celular y no puede enviarse a Pérdidas.', 'danger')
         return redirect(url_for('warranties_bp.index'))
 
     variante = None
     if variant_id:
-        variante = ProductVariant.query.filter_by(id=variant_id, product_id=producto.id).first()
-    elif producto.variantes and len(producto.variantes) == 1:
-        variante = producto.variantes[0]
+        variante = ProductVariant.query.filter_by(id=variant_id, product_id=producto_reposicion.id).first()
+    elif producto_reposicion.variantes and len(producto_reposicion.variantes) == 1:
+        variante = producto_reposicion.variantes[0]
         variant_id = variante.id
 
     sucursal = Branch.query.get(branch_id)
     nombre_sede = sucursal.nombre if sucursal else 'Sede Principal'
 
+    stock_anterior = None
+    stock_nuevo = None
     if reponer_stock:
-        bs = get_or_create_branch_stock(branch_id=branch_id, product_id=producto.id, variant_id=variant_id, for_update=True)
+        bs = get_or_create_branch_stock(branch_id=branch_id, product_id=producto_reposicion.id, variant_id=variant_id, for_update=True)
         if (bs.cantidad or 0) < cantidad:
             flash(
                 f'No hay suficiente stock en {nombre_sede} para entregar el accesorio nuevo de reposición '
-                f'("{producto.nombre}": disponible {bs.cantidad or 0} uds., requerido {cantidad} uds.).',
+                f'("{producto_reposicion.nombre}": disponible {bs.cantidad or 0} uds., requerido {cantidad} uds.).',
                 'danger'
             )
             return redirect(url_for('warranties_bp.index'))
 
         stock_anterior = bs.cantidad or 0
         bs.cantidad = stock_anterior - cantidad
+        stock_nuevo = bs.cantidad
         db.session.flush()
-        sync_global_product_stock(producto.id, variant_id=variant_id)
+        sync_global_product_stock(producto_reposicion.id, variant_id=variant_id)
 
         ajuste = StockAdjustment(
-            product_id=producto.id,
+            product_id=producto_reposicion.id,
             admin_id=current_user.id,
             branch_id=branch_id,
             tipo_movimiento=f"Reposición por Garantía #{warranty.id} (Fac #{warranty.sale_id}) -> Pérdida",
@@ -369,20 +376,31 @@ def registrar_desde_garantia(warranty_id):
         )
         db.session.add(ajuste)
 
-    costo_unit = Decimal(str((variante.precio_costo if (variante and variante.precio_costo) else producto.precio_costo) or 0))
+    costo_unit = Decimal(str((variante.precio_costo if (variante and variante.precio_costo) else producto_reposicion.precio_costo) or 0))
     costo_tot = costo_unit * Decimal(str(cantidad))
 
+    nombre_danado_txt = producto_danado.nombre if producto_danado else (warranty.nombre_manual or producto_reposicion.nombre)
+    nombre_repuesto_txt = f"{producto_reposicion.nombre}{' (' + variante.nombre_variante + ')' if variante else ''}"
+
+    if reponer_stock:
+        if producto_danado and producto_danado.id != producto_reposicion.id:
+            flujo_txt = f"Entró dañado: {nombre_danado_txt} | Salió en reposición: {cantidad}x {nombre_repuesto_txt} (Stock {nombre_sede}: {stock_anterior} -> {stock_nuevo})"
+        else:
+            flujo_txt = f"Entró dañado a Pérdidas y salió 1 nuevo de stock ({nombre_sede}: {stock_anterior} -> {stock_nuevo} uds.)"
+    else:
+        flujo_txt = f"Entró dañado a Pérdidas sin descontar reposición de stock"
+
     detalle_motivo = (
-        f"Garantía #{warranty.id} (Factura #{warranty.sale_id}) - Falla reportada: {warranty.motivo_reportado or warranty.reason}"
+        f"Garantía #{warranty.id} (Fac #{warranty.sale_id}) · {flujo_txt} · Falla: {warranty.motivo_reportado or warranty.reason}"
     )
     if notas_resolucion:
-        detalle_motivo += f" | Resolución: {notas_resolucion}"
+        detalle_motivo += f" · Nota: {notas_resolucion}"
 
     loss = AccessoryLoss(
         origen='GARANTIA',
         tipo_motivo='Garantía de Cliente (Reposición por accesorio defectuoso)',
         motivo_detalle=detalle_motivo,
-        product_id=producto.id,
+        product_id=producto_reposicion.id,
         variant_id=variant_id,
         warranty_id=warranty.id,
         sale_id=warranty.sale_id,
@@ -399,13 +417,14 @@ def registrar_desde_garantia(warranty_id):
     db.session.add(loss)
 
     # Actualizar estado de la garantía
-    warranty.product_id = producto.id
+    if not warranty.product_id:
+        warranty.product_id = producto_reposicion.id
     warranty.variant_id = variant_id
     warranty.resolution = 'Repuesto (Pérdida)'
     warranty.entregado_por_id = current_user.id
     warranty.fecha_entrega = obtener_hora_bogota()
     warranty.firma_o_soporte_entrega = soporte_entrega
-    nota_extra = f"Enviado a Pérdidas (#{loss.id}) y {'repuesto con unidad nueva de ' + nombre_sede if reponer_stock else 'dado de baja'}. {notas_resolucion}".strip()
+    nota_extra = f"Enviado a Pérdidas (#{loss.id}) y {'repuesto con ' + nombre_repuesto_txt + ' de ' + nombre_sede if reponer_stock else 'dado de baja'}. {notas_resolucion}".strip()
     warranty.admin_notes = f"{nota_extra} | {warranty.admin_notes or ''}".strip(' |')
 
     db.session.flush()
@@ -415,14 +434,14 @@ def registrar_desde_garantia(warranty_id):
         user_id=current_user.id,
         target_id=warranty.id,
         target_type='WARRANTY',
-        motivo=f"Garantía #{warranty.id} de accesorio '{producto.nombre}' enviada a Pérdidas (#{loss.id}). Reposición de stock en {nombre_sede}: {'SÍ' if reponer_stock else 'NO'}.",
-        detalles=f'{{"loss_id": {loss.id}, "product_id": {producto.id}, "cantidad": {cantidad}, "costo_total": {float(costo_tot)}}}'
+        motivo=f"Garantía #{warranty.id} enviada a Pérdidas (#{loss.id}). {flujo_txt}.",
+        detalles=f'{{"loss_id": {loss.id}, "product_id": {producto_reposicion.id}, "cantidad": {cantidad}, "costo_total": {float(costo_tot)}}}'
     )
     db.session.commit()
 
     flash(
-        f'✅ Garantía #{warranty.id} resuelta: el accesorio dañado pasó al Módulo de Pérdidas '
-        f'{"y se descontó 1 unidad nueva del stock de " + nombre_sede + " entregada al cliente" if reponer_stock else ""}.',
+        f'✅ Garantía #{warranty.id} procesada: el accesorio dañado quedó registrado en el Módulo de Pérdidas '
+        f'{"y se descontó -" + str(cantidad) + " ud. nueva de " + nombre_repuesto_txt + " del stock de " + nombre_sede + " (Stock: " + str(stock_anterior) + " → " + str(stock_nuevo) + ")" if reponer_stock else ""}.',
         'success'
     )
     return redirect(url_for('warranties_bp.index'))
