@@ -220,6 +220,12 @@ def entregar_garantia(id):
 def update_status(id):
     from models import obtener_hora_bogota, AuditLog
     warranty = Warranty.query.get_or_404(id)
+    if warranty.resolution in ['Repuesto (Pérdida)', 'Entregada'] or 'Repuesto' in (warranty.resolution or ''):
+        return jsonify({
+            'success': False,
+            'error': 'Esta garantía ya fue ejecutada como Pérdida / Entregada y su estado no se puede modificar manualmente.'
+        }), 400
+
     data = request.get_json()
     new_status = data.get('status')
     admin_notes = data.get('admin_notes')

@@ -141,21 +141,29 @@
                     </td>
                     <td class="text-nowrap">
                         {% set estado = w.estado_actual %}
-                        <div class="dropdown d-inline-block">
-                            <button class="btn btn-sm dropdown-toggle rounded-pill fw-bold text-nowrap
-                                {% if estado == 'Pendiente' %}btn-warning text-dark
-                                {% elif estado == 'Demorado' %}btn-danger
-                                {% elif estado == 'Entregada' or 'Repuesto' in estado %}btn-success
-                                {% else %}btn-secondary{% endif %}" 
-                                style="font-size: 0.74rem; padding: 0.22rem 0.65rem;"
-                                type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
-                                {{ estado }}
-                            </button>
-                            <ul class="dropdown-menu shadow-sm border-0">
-                                <li><a class="dropdown-item fw-bold text-warning small" href="#" onclick="updateWarrantyStatus({{ w.id }}, 'Pendiente')"><i class="fa-solid fa-clock me-2"></i> Pendiente</a></li>
-                                <li><a class="dropdown-item fw-bold text-danger small" href="#" onclick="updateWarrantyStatus({{ w.id }}, 'Rechazada')"><i class="fa-solid fa-xmark me-2"></i> Rechazada</a></li>
-                            </ul>
-                        </div>
+                        {% if w.resolution in ['Repuesto (Pérdida)', 'Entregada'] or 'Repuesto' in estado %}
+                            <span class="badge rounded-pill bg-success text-white fw-bold shadow-sm d-inline-flex align-items-center gap-1"
+                                  style="font-size: 0.74rem; padding: 0.35rem 0.75rem;"
+                                  title="Estado cerrado y bloqueado">
+                                <i class="fa-solid fa-lock" style="font-size: 0.68rem;"></i>
+                                <span>{{ estado }}</span>
+                            </span>
+                        {% else %}
+                            <div class="dropdown d-inline-block">
+                                <button class="btn btn-sm dropdown-toggle rounded-pill fw-bold text-nowrap
+                                    {% if estado == 'Pendiente' %}btn-warning text-dark
+                                    {% elif estado == 'Demorado' %}btn-danger
+                                    {% else %}btn-secondary{% endif %}" 
+                                    style="font-size: 0.74rem; padding: 0.22rem 0.65rem;"
+                                    type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
+                                    {{ estado }}
+                                </button>
+                                <ul class="dropdown-menu shadow-sm border-0">
+                                    <li><a class="dropdown-item fw-bold text-warning small" href="#" onclick="updateWarrantyStatus({{ w.id }}, 'Pendiente')"><i class="fa-solid fa-clock me-2"></i> Pendiente</a></li>
+                                    <li><a class="dropdown-item fw-bold text-danger small" href="#" onclick="updateWarrantyStatus({{ w.id }}, 'Rechazada')"><i class="fa-solid fa-xmark me-2"></i> Rechazada</a></li>
+                                </ul>
+                            </div>
+                        {% endif %}
                     </td>
                     <td class="text-end pe-3 text-nowrap">
                         <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-nowrap">
