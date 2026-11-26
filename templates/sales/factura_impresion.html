@@ -490,9 +490,9 @@
                     {% set imei2_val = (prod.imei2|replace('-EXT', '')) if (prod and prod.imei2) else '' %}
                     {% if prod and (prod.tipo_inventario in ['celulares', 'externos'] or imei_val or imei2_val) %}
                     <div class="prod-specs">
+                        {% if prod.modelo_celular and prod.modelo_celular not in (prod.nombre or '') %}Modelo: {{ prod.modelo_celular }} {% endif %}
                         {% if prod.memoria and prod.memoria != 'N/A' %}[{{ prod.memoria }}] {% endif %}
-                        {% if prod.color and prod.color != 'N/A' and prod.color not in (prod.nombre or '') %}{{ prod.color }} {% endif %}
-                        {% if prod.bateria and prod.bateria != 'N/A' %}| Batería: {{ prod.bateria }}{% if '%' not in (prod.bateria|string) %}%{% endif %} {% endif %}
+                        {% if prod.color and prod.color != 'N/A' %}Color: {{ prod.color }} {% endif %}
                         {% if imei_val %}| <strong>IMEI / Serial: {{ imei_val }}</strong>{% endif %}
                         {% if imei2_val %}| IMEI 2: {{ imei2_val }}{% endif %}
                     </div>

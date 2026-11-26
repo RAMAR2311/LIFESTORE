@@ -320,12 +320,11 @@
                         {% endif %}
 
                         <div style="font-size: 0.7rem; color: #444; margin-top: 3px; line-height: 1.2;">
-                            {% if prod.memoria %}Cap: {{ prod.memoria }} {% endif %}
-                            {% if prod.bateria %}Bat: {{ prod.bateria }}% {% endif %}
-                            {% if prod.color %}Col: {{ prod.color }}{% endif %}
+                            {% if prod.memoria and prod.memoria != 'N/A' %}Cap: {{ prod.memoria }} {% endif %}
+                            {% if prod.color and prod.color != 'N/A' %}Color: {{ prod.color }}{% endif %}
                             {% if prod.imei or prod.imei2 %}<br>{% endif %}
-                            {% if prod.imei %}IMEI 1: {{ prod.imei }}{% endif %}
-                            {% if prod.imei2 %}| IMEI 2: {{ prod.imei2 }}{% endif %}
+                            {% if prod.imei %}IMEI 1: {{ prod.imei|replace('-EXT', '') }}{% endif %}
+                            {% if prod.imei2 %} | IMEI 2: {{ prod.imei2|replace('-EXT', '') }}{% endif %}
                         </div>
                         {% elif detalle.nombre_manual %}
                         {% set manual_clean = detalle.nombre_manual|replace('Externo ', '')|replace('Acc. Externo ', '') %}
