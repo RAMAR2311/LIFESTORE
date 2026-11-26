@@ -2193,7 +2193,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             function inicializarBuscadorPredictivo(input) {
                 if (!input || input.dataset.predictivoInit) return;
-                // Excluir inputs que ya tienen su propio manejador personalizado de tarjetas o catálogo
+                // Excluir inputs que ya tienen su propio motor optimizado o manejador personalizado
+                if (input.dataset.customSearch === 'true') return;
+                if (input.id === 'inventarioSearch') return;
                 if (input.id === 'productSearch' && document.getElementById('productsGrid')) return;
                 input.dataset.predictivoInit = "true";
 
@@ -2220,6 +2222,9 @@
                 }
 
                 function getTextoFila(fila) {
+                    if (typeof fila._cachedSearchText === 'string') {
+                        return fila._cachedSearchText;
+                    }
                     let text = '';
                     fila.childNodes.forEach(node => {
                         if (node.nodeType === Node.ELEMENT_NODE) {
@@ -2237,59 +2242,67 @@
                             text += ' ' + node.textContent;
                         }
                     });
-                    return text.toLowerCase();
+                    fila._cachedSearchText = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    return fila._cachedSearchText;
                 }
 
                 const formPadre = input.closest('form');
+                let debounceTimer = null;
 
                 input.addEventListener('input', function() {
-                    const rawVal = this.value.trim().toLowerCase();
-                    const filas = getFilas();
-                    if (!filas.length) return;
+                    const self = this;
+                    if (debounceTimer) clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(function() {
+                        const rawVal = self.value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        const filas = getFilas();
+                        if (!filas.length) return;
 
-                    if (rawVal.length >= 2) {
-                        const palabras = rawVal.split(/\s+/).filter(w => w.length > 0);
-                        let visibles = 0;
+                        if (rawVal.length >= 2) {
+                            const palabras = rawVal.split(/\s+/).filter(w => w.length > 0);
+                            let visibles = 0;
 
-                        filas.forEach(fila => {
-                            const textoFila = getTextoFila(fila);
-                            const coincide = palabras.every(pal => textoFila.includes(pal));
-                            if (coincide) {
-                                fila.style.display = '';
-                                visibles++;
-                            } else {
-                                fila.style.display = 'none';
+                            filas.forEach(fila => {
+                                const textoFila = getTextoFila(fila);
+                                const coincide = palabras.every(pal => textoFila.includes(pal));
+                                if (coincide) {
+                                    if (fila.style.display === 'none') fila.style.display = '';
+                                    visibles++;
+                                } else {
+                                    if (fila.style.display !== 'none') fila.style.display = 'none';
+                                }
+                            });
+
+                            // Feedback visual dinámico cuando no hay coincidencias
+                            let msgVacio = tabla.querySelector('.empty-search-feedback');
+                            if (visibles === 0) {
+                                if (!msgVacio) {
+                                    msgVacio = document.createElement('tr');
+                                    msgVacio.className = 'empty-search-feedback text-center text-muted';
+                                    const primerTr = tabla.querySelector('thead tr') || filas[0];
+                                    const numCols = primerTr ? primerTr.children.length : 8;
+                                    msgVacio.innerHTML = `<td colspan="${numCols}" class="py-4 text-center text-muted">
+                                        <i class="fa-solid fa-magnifying-glass fa-2x mb-2 d-block opacity-25"></i>
+                                        <span class="small fw-semibold">No se encontraron coincidencias para "<strong>${self.value.trim()}</strong>"</span>
+                                    </td>`;
+                                    const tbody = tabla.querySelector(':scope > tbody') || tabla.querySelector('tbody') || tabla;
+                                    tbody.appendChild(msgVacio);
+                                } else {
+                                    msgVacio.style.display = '';
+                                    const strongEl = msgVacio.querySelector('strong');
+                                    if (strongEl) strongEl.textContent = self.value.trim();
+                                }
+                            } else if (msgVacio) {
+                                msgVacio.style.display = 'none';
                             }
-                        });
-
-                        // Feedback visual dinámico cuando no hay coincidencias
-                        let msgVacio = tabla.querySelector('.empty-search-feedback');
-                        if (visibles === 0) {
-                            if (!msgVacio) {
-                                msgVacio = document.createElement('tr');
-                                msgVacio.className = 'empty-search-feedback text-center text-muted';
-                                const primerTr = tabla.querySelector('thead tr') || filas[0];
-                                const numCols = primerTr ? primerTr.children.length : 8;
-                                msgVacio.innerHTML = `<td colspan="${numCols}" class="py-4 text-center text-muted">
-                                    <i class="fa-solid fa-magnifying-glass fa-2x mb-2 d-block opacity-25"></i>
-                                    <span class="small fw-semibold">No se encontraron coincidencias para "<strong>${rawVal}</strong>"</span>
-                                </td>`;
-                                const tbody = tabla.querySelector(':scope > tbody') || tabla.querySelector('tbody') || tabla;
-                                tbody.appendChild(msgVacio);
-                            } else {
-                                msgVacio.style.display = '';
-                                const strongEl = msgVacio.querySelector('strong');
-                                if (strongEl) strongEl.textContent = rawVal;
-                            }
-                        } else if (msgVacio) {
-                            msgVacio.style.display = 'none';
+                        } else {
+                            // Si hay menos de 2 caracteres, restaurar las filas ocultas
+                            filas.forEach(fila => {
+                                if (fila.style.display === 'none') fila.style.display = '';
+                            });
+                            let msgVacio = tabla.querySelector('.empty-search-feedback');
+                            if (msgVacio) msgVacio.style.display = 'none';
                         }
-                    } else {
-                        // Si hay menos de 2 caracteres, restaurar todas las filas
-                        filas.forEach(fila => fila.style.display = '');
-                        let msgVacio = tabla.querySelector('.empty-search-feedback');
-                        if (msgVacio) msgVacio.style.display = 'none';
-                    }
+                    }, 40);
                 });
 
                 // Si presiona Enter dentro de un form de búsqueda, se ejecuta búsqueda en BD

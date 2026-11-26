@@ -48,7 +48,7 @@
         <div class="col-md-6 col-lg-5 position-relative">
             <div class="input-group input-group-lg shadow-sm rounded-pill border">
                 <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                <input type="text" id="inventarioSearch" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por SKU o Nombre del producto..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
+                <input type="text" id="inventarioSearch" data-custom-search="true" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por SKU o Nombre del producto..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
                 <button class="btn btn-light border-0 px-3 text-muted" type="button" id="clearSearch" title="Limpiar búsqueda" style="border-radius: 0 50px 50px 0;">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -71,9 +71,8 @@
         {% endif %}
         <div class="col-md-3 col-lg-4 text-md-end mt-2 mt-md-0">
             <small class="text-muted fw-bold text-uppercase" style="font-size: 0.75rem;">
-                Mostrando <span id="visibleCount" class="text-brand-pink">{{ productos|length }}</span>
-                de <strong>{{ total_productos }}</strong> productos
-                {% if paginacion.pages > 1 %}<span class="text-muted">&nbsp;· pág. {{ paginacion.page }}/{{ paginacion.pages }}</span>{% endif %}
+                Mostrando <span id="visibleCount" class="text-brand-pink">{{ [productos|length, 50]|min }}</span>
+                de <strong id="totalFilteredCount">{{ total_productos }}</strong> productos
             </small>
         </div>
     </div>
@@ -97,7 +96,7 @@
             </thead>
             <tbody class="align-middle">
                 {% for p in productos %}
-                <tr class="product-main-row" data-prod-id="{{ p.id }}" data-sku="{{ (p.sku or '')|lower }}" data-nombre="{{ (p.nombre or '')|lower }}" data-variantes="{% if p.variantes %}{{ p.variantes|map(attribute='nombre_variante')|join(' ')|lower }}{% endif %}">
+                <tr class="product-main-row" data-prod-id="{{ p.id }}" data-sku="{{ (p.sku or '')|lower }}" data-nombre="{{ (p.nombre or '')|lower }}" data-variantes="{% if p.variantes %}{{ p.variantes|map(attribute='nombre_variante')|join(' ')|lower }}{% endif %}" {% if loop.index > 50 %}style="display: none;"{% endif %}>
                     <td class="text-muted text-nowrap">
                         {% if p.variantes %}
                             <button class="btn btn-sm btn-light border me-1 rounded-circle shadow-sm p-1" style="width: 28px; height: 28px;" type="button" data-bs-toggle="collapse" data-bs-target="#collapseVariantes{{ p.id }}" aria-expanded="false" title="Ver Subcategorías">
@@ -296,46 +295,21 @@
     </div>
 </div>
 
-<!-- ════════════════════════════════════ PAGINACIÓN ════════════════════════════════════ -->
-{% if paginacion.pages > 1 %}
-<nav aria-label="Paginación de inventario" class="mt-4">
-    <ul class="pagination justify-content-center flex-wrap gap-1 mb-0">
-
-        <!-- Anterior -->
-        <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
-            <a class="page-link rounded-pill px-3 shadow-sm"
-               href="{% if paginacion.has_prev %}{{ url_for('inventory_bp.index', page=paginacion.prev_num, branch_id=(active_b_id or 'all')) }}{% else %}#{% endif %}"
-               aria-label="Anterior">
-                <i class="fa-solid fa-chevron-left"></i>
-            </a>
-        </li>
-
-        <!-- Páginas numeradas -->
-        {% for p_num in paginacion.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
-            {% if p_num %}
-                <li class="page-item {% if p_num == paginacion.page %}active{% endif %}">
-                    <a class="page-link rounded-pill px-3 shadow-sm"
-                       href="{{ url_for('inventory_bp.index', page=p_num, branch_id=(active_b_id or 'all')) }}">{{ p_num }}</a>
-                </li>
-            {% else %}
-                <li class="page-item disabled">
-                    <span class="page-link rounded-pill px-3">…</span>
-                </li>
-            {% endif %}
-        {% endfor %}
-
-        <!-- Siguiente -->
-        <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
-            <a class="page-link rounded-pill px-3 shadow-sm"
-               href="{% if paginacion.has_next %}{{ url_for('inventory_bp.index', page=paginacion.next_num, branch_id=(active_b_id or 'all')) }}{% else %}#{% endif %}"
-               aria-label="Siguiente">
-                <i class="fa-solid fa-chevron-right"></i>
-            </a>
-        </li>
-
-    </ul>
-</nav>
-{% endif %}
+<!-- ════════════════════════════ PAGINACIÓN VIRTUAL EN CLIENTE ════════════════════════════ -->
+<div id="clientPaginationBar" class="d-flex flex-wrap justify-content-between align-items-center mt-3 px-3 py-2 bg-white rounded-4 shadow-sm border {% if productos|length <= 50 %}d-none{% endif %}">
+    <div class="small text-muted fw-semibold">
+        Página <span id="currPageNum" class="fw-bold text-dark">1</span> de <span id="totalPagesNum" class="fw-bold text-dark">{{ ((productos|length - 1) // 50) + 1 if productos|length > 0 else 1 }}</span>
+        <span class="ms-2 text-muted">(<span id="rangeStart">1</span>–<span id="rangeEnd">{{ [productos|length, 50]|min }}</span> de <span id="rangeTotal">{{ productos|length }}</span>)</span>
+    </div>
+    <div class="btn-group btn-group-sm">
+        <button type="button" id="btnPrevPage" class="btn btn-outline-dark rounded-start-pill px-3 fw-bold" disabled>
+            <i class="fa-solid fa-chevron-left me-1"></i> Anterior
+        </button>
+        <button type="button" id="btnNextPage" class="btn btn-outline-dark rounded-end-pill px-3 fw-bold" {% if productos|length <= 50 %}disabled{% endif %}>
+            Siguiente <i class="fa-solid fa-chevron-right ms-1"></i>
+        </button>
+    </div>
+</div>
 <!-- ═══════════════════════════════════════════════════════════════════════════════════ -->
 
 <!-- Modales de Variantes generados solo para productos con variantes activas + 1 modal compartido para los demás -->
@@ -463,9 +437,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('inventarioSearch');
     const clearBtn = document.getElementById('clearSearch');
     const dropdown = document.getElementById('searchDropdown');
-    const tableRows = document.querySelectorAll('tr.product-main-row');
+    const allRows = Array.from(document.querySelectorAll('tr.product-main-row'));
     const visibleCount = document.getElementById('visibleCount');
+    const totalFilteredCount = document.getElementById('totalFilteredCount');
     const tbody = document.querySelector('tbody');
+
+    const paginationBar = document.getElementById('clientPaginationBar');
+    const currPageNumEl = document.getElementById('currPageNum');
+    const totalPagesNumEl = document.getElementById('totalPagesNum');
+    const rangeStartEl = document.getElementById('rangeStart');
+    const rangeEndEl = document.getElementById('rangeEnd');
+    const rangeTotalEl = document.getElementById('rangeTotal');
+    const btnPrevPage = document.getElementById('btnPrevPage');
+    const btnNextPage = document.getElementById('btnNextPage');
+
+    const PAGE_SIZE = 50;
+    let currentPage = 1;
+    let filteredRows = allRows;
+    // Guardamos únicamente las filas actualmente visibles en el DOM (máximo 50)
+    // para que limpiar con la X o cambiar de búsqueda jamás tenga que tocar las 774 filas a la vez
+    let currentlyVisibleRows = allRows.slice(0, PAGE_SIZE);
 
     // Crear fila de "No hay resultados" si no existe
     const noResultsRow = document.createElement('tr');
@@ -480,59 +471,133 @@ document.addEventListener('DOMContentLoaded', function() {
         return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
 
-    function performSearch() {
-        const rawQuery = searchInput.value.trim();
-        const queryNorm = normalizarTexto(rawQuery);
-        const tokens = queryNorm.split(/[\s\-]+/).filter(t => t.length > 0);
+    // Pre-indexar cada fila una sola vez al cargar (< 5ms en total)
+    allRows.forEach(row => {
+        const skuText = normalizarTexto(row.dataset.sku || '');
+        const nombreText = normalizarTexto(row.dataset.nombre || '');
+        const varText = normalizarTexto(row.dataset.variantes || '');
+        row._searchStr = `${skuText} ${skuText.replace(/-/g, '')} ${nombreText} ${varText}`;
+        const prodId = row.dataset.prodId;
+        row._collapseRow = prodId ? document.getElementById('collapseVariantes' + prodId) : null;
+    });
 
-        let matches = 0;
-        tableRows.forEach(row => {
-            const prodId = row.dataset.prodId;
-            const collapseRow = prodId ? document.getElementById('collapseVariantes' + prodId) : null;
+    function renderPage(page) {
+        const total = filteredRows.length;
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        currentPage = Math.min(Math.max(1, page), totalPages);
 
-            // Si tiene menos de 2 letras, mostrar todos (o si está vacío)
-            if (queryNorm.length < 2) {
-                row.classList.remove('d-none');
-                if (collapseRow) collapseRow.classList.remove('d-none');
-                matches++;
-                return;
+        const startIdx = (currentPage - 1) * PAGE_SIZE;
+        const endIdx = Math.min(startIdx + PAGE_SIZE, total);
+        const nextVisibleRows = filteredRows.slice(startIdx, endIdx);
+        const nextVisibleSet = new Set(nextVisibleRows);
+
+        // 1. Ocultar solo las filas que estaban visibles y ya no deben estarlo (máx 50 operaciones)
+        for (let i = 0; i < currentlyVisibleRows.length; i++) {
+            const r = currentlyVisibleRows[i];
+            if (!nextVisibleSet.has(r)) {
+                r.style.display = 'none';
+                if (r._collapseRow && r._collapseRow.classList.contains('show')) {
+                    r._collapseRow.classList.remove('show');
+                }
             }
+        }
 
-            const skuText = normalizarTexto(row.dataset.sku || (row.cells[0] ? row.cells[0].textContent : ''));
-            const nombreText = normalizarTexto(row.dataset.nombre || (row.cells[1] ? row.cells[1].textContent : ''));
-            const varText = normalizarTexto(row.dataset.variantes || '');
-            const combined = `${skuText} ${skuText.replace(/-/g, '')} ${nombreText} ${varText}`;
-
-            const isMatch = tokens.every(tok => combined.includes(tok));
-            if (isMatch) {
-                row.classList.remove('d-none');
-                if (collapseRow) collapseRow.classList.remove('d-none');
-                matches++;
-            } else {
-                row.classList.add('d-none');
-                if (collapseRow) collapseRow.classList.add('d-none');
+        // 2. Mostrar solo las filas de la página actual (máx 50 operaciones)
+        for (let i = 0; i < nextVisibleRows.length; i++) {
+            const r = nextVisibleRows[i];
+            if (r.style.display === 'none') {
+                r.style.display = '';
             }
-        });
+        }
 
-        if (visibleCount) visibleCount.textContent = matches;
-        if (matches === 0 && queryNorm.length >= 2) {
+        currentlyVisibleRows = nextVisibleRows;
+
+        // Actualizar contadores
+        if (visibleCount) visibleCount.textContent = nextVisibleRows.length;
+        if (totalFilteredCount) totalFilteredCount.textContent = total;
+
+        if (total === 0) {
             noResultsRow.classList.remove('d-none');
         } else {
             noResultsRow.classList.add('d-none');
         }
+
+        if (paginationBar) {
+            if (total > PAGE_SIZE) {
+                paginationBar.classList.remove('d-none');
+                if (currPageNumEl) currPageNumEl.textContent = currentPage;
+                if (totalPagesNumEl) totalPagesNumEl.textContent = totalPages;
+                if (rangeStartEl) rangeStartEl.textContent = startIdx + 1;
+                if (rangeEndEl) rangeEndEl.textContent = endIdx;
+                if (rangeTotalEl) rangeTotalEl.textContent = total;
+                if (btnPrevPage) btnPrevPage.disabled = (currentPage <= 1);
+                if (btnNextPage) btnNextPage.disabled = (currentPage >= totalPages);
+            } else {
+                paginationBar.classList.add('d-none');
+            }
+        }
     }
 
-    searchInput.addEventListener('input', performSearch);
+    function performSearch() {
+        const rawQuery = searchInput.value.trim();
+        const queryNorm = normalizarTexto(rawQuery);
 
-    clearBtn.addEventListener('click', () => {
-        searchInput.value = '';
-        performSearch();
-        if (dropdown) {
-            dropdown.classList.add('d-none');
-            dropdown.classList.remove('show');
+        // Si tiene menos de 2 letras, restaurar vista paginada completa al instante (< 1ms)
+        if (queryNorm.length < 2) {
+            filteredRows = allRows;
+            renderPage(1);
+            return;
         }
-        searchInput.focus();
-    });
+
+        const tokens = queryNorm.split(/[\s\-]+/).filter(t => t.length > 0);
+        const matches = [];
+        for (let i = 0; i < allRows.length; i++) {
+            const row = allRows[i];
+            let isMatch = true;
+            for (let j = 0; j < tokens.length; j++) {
+                if (!row._searchStr.includes(tokens[j])) {
+                    isMatch = false;
+                    break;
+                }
+            }
+            if (isMatch) matches.push(row);
+        }
+
+        filteredRows = matches;
+        renderPage(1);
+    }
+
+    let searchTimer = null;
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchTimer = setTimeout(performSearch, 45);
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (searchTimer) clearTimeout(searchTimer);
+            searchInput.value = '';
+            performSearch();
+            if (dropdown) {
+                dropdown.classList.add('d-none');
+                dropdown.classList.remove('show');
+            }
+            searchInput.focus();
+        });
+    }
+
+    if (btnPrevPage) {
+        btnPrevPage.addEventListener('click', () => {
+            if (currentPage > 1) renderPage(currentPage - 1);
+        });
+    }
+    if (btnNextPage) {
+        btnNextPage.addEventListener('click', () => {
+            renderPage(currentPage + 1);
+        });
+    }
 });
 
 function abrirModalVariantesCompartido(btn) {

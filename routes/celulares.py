@@ -45,7 +45,7 @@ def inventario():
         referencias_seleccionadas = [r.strip() for r in request.args.get('referencia').split(',') if r.strip()]
     estado = request.args.get('estado', 'activos').strip()
     page = request.args.get('page', 1, type=int)
-    per_page = 20
+    per_page = 1000
 
     # Resolver sucursal activa (soporta parámetro directo ?branch_id=... o selector global de sesión)
     active_b_id = None
