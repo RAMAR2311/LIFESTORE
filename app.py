@@ -139,6 +139,10 @@ def create_app():
     from routes.exchanges import exchanges_bp
     app.register_blueprint(exchanges_bp, url_prefix='/cambios-celulares')
 
+    # Registro de Blueprint Pérdidas / Mermas de Accesorios
+    from routes.losses import losses_bp
+    app.register_blueprint(losses_bp, url_prefix='/perdidas')
+
 
     @app.template_filter('cop')
     def cop_filter(value):
@@ -354,7 +358,8 @@ def create_app():
             "UPDATE device_exchanges SET tipo_flujo = 'SALIDA_PRIMERO' WHERE tipo_flujo IS NULL;",
             "UPDATE products SET memoria = UPPER(REPLACE(TRIM(memoria), ' ', '')) WHERE memoria IS NOT NULL AND TRIM(memoria) != '' AND UPPER(TRIM(memoria)) != 'N/A';",
             "ALTER TABLE provider_payments ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
-            "ALTER TABLE provider_payments ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;"
+            "ALTER TABLE provider_payments ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;",
+            "ALTER TABLE warranties ADD COLUMN variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL;"
         ]
         for q in queries:
             try:

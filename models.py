@@ -925,6 +925,7 @@ class Warranty(db.Model):
     sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=False)
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True)
+    variant_id = db.Column(db.Integer, db.ForeignKey('product_variants.id'), nullable=True)
     nombre_manual = db.Column(db.String(200), nullable=True)
     quantity = db.Column(db.Integer, default=1)
     reason = db.Column(db.Text, nullable=False)
@@ -948,9 +949,20 @@ class Warranty(db.Model):
     # Relaciones
     sale = db.relationship('Sale', backref=db.backref('warranties', lazy=True))
     product = db.relationship('Product', backref=db.backref('warranties', lazy=True))
+    variant = db.relationship('ProductVariant', backref=db.backref('warranties', lazy=True))
     recibido_por = db.relationship('User', foreign_keys=[recibido_por_id], backref=db.backref('garantias_recibidas', lazy=True))
     entregado_por = db.relationship('User', foreign_keys=[entregado_por_id], backref=db.backref('garantias_entregadas', lazy=True))
     asesor = db.relationship('Asesor', foreign_keys=[asesor_id], backref=db.backref('garantias_atendidas', lazy=True))
+
+    @property
+    def es_celular(self):
+        if self.product and self.product.tipo_inventario == 'celulares':
+            return True
+        return False
+
+    @property
+    def es_accesorio(self):
+        return not self.es_celular
 
     @property
     def tiempo_transcurrido(self):
@@ -1354,6 +1366,49 @@ class ReferenceImage(db.Model):
 
     def __init__(self, **kwargs):
         super(ReferenceImage, self).__init__(**kwargs)
+
+
+class AccessoryLoss(db.Model):
+    """Registro de pérdidas / mermas de accesorios (por garantía con reposición o daño operativo en local).
+    Candado estricto: Solo permite productos que NO sean de tipo_inventario == 'celulares'.
+    """
+    __tablename__ = 'accessory_losses'
+
+    id = db.Column(db.Integer, primary_key=True)
+    origen = db.Column(db.String(30), nullable=False, default='OPERACION', index=True)  # 'GARANTIA' o 'OPERACION'
+    tipo_motivo = db.Column(db.String(100), nullable=False, default='Daño en operación / instalación')
+    motivo_detalle = db.Column(db.Text, nullable=False)
+
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False, index=True)
+    variant_id = db.Column(db.Integer, db.ForeignKey('product_variants.id'), nullable=True, index=True)
+    warranty_id = db.Column(db.Integer, db.ForeignKey('warranties.id'), nullable=True, index=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('sales.id'), nullable=True, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=False, index=True)
+    asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=True, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    cantidad = db.Column(db.Integer, nullable=False, default=1)
+    costo_unitario = db.Column(db.Numeric(12, 2), nullable=False, default=0.0)
+    costo_total = db.Column(db.Numeric(14, 2), nullable=False, default=0.0)
+    desconto_stock = db.Column(db.Boolean, nullable=False, default=True)
+    estado = db.Column(db.String(20), nullable=False, default='ACTIVA', index=True)  # 'ACTIVA' o 'ANULADA'
+    fecha_registro = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False, index=True)
+    anulado_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    fecha_anulacion = db.Column(db.DateTime, nullable=True)
+    motivo_anulacion = db.Column(db.String(255), nullable=True)
+
+    producto = db.relationship('Product', backref=db.backref('perdidas_accesorios', lazy=True))
+    variante = db.relationship('ProductVariant', backref=db.backref('perdidas_variantes', lazy=True))
+    garantia = db.relationship('Warranty', backref=db.backref('perdidas_asociadas', lazy=True))
+    venta = db.relationship('Sale', backref=db.backref('perdidas_asociadas', lazy=True))
+    branch = db.relationship('Branch', backref=db.backref('perdidas_accesorios', lazy=True))
+    asesor = db.relationship('Asesor', foreign_keys=[asesor_id], backref=db.backref('perdidas_reportadas', lazy=True))
+    usuario = db.relationship('User', foreign_keys=[user_id], backref=db.backref('perdidas_registradas', lazy=True))
+    anulado_por = db.relationship('User', foreign_keys=[anulado_por_id])
+
+    def __init__(self, **kwargs):
+        super(AccessoryLoss, self).__init__(**kwargs)
+
 
 
 

@@ -1627,6 +1627,9 @@
                             <a class="sidebar-sublink" href="{{ url_for('warranties_bp.index') }}">
                                 <i class="fa-solid fa-shield-halved me-2" style="width: 16px;"></i> Garantías Clientes
                             </a>
+                            <a class="sidebar-sublink" href="{{ url_for('losses_bp.index') }}">
+                                <i class="fa-solid fa-heart-crack me-2 text-danger" style="width: 16px;"></i> Pérdidas Accesorios
+                            </a>
                             <a class="sidebar-sublink d-flex justify-content-between align-items-center" href="{{ url_for('support_bp.index') }}">
                                 <span><i class="fa-solid fa-screwdriver-wrench me-2" style="width: 16px;"></i> Soporte Técnico</span>
                                 {% if pending_support_count > 0 %}
@@ -1699,6 +1702,9 @@
                                 {% if equipos_estancados_count and equipos_estancados_count > 0 %}
                                     <span class="badge bg-danger rounded-pill">{{ equipos_estancados_count }}</span>
                                 {% endif %}
+                            </a>
+                            <a class="sidebar-sublink" href="{{ url_for('losses_bp.index') }}">
+                                <i class="fa-solid fa-heart-crack me-2 text-danger" style="width: 16px;"></i> Pérdidas / Mermas Accesorios
                             </a>
                             <a class="sidebar-sublink" href="{{ url_for('admin_bp.gift_combos') }}">
                                 <i class="fa-solid fa-gifts me-2 text-warning" style="width: 16px;"></i> Combos de Obsequios
@@ -1900,6 +1906,10 @@
                     <a class="sidebar-link" href="{{ url_for('warranties_bp.index') }}">
                         <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-shield-halved"></i></div>
                         <span>Garantías</span>
+                    </a>
+                    <a class="sidebar-link" href="{{ url_for('losses_bp.index') }}">
+                        <div class="sidebar-icon-box icon-box-compras"><i class="fa-solid fa-heart-crack text-danger"></i></div>
+                        <span>Pérdidas Accesorios</span>
                     </a>
                     <a class="sidebar-link d-flex justify-content-between align-items-center" href="{{ url_for('support_bp.index') }}">
                         <span class="d-flex align-items-center"><div class="sidebar-icon-box icon-box-admin"><i class="fa-solid fa-screwdriver-wrench"></i></div> Soporte Técnico</span>

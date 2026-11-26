@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="fw-bold text-brand-black m-0"><i class="fa-solid fa-shield-halved text-warning me-2"></i> Gestión de Garantías</h2>
-    <button type="button" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaGarantia">
-        <i class="fa-solid fa-plus me-1"></i> Registrar Garantía
-    </button>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('losses_bp.index') }}" class="btn btn-outline-danger rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-heart-crack me-1"></i> Módulo de Pérdidas (Accesorios)
+        </a>
+        <button type="button" class="btn btn-warning rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNuevaGarantia">
+            <i class="fa-solid fa-plus me-1"></i> Registrar Garantía
+        </button>
+    </div>
 </div>
 
 <div class="card card-custom p-0 shadow-sm border-0">
@@ -43,9 +48,26 @@
                         <div class="fw-bold">Fac #{{ w.sale_id }}</div>
                         <div class="small text-muted">{{ w.sale.cliente.nombre if w.sale and w.sale.cliente else 'Sin cliente' }}</div>
                     </td>
-                    <td class="text-start" style="max-width: 220px;">
+                    <td class="text-start" style="max-width: 240px;">
+                        <div class="d-flex align-items-center gap-1 mb-1">
+                            {% if w.es_celular %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.68rem;">
+                                    <i class="fa-solid fa-mobile-screen-button me-1"></i>CELULAR
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning-subtle text-dark border border-warning" style="font-size: 0.68rem;">
+                                    <i class="fa-solid fa-plug me-1"></i>ACCESORIO
+                                </span>
+                            {% endif %}
+                            {% if w.product and w.product.sku %}
+                                <small class="text-muted font-mono" style="font-size: 0.72rem;">{{ w.product.sku }}</small>
+                            {% endif %}
+                        </div>
                         <div class="text-truncate fw-semibold" title="{{ w.product.nombre if w.product else w.nombre_manual }}">
                             {{ w.product.nombre if w.product else w.nombre_manual }}
+                            {% if w.variant %}
+                                <span class="text-muted small">({{ w.variant.nombre_variante }})</span>
+                            {% endif %}
                         </div>
                         {% if w.product and w.product.imei %}
                             <small class="badge bg-dark text-white font-mono px-2 py-0">IMEI: {{ w.product.imei }}</small>
@@ -81,7 +103,7 @@
                             <button class="btn btn-sm dropdown-toggle rounded-pill px-3 fw-bold
                                 {% if estado == 'Pendiente' %}btn-warning text-dark
                                 {% elif estado == 'Demorado' %}btn-danger
-                                {% elif estado == 'Entregada' %}btn-success
+                                {% elif estado == 'Entregada' or 'Repuesto' in estado %}btn-success
                                 {% else %}btn-secondary{% endif %}" 
                                 type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 {{ estado }}
@@ -94,11 +116,28 @@
                     </td>
                     <td class="text-end pe-4">
                         <div class="d-flex justify-content-end gap-1">
-                            {% if w.resolution != 'Entregada' %}
-                                <!-- Botón Enviar a Soporte Técnico -->
-                                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDerivarSoporte{{ w.id }}" title="Enviar a Soporte Técnico / Taller">
-                                    <i class="fa-solid fa-screwdriver-wrench me-1"></i> Soporte
-                                </button>
+                            {% if w.resolution not in ['Entregada', 'Repuesto (Pérdida)'] %}
+                                {% if w.es_celular %}
+                                    <!-- CELULAR: Solo permite Soporte Técnico (Bloqueado para Pérdidas) -->
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalDerivarSoporte{{ w.id }}" title="Enviar Celular a Soporte Técnico / Taller">
+                                        <i class="fa-solid fa-screwdriver-wrench me-1"></i> Soporte
+                                    </button>
+                                {% else %}
+                                    <!-- ACCESORIO: Permite Enviar a Pérdidas y Reponer unidad nueva del stock -->
+                                    <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 fw-bold shadow-sm"
+                                            data-warranty-id="{{ w.id }}"
+                                            data-sale-id="{{ w.sale_id }}"
+                                            data-product-id="{{ w.product_id or '' }}"
+                                            data-variant-id="{{ w.variant_id or '' }}"
+                                            data-branch-id="{{ w.branch_id or '' }}"
+                                            data-asesor-id="{{ w.asesor_id or '' }}"
+                                            data-nombre="{{ w.product.nombre if w.product else (w.nombre_manual or 'Accesorio') }}"
+                                            data-falla="{{ w.motivo_reportado or w.reason }}"
+                                            onclick="abrirModalPerdidaGarantia(this)"
+                                            title="Dar de baja el accesorio dañado en Pérdidas y descontar 1 nuevo del stock por reposición">
+                                        <i class="fa-solid fa-heart-crack me-1"></i> Pérdida / Reponer
+                                    </button>
+                                {% endif %}
                                 <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalEntregar{{ w.id }}" title="Entregar al Cliente">
                                     <i class="fa-solid fa-hand-holding-hand me-1"></i> Entregar
                                 </button>
@@ -399,7 +438,7 @@
 
             // Poblamos el form
             document.getElementById('formSaleId').value = data.sale.id;
-            document.getElementById('lblSaleId').innerText = `Fac #${data.sale.id} (${data.sale.fecha})`;
+            document.getElementById('lblSaleId').innerText = `Fac ${data.sale.numero_factura || ('#' + data.sale.id)} (${data.sale.fecha})`;
             document.getElementById('lblClient').innerText = data.sale.cliente_nombre;
             document.getElementById('lblClientDoc').innerText = `CC: ${data.sale.cliente_doc}`;
 
@@ -407,10 +446,13 @@
             select.innerHTML = '<option value="" disabled selected>-- Seleccione un producto de esta factura --</option>';
             data.details.forEach(d => {
                 let opt = document.createElement('option');
-                // Value is product_id|nombre_manual
                 let valId = d.product_id ? d.product_id : 'None';
-                opt.value = `${valId}|${d.nombre}`;
-                opt.text = `${d.nombre} (Cant: ${d.cantidad}, $${d.precio})`;
+                let varId = d.variant_id ? d.variant_id : 'None';
+                opt.value = `${valId}|${d.nombre}|${varId}`;
+                opt.dataset.esCelular = d.es_celular ? '1' : '0';
+                let badgeTipo = d.es_celular ? '[CELULAR]' : '[ACCESORIO]';
+                let precioTxt = d.es_obsequio ? 'OBSEQUIO' : `$${d.precio}`;
+                opt.text = `${badgeTipo} ${d.nombre} (Cant: ${d.cantidad}, ${precioTxt})`;
                 select.appendChild(opt);
             });
 
@@ -421,9 +463,87 @@
             feedback.innerText = "Error de red al consultar el servidor.";
             feedback.style.display = 'block';
             btn.innerHTML = 'Buscar';
-            btn.innerHTML = 'Buscar';
             btn.disabled = false;
         }
+    }
+
+    const URL_GARANTIA_PERDIDA_TPL = "{{ url_for('losses_bp.registrar_desde_garantia', warranty_id=999999999) }}";
+    const URL_API_VAR_LOSS_TPL = "{{ url_for('losses_bp.api_variantes_accesorio', product_id=999999999) }}";
+
+    async function cargarVariantesEnModalGarantia(prodId, preselectVarId, branchId) {
+        const contVar = document.getElementById('garPerdidaVarianteBox');
+        const selVar = document.getElementById('garPerdidaVariantId');
+        const stockInfoEl = document.getElementById('garPerdidaStockInfo');
+        if (!prodId) {
+            if (contVar) contVar.style.display = 'none';
+            if (stockInfoEl) stockInfoEl.textContent = '';
+            return;
+        }
+        try {
+            let url = URL_API_VAR_LOSS_TPL.replace('999999999', prodId);
+            if (branchId) url += `?branch_id=${branchId}`;
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!data.success) {
+                if (stockInfoEl) stockInfoEl.innerHTML = `<span class="text-danger fw-bold">${data.error}</span>`;
+                return;
+            }
+            if (data.tiene_variantes) {
+                contVar.style.display = 'block';
+                selVar.required = true;
+                selVar.innerHTML = '<option value="">-- Seleccionar Subcategoría / Variante a Reponer --</option>';
+                data.variantes.forEach(v => {
+                    const sel = (String(v.id) === String(preselectVarId)) ? 'selected' : '';
+                    selVar.innerHTML += `<option value="${v.id}" ${sel}>${v.nombre} (Stock en sede: ${v.stock_sede} uds.)</option>`;
+                });
+                if (stockInfoEl) stockInfoEl.innerHTML = `<i class="fa-solid fa-layer-group text-primary me-1"></i>Este accesorio tiene variantes. Selecciona cuál entregas en reposición.`;
+            } else {
+                contVar.style.display = 'none';
+                selVar.required = false;
+                selVar.innerHTML = '<option value="">Sin variantes</option>';
+                if (stockInfoEl) {
+                    const colorCls = data.stock_sede > 0 ? 'text-success' : 'text-danger';
+                    stockInfoEl.innerHTML = `<i class="fa-solid fa-boxes-stacked me-1"></i>Stock disponible en la sede para reposición: <strong class="${colorCls}">${data.stock_sede} uds.</strong> | Costo unitario: <strong>$${Math.round(data.costo).toLocaleString('es-CO')}</strong>`;
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    function abrirModalPerdidaGarantia(btn) {
+        const wId = btn.dataset.warrantyId;
+        const saleId = btn.dataset.saleId;
+        const prodId = btn.dataset.productId || '';
+        const varId = btn.dataset.variantId || '';
+        const branchId = btn.dataset.branchId || '';
+        const asesorId = btn.dataset.asesorId || '';
+        const nombre = btn.dataset.nombre || '';
+        const falla = btn.dataset.falla || '';
+
+        const form = document.getElementById('formGarantiaAPerdida');
+        form.action = URL_GARANTIA_PERDIDA_TPL.replace('999999999', wId);
+        document.getElementById('garPerdidaLblId').textContent = `#${wId} (Fac #${saleId})`;
+        document.getElementById('garPerdidaLblNombre').textContent = nombre;
+        document.getElementById('garPerdidaLblFalla').textContent = falla;
+
+        const selProd = document.getElementById('garPerdidaProductId');
+        if (selProd) {
+            selProd.value = prodId;
+        }
+        const selBranch = document.getElementById('garPerdidaBranchId');
+        if (selBranch && branchId) {
+            selBranch.value = branchId;
+        }
+        const selAsesor = document.getElementById('garPerdidaAsesorId');
+        if (selAsesor && asesorId) {
+            selAsesor.value = asesorId;
+        }
+
+        cargarVariantesEnModalGarantia(prodId, varId, selBranch ? selBranch.value : branchId);
+
+        const modalEl = document.getElementById('modalGarantiaAPerdida');
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     async function updateWarrantyStatus(id, newStatus) {
@@ -478,4 +598,103 @@
         }
     }
 </script>
+
+<!-- Modal Compartido: Enviar Garantía de Accesorio a Pérdidas y Reponer -->
+<div class="modal fade" id="modalGarantiaAPerdida" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-danger text-white border-0 py-3">
+                <h6 class="modal-title fw-bold mb-0">
+                    <i class="fa-solid fa-heart-crack me-2"></i>Enviar Accesorio a Pérdidas y Reponer Stock
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formGarantiaAPerdida" action="">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4 text-start">
+                    <div class="p-3 bg-light rounded-3 border mb-3 small">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-warning text-dark fw-bold">GARANTÍA DE ACCESORIO</span>
+                            <span class="fw-bold text-muted" id="garPerdidaLblId"></span>
+                        </div>
+                        <div class="fw-bold fs-6 text-dark" id="garPerdidaLblNombre"></div>
+                        <div class="text-muted mt-1"><strong>Falla reportada:</strong> <span id="garPerdidaLblFalla"></span></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Accesorio en Inventario (Solo Accesorios) *</label>
+                        <select name="product_id" id="garPerdidaProductId" class="form-select form-select-sm fw-semibold" required
+                                onchange="cargarVariantesEnModalGarantia(this.value, '', document.getElementById('garPerdidaBranchId')?.value)">
+                            <option value="">-- Seleccionar Accesorio del Inventario --</option>
+                            {% for acc in accesorios_disponibles %}
+                            <option value="{{ acc.id }}">[{{ acc.sku }}] {{ acc.nombre }} (Costo: ${{ (acc.precio_costo or 0)|cop }})</option>
+                            {% endfor %}
+                        </select>
+                        <div id="garPerdidaStockInfo" class="small mt-1 text-muted"></div>
+                    </div>
+
+                    <div class="mb-3" id="garPerdidaVarianteBox" style="display: none;">
+                        <label class="form-label small fw-bold text-primary">Subcategoría / Variante entregada en reposición *</label>
+                        <select name="variant_id" id="garPerdidaVariantId" class="form-select form-select-sm">
+                            <option value="">-- Seleccionar Variante --</option>
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        {% if current_user.rol == 'admin' %}
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark">Local de donde sale la reposición *</label>
+                            <select name="branch_id" id="garPerdidaBranchId" class="form-select form-select-sm"
+                                    onchange="cargarVariantesEnModalGarantia(document.getElementById('garPerdidaProductId').value, document.getElementById('garPerdidaVariantId').value, this.value)">
+                                {% for b in sucursales_activas %}
+                                <option value="{{ b.id }}">{{ b.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+                        <div class="{% if current_user.rol == 'admin' %}col-md-6{% else %}col-md-12{% endif %}">
+                            <label class="form-label small fw-bold text-dark">Asesor Responsable *</label>
+                            <select name="asesor_id" id="garPerdidaAsesorId" class="form-select form-select-sm" required>
+                                <option value="">-- Seleccionar Asesor --</option>
+                                {% for asr in asesores_disponibles %}
+                                <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3 align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-dark">Cantidad *</label>
+                            <input type="number" name="cantidad" class="form-control form-control-sm fw-bold" value="1" min="1" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-dark">¿Qué hacer con el inventario?</label>
+                            <select name="reponer_stock" class="form-select form-select-sm border-danger fw-semibold">
+                                <option value="1" selected>✅ Descontar 1 unidad nueva del stock (Entregar reposición al cliente)</option>
+                                <option value="0">Solo registrar pérdida (Sin descontar unidad nueva del stock)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">Soporte de Entrega / Reposición al Cliente *</label>
+                        <input type="text" name="soporte_entrega" class="form-control form-control-sm" value="Se recibe accesorio dañado por garantía y se entrega unidad nueva de reposición" required>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-dark">Observaciones Adicionales (Opcional)</label>
+                        <textarea name="notas_resolucion" class="form-control form-control-sm" rows="2" placeholder="Ej: Se verificó que el cable/cargador no daba carga y se entregó uno nuevo sellado..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 bg-light">
+                    <button type="button" class="btn btn-light rounded-pill btn-sm px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill btn-sm px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-check-double me-1"></i> Enviar a Pérdidas y Reponer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

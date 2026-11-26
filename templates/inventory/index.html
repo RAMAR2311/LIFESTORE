@@ -4,6 +4,9 @@
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h2 class="fw-bold text-brand-black m-0">Inventario Central</h2>
     <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('losses_bp.index') }}" class="btn btn-outline-danger rounded-pill px-4 fw-bold shadow-sm">
+            <i class="fa-solid fa-heart-crack me-1"></i> Pérdidas / Mermas
+        </a>
         <a href="{{ url_for('transfers_bp.nuevo') }}" class="btn btn-dark rounded-pill px-4 fw-bold shadow-sm">
             <i class="fa-solid fa-truck-moving me-1"></i> Trasladar Mercancía
         </a>
@@ -204,6 +207,9 @@
                             {% endif %}
                             <a href="{{ url_for('transfers_bp.nuevo', product_id=p.id) }}" class="btn btn-sm btn-outline-primary rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Trasladar este Producto">
                                 <i class="fa-solid fa-truck-moving"></i>
+                            </a>
+                            <a href="{{ url_for('losses_bp.index', product_id=p.id) }}" class="btn btn-sm btn-outline-danger rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Registrar Pérdida / Merma de este Accesorio">
+                                <i class="fa-solid fa-heart-crack"></i>
                             </a>
                             {% if p.variantes %}
                             <button type="button" class="btn btn-sm btn-outline-dark rounded-pill fw-bold shadow-sm" title="Gestionar Subcategorías" data-bs-toggle="modal" data-bs-target="#variantesModal{{ p.id }}">

@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <h2 class="fw-bold text-brand-black m-0">
+            <i class="fa-solid fa-heart-crack text-danger me-2"></i> Módulo de Pérdidas y Mermas (Accesorios)
+        </h2>
+        <p class="text-muted small mb-0 mt-1">
+            Control y trazabilidad de accesorios dados de baja por <strong>garantías de clientes (con reposición)</strong> o <strong>daños en la operación</strong> (ej. vidrios templados).
+            <span class="badge bg-dark text-white ms-1"><i class="fa-solid fa-lock me-1"></i>Exclusivo Accesorios · Bloqueado para Celulares</span>
+        </p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('warranties_bp.index') }}" class="btn btn-outline-dark rounded-pill px-3 fw-bold shadow-sm">
+            <i class="fa-solid fa-shield-halved text-warning me-1"></i> Ir a Garantías
+        </a>
+        <a href="{{ url_for('inventory_bp.index') }}" class="btn btn-outline-secondary rounded-pill px-3 fw-bold shadow-sm">
+            <i class="fa-solid fa-box-open me-1"></i> Inventario Accesorios
+        </a>
+        <button type="button" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRegistrarPerdida">
+            <i class="fa-solid fa-plus me-1"></i> Registrar Pérdida / Baja
+        </button>
+    </div>
+</div>
+
+<!-- ════════════════════════════ TARJETAS KPI DE PÉRDIDAS ════════════════════════════ -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #fff5f5);">
+            <div class="fs-2 fw-bold text-danger">{{ total_unidades }} uds.</div>
+            <div class="text-muted small fw-bold text-uppercase">Total Unidades en Pérdida</div>
+        </div>
+    </div>
+    {% if current_user.rol != 'coordinador' %}
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #fef2f2);">
+            <div class="fs-2 fw-bold text-danger">${{ total_costo|cop }}</div>
+            <div class="text-muted small fw-bold text-uppercase">Costo Total Mercancía Perdida</div>
+        </div>
+    </div>
+    {% endif %}
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #fffbeb);">
+            <div class="fs-3 fw-bold text-warning-emphasis">{{ unidades_operacion }} uds.</div>
+            <div class="text-muted small fw-bold text-uppercase">Daño en Operación / Instalación</div>
+            {% if current_user.rol != 'coordinador' %}
+            <div class="extra-small text-muted mt-1">Costo: <strong>${{ costo_operacion|cop }}</strong></div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card border-0 shadow-sm rounded-4 p-3 text-center h-100" style="background: linear-gradient(135deg, #ffffff, #eff6ff);">
+            <div class="fs-3 fw-bold text-primary">{{ unidades_garantia }} uds.</div>
+            <div class="text-muted small fw-bold text-uppercase">Reposición por Garantía</div>
+            {% if current_user.rol != 'coordinador' %}
+            <div class="extra-small text-muted mt-1">Costo: <strong>${{ costo_garantia|cop }}</strong></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════ BARRA DE FILTROS Y BÚSQUEDA ════════════════════════════ -->
+<div class="card card-custom p-3 mb-4 border-0 shadow-sm bg-white">
+    <form method="GET" action="{{ url_for('losses_bp.index') }}" class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small fw-bold text-muted mb-1">Buscar en el historial</label>
+            <div class="input-group input-group-sm shadow-sm">
+                <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                <input type="text" id="lossesSearchInput" class="form-control border-start-0 ps-0 buscador-predictivo"
+                       placeholder="Buscar SKU, accesorio, motivo, asesor o factura..." autocomplete="off">
+                <button class="btn btn-outline-secondary border-start-0" type="button"
+                        onclick="const i=document.getElementById('lossesSearchInput'); i.value=''; i.dispatchEvent(new Event('input'));">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        {% if current_user.rol in ['admin', 'coordinador'] %}
+        <div class="col-md-2">
+            <label class="form-label small fw-bold text-muted mb-1">Sede / Local</label>
+            <select name="branch_id" class="form-select form-select-sm shadow-sm fw-semibold" onchange="this.form.submit()">
+                <option value="all" {% if not active_b_id %}selected{% endif %}>📍 Todas las Sedes</option>
+                {% for b in sucursales %}
+                <option value="{{ b.id }}" {% if active_b_id == b.id %}selected{% endif %}>{{ b.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+
+        <div class="col-md-2">
+            <label class="form-label small fw-bold text-muted mb-1">Origen de la Pérdida</label>
+            <select name="origen" class="form-select form-select-sm shadow-sm fw-semibold" onchange="this.form.submit()">
+                <option value="" {% if not filtro_origen %}selected{% endif %}>Todos los orígenes</option>
+                <option value="OPERACION" {% if filtro_origen == 'OPERACION' %}selected{% endif %}>🛠️ Daño en Operación</option>
+                <option value="GARANTIA" {% if filtro_origen == 'GARANTIA' %}selected{% endif %}>🛡️ Garantía de Cliente</option>
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label small fw-bold text-muted mb-1">Desde</label>
+            <input type="date" name="fecha_inicio" value="{{ fecha_inicio }}" class="form-control form-control-sm shadow-sm" onchange="this.form.submit()">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label small fw-bold text-muted mb-1">Hasta</label>
+            <div class="d-flex gap-1">
+                <input type="date" name="fecha_fin" value="{{ fecha_fin }}" class="form-control form-control-sm shadow-sm" onchange="this.form.submit()">
+                {% if filtro_origen or fecha_inicio or fecha_fin %}
+                <a href="{{ url_for('losses_bp.index', branch_id=(active_b_id or 'all')) }}" class="btn btn-sm btn-outline-secondary" title="Limpiar filtros">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- ════════════════════════════ TABLA DE HISTORIAL DE PÉRDIDAS ════════════════════════════ -->
+<div class="card card-custom p-0 shadow-sm border-0 overflow-hidden">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-center w-100" style="font-size: 0.88rem;">
+            <thead class="bg-dark text-white text-nowrap">
+                <tr>
+                    <th class="ps-3 text-start">ID / FECHA</th>
+                    <th class="text-start">ORIGEN</th>
+                    <th class="text-start">ACCESORIO DADO DE BAJA</th>
+                    <th>SEDE / LOCAL</th>
+                    <th>CANT.</th>
+                    {% if current_user.rol != 'coordinador' %}
+                    <th class="text-end">COSTO UNIT.</th>
+                    <th class="text-end">COSTO PÉRDIDA</th>
+                    {% endif %}
+                    <th class="text-start">MOTIVO / DETALLE</th>
+                    <th class="text-start">RESPONSABLE</th>
+                    <th class="pe-3 text-center">ESTADO / ACCIÓN</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in perdidas %}
+                <tr class="{% if p.estado == 'ANULADA' %}table-light text-muted opacity-75{% endif %}">
+                    <td class="ps-3 text-start text-nowrap">
+                        <div class="fw-bold text-dark">#{{ p.id }}</div>
+                        <small class="text-muted">{{ p.fecha_registro.strftime('%d/%m/%Y %I:%M %p') }}</small>
+                    </td>
+                    <td class="text-start text-nowrap">
+                        {% if p.origen == 'GARANTIA' %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fw-bold">
+                                <i class="fa-solid fa-shield-halved me-1"></i>Garantía #{{ p.warranty_id or '' }}
+                            </span>
+                            {% if p.sale_id %}
+                                <div class="extra-small text-muted mt-1">Factura #{{ p.sale_id }}</div>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-warning-subtle text-dark border border-warning rounded-pill px-2.5 py-1 fw-bold">
+                                <i class="fa-solid fa-screwdriver-wrench me-1"></i>Daño Operación
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-start" style="min-width: 220px;">
+                        <div class="fw-bold text-brand-black">
+                            {{ p.producto.nombre if p.producto else 'Accesorio Eliminado' }}
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mt-1">
+                            {% if p.producto and p.producto.sku %}
+                                <span class="badge bg-light text-dark border font-mono" style="font-size: 0.7rem;">{{ p.producto.sku }}</span>
+                            {% endif %}
+                            {% if p.variante %}
+                                <span class="badge bg-secondary-subtle text-dark border" style="font-size: 0.7rem;">{{ p.variante.nombre_variante }}</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="text-nowrap">
+                        {% if p.branch %}
+                            <span class="badge bg-light text-dark border rounded-pill px-2.5 py-1 fw-semibold">
+                                📍 {{ p.branch.nombre }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-danger rounded-pill px-2.5 py-1 fw-bold">-{{ p.cantidad }} uds.</span>
+                        {% if p.desconto_stock %}
+                            <div class="extra-small text-success fw-semibold mt-1" title="Se descontó del stock local">
+                                <i class="fa-solid fa-check"></i> Stock descontado
+                            </div>
+                        {% endif %}
+                    </td>
+                    {% if current_user.rol != 'coordinador' %}
+                    <td class="text-end text-muted font-mono">${{ p.costo_unitario|cop }}</td>
+                    <td class="text-end fw-bold text-danger font-mono">${{ p.costo_total|cop }}</td>
+                    {% endif %}
+                    <td class="text-start" style="max-width: 260px;">
+                        <div class="fw-semibold text-dark small">{{ p.tipo_motivo }}</div>
+                        {% if p.motivo_detalle and p.motivo_detalle != p.tipo_motivo %}
+                            <div class="text-muted small text-wrap" style="font-size: 0.78rem; line-height: 1.25;">{{ p.motivo_detalle }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-start text-nowrap">
+                        {% if p.asesor %}
+                            <div class="small fw-bold text-dark"><i class="fa-solid fa-user-tie text-primary me-1"></i>{{ p.asesor.nombre }}</div>
+                        {% endif %}
+                        <small class="text-muted">Reg: {{ p.usuario.nombre if p.usuario else 'Sistema' }}</small>
+                    </td>
+                    <td class="pe-3 text-center text-nowrap">
+                        {% if p.estado == 'ACTIVA' %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2 py-1 fw-bold">
+                                PÉRDIDA ACTIVA
+                            </span>
+                            {% if current_user.rol == 'admin' %}
+                            <form method="POST" action="{{ url_for('losses_bp.anular_perdida', loss_id=p.id) }}" class="d-inline ms-1"
+                                  onsubmit="return confirm('¿Anular esta pérdida y devolver +{{ p.cantidad }} uds. al stock de {{ p.branch.nombre if p.branch else 'la sede' }}?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary rounded-circle" style="width: 28px; height: 28px; padding: 0;" title="Anular pérdida y devolver al stock">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-secondary rounded-pill px-2 py-1">ANULADA</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-box-open fs-1 mb-3 opacity-25 d-block"></i>
+                        <p class="mb-0 fw-semibold">No hay registros de pérdidas de accesorios en este filtro.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ════════════════════════════ MODAL REGISTRAR PÉRDIDA / MERMA ════════════════════════════ -->
+<div class="modal fade" id="modalRegistrarPerdida" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-danger text-white border-0 py-3">
+                <h5 class="modal-title fw-bold mb-0">
+                    <i class="fa-solid fa-heart-crack me-2"></i>Registrar Pérdida / Baja de Accesorio
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('losses_bp.registrar_perdida') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning border-warning small py-2 px-3 mb-3">
+                        <i class="fa-solid fa-shield-halved me-1"></i>
+                        <strong>Regla del Sistema:</strong> Solo se permite dar de baja artículos del <strong>Inventario de Accesorios</strong> (vidrios templados dañados en instalación, cargadores, cables o fundas defectuosas). Los equipos de <strong>Inventario de Celulares</strong> están bloqueados para pérdidas.
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <!-- Selector de Sucursal -->
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark">1. Sede / Local donde se descuenta el stock *</label>
+                            {% if current_user.rol in ['admin', 'coordinador'] %}
+                            <select name="branch_id" id="lossBranchSelect" class="form-select fw-semibold" required onchange="onLossProductChange()">
+                                {% for b in sucursales %}
+                                <option value="{{ b.id }}" {% if branch_target_id == b.id %}selected{% endif %}>📍 {{ b.nombre }} ({{ b.codigo }})</option>
+                                {% endfor %}
+                            </select>
+                            {% else %}
+                            <input type="hidden" name="branch_id" id="lossBranchSelect" value="{{ branch_target_id }}">
+                            <input type="text" class="form-control bg-light fw-bold" value="📍 {{ current_user.branch.nombre if current_user.branch else 'Sede Actual' }}" readonly>
+                            {% endif %}
+                        </div>
+
+                        <!-- Selector de Asesor -->
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-dark">2. Asesor Responsable *</label>
+                            <select name="asesor_id" class="form-select" required>
+                                <option value="">-- Seleccionar Asesor --</option>
+                                {% for asr in asesores %}
+                                <option value="{{ asr.id }}">{{ asr.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Buscador rápido y Selector de Accesorio -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-dark">3. Seleccionar Accesorio Dañado *</label>
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text bg-light"><i class="fa-solid fa-filter text-muted"></i></span>
+                            <input type="text" id="filterAccLossInput" class="form-control bg-light"
+                                   placeholder="Escribe 2+ letras para filtrar la lista por SKU o nombre (ej: vidrio, cable, 20w)..."
+                                   autocomplete="off" oninput="filtrarSelectorAccesorios(this.value)">
+                        </div>
+                        <select name="product_id" id="lossProductSelect" class="form-select fw-semibold border-danger" size="5" required onchange="onLossProductChange()">
+                            {% for acc in accesorios %}
+                            {% set st_local = stocks_local.get(acc.id ~ '_total') if acc.variantes else stocks_local.get(acc.id ~ '_0', 0) %}
+                            <option value="{{ acc.id }}"
+                                    data-search="{{ (acc.sku or '')|lower }} {{ (acc.nombre or '')|lower }}"
+                                    {% if preselect_product_id and preselect_product_id == acc.id %}selected{% endif %}>
+                                [{{ acc.sku }}] {{ acc.nombre }} — Stock sede: {{ st_local or 0 }} uds. (Global: {{ acc.total_stock }} uds.) | Costo: ${{ (acc.precio_costo or 0)|cop }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div id="lossStockFeedback" class="small mt-2"></div>
+                    </div>
+
+                    <!-- Selector dinámico de Variante si el accesorio tiene subcategorías -->
+                    <div class="mb-3" id="lossVariantContainer" style="display: none;">
+                        <label class="form-label small fw-bold text-primary">Subcategoría / Variante Dañada *</label>
+                        <select name="variant_id" id="lossVariantSelect" class="form-select border-primary fw-semibold">
+                            <option value="">-- Seleccionar Subcategoría --</option>
+                        </select>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-dark">4. Cantidad a dar de baja *</label>
+                            <input type="number" name="cantidad" class="form-control fw-bold" value="1" min="1" required>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold text-dark">5. Tipo de Motivo *</label>
+                            <select name="tipo_motivo" class="form-select fw-semibold" required>
+                                {% for mot in motivos_perdida %}
+                                <option value="{{ mot }}">{{ mot }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-dark">6. Detalle / Observación de lo ocurrido *</label>
+                        <textarea name="motivo_detalle" class="form-control" rows="2"
+                                  placeholder="Ej: Se partió vidrio templado de iPhone 15 Pro Max al momento de instalarlo al cliente en el local..." required></textarea>
+                    </div>
+                    <input type="hidden" name="descontar_stock" value="1">
+                </div>
+                <div class="modal-footer border-top py-3 bg-light">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-arrow-trend-down me-1"></i> Confirmar Baja y Descontar del Stock
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+const URL_API_VAR_ACC = "{{ url_for('losses_bp.api_variantes_accesorio', product_id=999999999) }}";
+
+function filtrarSelectorAccesorios(query) {
+    const q = (query || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const sel = document.getElementById('lossProductSelect');
+    if (!sel) return;
+    const tokens = q.split(/\s+/).filter(t => t.length > 0);
+    Array.from(sel.options).forEach(opt => {
+        const text = (opt.dataset.search || opt.textContent || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const match = tokens.length === 0 || tokens.every(tok => text.includes(tok));
+        opt.hidden = !match;
+        opt.style.display = match ? '' : 'none';
+    });
+}
+
+async function onLossProductChange() {
+    const selProd = document.getElementById('lossProductSelect');
+    const branchEl = document.getElementById('lossBranchSelect');
+    const varCont = document.getElementById('lossVariantContainer');
+    const varSel = document.getElementById('lossVariantSelect');
+    const feedback = document.getElementById('lossStockFeedback');
+
+    const prodId = selProd ? selProd.value : '';
+    const branchId = branchEl ? branchEl.value : '';
+    if (!prodId) return;
+
+    try {
+        const url = URL_API_VAR_ACC.replace('999999999', prodId) + `?branch_id=${encodeURIComponent(branchId)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.success) {
+            feedback.innerHTML = `<span class="text-danger fw-bold">${data.error}</span>`;
+            return;
+        }
+        if (data.tiene_variantes) {
+            varCont.style.display = 'block';
+            varSel.required = true;
+            varSel.innerHTML = '<option value="">-- Seleccionar Subcategoría / Variante --</option>';
+            data.variantes.forEach(v => {
+                varSel.innerHTML += `<option value="${v.id}">${v.nombre} — Stock en sede: ${v.stock_sede} uds. | Costo: $${Math.round(v.costo).toLocaleString('es-CO')}</option>`;
+            });
+            feedback.innerHTML = `<span class="text-primary fw-semibold"><i class="fa-solid fa-sitemap me-1"></i>Este accesorio maneja subcategorías. Elige arriba cuál variante se dañó.</span>`;
+        } else {
+            varCont.style.display = 'none';
+            varSel.required = false;
+            varSel.innerHTML = '<option value="">Sin variantes</option>';
+            const badgeCls = data.stock_sede > 0 ? 'bg-success-subtle text-success border-success' : 'bg-danger-subtle text-danger border-danger';
+            feedback.innerHTML = `
+                <span class="badge ${badgeCls} border px-2.5 py-1">
+                    Stock disponible en la sede seleccionada: <strong>${data.stock_sede} uds.</strong>
+                </span>
+                <span class="ms-2 text-muted">Costo unitario de pérdida: <strong>$${Math.round(data.costo).toLocaleString('es-CO')}</strong></span>
+            `;
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    {% if preselect_product_id %}
+    const modalEl = document.getElementById('modalRegistrarPerdida');
+    if (modalEl) {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        onLossProductChange();
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}

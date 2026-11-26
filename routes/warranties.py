@@ -27,8 +27,17 @@ def index():
     from models import Technician, Asesor
     tecnicos_disponibles = Technician.query.filter_by(activo=True).order_by(Technician.nombre.asc()).all()
     asesores_disponibles = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
+    sucursales_activas = Branch.query.filter_by(activa=True).order_by(Branch.tipo.desc(), Branch.nombre.asc()).all()
+    accesorios_disponibles = Product.query.filter(Product.tipo_inventario != 'celulares').order_by(Product.nombre.asc()).all()
     warranties = query.order_by(Warranty.created_at.desc()).all()
-    return render_template('warranties/index.html', warranties=warranties, tecnicos_disponibles=tecnicos_disponibles, asesores_disponibles=asesores_disponibles)
+    return render_template(
+        'warranties/index.html',
+        warranties=warranties,
+        tecnicos_disponibles=tecnicos_disponibles,
+        asesores_disponibles=asesores_disponibles,
+        sucursales_activas=sucursales_activas,
+        accesorios_disponibles=accesorios_disponibles
+    )
 
 @warranties_bp.route('/api/search', methods=['GET'])
 @login_required
@@ -39,22 +48,31 @@ def search_sale():
 
     sale = None
     
-    # 1. Intentar buscar por ID de Factura (número exacto)
+    # 1. Intentar buscar por ID de Factura (número exacto) o número consecutivo (ej. REM181-7, FAC2140-29)
     if query.isdigit():
         sale = Sale.query.get(int(query))
-
-    # 2. Si no se encontró, buscar por Cédula de cliente
     if not sale:
-        client = SaleClient.query.filter_by(documento=query).order_by(SaleClient.id.desc()).first()
+        sale = Sale.query.filter(Sale.numero_factura.ilike(f'%{query}%')).order_by(Sale.id.desc()).first()
+
+    # 2. Si no se encontró, buscar por Cédula o Nombre de cliente
+    if not sale:
+        client = SaleClient.query.filter(
+            db.or_(
+                SaleClient.documento == query,
+                SaleClient.nombre.ilike(f'%{query}%')
+            )
+        ).order_by(SaleClient.id.desc()).first()
         if client:
             sale = client.venta
 
-    # 3. Si no se encontró, buscar por IMEI en SaleDetail
+    # 3. Si no se encontró, buscar por IMEI, SKU o Nombre de producto en SaleDetail
     if not sale:
-        detail = SaleDetail.query.join(Product).filter(
+        detail = SaleDetail.query.outerjoin(Product).filter(
             db.or_(
                 Product.imei == query,
                 Product.imei2 == query,
+                Product.sku.ilike(f'%{query}%'),
+                Product.nombre.ilike(f'%{query}%'),
                 SaleDetail.nombre_manual.ilike(f'%{query}%')
             )
         ).order_by(SaleDetail.id.desc()).first()
@@ -62,27 +80,39 @@ def search_sale():
             sale = detail.venta
 
     if not sale:
-        return jsonify({'success': False, 'message': 'No se encontró ninguna factura asociada a ese ID, Cédula o IMEI.'})
+        return jsonify({'success': False, 'message': 'No se encontró ninguna factura asociada a ese ID, Factura, Cédula, IMEI o Accesorio.'})
 
     # Preparar detalles de la factura
     details_data = []
     for d in sale.detalles:
+        prod = d.producto
+        if not prod and d.variante and d.variante.producto:
+            prod = d.variante.producto
+        es_celular = bool(prod and prod.tipo_inventario == 'celulares')
+        nombre_item = d.nombre_manual or (prod.nombre if prod else 'Desconocido')
+        if d.variante and d.variante.nombre_variante:
+            nombre_item = f"{nombre_item} ({d.variante.nombre_variante})"
         details_data.append({
             'detail_id': d.id,
-            'product_id': d.product_id,
-            'nombre': d.nombre_manual or (d.producto.nombre if d.producto else 'Desconocido'),
+            'product_id': prod.id if prod else d.product_id,
+            'variant_id': d.variant_id,
+            'nombre': nombre_item,
             'cantidad': d.cantidad_vendida,
-            'precio': str(d.precio_venta_final)
+            'precio': str(d.precio_venta_final),
+            'es_obsequio': bool(d.es_obsequio or float(d.precio_venta_final or 0) == 0),
+            'es_celular': es_celular,
+            'tipo_label': 'CELULAR' if es_celular else 'ACCESORIO'
         })
 
     client_doc = sale.cliente.documento if sale.cliente else 'N/A'
-    client_name = sale.cliente.nombre if sale.cliente else 'N/A'
+    client_name = sale.cliente.nombre if sale.cliente else 'Consumidor Final'
     sucursal_origen = sale.branch.nombre if getattr(sale, 'branch', None) else (sale.sucursal or 'Principal')
 
     return jsonify({
         'success': True,
         'sale': {
             'id': sale.id,
+            'numero_factura': sale.numero_factura or f"#{sale.id}",
             'fecha': sale.fecha_venta.strftime('%d/%m/%Y %I:%M %p'),
             'total': str(sale.monto_total),
             'cliente_doc': client_doc,
@@ -96,7 +126,7 @@ def search_sale():
 @login_required
 def create_warranty():
     sale_id = request.form.get('sale_id')
-    detail_index_str = request.form.get('detail_index') # formato "product_id|nombre_manual"
+    detail_index_str = request.form.get('detail_index') # formato "product_id|nombre_manual|variant_id"
     reason = request.form.get('reason', '').strip()
 
     if not sale_id or not detail_index_str or not reason:
@@ -107,8 +137,10 @@ def create_warranty():
     parts = detail_index_str.split('|')
     product_id_str = parts[0]
     nombre_manual = parts[1] if len(parts) > 1 else None
+    variant_id_str = parts[2] if len(parts) > 2 else None
 
-    product_id = int(product_id_str) if product_id_str != 'None' else None
+    product_id = int(product_id_str) if (product_id_str and product_id_str not in ('None', 'null', '')) else None
+    variant_id = int(variant_id_str) if (variant_id_str and variant_id_str not in ('None', 'null', '')) else None
 
     # Determinar la sucursal física donde se radica el reclamo
     if current_user.rol in ['vendedor', 'bodega']:
@@ -134,6 +166,7 @@ def create_warranty():
     warranty.sale_id = sale_id
     warranty.branch_id = receiving_branch_id
     warranty.product_id = product_id
+    warranty.variant_id = variant_id
     warranty.nombre_manual = nombre_manual
     warranty.quantity = 1
     warranty.reason = reason
