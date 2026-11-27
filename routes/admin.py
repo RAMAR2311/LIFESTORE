@@ -1458,6 +1458,23 @@ def ventas_vendedores():
                     CommissionPayment.fecha_pago <= end_date
                 ).order_by(CommissionPayment.fecha_pago.desc()).all()
 
+                # Backfill automático para pagos de comisiones/nómina previos sin Expense
+                default_tienda = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
+                changed_backfill = False
+                for pc in pagos_comisiones:
+                    if not pc.expense_id and default_tienda:
+                        b_obj = Branch.query.get(pc.branch_id) if pc.branch_id else default_tienda
+                        if not b_obj or b_obj.tipo != 'tienda':
+                            b_obj = default_tienda
+                        pc.branch_id = b_obj.id
+                        _sincronizar_gasto_comision_nomina(pc, b_obj, pc.metodo_pago or 'efectivo', pc.registrado_por_id or current_user.id)
+                        changed_backfill = True
+                if changed_backfill:
+                    try:
+                        db.session.commit()
+                    except Exception:
+                        db.session.rollback()
+
                 for p in pagos_comisiones:
                     monto_pago = Decimal(str(p.monto or 0))
                     if p.tipo_pago == 'ANTICIPO':
@@ -1470,7 +1487,10 @@ def ventas_vendedores():
 
             except Exception as e:
                 flash(f"Error al procesar comisiones: {str(e)}", 'danger')
-                
+
+    from routes.vales import _calcular_saldos_por_local_y_metodo, METODOS_PAGO_VALE
+    locales_tienda, saldos_locales = _calcular_saldos_por_local_y_metodo()
+
     return render_template(
         'admin/ventas_vendedores.html',
         asesores=asesores_lista,
@@ -1489,7 +1509,10 @@ def ventas_vendedores():
         total_comision_mes=total_comision_mes,
         total_anticipos=total_anticipos,
         total_liquidado=total_liquidado,
-        saldo_pendiente=saldo_pendiente
+        saldo_pendiente=saldo_pendiente,
+        locales_tienda=locales_tienda,
+        saldos_locales=saldos_locales,
+        metodos_pago_vale=METODOS_PAGO_VALE
     )
 
 
@@ -1558,43 +1581,138 @@ def parse_monto_comision(monto_raw):
         return Decimal(str(int(round(float(limpio or 0)))))
 
 
+def _sincronizar_gasto_comision_nomina(pago, branch_obj, metodo_pago, user_id):
+    """
+    Crea o actualiza el registro de Gasto (Expense) asociado a un Anticipo,
+    Liquidación de Comisión o Liquidación de Nómina de un asesor.
+    """
+    nombre_asesor = pago.asesor.nombre if pago.asesor else f'Asesor #{pago.asesor_id}'
+    if pago.tipo_pago == 'ANTICIPO':
+        cat = 'Anticipo de Comisión'
+        prefijo = f"[ANTICIPO #COM-{pago.id:04d}]"
+    elif pago.tipo_pago == 'LIQUIDACION_NOMINA':
+        cat = 'Pago de Nómina'
+        prefijo = f"[NÓMINA #NOM-{pago.id:04d}]"
+    else:
+        cat = 'Liquidación Comisiones'
+        prefijo = f"[LIQ. COMISIÓN #COM-{pago.id:04d}]"
+
+    desc_gasto = f"{prefijo} Asesor: {nombre_asesor} ({metodo_pago.capitalize()})"
+    if pago.notas:
+        desc_gasto += f" — {pago.notas}"
+    desc_gasto = desc_gasto[:255]
+
+    if pago.expense_id:
+        gasto_existente = Expense.query.get(pago.expense_id)
+        if gasto_existente:
+            gasto_existente.monto = pago.monto
+            gasto_existente.metodo_pago = metodo_pago
+            gasto_existente.branch_id = branch_obj.id
+            gasto_existente.sucursal = branch_obj.nombre
+            gasto_existente.categoria = cat
+            gasto_existente.descripcion = desc_gasto
+            return gasto_existente
+
+    nuevo_gasto = Expense(
+        usuario_id=user_id,
+        tipo_gasto='Gasto Diario',
+        categoria=cat,
+        descripcion=desc_gasto,
+        monto=pago.monto,
+        metodo_pago=metodo_pago,
+        sucursal=branch_obj.nombre,
+        branch_id=branch_obj.id,
+        fecha_gasto=pago.fecha_pago or obtener_hora_bogota()
+    )
+    db.session.add(nuevo_gasto)
+    db.session.flush()
+    pago.expense_id = nuevo_gasto.id
+    return nuevo_gasto
+
+
 @admin_bp.route('/comisiones/anticipo', methods=['POST'])
 @login_required
 @admin_required
 def registrar_anticipo_comision():
     asesor_id = request.form.get('asesor_id', type=int)
     monto_raw = request.form.get('monto', '0')
-    metodo_pago = request.form.get('metodo_pago', 'efectivo')
+    branch_id_pago = request.form.get('branch_id_pago', type=int) or session.get('active_branch_id')
+    metodo_pago = (request.form.get('metodo_pago') or 'efectivo').strip().lower()
     notas = request.form.get('notas', '').strip()
     mes_origen = request.form.get('mes', obtener_hora_bogota().strftime('%Y-%m'))
     comision_fija = request.form.get('comision_fija', '20000')
+    origen_vista = request.form.get('origen_vista', 'comisiones').strip()
 
     asesor = Asesor.query.get_or_404(asesor_id)
+    branch_obj = Branch.query.get(branch_id_pago) if branch_id_pago else None
+    if not branch_obj or branch_obj.tipo != 'tienda':
+        branch_obj = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
+
+    if not branch_obj:
+        flash("Debes seleccionar un Local comercial válido de donde salió el dinero.", "danger")
+        if origen_vista == 'nomina':
+            return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
+        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
+
     try:
         monto = parse_monto_comision(monto_raw)
         if monto <= 0:
             raise ValueError("El monto debe ser mayor a 0.")
     except Exception as e:
         flash(f"Monto inválido para el anticipo: {str(e)}", "danger")
+        if origen_vista == 'nomina':
+            return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
         return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
 
     try:
         nuevo_pago = CommissionPayment(
             asesor_id=asesor.id,
+            branch_id=branch_obj.id,
             monto=monto,
             tipo_pago='ANTICIPO',
             metodo_pago=metodo_pago,
             fecha_pago=obtener_hora_bogota(),
             registrado_por_id=current_user.id,
-            notas=notas
+            notas=notas or f"Anticipo pagado desde {branch_obj.nombre} ({metodo_pago.capitalize()})."
         )
         db.session.add(nuevo_pago)
+        db.session.flush()
+
+        # 1. Generar Gasto automáticamente en el Local seleccionado
+        gasto_obj = _sincronizar_gasto_comision_nomina(nuevo_pago, branch_obj, metodo_pago, current_user.id)
+
+        # 2. Descontar en Bancos / Métodos de pago
+        from services.bank_service import registrar_movimiento_banco
+        registrar_movimiento_banco(
+            codigo_metodo=metodo_pago,
+            monto=monto,
+            tipo_movimiento='EGRESO',
+            origen='GASTO',
+            descripcion=f'Anticipo Comisión #COM-{nuevo_pago.id:04d} a {asesor.nombre} [Desde: {branch_obj.nombre}]',
+            referencia_id=gasto_obj.id,
+            usuario_id=current_user.id
+        )
+
+        AuditLog.registrar(
+            action='ANTICIPO_COMISION',
+            user_id=current_user.id,
+            motivo=f"Anticipo de comisión #COM-{nuevo_pago.id:04d} para '{asesor.nombre}' por ${float(monto):,.0f} desde {branch_obj.nombre} ({metodo_pago.capitalize()}) - Gasto #{gasto_obj.id}.",
+            target_id=nuevo_pago.id,
+            target_type='COMMISSION_PAYMENT'
+        )
+
         db.session.commit()
-        flash(f"Anticipo por ${monto:,.0f} registrado con éxito para {asesor.nombre}.", "success")
+        flash(
+            f"✅ Anticipo por ${int(monto):,} registrado para {asesor.nombre}. "
+            f"Se generó el Gasto automáticamente en {branch_obj.nombre} ({metodo_pago.capitalize()}).".replace(',', '.'),
+            "success"
+        )
         return redirect(url_for('admin_bp.recibo_comision', payment_id=nuevo_pago.id, comision_fija=comision_fija))
     except Exception as e:
         db.session.rollback()
         flash(f"Error al registrar anticipo: {str(e)}", "danger")
+        if origen_vista == 'nomina':
+            return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
         return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
 
 
@@ -1604,38 +1722,177 @@ def registrar_anticipo_comision():
 def liquidar_saldo_comision():
     asesor_id = request.form.get('asesor_id', type=int)
     monto_raw = request.form.get('monto', '0')
-    metodo_pago = request.form.get('metodo_pago', 'efectivo')
+    branch_id_pago = request.form.get('branch_id_pago', type=int) or session.get('active_branch_id')
+    metodo_pago = (request.form.get('metodo_pago') or 'efectivo').strip().lower()
     notas = request.form.get('notas', '').strip()
     mes_origen = request.form.get('mes', obtener_hora_bogota().strftime('%Y-%m'))
     comision_fija = request.form.get('comision_fija', '20000')
+    origen_vista = request.form.get('origen_vista', 'comisiones').strip()
+    tipo_pago_form = request.form.get('tipo_pago', 'LIQUIDACION_TOTAL').strip()
 
     asesor = Asesor.query.get_or_404(asesor_id)
+    branch_obj = Branch.query.get(branch_id_pago) if branch_id_pago else None
+    if not branch_obj or branch_obj.tipo != 'tienda':
+        branch_obj = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
+
+    if not branch_obj:
+        flash("Debes seleccionar un Local comercial válido de donde salió el dinero.", "danger")
+        if origen_vista == 'nomina':
+            return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
+        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
+
     try:
         monto = parse_monto_comision(monto_raw)
         if monto <= 0:
             raise ValueError("El monto a liquidar debe ser mayor a 0.")
     except Exception as e:
         flash(f"Monto de liquidación inválido: {str(e)}", "danger")
+        if origen_vista == 'nomina':
+            return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
         return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
 
     try:
+        tipo_final = 'LIQUIDACION_NOMINA' if (origen_vista == 'nomina' or tipo_pago_form == 'LIQUIDACION_NOMINA') else 'LIQUIDACION_TOTAL'
+        etiqueta_liq = 'Liquidación de Nómina' if tipo_final == 'LIQUIDACION_NOMINA' else 'Liquidación de Comisiones'
+
         nuevo_pago = CommissionPayment(
             asesor_id=asesor.id,
+            branch_id=branch_obj.id,
             monto=monto,
-            tipo_pago='LIQUIDACION_TOTAL',
+            tipo_pago=tipo_final,
             metodo_pago=metodo_pago,
             fecha_pago=obtener_hora_bogota(),
             registrado_por_id=current_user.id,
-            notas=notas
+            notas=notas or f"{etiqueta_liq} ({mes_origen}) pagada desde {branch_obj.nombre} ({metodo_pago.capitalize()})."
         )
         db.session.add(nuevo_pago)
+        db.session.flush()
+
+        # 1. Generar automáticamente el Gasto (Expense) en el Local seleccionado por el Neto desembolsado
+        gasto_obj = _sincronizar_gasto_comision_nomina(nuevo_pago, branch_obj, metodo_pago, current_user.id)
+
+        # 2. Descontar en Bancos / Métodos de pago
+        from services.bank_service import registrar_movimiento_banco
+        registrar_movimiento_banco(
+            codigo_metodo=metodo_pago,
+            monto=monto,
+            tipo_movimiento='EGRESO',
+            origen='GASTO',
+            descripcion=f'{etiqueta_liq} #{nuevo_pago.id:04d} a {asesor.nombre} [Desde: {branch_obj.nombre}]',
+            referencia_id=gasto_obj.id,
+            usuario_id=current_user.id
+        )
+
+        AuditLog.registrar(
+            action='LIQUIDACION_NOMINA' if tipo_final == 'LIQUIDACION_NOMINA' else 'LIQUIDACION_COMISION',
+            user_id=current_user.id,
+            motivo=(
+                f"{etiqueta_liq} #{nuevo_pago.id:04d} para '{asesor.nombre}' por ${float(monto):,.0f} "
+                f"pagada desde {branch_obj.nombre} en {metodo_pago.capitalize()} (Gasto #{gasto_obj.id})."
+            ),
+            target_id=nuevo_pago.id,
+            target_type='COMMISSION_PAYMENT'
+        )
+
         db.session.commit()
-        flash(f"Liquidación por ${monto:,.0f} registrada con éxito para {asesor.nombre}.", "success")
+        flash(
+            f"✅ {etiqueta_liq} por ${int(monto):,} registrada para {asesor.nombre}. "
+            f"Se generó el Gasto #{gasto_obj.id} en {branch_obj.nombre} ({metodo_pago.capitalize()}) y se descontó del saldo.".replace(',', '.'),
+            "success"
+        )
+        if origen_vista == 'nomina':
+            return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
         return redirect(url_for('admin_bp.recibo_comision', payment_id=nuevo_pago.id, comision_fija=comision_fija))
     except Exception as e:
         db.session.rollback()
         flash(f"Error al liquidar saldo: {str(e)}", "danger")
+        if origen_vista == 'nomina':
+            return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
         return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id, mes=mes_origen, comision_fija=comision_fija))
+
+
+@admin_bp.route('/comisiones/pago/<int:payment_id>/reversar', methods=['POST'])
+@login_required
+@admin_required
+def reversar_pago_comision_nomina(payment_id):
+    """
+    Permite al Administrador reversar/anular una liquidación de nómina, liquidación de comisión
+    o anticipo exigiendo obligatoriamente el PIN de seguridad (1234).
+    - Elimina el Gasto (Expense) asociado para que deje de descontar en el local.
+    - Reversa el movimiento en Bancos devolviendo el saldo al método de pago.
+    - Elimina el registro de pago para poder volver a liquidar correctamente.
+    """
+    token_ingresado = (request.form.get('token_secreto') or '').strip()
+    expected_token = os.environ.get('DELETE_TOKEN', '1234').strip()
+    mes_origen = request.form.get('mes', obtener_hora_bogota().strftime('%Y-%m'))
+    comision_fija = request.form.get('comision_fija', '20000')
+    origen_vista = request.form.get('origen_vista', 'nomina').strip()
+    asesor_id_form = request.form.get('asesor_id', type=int)
+
+    if not token_ingresado or token_ingresado != expected_token:
+        flash('🚫 PIN de seguridad incorrecto. Operación de reversión cancelada.', 'danger')
+        if origen_vista == 'comisiones' and asesor_id_form:
+            return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id_form, mes=mes_origen, comision_fija=comision_fija))
+        return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
+
+    pago = CommissionPayment.query.get_or_404(payment_id)
+    motivo = (request.form.get('motivo_reversion') or 'Reversión de pago de nómina/comisión autorizada con PIN.').strip()
+
+    try:
+        asesor_id = pago.asesor_id
+        nombre_asesor = pago.asesor.nombre if pago.asesor else f'Asesor #{asesor_id}'
+        monto_val = Decimal(str(pago.monto or 0))
+        metodo_ant = (pago.metodo_pago or 'efectivo').strip().lower()
+        sede_nom = pago.branch.nombre if pago.branch else 'Local'
+        gasto_id_elim = pago.expense_id
+        tipo_ant = pago.tipo_pago
+
+        # 1. Eliminar Gasto (Expense) asociado
+        if pago.expense_id:
+            gasto_asoc = Expense.query.get(pago.expense_id)
+            pago.expense_id = None
+            db.session.flush()
+            if gasto_asoc:
+                db.session.delete(gasto_asoc)
+
+        # 2. Devolver el saldo en Bancos / Método de Pago
+        if monto_val > 0:
+            from services.bank_service import registrar_movimiento_banco
+            registrar_movimiento_banco(
+                codigo_metodo=metodo_ant,
+                monto=monto_val,
+                tipo_movimiento='INGRESO',
+                origen='AJUSTE_MANUAL',
+                descripcion=f'Reversión {tipo_ant} #{pago.id:04d} ({nombre_asesor}) [PIN Autorizado - {sede_nom}]',
+                referencia_id=pago.id,
+                usuario_id=current_user.id
+            )
+
+        AuditLog.registrar(
+            action='REVERSION_NOMINA_COMISION',
+            user_id=current_user.id,
+            motivo=(
+                f"Reversión de {tipo_ant} #{pago.id:04d} ({nombre_asesor}) por ${float(monto_val):,.0f} "
+                f"[Sede: {sede_nom}, Método: {metodo_ant.capitalize()}, Gasto anulado: #{gasto_id_elim or 'N/A'}]. Motivo: {motivo}"
+            ),
+            target_id=pago.id,
+            target_type='COMMISSION_PAYMENT'
+        )
+
+        db.session.delete(pago)
+        db.session.commit()
+        flash(
+            f"🔄 Pago #{payment_id:04d} de '{nombre_asesor}' por ${int(monto_val):,} revertido exitosamente. "
+            f"El gasto fue anulado y el saldo regresó a {sede_nom} ({metodo_ant.capitalize()}).".replace(',', '.'),
+            'success'
+        )
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al reversar el pago: {str(e)}', 'danger')
+
+    if origen_vista == 'comisiones' and (asesor_id_form or pago):
+        return redirect(url_for('admin_bp.ventas_vendedores', asesor_id=asesor_id_form or pago.asesor_id, mes=mes_origen, comision_fija=comision_fija))
+    return redirect(url_for('admin_bp.nomina', mes=mes_origen, comision_fija=comision_fija))
 
 
 @admin_bp.route('/comisiones/recibo/<int:payment_id>', methods=['GET'])
@@ -1996,23 +2253,43 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
     ).all()
     total_vales = sum(Decimal(str(v.monto or 0)) for v in vales_mes) if vales_mes else Decimal('0.0')
 
-    # 4. Anticipos de Comisiones Pagados en el Mes
+    # 4. Anticipos de Comisiones y Liquidaciones Pagadas en el Mes
     pagos_comisiones = CommissionPayment.query.filter(
         CommissionPayment.asesor_id == asesor_id,
         CommissionPayment.fecha_pago >= start_date,
         CommissionPayment.fecha_pago <= end_date
-    ).all()
+    ).order_by(CommissionPayment.fecha_pago.desc()).all()
+
+    # Backfill automático si hay pagos previos sin Expense
+    default_tienda = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
+    changed_bf = False
+    for pc in pagos_comisiones:
+        if not pc.expense_id and default_tienda:
+            b_obj = Branch.query.get(pc.branch_id) if pc.branch_id else default_tienda
+            if not b_obj or b_obj.tipo != 'tienda':
+                b_obj = default_tienda
+            pc.branch_id = b_obj.id
+            _sincronizar_gasto_comision_nomina(pc, b_obj, pc.metodo_pago or 'efectivo', pc.registrado_por_id or current_user.id)
+            changed_bf = True
+    if changed_bf:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
     total_anticipos = Decimal('0.0')
     total_liquidado_previo = Decimal('0.0')
+    pagos_liquidacion_list = []
     for p in pagos_comisiones:
         monto_p = Decimal(str(p.monto or 0))
         if p.tipo_pago == 'ANTICIPO':
             total_anticipos += monto_p
         else:
             total_liquidado_previo += monto_p
+            pagos_liquidacion_list.append(p)
 
     total_deducciones = total_vales + total_anticipos
+    neto_antes_liquidar = max(Decimal('0'), (total_devengado - total_deducciones).quantize(Decimal('1')))
     neto_a_pagar = max(Decimal('0'), (total_devengado - total_deducciones - total_liquidado_previo).quantize(Decimal('1')))
 
     return {
@@ -2029,8 +2306,11 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
         'total_anticipos': total_anticipos,
         'total_liquidado_previo': total_liquidado_previo,
         'total_deducciones': total_deducciones,
+        'neto_antes_liquidar': neto_antes_liquidar,
         'neto_a_pagar': neto_a_pagar,
-        'total_monto_ventas': total_monto_ventas
+        'total_monto_ventas': total_monto_ventas,
+        'pagos_mes': pagos_comisiones,
+        'pagos_liquidacion': pagos_liquidacion_list
     }
 
 
@@ -2041,10 +2321,13 @@ def nomina():
     """
     Vista Ejecutiva de Nómina de Asesores:
     Consolida para cada asesor: Salario Base + Comisiones (Fijo Inventario + Bolsa 15% Retomas) - Vales Aprobados - Anticipos.
+    Permite liquidar y pagar directamente seleccionando el Local y Método de Pago (mostrando saldos disponibles),
+    generando el Gasto únicamente por el Neto desembolsado (sin duplicar los Vales que ya generaron gasto al aprobarse).
     """
     import calendar
     from datetime import datetime
     from models import Asesor, Branch
+    from routes.vales import _calcular_saldos_por_local_y_metodo, METODOS_PAGO_VALE
 
     mes_seleccionado = request.args.get('mes', '').strip()
     if not mes_seleccionado:
@@ -2068,6 +2351,7 @@ def nomina():
     total_comisiones_global = Decimal('0.0')
     total_vales_global = Decimal('0.0')
     total_anticipos_global = Decimal('0.0')
+    total_liquidado_global = Decimal('0.0')
     total_neto_nomina = Decimal('0.0')
 
     for a in asesores:
@@ -2078,7 +2362,10 @@ def nomina():
             total_comisiones_global += data['total_comisiones']
             total_vales_global += data['total_vales']
             total_anticipos_global += data['total_anticipos']
+            total_liquidado_global += data['total_liquidado_previo']
             total_neto_nomina += data['neto_a_pagar']
+
+    locales_tienda, saldos_locales = _calcular_saldos_por_local_y_metodo()
 
     return render_template(
         'admin/nomina.html',
@@ -2089,7 +2376,11 @@ def nomina():
         total_comisiones_global=total_comisiones_global,
         total_vales_global=total_vales_global,
         total_anticipos_global=total_anticipos_global,
-        total_neto_nomina=total_neto_nomina
+        total_liquidado_global=total_liquidado_global,
+        total_neto_nomina=total_neto_nomina,
+        locales_tienda=locales_tienda,
+        saldos_locales=saldos_locales,
+        metodos_pago_vale=METODOS_PAGO_VALE
     )
 
 

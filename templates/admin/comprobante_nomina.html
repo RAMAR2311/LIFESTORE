@@ -202,6 +202,7 @@
                     <tr>
                         <th>Vale #</th>
                         <th>Fecha</th>
+                        <th>Origen / Método</th>
                         <th>Concepto / Motivo</th>
                         <th class="text-end">Monto Deducido</th>
                     </tr>
@@ -211,8 +212,40 @@
                     <tr>
                         <td>VAL-{{ '%05d' % v.id }}</td>
                         <td>{{ v.fecha_solicitud.strftime('%d/%m/%Y') }}</td>
+                        <td>{{ v.branch.nombre if v.branch else 'Local' }} ({{ (v.metodo_pago or 'efectivo')|capitalize }})</td>
                         <td>{{ v.concepto or 'Sin concepto' }}</td>
                         <td class="text-end fw-bold text-danger">${{ v.monto|cop }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Si tiene pagos/liquidaciones o anticipos realizados en el mes, mostrar de dónde salió el dinero -->
+    {% if anticipos_detalle %}
+    <div class="mb-4">
+        <h6 class="fw-bold text-muted text-uppercase mb-2" style="font-size: 0.75rem;">Pagos de Nómina y Anticipos Desembolsados</h6>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered" style="font-size: 0.8rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Comprobante</th>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Local y Método de Salida</th>
+                        <th class="text-end">Monto Pagado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in anticipos_detalle %}
+                    <tr>
+                        <td>#{{ '%04d' % p.id }}</td>
+                        <td>{{ p.fecha_pago.strftime('%d/%m/%Y %I:%M %p') }}</td>
+                        <td>{{ 'Anticipo' if p.tipo_pago == 'ANTICIPO' else 'Liquidación Nómina' }}</td>
+                        <td>{{ p.branch.nombre if p.branch else 'Local' }} ({{ (p.metodo_pago or 'efectivo')|capitalize }}){% if p.expense_id %} · Gasto #{{ p.expense_id }}{% endif %}</td>
+                        <td class="text-end fw-bold text-success">${{ p.monto|cop }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -332,12 +332,20 @@
                                             <td>
                                                 {% if p.tipo_pago == 'ANTICIPO' %}
                                                     <span class="badge bg-warning text-dark"><i class="fa-solid fa-hand-holding-dollar me-1"></i> Anticipo</span>
+                                                {% elif p.tipo_pago == 'LIQUIDACION_NOMINA' %}
+                                                    <span class="badge bg-primary"><i class="fa-solid fa-money-check-dollar me-1"></i> Liquidación Nómina</span>
                                                 {% else %}
                                                     <span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i> Liquidación Total</span>
                                                 {% endif %}
                                             </td>
                                             <td>
                                                 <span class="badge bg-light text-dark border text-capitalize">{{ p.metodo_pago }}</span>
+                                                {% if p.branch %}
+                                                <div class="extra-small text-success fw-semibold mt-1">
+                                                    <i class="fa-solid fa-location-dot me-1"></i>{{ p.branch.nombre }}
+                                                    {% if p.expense_id %}(Gasto #{{ p.expense_id }}){% endif %}
+                                                </div>
+                                                {% endif %}
                                             </td>
                                             <td class="text-end fw-bold text-success fs-6">
                                                 ${{ p.monto|cop }}
@@ -347,11 +355,55 @@
                                                 <div class="extra-small text-muted text-truncate" style="max-width: 180px;">{{ p.notas or 'Sin notas' }}</div>
                                             </td>
                                             <td class="text-center pe-4">
-                                                <a href="{{ url_for('admin_bp.recibo_comision', payment_id=p.id, comision_fija=comision_fija) }}"
-                                                   target="_blank"
-                                                   class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm">
-                                                    <i class="fa-solid fa-print me-1"></i> Recibo
-                                                </a>
+                                                <div class="d-inline-flex gap-1">
+                                                    <a href="{{ url_for('admin_bp.recibo_comision', payment_id=p.id, comision_fija=comision_fija) }}"
+                                                       target="_blank"
+                                                       class="btn btn-sm btn-outline-primary rounded-pill px-2.5 shadow-sm">
+                                                        <i class="fa-solid fa-print me-1"></i> Recibo
+                                                    </a>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger rounded-pill px-2.5"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#modalReversarPagoCom{{ p.id }}"
+                                                            title="Reversar pago con PIN 1234">
+                                                        <i class="fa-solid fa-rotate-left"></i>
+                                                    </button>
+                                                </div>
+
+                                                <!-- Modal Revertir Pago #{{ p.id }} con PIN 1234 -->
+                                                <div class="modal fade text-start" id="modalReversarPagoCom{{ p.id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered modal-sm">
+                                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                                            <form method="POST" action="{{ url_for('admin_bp.reversar_pago_comision_nomina', payment_id=p.id) }}">
+                                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                                <input type="hidden" name="mes" value="{{ mes_seleccionado }}"/>
+                                                                <input type="hidden" name="comision_fija" value="{{ comision_fija }}"/>
+                                                                <input type="hidden" name="origen_vista" value="comisiones"/>
+                                                                <input type="hidden" name="asesor_id" value="{{ asesor_filtro.id }}"/>
+                                                                <div class="modal-header bg-danger text-white border-0 py-2.5">
+                                                                    <h6 class="modal-title fw-bold mb-0">
+                                                                        <i class="fa-solid fa-rotate-left me-1"></i> Revertir Pago #{{ p.id }}
+                                                                    </h6>
+                                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body p-3">
+                                                                    <p class="extra-small text-muted mb-2">
+                                                                        Se anulará el pago por <strong>${{ p.monto|cop }}</strong>, se eliminará el Gasto asociado y el dinero regresará al saldo del local.
+                                                                    </p>
+                                                                    <label class="form-label fw-bold extra-small text-danger mb-1">
+                                                                        <i class="fa-solid fa-key me-1"></i> PIN Obligatorio (1234) *
+                                                                    </label>
+                                                                    <input type="password" name="token_secreto" class="form-control form-control-sm text-center fw-bold border-danger"
+                                                                           placeholder="••••" required autocomplete="off" inputmode="numeric">
+                                                                </div>
+                                                                <div class="modal-footer border-0 pt-0">
+                                                                    <button type="button" class="btn btn-sm btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-sm btn-danger rounded-pill fw-bold">Confirmar</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                         {% else %}
@@ -370,6 +422,7 @@
                 </div>
             </div>
 
+            {% set default_loc_id = session.get('active_branch_id') or (locales_tienda[0].id if locales_tienda else 1) %}
             <!-- Modal: Registrar Anticipo -->
             <div class="modal fade" id="modalAnticipo" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
@@ -379,45 +432,69 @@
                             <input type="hidden" name="asesor_id" value="{{ asesor_filtro.id }}">
                             <input type="hidden" name="mes" value="{{ mes_seleccionado }}">
                             <input type="hidden" name="comision_fija" value="{{ comision_fija }}">
+                            <input type="hidden" name="origen_vista" value="comisiones">
                             
-                            <div class="modal-header border-0 pb-0">
-                                <h5 class="modal-title fw-bold text-dark">
-                                    <i class="fa-solid fa-hand-holding-dollar text-warning me-2"></i>Registrar Anticipo de Comisión
+                            <div class="modal-header bg-warning text-dark border-0 py-3">
+                                <h5 class="modal-title fw-bold mb-0">
+                                    <i class="fa-solid fa-hand-holding-dollar me-2"></i>Registrar Anticipo de Comisión
                                 </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <div class="modal-body py-4">
-                                <p class="text-muted small mb-3">
-                                    Asesor beneficiario: <strong>{{ asesor_filtro.nombre }}</strong><br>
-                                    Saldo actual pendiente: <span class="fw-bold text-danger">${{ saldo_pendiente|cop }}</span>
-                                </p>
+                            <div class="modal-body p-4">
+                                <div class="bg-light rounded-3 p-3 mb-3 border">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-muted">Asesor beneficiario:</span>
+                                        <strong class="text-dark">{{ asesor_filtro.nombre }}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span class="text-muted">Saldo actual de comisiones:</span>
+                                        <strong class="text-danger">${{ saldo_pendiente|cop }}</strong>
+                                    </div>
+                                </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Monto del Anticipo <span class="text-danger">*</span></label>
+                                    <label class="form-label fw-bold small">Monto del Anticipo <span class="text-danger">*</span></label>
                                     <div class="input-group">
-                                        <span class="input-group-text bg-light">$</span>
-                                        <input type="number" name="monto" class="form-control form-control-lg bg-light fw-bold text-success" 
+                                        <span class="input-group-text bg-light fw-bold">$</span>
+                                        <input type="number" name="monto" class="form-control bg-light fw-bold text-success fs-5" 
                                                min="1000" max="{{ saldo_pendiente|round(0)|int if saldo_pendiente > 0 else '' }}" required placeholder="0">
                                     </div>
-                                    <small class="text-muted">No puede superar el saldo pendiente del mes.</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Método de Desembolso <span class="text-danger">*</span></label>
-                                    <select name="metodo_pago" class="form-select bg-light" required>
-                                        <option value="efectivo" selected>Efectivo</option>
-                                        <option value="transferencia">Transferencia Bancaria</option>
-                                        <option value="nequi">Nequi</option>
-                                        <option value="daviplata">Daviplata</option>
+                                    <label class="form-label fw-bold small">1. ¿De qué Local sale el dinero? <span class="text-danger">*</span></label>
+                                    <select name="branch_id_pago" id="branchSelectComAnt" class="form-select fw-semibold border-warning"
+                                            required onchange="actualizarSaldosModalCom('ComAnt', this.value)">
+                                        {% for loc in locales_tienda %}
+                                        {% set info_l = saldos_locales.get(loc.id) %}
+                                        <option value="{{ loc.id }}" {% if loc.id == default_loc_id %}selected{% endif %}>
+                                            📍 {{ loc.nombre }} — Disponible: ${{ (info_l.total_disponible if info_l else 0)|cop }}
+                                        </option>
+                                        {% endfor %}
                                     </select>
                                 </div>
-                                <div class="mb-2">
-                                    <label class="form-label fw-bold">Concepto / Observaciones</label>
-                                    <textarea name="notas" class="form-control bg-light" rows="2" placeholder="Ej: Adelanto para gastos personales..."></textarea>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label fw-bold small text-muted mb-0">Saldos disponibles en este Local:</label>
+                                        <small class="text-primary extra-small fw-semibold">Clic para elegir</small>
+                                    </div>
+                                    <div class="row g-1.5" id="gridSaldosComAnt"></div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">2. Método de Desembolso <span class="text-danger">*</span></label>
+                                    <select name="metodo_pago" id="metodoSelectComAnt" class="form-select fw-bold" required>
+                                        {% for m_code, m_label, m_icon in metodos_pago_vale %}
+                                        <option value="{{ m_code }}">{{ m_label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold small">Concepto / Observaciones</label>
+                                    <textarea name="notas" class="form-control bg-light" rows="2" placeholder="Ej: Adelanto de comisiones..."></textarea>
                                 </div>
                             </div>
                             <div class="modal-footer border-0 pt-0">
                                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
                                 <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold">
-                                    <i class="fa-solid fa-check me-1"></i> Confirmar Anticipo
+                                    <i class="fa-solid fa-check me-1"></i> Confirmar y Generar Gasto
                                 </button>
                             </div>
                         </form>
@@ -434,44 +511,123 @@
                             <input type="hidden" name="asesor_id" value="{{ asesor_filtro.id }}">
                             <input type="hidden" name="mes" value="{{ mes_seleccionado }}">
                             <input type="hidden" name="comision_fija" value="{{ comision_fija }}">
+                            <input type="hidden" name="origen_vista" value="comisiones">
                             
-                            <div class="modal-header border-0 pb-0">
-                                <h5 class="modal-title fw-bold text-dark">
-                                    <i class="fa-solid fa-money-bill-transfer text-success me-2"></i>Liquidar Saldo Total de Comisión
+                            <div class="modal-header bg-success text-white border-0 py-3">
+                                <h5 class="modal-title fw-bold mb-0">
+                                    <i class="fa-solid fa-money-bill-transfer me-2"></i>Liquidar Saldo Total de Comisión
                                 </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                            <div class="modal-body py-4">
+                            <div class="modal-body p-4">
                                 <div class="alert alert-success border-0 rounded-3 mb-3">
                                     <div class="extra-small text-uppercase fw-bold text-muted">Monto total pendiente a saldar:</div>
                                     <div class="fs-3 fw-bold text-success">${{ saldo_pendiente|cop }}</div>
-                                    <small class="text-muted">Se generará un pago que dejará el saldo del mes en $0.</small>
+                                    <small class="text-muted">Se generará el pago y el Gasto en el local seleccionado.</small>
                                 </div>
                                 <input type="hidden" name="monto" value="{{ saldo_pendiente|round(0)|int }}">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">Método de Liquidación <span class="text-danger">*</span></label>
-                                    <select name="metodo_pago" class="form-select bg-light" required>
-                                        <option value="efectivo" selected>Efectivo</option>
-                                        <option value="transferencia">Transferencia Bancaria</option>
-                                        <option value="nequi">Nequi</option>
-                                        <option value="daviplata">Daviplata</option>
+                                    <label class="form-label fw-bold small">1. ¿De qué Local sale el dinero? <span class="text-danger">*</span></label>
+                                    <select name="branch_id_pago" id="branchSelectComLiq" class="form-select fw-semibold border-success"
+                                            required onchange="actualizarSaldosModalCom('ComLiq', this.value)">
+                                        {% for loc in locales_tienda %}
+                                        {% set info_l = saldos_locales.get(loc.id) %}
+                                        <option value="{{ loc.id }}" {% if loc.id == default_loc_id %}selected{% endif %}>
+                                            📍 {{ loc.nombre }} — Disponible: ${{ (info_l.total_disponible if info_l else 0)|cop }}
+                                        </option>
+                                        {% endfor %}
                                     </select>
                                 </div>
-                                <div class="mb-2">
-                                    <label class="form-label fw-bold">Observaciones de la Liquidación</label>
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label fw-bold small text-muted mb-0">Saldos disponibles en este Local:</label>
+                                        <small class="text-primary extra-small fw-semibold">Clic para elegir</small>
+                                    </div>
+                                    <div class="row g-1.5" id="gridSaldosComLiq"></div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">2. Método de Liquidación <span class="text-danger">*</span></label>
+                                    <select name="metodo_pago" id="metodoSelectComLiq" class="form-select fw-bold" required>
+                                        {% for m_code, m_label, m_icon in metodos_pago_vale %}
+                                        <option value="{{ m_code }}">{{ m_label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-0">
+                                    <label class="form-label fw-bold small">Observaciones de la Liquidación</label>
                                     <textarea name="notas" class="form-control bg-light" rows="2" placeholder="Ej: Cierre y pago final de comisiones del mes..."></textarea>
                                 </div>
                             </div>
                             <div class="modal-footer border-0 pt-0">
                                 <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
                                 <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">
-                                    <i class="fa-solid fa-check-double me-1"></i> Confirmar Liquidación
+                                    <i class="fa-solid fa-check-double me-1"></i> Confirmar Liquidación y Gasto
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
             </div>
+
+            <script>
+            const SALDOS_LOCALES_COM = {{ (saldos_locales or {})|tojson }};
+
+            function formatCOPCom(val) {
+                const n = Math.round(Number(val) || 0);
+                return '$' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+            }
+
+            function seleccionarMetodoPagoCom(keyId, codigoMetodo) {
+                const sel = document.getElementById('metodoSelect' + keyId);
+                if (sel) sel.value = codigoMetodo;
+                document.querySelectorAll('#gridSaldos' + keyId + ' .saldo-metodo-card').forEach(card => {
+                    if (card.dataset.metodo === codigoMetodo) {
+                        card.classList.add('border-success', 'bg-success-subtle');
+                        card.classList.remove('border-light-subtle', 'bg-white');
+                    } else {
+                        card.classList.remove('border-success', 'bg-success-subtle');
+                        card.classList.add('border-light-subtle', 'bg-white');
+                    }
+                });
+            }
+
+            function actualizarSaldosModalCom(keyId, branchId) {
+                const grid = document.getElementById('gridSaldos' + keyId);
+                const selMetodo = document.getElementById('metodoSelect' + keyId);
+                if (!grid) return;
+
+                const infoLocal = SALDOS_LOCALES_COM[branchId] || SALDOS_LOCALES_COM[String(branchId)];
+                if (!infoLocal || !infoLocal.metodos) return;
+
+                const metodoActual = selMetodo ? selMetodo.value : 'efectivo';
+                let html = '';
+                Object.values(infoLocal.metodos).forEach(m => {
+                    const isSelected = (m.codigo === metodoActual);
+                    const borderCls = isSelected ? 'border-success bg-success-subtle' : 'border-light-subtle bg-white';
+                    const saldoColor = m.saldo > 0 ? 'text-success' : 'text-muted';
+                    html += `
+                        <div class="col-6 col-sm-4">
+                            <div class="p-2 rounded-3 border ${borderCls} saldo-metodo-card h-100"
+                                 data-metodo="${m.codigo}"
+                                 style="cursor: pointer;"
+                                 onclick="seleccionarMetodoPagoCom('${keyId}', '${m.codigo}')">
+                                <div class="extra-small fw-bold text-dark text-truncate">${m.label}</div>
+                                <div class="fw-bolder ${saldoColor}" style="font-size: 0.85rem;">${formatCOPCom(m.saldo)}</div>
+                                <div class="text-muted" style="font-size: 0.65rem;">Disponible</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                grid.innerHTML = html;
+            }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                ['ComAnt', 'ComLiq'].forEach(k => {
+                    const sel = document.getElementById('branchSelect' + k);
+                    if (sel) actualizarSaldosModalCom(k, sel.value);
+                });
+            });
+            </script>
 
         {% else %}
             <div class="alert alert-warning border-0 rounded-4 p-4 shadow-sm text-center">

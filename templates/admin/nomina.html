@@ -66,28 +66,37 @@
         </div>
         <div class="col-lg-3 col-md-6">
             <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-danger h-100">
-                <div class="text-uppercase fw-bold text-danger extra-small mb-1">Vales Aprobados Deducibles</div>
-                <h4 class="fw-bold text-danger mb-0">-${{ total_vales_global|cop }}</h4>
-                <span class="text-muted extra-small mt-1 d-block">Anticipos: -${{ total_anticipos_global|cop }}</span>
+                <div class="text-uppercase fw-bold text-danger extra-small mb-1">Vales & Anticipos Deducidos</div>
+                <h4 class="fw-bold text-danger mb-0">-${{ (total_vales_global + total_anticipos_global)|cop }}</h4>
+                <span class="text-muted extra-small mt-1 d-block">Vales: -${{ total_vales_global|cop }} | Ant: -${{ total_anticipos_global|cop }}</span>
             </div>
         </div>
         <div class="col-lg-3 col-md-6">
             <div class="card border-0 shadow-sm rounded-4 p-3 bg-white border-start border-4 border-success h-100">
-                <div class="text-uppercase fw-bold text-success extra-small mb-1">Total Neto Nómina a Pagar</div>
+                <div class="text-uppercase fw-bold text-success extra-small mb-1">Saldo Neto Pendiente Nómina</div>
                 <h3 class="fw-bold text-success mb-0">${{ total_neto_nomina|cop }}</h3>
-                <span class="text-muted extra-small mt-1 d-block">Saldo neto a desembolsar</span>
+                <span class="text-muted extra-small mt-1 d-block">Ya liquidado este mes: ${{ (total_liquidado_global or 0)|cop }}</span>
             </div>
+        </div>
+    </div>
+
+    <!-- Nota contable importante sobre Vales y Liquidación de Nómina -->
+    <div class="alert alert-info border-0 rounded-4 shadow-sm d-flex align-items-center mb-4 py-2.5 px-3">
+        <i class="fa-solid fa-circle-info fs-4 text-primary me-3"></i>
+        <div class="small">
+            <strong>¿Cómo se liquida la Nómina sin duplicar gastos con los Vales?</strong><br>
+            Los <strong>Vales Aprobados</strong> y los <strong>Anticipos</strong> ya generaron su propio Gasto y descontaron saldo del local en el momento en que se entregaron. Al oprimir <strong>"Liquidar / Pagar"</strong>, el sistema solo genera el Gasto y descuenta del Local por el <strong>Saldo Neto Pendiente</strong> que realmente sale hoy de caja.
         </div>
     </div>
 
     <!-- Tabla Detallada de Nómina de Asesores -->
     <div class="card card-custom border-0 shadow-sm">
-        <div class="card-header bg-white border-0 py-3 ps-4 pe-4 d-flex justify-content-between align-items-center">
+        <div class="card-header bg-white border-0 py-3 ps-4 pe-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h5 class="fw-bold m-0 text-brand-black">
                     <i class="fa-solid fa-users me-2 text-primary"></i>Liquidación Individual de Asesores (Mes: {{ mes_seleccionado }})
                 </h5>
-                <small class="text-muted">Fórmula: [Salario Base + Comisiones] − [Vales Aprobados + Anticipos] = <strong>Neto a Pagar</strong></small>
+                <small class="text-muted">Fórmula: [Salario Base + Comisiones] − [Vales Aprobados + Anticipos + Pagos Previos] = <strong>Saldo Neto a Pagar</strong></small>
             </div>
             <span class="badge bg-light text-dark border px-3 py-2 fw-semibold">
                 Comisión Fija Aplicada: ${{ comision_fija|cop }}
@@ -95,20 +104,22 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
-                    <thead class="table-light text-uppercase" style="font-size: 0.78rem;">
+                <table class="table table-hover align-middle mb-0" style="font-size: 0.86rem;">
+                    <thead class="table-light text-uppercase" style="font-size: 0.75rem;">
                         <tr>
-                            <th class="ps-4" width="20%">Asesor Comercial</th>
-                            <th class="text-end" width="12%">Salario Base</th>
-                            <th class="text-end" width="14%">Comisiones</th>
-                            <th class="text-end" width="13%">Total Devengado</th>
-                            <th class="text-end text-danger" width="12%">Vales Deducidos</th>
-                            <th class="text-end text-warning" width="11%">Anticipos</th>
-                            <th class="text-end" width="14%">Neto a Pagar</th>
-                            <th class="text-center pe-4" width="14%">Acciones</th>
+                            <th class="ps-4" width="18%">Asesor Comercial</th>
+                            <th class="text-end" width="10%">Salario Base</th>
+                            <th class="text-end" width="12%">Comisiones</th>
+                            <th class="text-end" width="11%">Devengado</th>
+                            <th class="text-end text-danger" width="11%">Vales (Ya Gasto)</th>
+                            <th class="text-end text-warning" width="10%">Anticipos</th>
+                            <th class="text-end text-primary" width="11%">Ya Liquidado</th>
+                            <th class="text-end" width="11%">Neto a Pagar</th>
+                            <th class="text-center pe-4" width="16%">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
+                        {% set default_loc_id = session.get('active_branch_id') or (locales_tienda[0].id if locales_tienda else 1) %}
                         {% for item in resumen_nomina %}
                         <tr>
                             <td class="ps-4">
@@ -118,7 +129,11 @@
                                     </div>
                                     <div>
                                         <strong class="text-dark d-block">{{ item.asesor.nombre }}</strong>
-                                        <span class="badge bg-secondary bg-opacity-25 text-dark extra-small">Activo</span>
+                                        {% if item.neto_a_pagar == 0 and item.total_devengado > 0 %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle extra-small">Liquidado al 100%</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary bg-opacity-25 text-dark extra-small">Activo</span>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </td>
@@ -128,7 +143,7 @@
                             <td class="text-end">
                                 <div class="fw-bold text-info">+${{ item.total_comisiones|cop }}</div>
                                 <div class="extra-small text-muted">
-                                    {{ item.items_inventario_count }} eq. fij. / {{ item.retomas_count }} ret.
+                                    {{ item.items_inventario_count }} eq. / {{ item.retomas_count }} ret.
                                 </div>
                             </td>
                             <td class="text-end fw-bold text-dark">
@@ -150,16 +165,50 @@
                                 {% endif %}
                             </td>
                             <td class="text-end">
+                                {% if item.total_liquidado_previo > 0 %}
+                                    <div class="fw-bold text-primary">${{ item.total_liquidado_previo|cop }}</div>
+                                    {% for pl in item.pagos_liquidacion %}
+                                    <div class="extra-small text-success">
+                                        <i class="fa-solid fa-location-dot"></i> {{ pl.branch.nombre if pl.branch else 'Local' }} ({{ (pl.metodo_pago or 'efectivo')|capitalize }})
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted">$0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
                                 <span class="fs-6 fw-bolder {% if item.neto_a_pagar > 0 %}text-success{% else %}text-muted{% endif %}">
                                     ${{ item.neto_a_pagar|cop }}
                                 </span>
                             </td>
                             <td class="text-center pe-4">
-                                <div class="d-inline-flex gap-1">
+                                <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
+                                    {% if item.neto_a_pagar > 0 %}
+                                    <!-- Botón Liquidar / Pagar Nómina -->
+                                    <button type="button"
+                                            class="btn btn-sm btn-success rounded-pill px-2.5 fw-bold shadow-sm"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalLiquidarNomina{{ item.asesor.id }}"
+                                            title="Liquidar Nómina seleccionando Local y Método de Pago">
+                                        <i class="fa-solid fa-money-bill-transfer me-1"></i> Liquidar
+                                    </button>
+                                    {% endif %}
+
+                                    {% if item.pagos_mes and item.pagos_mes|length > 0 %}
+                                    <!-- Botón Revertir Pagos del Mes con PIN 1234 -->
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger rounded-pill px-2 fw-semibold"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalReversarNominaAsesor{{ item.asesor.id }}"
+                                            title="Reversar Pago de Nómina / Anticipo con PIN 1234">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                    </button>
+                                    {% endif %}
+
                                     <!-- Botón Comprobante / Colilla -->
                                     <a href="{{ url_for('admin_bp.colilla_nomina', asesor_id=item.asesor.id, mes=mes_seleccionado, comision_fija=comision_fija) }}"
                                        target="_blank"
-                                       class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm"
+                                       class="btn btn-sm btn-outline-success rounded-pill px-2.5 shadow-sm"
                                        title="Imprimir Colilla de Nómina">
                                         <i class="fa-solid fa-receipt me-1"></i> Colilla
                                     </a>
@@ -170,11 +219,188 @@
                                         <i class="fa-solid fa-chart-line"></i>
                                     </a>
                                 </div>
+
+                                <!-- Modal Liquidar Nómina del Asesor {{ item.asesor.id }} -->
+                                {% if item.neto_a_pagar > 0 %}
+                                <div class="modal fade text-start" id="modalLiquidarNomina{{ item.asesor.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                            <form method="POST" action="{{ url_for('admin_bp.liquidar_saldo_comision') }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <input type="hidden" name="asesor_id" value="{{ item.asesor.id }}"/>
+                                                <input type="hidden" name="mes" value="{{ mes_seleccionado }}"/>
+                                                <input type="hidden" name="comision_fija" value="{{ comision_fija }}"/>
+                                                <input type="hidden" name="origen_vista" value="nomina"/>
+                                                <input type="hidden" name="tipo_pago" value="LIQUIDACION_NOMINA"/>
+
+                                                <div class="modal-header bg-success text-white border-0 py-3">
+                                                    <h5 class="modal-title fw-bold mb-0">
+                                                        <i class="fa-solid fa-money-check-dollar me-2"></i> Liquidar Nómina · {{ item.asesor.nombre }}
+                                                    </h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body p-4">
+                                                    <!-- Resumen Contable de la Liquidación -->
+                                                    <div class="bg-light rounded-3 p-3 mb-3 border">
+                                                        <div class="d-flex justify-content-between small mb-1">
+                                                            <span class="text-muted">Salario Base + Comisiones:</span>
+                                                            <strong class="text-dark">${{ item.total_devengado|cop }}</strong>
+                                                        </div>
+                                                        {% if item.total_vales > 0 %}
+                                                        <div class="d-flex justify-content-between small mb-1">
+                                                            <span class="text-danger">(-) Vales Aprobados (Ya en Gastos):</span>
+                                                            <strong class="text-danger">-${{ item.total_vales|cop }}</strong>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if item.total_anticipos > 0 %}
+                                                        <div class="d-flex justify-content-between small mb-1">
+                                                            <span class="text-warning">(-) Anticipos Pagados (Ya en Gastos):</span>
+                                                            <strong class="text-warning">-${{ item.total_anticipos|cop }}</strong>
+                                                        </div>
+                                                        {% endif %}
+                                                        {% if item.total_liquidado_previo > 0 %}
+                                                        <div class="d-flex justify-content-between small mb-1">
+                                                            <span class="text-primary">(-) Pagos de Nómina Previos:</span>
+                                                            <strong class="text-primary">-${{ item.total_liquidado_previo|cop }}</strong>
+                                                        </div>
+                                                        {% endif %}
+                                                        <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-1">
+                                                            <span class="fw-bold text-brand-black">Neto Real a Pagar Hoy:</span>
+                                                            <strong class="text-success fs-4">${{ item.neto_a_pagar|cop }}</strong>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Monto a Desembolsar (por defecto el Neto total, editable por si es pago parcial/quincenal) -->
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-brand-black mb-1">
+                                                            Monto a Desembolsar Hoy <span class="text-danger">*</span>
+                                                        </label>
+                                                        <div class="input-group">
+                                                            <span class="input-group-text bg-light fw-bold">$</span>
+                                                            <input type="number" name="monto" class="form-control fw-bold text-success fs-5"
+                                                                   value="{{ item.neto_a_pagar|round(0)|int }}" min="1000" max="{{ item.neto_a_pagar|round(0)|int }}" required>
+                                                        </div>
+                                                        <small class="text-muted extra-small">Puedes pagar el 100% del saldo neto o una fracción (ej. quincena).</small>
+                                                    </div>
+
+                                                    <!-- 1. Selección del Local de donde sale el dinero -->
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-brand-black mb-1">
+                                                            1. ¿De qué Local sale el dinero de la Nómina? <span class="text-danger">*</span>
+                                                        </label>
+                                                        <select name="branch_id_pago" id="branchSelectNom{{ item.asesor.id }}" class="form-select fw-semibold border-success"
+                                                                required onchange="actualizarSaldosModalNomina('Nom{{ item.asesor.id }}', this.value)">
+                                                            {% for loc in locales_tienda %}
+                                                            {% set info_l = saldos_locales.get(loc.id) %}
+                                                            <option value="{{ loc.id }}" {% if loc.id == default_loc_id %}selected{% endif %}>
+                                                                📍 {{ loc.nombre }} — Total Disponible: ${{ (info_l.total_disponible if info_l else 0)|cop }}
+                                                            </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+
+                                                    <!-- 2. Tarjetas de Saldo Disponible en ese Local por cada Método de Pago -->
+                                                    <div class="mb-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <label class="form-label fw-bold small text-muted mb-0">
+                                                                Saldos disponibles en este Local por Método de Pago:
+                                                            </label>
+                                                            <small class="text-primary extra-small fw-semibold">Clic para elegir</small>
+                                                        </div>
+                                                        <div class="row g-1.5" id="gridSaldosNom{{ item.asesor.id }}"></div>
+                                                    </div>
+
+                                                    <!-- 3. Selector del Método de Pago -->
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-brand-black mb-1">
+                                                            2. Método de Pago con el que se entrega <span class="text-danger">*</span>
+                                                        </label>
+                                                        <select name="metodo_pago" id="metodoSelectNom{{ item.asesor.id }}" class="form-select fw-bold text-dark border-dark" required>
+                                                            {% for m_code, m_label, m_icon in metodos_pago_vale %}
+                                                            <option value="{{ m_code }}">{{ m_label }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                        <small class="text-success extra-small d-block mt-1 fw-semibold">
+                                                            <i class="fa-solid fa-circle-info me-1"></i>Se generará automáticamente el <strong>Gasto (Pago de Nómina)</strong> en este local y se descontará del método seleccionado.
+                                                        </small>
+                                                    </div>
+
+                                                    <div class="mb-0">
+                                                        <label class="form-label fw-bold small">Observación / Detalle del Pago (Opcional)</label>
+                                                        <input type="text" name="notas" class="form-control bg-light" placeholder="Ej: Pago liquidación nómina mes {{ mes_seleccionado }}...">
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-0 pt-0">
+                                                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
+                                                        <i class="fa-solid fa-check-double me-1"></i> Confirmar Pago y Generar Gasto
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <!-- Modal Revertir Pagos de Nómina / Anticipos del Asesor {{ item.asesor.id }} con PIN 1234 -->
+                                {% if item.pagos_mes and item.pagos_mes|length > 0 %}
+                                <div class="modal fade text-start" id="modalReversarNominaAsesor{{ item.asesor.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                            <div class="modal-header bg-danger text-white border-0 py-3">
+                                                <h5 class="modal-title fw-bold mb-0">
+                                                    <i class="fa-solid fa-rotate-left me-2"></i> Reversar Pago · {{ item.asesor.nombre }}
+                                                </h5>
+                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body p-4">
+                                                <p class="small text-muted mb-3">
+                                                    Selecciona el pago de nómina o anticipo registrado este mes que deseas anular. Al ingresar el <strong>PIN 1234</strong>, se eliminará el Gasto asociado y el dinero regresará al saldo del Local.
+                                                </p>
+                                                {% for pm in item.pagos_mes %}
+                                                <form method="POST" action="{{ url_for('admin_bp.reversar_pago_comision_nomina', payment_id=pm.id) }}" class="border rounded-3 p-3 mb-2 bg-light">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                    <input type="hidden" name="mes" value="{{ mes_seleccionado }}"/>
+                                                    <input type="hidden" name="comision_fija" value="{{ comision_fija }}"/>
+                                                    <input type="hidden" name="origen_vista" value="nomina"/>
+                                                    <input type="hidden" name="asesor_id" value="{{ item.asesor.id }}"/>
+
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <div>
+                                                            <span class="badge {% if pm.tipo_pago == 'ANTICIPO' %}bg-warning text-dark{% else %}bg-success{% endif %} rounded-pill">
+                                                                {{ 'Anticipo' if pm.tipo_pago == 'ANTICIPO' else 'Liquidación Nómina' }} #{{ pm.id }}
+                                                            </span>
+                                                            <div class="extra-small text-muted mt-1">
+                                                                {{ pm.fecha_pago.strftime('%d/%m/%Y %I:%M %p') }} ·
+                                                                <strong>{{ pm.branch.nombre if pm.branch else 'Local' }}</strong> ({{ (pm.metodo_pago or 'efectivo')|capitalize }})
+                                                                {% if pm.expense_id %} · Gasto #{{ pm.expense_id }}{% endif %}
+                                                            </div>
+                                                        </div>
+                                                        <strong class="text-danger fs-5">${{ pm.monto|cop }}</strong>
+                                                    </div>
+                                                    <div class="row g-2 align-items-center">
+                                                        <div class="col-7">
+                                                            <input type="password" name="token_secreto" class="form-control form-control-sm text-center fw-bold border-danger"
+                                                                   placeholder="PIN de Seguridad (1234)" required autocomplete="off" inputmode="numeric">
+                                                        </div>
+                                                        <div class="col-5">
+                                                            <button type="submit" class="btn btn-sm btn-danger w-100 rounded-pill fw-bold">
+                                                                <i class="fa-solid fa-rotate-left me-1"></i> Revertir
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
+                            <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="fa-solid fa-users-slash fs-2 mb-2 d-block opacity-50"></i>
                                 No hay asesores registrados para liquidar en este periodo.
                             </td>
@@ -186,5 +412,68 @@
         </div>
     </div>
 </div>
+
+<script>
+const SALDOS_LOCALES_NOMINA = {{ (saldos_locales or {})|tojson }};
+
+function formatCOPNomina(val) {
+    const n = Math.round(Number(val) || 0);
+    return '$' + n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function seleccionarMetodoPagoNomina(keyId, codigoMetodo) {
+    const sel = document.getElementById('metodoSelect' + keyId);
+    if (sel) sel.value = codigoMetodo;
+    document.querySelectorAll('#gridSaldos' + keyId + ' .saldo-metodo-card').forEach(card => {
+        if (card.dataset.metodo === codigoMetodo) {
+            card.classList.add('border-success', 'bg-success-subtle');
+            card.classList.remove('border-light-subtle', 'bg-white');
+        } else {
+            card.classList.remove('border-success', 'bg-success-subtle');
+            card.classList.add('border-light-subtle', 'bg-white');
+        }
+    });
+}
+
+function actualizarSaldosModalNomina(keyId, branchId) {
+    const grid = document.getElementById('gridSaldos' + keyId);
+    const selMetodo = document.getElementById('metodoSelect' + keyId);
+    if (!grid) return;
+
+    const infoLocal = SALDOS_LOCALES_NOMINA[branchId] || SALDOS_LOCALES_NOMINA[String(branchId)];
+    if (!infoLocal || !infoLocal.metodos) {
+        grid.innerHTML = '<div class="col-12"><div class="alert alert-warning py-1 px-2 small mb-0">Sin información de saldos para este local.</div></div>';
+        return;
+    }
+
+    const metodoActual = selMetodo ? selMetodo.value : 'efectivo';
+    let html = '';
+    Object.values(infoLocal.metodos).forEach(m => {
+        const isSelected = (m.codigo === metodoActual);
+        const borderCls = isSelected ? 'border-success bg-success-subtle' : 'border-light-subtle bg-white';
+        const saldoColor = m.saldo > 0 ? 'text-success' : 'text-muted';
+        html += `
+            <div class="col-6 col-sm-4">
+                <div class="p-2 rounded-3 border ${borderCls} saldo-metodo-card h-100"
+                     data-metodo="${m.codigo}"
+                     style="cursor: pointer; transition: all 0.15s ease;"
+                     onclick="seleccionarMetodoPagoNomina('${keyId}', '${m.codigo}')">
+                    <div class="extra-small fw-bold text-dark text-truncate">${m.label}</div>
+                    <div class="fw-bolder ${saldoColor}" style="font-size: 0.85rem;">${formatCOPNomina(m.saldo)}</div>
+                    <div class="text-muted" style="font-size: 0.65rem;">Disponible</div>
+                </div>
+            </div>
+        `;
+    });
+    grid.innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[id^="branchSelectNom"]').forEach(sel => {
+        const keyId = sel.id.replace('branchSelect', '');
+        actualizarSaldosModalNomina(keyId, sel.value);
+    });
+});
+</script>
 {% endblock %}
 

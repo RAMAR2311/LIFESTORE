@@ -1113,20 +1113,24 @@ class BankTransaction(db.Model):
 
 
 class CommissionPayment(db.Model):
-    """Modelo para registrar anticipos y liquidaciones de comisiones a asesores."""
+    """Modelo para registrar anticipos, pagos de comisiones y liquidaciones de nómina a asesores."""
     __tablename__ = 'commission_payments'
 
     id = db.Column(db.Integer, primary_key=True)
     asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=False, index=True)
+    branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+    expense_id = db.Column(db.Integer, db.ForeignKey('expenses.id', ondelete='SET NULL'), nullable=True)
     monto = db.Column(db.Numeric(14, 2), nullable=False)
-    tipo_pago = db.Column(db.String(50), nullable=False)  # 'ANTICIPO', 'LIQUIDACION_TOTAL'
-    metodo_pago = db.Column(db.String(50), nullable=False, default='efectivo') # 'efectivo', 'nequi', 'bancolombia', 'daviplata'
+    tipo_pago = db.Column(db.String(50), nullable=False)  # 'ANTICIPO', 'LIQUIDACION_TOTAL', 'LIQUIDACION_NOMINA'
+    metodo_pago = db.Column(db.String(50), nullable=False, default='efectivo') # 'efectivo', 'nequi', 'bancolombia', 'daviplata', 'davivienda', 'bold'
     fecha_pago = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False)
     registrado_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     notas = db.Column(db.Text, nullable=True)
 
     asesor = db.relationship('Asesor', backref=db.backref('pagos_comisiones', lazy=True, cascade='all, delete-orphan'))
     registrado_por = db.relationship('User', backref='comisiones_registradas', lazy=True)
+    branch = db.relationship('Branch', backref=db.backref('pagos_nomina_comisiones', lazy=True))
+    expense = db.relationship('Expense', foreign_keys=[expense_id])
 
     def __init__(self, **kwargs):
         super(CommissionPayment, self).__init__(**kwargs)
