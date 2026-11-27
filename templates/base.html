@@ -301,20 +301,7 @@
         @media (max-width: 768px) {
             .navbar-custom .brand-logo-img {
                 height: 36px;
-                max-width: 175px;
-            }
-        }
-        @media (max-width: 575.98px) {
-            .navbar-custom .brand-logo-img {
-                height: 28px;
-                max-width: 125px;
-            }
-            #adminBranchDropdown {
-                padding: 4px 10px !important;
-                font-size: 0.72rem !important;
-            }
-            #adminBranchDropdown .branch-label-text {
-                max-width: 92px !important;
+                max-width: 190px;
             }
         }
 
@@ -1462,8 +1449,8 @@
 </head>
 <body>
     <!-- Navbar LifeStore -->
-    <nav class="navbar navbar-custom mb-4 position-relative">
-        <div class="container-fluid px-3 d-flex justify-content-between align-items-center">
+    <nav class="navbar navbar-custom mb-4 position-relative flex-column">
+        <div class="container-fluid px-3 d-flex justify-content-between align-items-center position-relative">
             
             <div class="d-flex align-items-center gap-2">
                 {% if current_user.is_authenticated %}
@@ -1475,10 +1462,10 @@
                 <div style="width: 40px;"></div>
                 {% endif %}
 
-                <!-- SUCURSAL SELECTOR (ADMIN & COORDINADOR) / SUCURSAL BADGE (VENDEDOR/BODEGA) -->
+                <!-- SUCURSAL SELECTOR EN ESCRITORIO (>= 768px) -->
                 {% if current_user.is_authenticated %}
                     {% if current_user.rol in ['admin', 'coordinador'] %}
-                    <div class="dropdown">
+                    <div class="dropdown d-none d-md-block">
                         <button class="btn btn-sm btn-light border rounded-pill dropdown-toggle px-3 py-1 shadow-sm d-flex align-items-center gap-1.5" type="button" id="adminBranchDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.8rem; font-weight: 600;">
                             <i class="fa-solid fa-location-dot text-primary"></i>
                             <span class="text-truncate branch-label-text" style="max-width: 170px;">
@@ -1528,24 +1515,24 @@
                         </ul>
                     </div>
                     {% else %}
-                    <!-- Badge fijo para Vendedor o Bodeguero -->
-                    <div class="d-flex align-items-center">
-                        <span class="badge rounded-pill px-2.5 py-1 shadow-sm d-flex align-items-center gap-1" 
-                              style="font-size: 0.75rem; font-weight: 700; color: #1e293b !important; background-color: #f1f5f9 !important; border: 1px solid #cbd5e1 !important;">
+                    <!-- Badge fijo para Vendedor o Bodeguero en Escritorio -->
+                    <div class="d-none d-md-flex align-items-center">
+                        <span class="badge rounded-pill px-3 py-1 shadow-sm d-flex align-items-center gap-1.5" 
+                              style="font-size: 0.78rem; font-weight: 700; color: #1e293b !important; background-color: #f1f5f9 !important; border: 1px solid #cbd5e1 !important;">
                             {% if current_user.branch and current_user.branch.tipo == 'bodega' %}
                                 <span style="font-size: 0.85rem;">📦</span>
                             {% else %}
                                 <i class="fa-solid fa-location-dot text-primary"></i>
                             {% endif %}
-                            <span class="text-truncate" style="color: #0f172a !important; font-weight: 700; max-width: 110px;">{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
+                            <span style="color: #0f172a !important; font-weight: 700;">{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
                         </span>
                     </div>
                     {% endif %}
                 {% endif %}
             </div>
 
-            <!-- Brand Logo (Centro) -->
-            <a class="navbar-brand d-flex align-items-center justify-content-center m-0 position-absolute start-50 translate-middle-x text-decoration-none" href="{{ url_for('index') }}" style="max-width: calc(100% - 140px); overflow: visible;">
+            <!-- Brand Logo (Centro Limpio sin superposición) -->
+            <a class="navbar-brand d-flex align-items-center justify-content-center m-0 position-absolute start-50 translate-middle-x text-decoration-none" href="{{ url_for('index') }}" style="max-width: calc(100% - 120px); overflow: visible;">
                 <img src="{{ url_for('static', filename='img/lifestore_branding_light.png') }}?v=16" alt="LifeStore - Celulares & Tecnología" class="brand-logo-img brand-logo-light">
                 <img src="{{ url_for('static', filename='img/lifestore_branding_dark.png') }}?v=16" alt="LifeStore - Celulares & Tecnología" class="brand-logo-img brand-logo-dark">
             </a>
@@ -1555,6 +1542,36 @@
                 <i class="fa-solid fa-moon" id="themeToggleIcon"></i>
             </button>
         </div>
+
+        <!-- SUB-BARRA DE SEDE ACTIVA PARA CELULAR, TABLET Y PWA (< 768px) -->
+        {% if current_user.is_authenticated %}
+        <div class="container-fluid px-3 d-flex d-md-none justify-content-center w-100 mt-2 pt-2" style="border-top: 1px solid var(--brand-border-subtle);">
+            {% if current_user.rol in ['admin', 'coordinador'] %}
+            <form method="POST" action="{{ url_for('admin_bp.switch_branch') }}" class="w-100 m-0" style="max-width: 340px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="input-group input-group-sm shadow-sm rounded-pill overflow-hidden border" style="background: var(--brand-card-bg);">
+                    <span class="input-group-text border-0 bg-transparent ps-3 pe-1">
+                        <i class="fa-solid fa-location-dot text-primary"></i>
+                    </span>
+                    <select name="branch_id" class="form-select form-select-sm border-0 bg-transparent fw-bold text-center shadow-none py-1.5" onchange="this.form.submit()" style="font-size: 0.78rem; cursor: pointer;">
+                        <option value="all" {% if not active_branch %}selected{% endif %}>Todas las Sedes (Global)</option>
+                        {% for b in all_branches %}
+                        <option value="{{ b.id }}" {% if active_branch and active_branch.id == b.id %}selected{% endif %}>
+                            {{ b.nombre }} ({{ b.codigo }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+            {% else %}
+            <span class="badge rounded-pill px-3 py-1 shadow-sm d-inline-flex align-items-center gap-1.5"
+                  style="font-size: 0.75rem; font-weight: 700; color: #1e293b !important; background-color: #f1f5f9 !important; border: 1px solid #cbd5e1 !important;">
+                <i class="fa-solid fa-location-dot text-primary"></i>
+                <span style="color: #0f172a !important; font-weight: 700;">{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
     </nav>
 
     {% if current_user.is_authenticated %}
