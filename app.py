@@ -158,7 +158,7 @@ def create_app():
         """Helper global para obtener el branch_id activo según rol y sesión."""
         if not current_user.is_authenticated:
             return None
-        if current_user.rol == 'admin':
+        if current_user.rol in ['admin', 'coordinador']:
             return session.get('active_branch_id')
         if current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
             return current_user.branch_id
@@ -178,7 +178,7 @@ def create_app():
         if current_user.is_authenticated:
             from models import StockTransfer, Vale, TechnicalService, DeviceExchange
             q_pend = StockTransfer.query.filter_by(status='PENDIENTE')
-            if current_user.rol != 'admin':
+            if current_user.rol not in ['admin', 'coordinador']:
                 if current_user.branch_id:
                     q_pend = q_pend.filter(StockTransfer.destination_branch_id == current_user.branch_id)
             elif active_id:
@@ -186,7 +186,7 @@ def create_app():
             pending_transfers_count = q_pend.count()
 
             q_vales = Vale.query.filter_by(estado='PENDIENTE')
-            if current_user.rol != 'admin':
+            if current_user.rol not in ['admin', 'coordinador']:
                 if current_user.branch_id:
                     q_vales = q_vales.filter(
                         (Vale.branch_id == current_user.branch_id) | (Vale.solicitado_por_id == current_user.id)
@@ -198,7 +198,7 @@ def create_app():
             pending_vales_count = q_vales.count()
 
             q_sup = TechnicalService.query.filter(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
-            if current_user.rol != 'admin':
+            if current_user.rol not in ['admin', 'coordinador']:
                 if current_user.branch_id:
                     q_sup = q_sup.filter(TechnicalService.branch_id == current_user.branch_id)
             elif active_id:
@@ -206,7 +206,7 @@ def create_app():
             pending_support_count = q_sup.count()
 
             q_ex = DeviceExchange.query.filter_by(estado='PENDIENTE')
-            if current_user.rol != 'admin':
+            if current_user.rol not in ['admin', 'coordinador']:
                 if current_user.branch_id:
                     q_ex = q_ex.filter(DeviceExchange.branch_id == current_user.branch_id)
             elif active_id:
@@ -226,9 +226,14 @@ def create_app():
                 Product.cantidad_stock > 0,
                 Product.fecha_creacion <= fecha_umbral_estancado
             )
-            if current_user.rol != 'admin' and current_user.branch_id:
+            if current_user.rol not in ['admin', 'coordinador'] and current_user.branch_id:
                 q_estancados = q_estancados.join(BranchStock).filter(
                     BranchStock.branch_id == current_user.branch_id,
+                    BranchStock.cantidad > 0
+                )
+            elif active_id:
+                q_estancados = q_estancados.join(BranchStock).filter(
+                    BranchStock.branch_id == active_id,
                     BranchStock.cantidad > 0
                 )
             equipos_estancados_count = q_estancados.count()

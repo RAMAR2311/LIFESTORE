@@ -2177,9 +2177,10 @@ def toggle_asesor(id):
 
 @admin_bp.route('/switch-branch', methods=['POST'])
 @login_required
-@admin_required
 def switch_branch():
-    """Cambia la sucursal activa en la sesión del administrador o restablece a vista global."""
+    """Cambia la sucursal activa en la sesión del administrador o coordinador, o restablece a vista global."""
+    if current_user.rol not in ['admin', 'coordinador']:
+        abort(403)
     branch_id_raw = request.form.get('branch_id')
     if not branch_id_raw or branch_id_raw == 'None' or branch_id_raw == 'all':
         session.pop('active_branch_id', None)
@@ -2196,7 +2197,8 @@ def switch_branch():
         except (ValueError, TypeError):
             session.pop('active_branch_id', None)
 
-    return redirect(request.referrer or url_for('admin_bp.dashboard'))
+    fallback_url = url_for('admin_bp.dashboard') if current_user.rol == 'admin' else url_for('celulares_bp.inventario')
+    return redirect(request.referrer or fallback_url)
 
 @admin_bp.route('/sucursales/siguiente-codigo')
 @login_required

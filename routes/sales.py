@@ -1347,7 +1347,15 @@ def catalogo():
 
     query_str = request.args.get('q', '').strip()
     referencia_filtro = request.args.get('referencia', '').strip()
-    branch_filtro = request.args.get('branch_id', type=int)
+    branch_param_raw = request.args.get('branch_id', '').strip()
+    if branch_param_raw in ('all', '0'):
+        branch_filtro = None
+    elif branch_param_raw.isdigit():
+        branch_filtro = int(branch_param_raw)
+    elif current_user.rol in ['admin', 'coordinador'] and session.get('active_branch_id'):
+        branch_filtro = int(session.get('active_branch_id'))
+    else:
+        branch_filtro = None
     estado_filtro = request.args.get('estado', 'todos').strip() # 'todos', 'disponible', 'maneo', 'soporte', 'cambio'
     page = request.args.get('page', 1, type=int)
     per_page = 24

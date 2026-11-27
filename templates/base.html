@@ -1462,9 +1462,9 @@
                 <div style="width: 40px;"></div>
                 {% endif %}
 
-                <!-- SUCURSAL SELECTOR (ADMIN) / SUCURSAL BADGE (VENDEDOR/BODEGA) -->
+                <!-- SUCURSAL SELECTOR (ADMIN & COORDINADOR) / SUCURSAL BADGE (VENDEDOR/BODEGA) -->
                 {% if current_user.is_authenticated %}
-                    {% if current_user.rol == 'admin' %}
+                    {% if current_user.rol in ['admin', 'coordinador'] %}
                     <div class="dropdown d-none d-sm-block">
                         <button class="btn btn-sm btn-light border rounded-pill dropdown-toggle px-3 py-1 shadow-sm d-flex align-items-center gap-2" type="button" id="adminBranchDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.8rem; font-weight: 600;">
                             <i class="fa-solid fa-location-dot text-primary"></i>
@@ -1504,12 +1504,14 @@
                                 </form>
                             </li>
                             {% endfor %}
+                            {% if current_user.rol == 'admin' %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item rounded-2 py-2 text-primary fw-semibold small" href="{{ url_for('admin_bp.sucursales') }}">
                                     <i class="fa-solid fa-gear me-2"></i> Administrar Sucursales
                                 </a>
                             </li>
+                            {% endif %}
                         </ul>
                     </div>
                     {% else %}
@@ -1884,6 +1886,10 @@
                     <a class="sidebar-link" href="/sales/ventas_hoy">
                         <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-list-check"></i></div>
                         <span>Ventas del Día</span>
+                    </a>
+                    <a class="sidebar-link" href="{{ url_for('celulares_bp.clientes') }}">
+                        <div class="sidebar-icon-box icon-box-ventas"><i class="fa-solid fa-address-book"></i></div>
+                        <span>Directorio Clientes</span>
                     </a>
 
                     <div class="sidebar-section-label">Gestión de Turno</div>

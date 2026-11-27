@@ -119,7 +119,7 @@
             </button>
         </div>
 
-        {% if current_user.rol == 'admin' %}
+        {% if current_user.rol in ['admin', 'coordinador'] %}
         <div style="flex: 0 1 210px;">
             <select name="branch_id" class="form-select shadow-sm fw-semibold" onchange="this.form.submit()" title="Filtrar por Sede / Local">
                 <option value="all" {% if not active_b_id %}selected{% endif %}>📍 Todas las Sedes</option>

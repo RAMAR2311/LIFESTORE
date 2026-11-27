@@ -49,7 +49,7 @@ def inventario():
 
     # Resolver sucursal activa (soporta parámetro directo ?branch_id=... o selector global de sesión)
     active_b_id = None
-    if current_user.rol == 'admin':
+    if current_user.rol in ['admin', 'coordinador']:
         branch_param = request.args.get('branch_id', '').strip()
         if branch_param in ('all', '0'):
             active_b_id = None
@@ -131,8 +131,8 @@ def inventario():
         )
         if estado == 'activos':
             base_query = base_query.filter(BranchStock.cantidad > 0)
-    elif current_user.rol == 'admin' and active_b_id is not None:
-        # Si el admin filtró una sucursal específica
+    elif current_user.rol in ['admin', 'coordinador'] and active_b_id is not None:
+        # Si el admin o coordinador filtró una sucursal específica
         base_query = base_query.join(
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
@@ -886,7 +886,7 @@ def editar_precios_masivo():
 @celulares_bp.route('/clientes')
 @login_required
 def clientes():
-    if current_user.rol not in ['admin', 'coordinador']:
+    if current_user.rol not in ['admin', 'coordinador', 'vendedor']:
         abort(403)
     from models import SaleClient
     # Subconsulta para obtener el ID de registro más reciente para cada documento único
@@ -904,7 +904,7 @@ def clientes():
 @celulares_bp.route('/clientes/detalle/<documento>')
 @login_required
 def detalle_cliente(documento):
-    if current_user.rol not in ['admin', 'coordinador']:
+    if current_user.rol not in ['admin', 'coordinador', 'vendedor']:
         abort(403)
     from models import SaleClient
     # Obtener todas las compras asociadas a este documento
@@ -1050,6 +1050,11 @@ def historial_ventas():
     query = Sale.query.join(SaleDetail).join(Product).filter(
         Product.tipo_inventario == 'celulares'
     )
+
+    if current_user.rol in ['admin', 'coordinador'] and session.get('active_branch_id'):
+        query = query.filter(Sale.branch_id == int(session['active_branch_id']))
+    elif current_user.rol == 'vendedor' and current_user.branch_id:
+        query = query.filter(Sale.branch_id == current_user.branch_id)
     
     if filtro_inventario:
         query = query.filter(Product.inventario == filtro_inventario)
@@ -2078,7 +2083,13 @@ def alertas_estancados():
             BranchStock.branch_id == sucursal_id,
             BranchStock.cantidad > 0
         )
-    elif current_user.rol != 'admin' and current_user.branch_id:
+    elif current_user.rol in ['admin', 'coordinador'] and session.get('active_branch_id'):
+        sucursal_id = int(session['active_branch_id'])
+        query = query.join(BranchStock).filter(
+            BranchStock.branch_id == sucursal_id,
+            BranchStock.cantidad > 0
+        )
+    elif current_user.rol not in ['admin', 'coordinador'] and current_user.branch_id:
         query = query.join(BranchStock).filter(
             BranchStock.branch_id == current_user.branch_id,
             BranchStock.cantidad > 0

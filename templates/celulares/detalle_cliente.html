@@ -71,7 +71,10 @@
                                 style="width: 28px; height: 28px;">
                             <i class="fa-solid fa-chevron-down transition-transform" style="font-size: 0.75rem;"></i>
                         </button>
-                        <span class="badge bg-primary rounded-pill">#{{ cliente_rec.sale_id }}</span>
+                        <span class="badge bg-primary rounded-pill">{{ cliente_rec.venta.numero_factura or ('#' ~ cliente_rec.sale_id) }}</span>
+                        {% if cliente_rec.venta.branch %}
+                        <span class="badge bg-light text-dark border ms-1" style="font-size: 0.7rem;">📍 {{ cliente_rec.venta.branch.nombre }}</span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if cliente_rec.venta.detalles|length == 1 %}

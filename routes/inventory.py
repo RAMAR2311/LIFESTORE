@@ -42,7 +42,7 @@ def index():
     per_page = 5000
 
     active_b_id = None
-    if current_user.rol == 'admin':
+    if current_user.rol in ['admin', 'coordinador']:
         branch_param = request.args.get('branch_id', '').strip()
         if branch_param in ('all', '0'):
             active_b_id = None
@@ -75,8 +75,8 @@ def index():
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
         ).filter(BranchStock.cantidad > 0).distinct()
-    elif current_user.rol == 'admin' and active_b_id is not None:
-        # Admin con sucursal seleccionada: filtrar productos que tengan stock > 0 en esa sede
+    elif current_user.rol in ['admin', 'coordinador'] and active_b_id is not None:
+        # Admin o coordinador con sucursal seleccionada: filtrar productos que tengan stock > 0 en esa sede
         base_query = base_query.join(
             BranchStock,
             (BranchStock.product_id == Product.id) & (BranchStock.branch_id == active_b_id)
