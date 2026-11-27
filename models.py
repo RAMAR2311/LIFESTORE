@@ -1174,7 +1174,9 @@ class Vale(db.Model):
     asesor_id = db.Column(db.Integer, db.ForeignKey('asesores.id'), nullable=False, index=True)
     solicitado_por_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     branch_id = db.Column(db.Integer, db.ForeignKey('branches.id'), nullable=True, index=True)
+    expense_id = db.Column(db.Integer, db.ForeignKey('expenses.id', ondelete='SET NULL'), nullable=True)
     monto = db.Column(db.Numeric(14, 2), nullable=False)
+    metodo_pago = db.Column(db.String(50), nullable=True, default='efectivo')
     concepto = db.Column(db.Text, nullable=True)
     comprobante = db.Column(db.String(255), nullable=True)
     estado = db.Column(db.String(20), nullable=False, default='PENDIENTE', index=True)  # 'PENDIENTE', 'APROBADO', 'RECHAZADO'
@@ -1187,6 +1189,7 @@ class Vale(db.Model):
     solicitado_por = db.relationship('User', foreign_keys=[solicitado_por_id], backref=db.backref('vales_solicitados', lazy=True))
     resuelto_por = db.relationship('User', foreign_keys=[resuelto_por_id], backref=db.backref('vales_resueltos', lazy=True))
     branch = db.relationship('Branch', backref=db.backref('vales', lazy=True))
+    expense = db.relationship('Expense', foreign_keys=[expense_id])
 
     def __init__(self, **kwargs):
         super(Vale, self).__init__(**kwargs)

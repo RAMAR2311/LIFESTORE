@@ -208,12 +208,25 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge bg-light text-dark border rounded-pill px-2 py-1 mb-1">
-                                    <i class="fa-solid fa-store text-success me-1"></i>{{ v.branch.nombre if v.branch else (v.solicitado_por.sucursal if v.solicitado_por else 'Principal') }}
+                                {% set sede_vale = v.branch if v.branch else (v.solicitado_por.branch if (v.solicitado_por and v.solicitado_por.branch) else none) %}
+                                <span class="badge bg-light text-dark border rounded-pill px-2.5 py-1 mb-1">
+                                    <i class="fa-solid fa-store text-success me-1"></i>{{ sede_vale.nombre if sede_vale else (v.solicitado_por.sucursal if v.solicitado_por else 'Principal') }}
                                 </span>
                                 <div class="extra-small text-muted">
-                                    Por: <strong>{{ v.solicitado_por.nombre if v.solicitado_por else 'Usuario' }}</strong>
+                                    Solicitó: <strong>{{ v.solicitado_por.nombre if v.solicitado_por else 'Usuario' }}</strong>
                                 </div>
+                                {% if v.estado == 'APROBADO' %}
+                                <div class="mt-1">
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">
+                                        <i class="fa-solid fa-money-bill-transfer me-1"></i>Salió de: <strong>{{ sede_vale.nombre if sede_vale else 'Local' }}</strong> ({{ (v.metodo_pago or 'efectivo')|capitalize }})
+                                    </span>
+                                    {% if v.expense_id %}
+                                    <div class="extra-small text-success fw-semibold mt-0.5">
+                                        <i class="fa-solid fa-receipt me-1"></i>Gasto #{{ v.expense_id }} generado
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
                             </td>
                             <td class="text-end">
                                 <span class="fw-bolder fs-5 price-display text-brand-black">${{ v.monto|cop }}</span>
@@ -308,47 +321,96 @@
                                     </button>
                                 </div>
 
-                                <!-- Modal Aprobar Vale -->
+                                <!-- Modal Aprobar Vale con Saldos del Local por Método de Pago -->
+                                {% set default_b_id = v.branch_id if (v.branch and v.branch.tipo == 'tienda') else (v.solicitado_por.branch_id if (v.solicitado_por and v.solicitado_por.branch and v.solicitado_por.branch.tipo == 'tienda') else (locales_tienda[0].id if locales_tienda else 1)) %}
+                                {% set sede_solicitante_nom = v.branch.nombre if v.branch else (v.solicitado_por.branch.nombre if (v.solicitado_por and v.solicitado_por.branch) else (v.solicitado_por.sucursal if v.solicitado_por else 'Principal')) %}
                                 <div class="modal fade text-start" id="modalAprobarVale{{ v.id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content border-0 shadow-lg rounded-4">
                                             <form method="POST" action="{{ url_for('vales_bp.aprobar', id=v.id) }}" enctype="multipart/form-data">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                                <div class="modal-header bg-success text-white border-0">
-                                                    <h5 class="modal-title fw-bold">
+                                                <div class="modal-header bg-success text-white border-0 py-3">
+                                                    <h5 class="modal-title fw-bold mb-0">
                                                         <i class="fa-solid fa-circle-check me-2"></i> Aprobar Solicitud #VAL-{{ '%04d' % v.id }}
                                                     </h5>
                                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                                 </div>
                                                 <div class="modal-body p-4">
+                                                    <!-- Resumen del Vale y Local donde se encuentra quien lo pidió -->
                                                     <div class="bg-light rounded-3 p-3 mb-3 border">
-                                                        <div class="d-flex justify-content-between mb-1">
-                                                            <span class="text-muted small">Asesor:</span>
-                                                            <strong class="text-brand-black">{{ v.asesor.nombre if v.asesor else 'N/A' }}</strong>
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <span class="text-muted small">Asesor Solicitante:</span>
+                                                            <strong class="text-brand-black fs-6"><i class="fa-solid fa-user-tie text-primary me-1"></i>{{ v.asesor.nombre if v.asesor else 'N/A' }}</strong>
                                                         </div>
-                                                        <div class="d-flex justify-content-between mb-1">
-                                                            <span class="text-muted small">Cantidad Solicitada:</span>
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <span class="text-muted small">Valor del Vale:</span>
                                                             <strong class="text-success fs-5">${{ v.monto|cop }}</strong>
                                                         </div>
-                                                        <div class="d-flex justify-content-between">
-                                                            <span class="text-muted small">Solicitado desde:</span>
-                                                            <span class="small fw-semibold">{{ v.branch.nombre if v.branch else 'Principal' }} ({{ v.solicitado_por.nombre if v.solicitado_por else '' }})</span>
+                                                        <div class="d-flex justify-content-between align-items-center pt-1 border-top mt-1">
+                                                            <span class="text-muted small">📍 Local donde lo pidieron:</span>
+                                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fw-bold">
+                                                                {{ sede_solicitante_nom }} ({{ v.solicitado_por.nombre if v.solicitado_por else 'Cajero' }})
+                                                            </span>
                                                         </div>
                                                     </div>
+
+                                                    <!-- 1. Selección del Local de donde sale el dinero -->
                                                     <div class="mb-3">
-                                                        <label class="form-label fw-bold small">Adjuntar Soporte / Comprobante del Vale</label>
+                                                        <label class="form-label fw-bold small text-brand-black mb-1">
+                                                            1. ¿De qué Local sale el dinero del Vale? <span class="text-danger">*</span>
+                                                        </label>
+                                                        <select name="branch_id_pago" id="branchSelectVale{{ v.id }}" class="form-select fw-semibold border-success"
+                                                                required onchange="actualizarSaldosModalVale({{ v.id }}, this.value)">
+                                                            {% for loc in locales_tienda %}
+                                                            {% set info_l = saldos_locales.get(loc.id) %}
+                                                            <option value="{{ loc.id }}" {% if loc.id == default_b_id %}selected{% endif %}>
+                                                                📍 {{ loc.nombre }} — Total Disponible: ${{ (info_l.total_disponible if info_l else 0)|cop }}
+                                                            </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+
+                                                    <!-- 2. Tarjetas de Saldo Disponible en ese Local por cada Método de Pago -->
+                                                    <div class="mb-3">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <label class="form-label fw-bold small text-muted mb-0">
+                                                                Saldos disponibles en el Local por Método de Pago:
+                                                            </label>
+                                                            <small class="text-primary extra-small fw-semibold">Clic para elegir</small>
+                                                        </div>
+                                                        <div class="row g-1.5" id="gridSaldosVale{{ v.id }}">
+                                                            <!-- Poblado dinámicamente por JS al abrir / cambiar local -->
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- 3. Selector del Método de Pago -->
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-brand-black mb-1">
+                                                            2. Seleccionar Método de Pago con el que se entregó <span class="text-danger">*</span>
+                                                        </label>
+                                                        <select name="metodo_pago" id="metodoSelectVale{{ v.id }}" class="form-select fw-bold text-dark border-dark" required>
+                                                            {% for m_code, m_label, m_icon in metodos_pago_vale %}
+                                                            <option value="{{ m_code }}">{{ m_label }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                        <small class="text-success extra-small d-block mt-1 fw-semibold">
+                                                            <i class="fa-solid fa-circle-info me-1"></i>Al aprobar, se registrará automáticamente como <strong>Gasto Diario (Vale de Asesor)</strong> en ese local y se descontará en su cierre de caja.
+                                                        </small>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Adjuntar Soporte / Comprobante del Vale (Opcional)</label>
                                                         <input type="file" name="comprobante" class="form-control form-control-sm bg-light compress-image-input" accept="image/*,application/pdf">
-                                                        <small class="text-muted extra-small">Foto o PDF del comprobante de entrega/transferencia (se optimiza automáticamente).</small>
                                                     </div>
                                                     <div class="mb-0">
                                                         <label class="form-label fw-bold small">Nota de Autorización / Trazabilidad (Opcional)</label>
-                                                        <textarea name="observacion_resolucion" class="form-control bg-light" rows="2" placeholder="Ej: Autorizado por gerencia..."></textarea>
+                                                        <textarea name="observacion_resolucion" class="form-control bg-light" rows="2" placeholder="Ej: Autorizado por gerencia, entregado de caja del local..."></textarea>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer border-0 pt-0">
                                                     <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
                                                     <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm">
-                                                        <i class="fa-solid fa-check me-1"></i> Confirmar Aprobación
+                                                        <i class="fa-solid fa-check me-1"></i> Aprobar y Generar Gasto
                                                     </button>
                                                 </div>
                                             </form>
@@ -389,6 +451,58 @@
                                                     <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
                                                         <i class="fa-solid fa-xmark me-1"></i> Confirmar Rechazo
                                                     </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% elif v.estado == 'APROBADO' %}
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-1 fw-semibold"
+                                        data-bs-toggle="modal" data-bs-target="#modalEditarPagoVale{{ v.id }}"
+                                        title="Cambiar Local o Método de Pago del Vale">
+                                    <i class="fa-solid fa-pen-to-square me-1"></i> Origen Pago
+                                </button>
+                                {% set edit_b_id = v.branch_id if (v.branch and v.branch.tipo == 'tienda') else (locales_tienda[0].id if locales_tienda else 1) %}
+                                <div class="modal fade text-start" id="modalEditarPagoVale{{ v.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                            <form method="POST" action="{{ url_for('vales_bp.actualizar_origen_pago', id=v.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <div class="modal-header bg-dark text-white border-0 py-3">
+                                                    <h6 class="modal-title fw-bold mb-0">
+                                                        <i class="fa-solid fa-money-bill-transfer me-2 text-warning"></i>Origen del Dinero · #VAL-{{ '%04d' % v.id }}
+                                                    </h6>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body p-4">
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small">Local de donde salió el dinero *</label>
+                                                        <select name="branch_id_pago" id="branchSelectVale{{ v.id }}" class="form-select fw-semibold"
+                                                                onchange="actualizarSaldosModalVale({{ v.id }}, this.value)">
+                                                            {% for loc in locales_tienda %}
+                                                            {% set info_l = saldos_locales.get(loc.id) %}
+                                                            <option value="{{ loc.id }}" {% if loc.id == edit_b_id %}selected{% endif %}>
+                                                                📍 {{ loc.nombre }} — Disponible: ${{ (info_l.total_disponible if info_l else 0)|cop }}
+                                                            </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-muted mb-1">Saldos disponibles en este Local:</label>
+                                                        <div class="row g-1.5" id="gridSaldosVale{{ v.id }}"></div>
+                                                    </div>
+                                                    <div class="mb-0">
+                                                        <label class="form-label fw-bold small">Método de Pago *</label>
+                                                        <select name="metodo_pago" id="metodoSelectVale{{ v.id }}" data-current="{{ v.metodo_pago or 'efectivo' }}" class="form-select fw-bold">
+                                                            {% for m_code, m_label, m_icon in metodos_pago_vale %}
+                                                            <option value="{{ m_code }}" {% if (v.metodo_pago or 'efectivo') == m_code %}selected{% endif %}>{{ m_label }}</option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-0 pt-0">
+                                                    <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Guardar y Sincronizar Gasto</button>
                                                 </div>
                                             </form>
                                         </div>
@@ -474,6 +588,68 @@
 {% endif %}
 
 <script>
+const SALDOS_LOCALES_VALES = {{ saldos_locales|tojson }};
+
+function fmtCopVales(num) {
+    return '$' + Math.round(Number(num || 0)).toLocaleString('es-CO');
+}
+
+function seleccionarMetodoCardVale(valeId, codigoMetodo) {
+    const sel = document.getElementById('metodoSelectVale' + valeId);
+    if (sel) {
+        sel.value = codigoMetodo;
+    }
+    const grid = document.getElementById('gridSaldosVale' + valeId);
+    if (grid) {
+        grid.querySelectorAll('.metodo-saldo-card').forEach(card => {
+            if (card.dataset.metodo === codigoMetodo) {
+                card.classList.add('border-success', 'bg-success-subtle');
+                card.classList.remove('bg-white');
+            } else {
+                card.classList.remove('border-success', 'bg-success-subtle');
+                card.classList.add('bg-white');
+            }
+        });
+    }
+}
+
+function actualizarSaldosModalVale(valeId, branchId) {
+    const infoLocal = SALDOS_LOCALES_VALES[branchId] || SALDOS_LOCALES_VALES[String(branchId)];
+    const grid = document.getElementById('gridSaldosVale' + valeId);
+    const selMetodo = document.getElementById('metodoSelectVale' + valeId);
+    if (!infoLocal || !grid || !selMetodo) return;
+
+    const currentMethod = selMetodo.value || selMetodo.dataset.current || 'efectivo';
+    const metodosMap = infoLocal.metodos || {};
+
+    let cardsHtml = '';
+    let optionsHtml = '';
+
+    Object.keys(metodosMap).forEach(mKey => {
+        const m = metodosMap[mKey];
+        const isSelected = (mKey === currentMethod);
+        const saldoColor = m.saldo > 0 ? 'text-success' : 'text-muted';
+        const cardBorder = isSelected ? 'border-success bg-success-subtle' : 'bg-white';
+
+        cardsHtml += `
+            <div class="col-6 col-sm-4">
+                <div class="p-2 rounded-3 border ${cardBorder} metodo-saldo-card h-100"
+                     data-metodo="${mKey}"
+                     style="cursor: pointer; transition: all 0.15s ease;"
+                     onclick="seleccionarMetodoCardVale(${valeId}, '${mKey}')">
+                    <div class="extra-small fw-bold text-dark text-truncate">${m.label}</div>
+                    <div class="fw-bolder small ${saldoColor} font-mono mt-0.5">${fmtCopVales(m.saldo)}</div>
+                </div>
+            </div>
+        `;
+
+        optionsHtml += `<option value="${mKey}" ${isSelected ? 'selected' : ''}>${m.label} — Disponible en ${infoLocal.nombre}: ${fmtCopVales(m.saldo)}</option>`;
+    });
+
+    grid.innerHTML = cardsHtml;
+    selMetodo.innerHTML = optionsHtml;
+}
+
 function limpiarComprobanteVale() {
     const input = document.getElementById('inputComprobanteVale');
     const box = document.getElementById('previewComprobanteBox');
@@ -532,11 +708,16 @@ function comprimirImagenArchivo(file, maxDim = 1280, quality = 0.75) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Asegurar que los modales de la tabla funcionen bien en PWA / móvil
+    // Asegurar que los modales de la tabla funcionen bien en PWA / móvil e inicializar saldos por local
     document.querySelectorAll('.modal').forEach(modalEl => {
         if (modalEl.parentElement !== document.body) {
             document.body.appendChild(modalEl);
         }
+    });
+
+    document.querySelectorAll('select[id^="branchSelectVale"]').forEach(sel => {
+        const valeId = sel.id.replace('branchSelectVale', '');
+        actualizarSaldosModalVale(valeId, sel.value);
     });
 
     // Limpiar formulario e imagen al cargar o volver atrás en PWA

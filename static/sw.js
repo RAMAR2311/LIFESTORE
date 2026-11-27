@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lifestore-app-v10';
+const CACHE_NAME = 'lifestore-app-v11';
 const ASSETS_TO_CACHE = [
     '/manifest.json',
     '/static/manifest.json',

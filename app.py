@@ -364,7 +364,9 @@ def create_app():
             "UPDATE products SET memoria = UPPER(REPLACE(TRIM(memoria), ' ', '')) WHERE memoria IS NOT NULL AND TRIM(memoria) != '' AND UPPER(TRIM(memoria)) != 'N/A';",
             "ALTER TABLE provider_payments ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
             "ALTER TABLE provider_payments ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;",
-            "ALTER TABLE warranties ADD COLUMN variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL;"
+            "ALTER TABLE warranties ADD COLUMN variant_id INTEGER REFERENCES product_variants(id) ON DELETE SET NULL;",
+            "ALTER TABLE vales ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'efectivo';",
+            "ALTER TABLE vales ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;"
         ]
         for q in queries:
             try:

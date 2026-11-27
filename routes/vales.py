@@ -2,12 +2,23 @@ import os
 from werkzeug.utils import secure_filename
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort, current_app
 from flask_login import login_required, current_user
-from models import db, Vale, Asesor, Branch, User, AuditLog, obtener_hora_bogota
+from models import (
+    db, Vale, Asesor, Branch, User, Expense, Sale, SalePayment, CashShift, AuditLog, obtener_hora_bogota
+)
 from decorators import admin_required
 from decimal import Decimal
 from datetime import datetime
 
 vales_bp = Blueprint('vales_bp', __name__)
+
+METODOS_PAGO_VALE = [
+    ('efectivo', '💵 Efectivo', 'fa-money-bill-wave'),
+    ('nequi', '📱 Nequi', 'fa-mobile-screen'),
+    ('bancolombia', '🏦 Bancolombia', 'fa-building-columns'),
+    ('daviplata', '📲 Daviplata', 'fa-mobile-retro'),
+    ('davivienda', '🏦 Davivienda', 'fa-building-columns'),
+    ('bold', '💳 Bold', 'fa-bolt'),
+]
 
 
 def get_active_branch_for_user():
@@ -15,10 +26,132 @@ def get_active_branch_for_user():
     if current_user.rol in ['vendedor', 'bodega', 'vendedor_bodega']:
         if current_user.branch_id:
             return current_user.branch_id
-        b_def = Branch.query.filter_by(activa=True).order_by(Branch.id.asc()).first()
+        b_def = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
         return b_def.id if b_def else None
     active_b = session.get('active_branch_id')
     return int(active_b) if active_b else None
+
+
+def _calcular_saldos_por_local_y_metodo():
+    """
+    Calcula el saldo disponible de cada Local comercial (tipo='tienda') desglosado
+    por cada método de pago (Efectivo, Nequi, Bancolombia, Daviplata, Davivienda, Bold).
+    """
+    hoy = obtener_hora_bogota().date()
+    locales = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.nombre.asc()).all()
+    resultado = {}
+
+    for b in locales:
+        turno_abierto = CashShift.query.filter_by(branch_id=b.id, estado='ABIERTA').first()
+        base_efectivo_hoy = float(turno_abierto.base_inicial_efectivo or 0) if turno_abierto else 0.0
+
+        # Ventas de este local
+        ventas_local = Sale.query.filter_by(branch_id=b.id).all()
+        gastos_local = Expense.query.filter_by(branch_id=b.id).all()
+
+        recaudo_total = {k: 0.0 for k, _, _ in METODOS_PAGO_VALE}
+        recaudo_hoy = {k: 0.0 for k, _, _ in METODOS_PAGO_VALE}
+        recaudo_hoy['efectivo'] += base_efectivo_hoy
+
+        for v in ventas_local:
+            es_hoy = bool(v.fecha_venta and v.fecha_venta.date() == hoy)
+            if v.pagos:
+                for p in v.pagos:
+                    m = (p.metodo_pago or 'efectivo').lower().strip()
+                    if m == 'bolt':
+                        m = 'bold'
+                    if m in recaudo_total:
+                        val = float(p.monto or 0)
+                        recaudo_total[m] += val
+                        if es_hoy:
+                            recaudo_hoy[m] += val
+            else:
+                m = (v.metodo_pago or 'efectivo').lower().strip()
+                if m == 'bolt':
+                    m = 'bold'
+                if m in recaudo_total:
+                    val = float(v.monto_total or 0)
+                    recaudo_total[m] += val
+                    if es_hoy:
+                        recaudo_hoy[m] += val
+
+        gasto_total = {k: 0.0 for k, _, _ in METODOS_PAGO_VALE}
+        gasto_hoy = {k: 0.0 for k, _, _ in METODOS_PAGO_VALE}
+
+        for g in gastos_local:
+            es_hoy = bool(g.fecha_gasto and g.fecha_gasto.date() == hoy)
+            m = (g.metodo_pago or 'efectivo').lower().strip()
+            if m == 'bolt':
+                m = 'bold'
+            if m in gasto_total:
+                val = float(g.monto or 0)
+                gasto_total[m] += val
+                if es_hoy:
+                    gasto_hoy[m] += val
+
+        metodos_info = {}
+        total_local = 0.0
+        for m_key, m_label, m_icon in METODOS_PAGO_VALE:
+            disp_hoy = recaudo_hoy[m_key] - gasto_hoy[m_key]
+            disp_acum = recaudo_total[m_key] - gasto_total[m_key]
+            # Si hay base de caja hoy o saldo acumulado histórico, tomamos el disponible real (>= 0)
+            saldo_disp = max(0.0, max(disp_hoy, disp_acum))
+            metodos_info[m_key] = {
+                'codigo': m_key,
+                'label': m_label,
+                'icono': m_icon,
+                'saldo': round(saldo_disp),
+                'saldo_hoy': round(max(0.0, disp_hoy)),
+                'saldo_acumulado': round(max(0.0, disp_acum))
+            }
+            total_local += saldo_disp
+
+        resultado[b.id] = {
+            'branch_id': b.id,
+            'nombre': b.nombre,
+            'codigo': b.codigo,
+            'total_disponible': round(total_local),
+            'metodos': metodos_info
+        }
+
+    return locales, resultado
+
+
+def _sincronizar_gasto_vale(vale, branch_obj, metodo_pago, user_id):
+    """Crea o actualiza el registro de Gasto (Expense) asociado a un Vale aprobado."""
+    nombre_asesor = vale.asesor.nombre if vale.asesor else f'Asesor #{vale.asesor_id}'
+    desc_gasto = f"[VALE #VAL-{vale.id:04d}] Asesor: {nombre_asesor} ({metodo_pago.capitalize()})"
+    if vale.concepto:
+        desc_gasto += f" — {vale.concepto}"
+    if vale.observacion_resolucion:
+        desc_gasto += f" ({vale.observacion_resolucion})"
+    desc_gasto = desc_gasto[:255]
+
+    if vale.expense_id:
+        gasto_existente = Expense.query.get(vale.expense_id)
+        if gasto_existente:
+            gasto_existente.monto = vale.monto
+            gasto_existente.metodo_pago = metodo_pago
+            gasto_existente.branch_id = branch_obj.id
+            gasto_existente.sucursal = branch_obj.nombre
+            gasto_existente.descripcion = desc_gasto
+            return gasto_existente
+
+    nuevo_gasto = Expense(
+        usuario_id=user_id,
+        tipo_gasto='Gasto Diario',
+        categoria='Vale de Asesor',
+        descripcion=desc_gasto,
+        monto=vale.monto,
+        metodo_pago=metodo_pago,
+        sucursal=branch_obj.nombre,
+        branch_id=branch_obj.id,
+        fecha_gasto=vale.fecha_resolucion or obtener_hora_bogota()
+    )
+    db.session.add(nuevo_gasto)
+    db.session.flush()
+    vale.expense_id = nuevo_gasto.id
+    return nuevo_gasto
 
 
 @vales_bp.route('/', methods=['GET'])
@@ -29,10 +162,32 @@ def index():
     - Si es Vendedor: muestra el formulario para solicitar un vale seleccionando el asesor y el monto,
       junto con el historial y trazabilidad de los vales solicitados en su sede/usuario.
     - Si es Administrador: muestra el panel de bandeja de solicitudes recibidas para aceptar o rechazar,
-      filtros avanzados y la trazabilidad completa de todos los vales.
+      mostrando en qué local está la persona que lo pidió y el saldo disponible de cada método de pago en ese local.
     """
+    # Backfill automático para vales que hayan sido aprobados antes de esta actualización sin generar Expense
+    vales_sin_gasto = Vale.query.filter_by(estado='APROBADO', expense_id=None).all()
+    if vales_sin_gasto:
+        default_tienda = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
+        changed_backfill = False
+        for vs in vales_sin_gasto:
+            target_b_id = vs.branch_id or (vs.solicitado_por.branch_id if vs.solicitado_por else None)
+            b_obj = Branch.query.get(target_b_id) if target_b_id else default_tienda
+            if b_obj and b_obj.tipo != 'tienda' and default_tienda:
+                b_obj = default_tienda
+            if b_obj:
+                vs.branch_id = b_obj.id
+                vs.metodo_pago = vs.metodo_pago or 'efectivo'
+                _sincronizar_gasto_vale(vs, b_obj, vs.metodo_pago, vs.resuelto_por_id or current_user.id)
+                changed_backfill = True
+        if changed_backfill:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
     asesores_activos = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
     todos_asesores = Asesor.query.order_by(Asesor.nombre.asc()).all()
+    locales_tienda, saldos_locales = _calcular_saldos_por_local_y_metodo()
 
     estado_filtro = request.args.get('estado', '').strip().upper()
     asesor_id_filtro = request.args.get('asesor_id', type=int)
@@ -41,7 +196,7 @@ def index():
     query = Vale.query
 
     # Filtrado según perfil
-    if current_user.rol != 'admin':
+    if current_user.rol not in ['admin', 'coordinador']:
         if current_user.branch_id:
             query = query.filter(
                 (Vale.branch_id == current_user.branch_id) | (Vale.solicitado_por_id == current_user.id)
@@ -66,12 +221,10 @@ def index():
         except ValueError:
             pass
 
-    # Ordenar pendientes primero o por fecha descendente
     vales = query.order_by(Vale.fecha_solicitud.desc()).all()
 
-    # Métricas de resumen sobre la consulta base (sin filtro de estado puntual para mostrar KPIs globales del contexto)
     base_kpi_q = Vale.query
-    if current_user.rol != 'admin':
+    if current_user.rol not in ['admin', 'coordinador']:
         if current_user.branch_id:
             base_kpi_q = base_kpi_q.filter(
                 (Vale.branch_id == current_user.branch_id) | (Vale.solicitado_por_id == current_user.id)
@@ -103,6 +256,9 @@ def index():
         vales=vales,
         asesores_activos=asesores_activos,
         todos_asesores=todos_asesores,
+        locales_tienda=locales_tienda,
+        saldos_locales=saldos_locales,
+        metodos_pago_vale=METODOS_PAGO_VALE,
         estado_filtro=estado_filtro,
         asesor_id_filtro=asesor_id_filtro,
         fecha_filtro=fecha_filtro,
@@ -113,10 +269,11 @@ def index():
 @vales_bp.route('/solicitar', methods=['POST'])
 @login_required
 def solicitar():
-    """Permite al vendedor (o usuario en sesión) enviar una solicitud de vale indicando el asesor y la cantidad."""
+    """Permite al vendedor (o admin) enviar una solicitud de vale indicando el asesor, local y la cantidad."""
     asesor_id = request.form.get('asesor_id', type=int)
     monto_raw = request.form.get('monto', '0')
     concepto = request.form.get('concepto', '').strip()
+    branch_form_id = request.form.get('branch_id', type=int)
 
     if not asesor_id:
         flash('Debes seleccionar el asesor que solicita el vale.', 'danger')
@@ -142,9 +299,11 @@ def solicitar():
         flash('Ingresa una cantidad de dinero válida mayor a $0.', 'danger')
         return redirect(url_for('vales_bp.index'))
 
-    branch_id = get_active_branch_for_user()
+    branch_id = branch_form_id or get_active_branch_for_user()
+    if not branch_id:
+        b_def = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
+        branch_id = b_def.id if b_def else None
 
-    # Manejar comprobante adjunto si se suministra
     comprobante_rel = None
     if 'comprobante' in request.files:
         file = request.files['comprobante']
@@ -195,13 +354,26 @@ def solicitar():
 @login_required
 @admin_required
 def aprobar(id):
-    """El Administrador aprueba la solicitud de vale y queda la trazabilidad."""
+    """
+    El Administrador aprueba la solicitud de vale seleccionando el Local y el Método de Pago
+    de donde salió el dinero, generando automáticamente el Gasto en ese local y el movimiento en Bancos.
+    """
     vale = Vale.query.get_or_404(id)
     if vale.estado != 'PENDIENTE':
         flash(f'El vale #VAL-{vale.id:04d} ya fue procesado anteriormente ({vale.estado}).', 'warning')
         return redirect(url_for('vales_bp.index'))
 
+    branch_id_pago = request.form.get('branch_id_pago', type=int) or vale.branch_id or (vale.solicitado_por.branch_id if vale.solicitado_por else None)
+    metodo_pago = (request.form.get('metodo_pago') or 'efectivo').strip().lower()
     observacion = request.form.get('observacion_resolucion', '').strip()
+
+    branch_obj = Branch.query.get(branch_id_pago) if branch_id_pago else None
+    if not branch_obj or branch_obj.tipo != 'tienda':
+        branch_obj = Branch.query.filter_by(activa=True, tipo='tienda').order_by(Branch.id.asc()).first()
+
+    if not branch_obj:
+        flash('Debes seleccionar un Local comercial válido de donde salió el dinero del vale.', 'danger')
+        return redirect(url_for('vales_bp.index'))
 
     comprobante_rel = None
     if 'comprobante' in request.files:
@@ -220,25 +392,90 @@ def aprobar(id):
 
     try:
         vale.estado = 'APROBADO'
+        vale.branch_id = branch_obj.id
+        vale.metodo_pago = metodo_pago
         vale.resuelto_por_id = current_user.id
-        vale.observacion_resolucion = observacion or 'Vale autorizado por administración.'
+        vale.observacion_resolucion = observacion or f'Autorizado y pagado desde {branch_obj.nombre} ({metodo_pago.capitalize()}).'
         vale.fecha_resolucion = obtener_hora_bogota()
         if comprobante_rel:
             vale.comprobante = comprobante_rel
 
+        # 1. Generar automáticamente el Gasto (Expense) en el Local seleccionado
+        gasto_vale = _sincronizar_gasto_vale(vale, branch_obj, metodo_pago, current_user.id)
+
+        # 2. Descontar en Bancos / Métodos de Pago
+        from services.bank_service import registrar_movimiento_banco
+        nombre_asesor = vale.asesor.nombre if vale.asesor else 'Asesor'
+        registrar_movimiento_banco(
+            codigo_metodo=metodo_pago,
+            monto=vale.monto,
+            tipo_movimiento='EGRESO',
+            origen='GASTO',
+            descripcion=f'Vale #VAL-{vale.id:04d} a {nombre_asesor} [Desde: {branch_obj.nombre}]',
+            referencia_id=gasto_vale.id,
+            usuario_id=current_user.id
+        )
+
         AuditLog.registrar(
             action='APROBACION_VALE',
             user_id=current_user.id,
-            motivo=f"Aprobación de vale #VAL-{vale.id:04d} para el asesor '{vale.asesor.nombre if vale.asesor else 'N/A'}' por ${float(vale.monto):,.0f}. Nota: {vale.observacion_resolucion}",
+            motivo=(
+                f"Aprobación de vale #VAL-{vale.id:04d} para '{nombre_asesor}' por ${float(vale.monto):,.0f}. "
+                f"Pagado desde {branch_obj.nombre} en {metodo_pago.capitalize()} (Gasto #{gasto_vale.id}). "
+                f"Nota: {vale.observacion_resolucion}"
+            ),
             target_id=vale.id,
             target_type='VALE'
         )
 
         db.session.commit()
-        flash(f"Vale #VAL-{vale.id:04d} de '{vale.asesor.nombre}' por ${float(vale.monto):,.0f} APROBADO correctamente.", 'success')
+        flash(
+            f"✅ Vale #VAL-{vale.id:04d} de '{nombre_asesor}' por ${int(vale.monto):,} APROBADO. "
+            f"Se generó el Gasto automáticamente en {branch_obj.nombre} ({metodo_pago.capitalize()}) y se descontó del saldo.".replace(',', '.'),
+            'success'
+        )
     except Exception as e:
         db.session.rollback()
         flash(f'Error al aprobar el vale: {str(e)}', 'danger')
+
+    return redirect(url_for('vales_bp.index'))
+
+
+@vales_bp.route('/<int:id>/actualizar-origen', methods=['POST'])
+@login_required
+@admin_required
+def actualizar_origen_pago(id):
+    """Permite al Administrador actualizar el Local o el Método de Pago de un vale ya aprobado y sincronizar su gasto."""
+    vale = Vale.query.get_or_404(id)
+    if vale.estado != 'APROBADO':
+        flash('Solo se puede actualizar el origen de pago de un vale aprobado.', 'warning')
+        return redirect(url_for('vales_bp.index'))
+
+    branch_id_pago = request.form.get('branch_id_pago', type=int)
+    metodo_pago = (request.form.get('metodo_pago') or 'efectivo').strip().lower()
+    branch_obj = Branch.query.get(branch_id_pago) if branch_id_pago else None
+
+    if not branch_obj or branch_obj.tipo != 'tienda':
+        flash('Selecciona un Local comercial válido.', 'danger')
+        return redirect(url_for('vales_bp.index'))
+
+    try:
+        vale.branch_id = branch_obj.id
+        vale.metodo_pago = metodo_pago
+        gasto_vale = _sincronizar_gasto_vale(vale, branch_obj, metodo_pago, current_user.id)
+
+        AuditLog.registrar(
+            action='ACTUALIZACION_PAGO_VALE',
+            user_id=current_user.id,
+            motivo=f"Actualización de origen de pago del vale #VAL-{vale.id:04d}: Local {branch_obj.nombre}, Método {metodo_pago.capitalize()} (Gasto #{gasto_vale.id}).",
+            target_id=vale.id,
+            target_type='VALE'
+        )
+        db.session.commit()
+        flash(f"Origen de pago del vale #VAL-{vale.id:04d} actualizado a {branch_obj.nombre} ({metodo_pago.capitalize()}) y sincronizado en Gastos.", 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar el vale: {str(e)}', 'danger')
 
     return redirect(url_for('vales_bp.index'))
 
@@ -305,20 +542,11 @@ def adjuntar_comprobante(id):
         clean_name = secure_filename(file.filename)
         fname = f"vale_{timestamp}_{clean_name}"
         file.save(os.path.join(upload_folder, fname))
-
         vale.comprobante = f"uploads/vales/{fname}"
         db.session.commit()
-
-        AuditLog.registrar(
-            action='ADJUNTAR_COMPROBANTE_VALE',
-            user_id=current_user.id,
-            motivo=f"Adjuntado soporte/comprobante para el vale #VAL-{vale.id:04d}",
-            target_id=vale.id,
-            target_type='VALE'
-        )
-        flash(f'Comprobante de soporte adjuntado exitosamente al vale #VAL-{vale.id:04d}.', 'success')
+        flash(f'Comprobante adjuntado exitosamente al vale #VAL-{vale.id:04d}.', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al adjuntar el comprobante: {str(e)}', 'danger')
+        flash(f'Error al subir el comprobante: {str(e)}', 'danger')
 
     return redirect(url_for('vales_bp.index'))
