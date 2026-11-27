@@ -866,4 +866,95 @@ def imprimir_ticket_arqueo():
         total_ventas=total_ventas,
         total_gastos=total_gastos,
         sucursal=sucursal_nombre,
-      
+        branch_id=branch_id
+    )
+
+
+@arqueo_bp.route('/comprobante', methods=['GET'])
+@login_required
+def comprobante_arqueo():
+    """
+    Genera el Comprobante de Cierre / Arqueo de Caja en el mismo formato visual de la Factura (1 Cara),
+    accesible tanto para el perfil de Vendedor como para Coordinador y Administrador, con botón directo
+    para alternar al Formato Térmico 80mm.
+    """
+    arqueo_id = request.args.get('id', type=int)
+    fecha_str = request.args.get('fecha', obtener_hora_bogota().strftime('%Y-%m-%d'))
+    branch_id = request.args.get('branch_id', type=int) or get_current_branch_id()
+
+    arqueo = ArqueoCaja.query.get(arqueo_id) if arqueo_id else None
+    if arqueo:
+        fecha_obj = arqueo.fecha_arqueo
+        fecha_str = fecha_obj.strftime('%Y-%m-%d')
+        if arqueo.branch_id:
+            branch_id = arqueo.branch_id
+    else:
+        try:
+            fecha_obj = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_obj = obtener_hora_bogota().date()
+            fecha_str = fecha_obj.strftime('%Y-%m-%d')
+        arqueo_q = ArqueoCaja.query.filter_by(fecha_arqueo=fecha_obj, tipo_arqueo='general')
+        if branch_id:
+            arqueo_q = arqueo_q.filter_by(branch_id=branch_id)
+        arqueo = arqueo_q.first()
+
+    sede = Branch.query.get(branch_id) if branch_id else None
+    sucursal_nombre = sede.nombre if sede else 'TIENDA PRINCIPAL'
+
+    ventas_q = Sale.query.filter(
+        db.func.date(Sale.fecha_venta) == fecha_obj,
+        Sale.tipo_venta.in_(['general', 'celulares'])
+    )
+    if branch_id:
+        ventas_q = ventas_q.filter(Sale.branch_id == branch_id)
+    ventas = ventas_q.order_by(Sale.fecha_venta.asc()).all()
+
+    gastos_q = Expense.query.filter(
+        db.func.date(Expense.fecha_gasto) == fecha_obj,
+        Expense.tipo_gasto == 'Gasto Diario'
+    )
+    if branch_id:
+        gastos_q = gastos_q.filter(Expense.branch_id == branch_id)
+    gastos = gastos_q.order_by(Expense.fecha_gasto.asc()).all()
+
+    total_efectivo, total_transferencia, _ = calcular_totales_dia(ventas)
+    desglose_metodos = calcular_desglose_metodos_dia(ventas)
+    total_ventas = float(total_efectivo) + float(total_transferencia)
+    total_gastos = sum(float(g.monto or 0) for g in gastos)
+    gastos_efectivo = sum(float(g.monto or 0) for g in gastos if (g.metodo_pago or 'efectivo').lower() == 'efectivo')
+    fecha_generacion = obtener_hora_bogota().strftime('%d/%m/%Y %I:%M %p')
+
+    turno = None
+    if arqueo and arqueo.shift_id:
+        turno = CashShift.query.get(arqueo.shift_id)
+    if not turno:
+        t_q = CashShift.query.filter(db.func.date(CashShift.fecha_apertura) == fecha_obj)
+        if branch_id:
+            t_q = t_q.filter(CashShift.branch_id == branch_id)
+        turno = t_q.order_by(CashShift.fecha_apertura.desc()).first()
+
+    todos_asesores = {a.id: a.nombre for a in Asesor.query.all()}
+    asesores_nombres = []
+    if turno and turno.lista_asesores_ids:
+        asesores_nombres = [todos_asesores.get(aid, f"Asesor #{aid}") for aid in turno.lista_asesores_ids]
+
+    return render_template(
+        'arqueo/comprobante_impresion.html',
+        sede=sede,
+        sucursal=sucursal_nombre,
+        fecha=fecha_obj.strftime('%d/%m/%Y'),
+        fecha_str=fecha_str,
+        fecha_generacion=fecha_generacion,
+        arqueo=arqueo,
+        turno=turno,
+        asesores_nombres=asesores_nombres,
+        ventas=ventas,
+        gastos=gastos,
+        total_efectivo=total_efectivo,
+        total_transferencia=total_transferencia,
+        total_ventas=total_ventas,
+        total_gastos=total_gastos,
+        gastos_efectivo=gastos_efectivo,
+        desglose_metodos=desglose_metodos
+    )
