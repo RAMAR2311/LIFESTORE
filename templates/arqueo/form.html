@@ -43,7 +43,7 @@
                             </div>
                             <div>
                                 <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">EFECTIVO SISTEMA</h6>
-                                <h4 class="fw-bolder text-success mb-0">${{ total_efectivo|cop }}</h4>
+                                <h4 class="fw-bolder text-success mb-0">${{ total_efectivo|cop|replace(',', '.') }}</h4>
                             </div>
                         </div>
                     </div>
@@ -56,7 +56,7 @@
                             </div>
                             <div>
                                 <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">DINERO DIGITAL</h6>
-                                <h4 class="fw-bolder text-info mb-0">${{ total_transferencia|cop }}</h4>
+                                <h4 class="fw-bolder text-info mb-0">${{ total_transferencia|cop|replace(',', '.') }}</h4>
                             </div>
                         </div>
                     </div>
@@ -69,7 +69,7 @@
                             </div>
                             <div>
                                 <h6 class="text-muted fw-bold mb-1" style="font-size: 0.8rem;">VENTA TOTAL</h6>
-                                <h4 class="fw-bolder text-warning mb-0 text-dark">${{ (total_efectivo + total_transferencia)|cop }}</h4>
+                                <h4 class="fw-bolder text-warning mb-0 text-dark">${{ (total_efectivo + total_transferencia)|cop|replace(',', '.') }}</h4>
                             </div>
                         </div>
                     </div>
@@ -108,7 +108,7 @@
                                             <span class="badge bg-warning text-dark border rounded-pill">Mixto</span>
                                             {% for pago in v.pagos %}
                                                 <small class="text-muted" style="font-size: 0.7rem;">
-                                                    - {{ 'Bold' if pago.metodo_pago in ['bold', 'bolt'] else pago.metodo_pago|capitalize }}: ${{ pago.monto|cop }}
+                                                    - {{ 'Bold' if pago.metodo_pago in ['bold', 'bolt'] else pago.metodo_pago|capitalize }}: ${{ pago.monto|cop|replace(',', '.') }}
                                                     {% if pago.comprobante %}
                                                         <a href="/static/{{ pago.comprobante }}" target="_blank" class="text-warning ms-1" title="Ver Comprobante"><i class="fa-solid fa-image"></i></a>
                                                     {% endif %}
@@ -134,7 +134,7 @@
                                         {% endfor %}
                                     </ul>
                                 </td>
-                                <td class="text-end pe-4 fw-bold">${{ v.monto_total|cop }}</td>
+                                <td class="text-end pe-4 fw-bold">${{ v.monto_total|cop|replace(',', '.') }}</td>
                             </tr>
                             {% else %}
                             <tr>
@@ -145,7 +145,7 @@
                         <tfoot class="bg-light sticky-bottom">
                             <tr>
                                 <td colspan="4" class="text-end fw-bold">GRAN TOTAL VENTAS:</td>
-                                <td class="text-end pe-4 fw-bolder fs-5 text-brand-black">${{ (total_efectivo + total_transferencia)|cop }}</td>
+                                <td class="text-end pe-4 fw-bolder fs-5 text-brand-black">${{ (total_efectivo + total_transferencia)|cop|replace(',', '.') }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -159,7 +159,7 @@
                         <i class="fa-solid fa-money-bill-transfer text-danger me-2"></i> Salidas del Local Hoy: Gastos y Abonos a Proveedores ({{ branch_nombre }})
                     </h5>
                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger rounded-pill px-3">
-                        Efectivo descontado de caja: -${{ (gastos_automaticos + gastos_externos)|cop }}
+                        Efectivo descontado de caja: -${{ (gastos_automaticos + gastos_externos)|cop|replace(',', '.') }}
                     </span>
                 </div>
                 <div class="table-responsive">
@@ -200,7 +200,7 @@
                                         </span>
                                     {% endif %}
                                 </td>
-                                <td class="text-end pe-4 fw-bold text-danger">-${{ g.monto|cop }}</td>
+                                <td class="text-end pe-4 fw-bold text-danger">-${{ g.monto|cop|replace(',', '.') }}</td>
                             </tr>
                             {% else %}
                             <tr>
@@ -226,13 +226,13 @@
                     <label class="form-label text-muted fw-bold small mb-1">Efectivo Sistema (Esperado)</label>
                     <div class="input-group mb-2 shadow-sm">
                         <span class="input-group-text bg-light border-0 text-muted"><i class="fa-solid fa-money-bill-wave"></i></span>
-                        <input type="text" class="form-control border-0 fw-bold bg-light" value="${{ total_efectivo|cop }}" readonly disabled>
+                        <input type="text" class="form-control border-0 fw-bold bg-light" value="${{ total_efectivo|cop|replace(',', '.') }}" readonly disabled>
                     </div>
 
                     <label class="form-label text-muted fw-bold small mb-1 mt-2">Digital Sistema</label>
                     <div class="input-group mb-3 shadow-sm">
                         <span class="input-group-text bg-light border-0 text-muted"><i class="fa-solid fa-mobile-screen"></i></span>
-                        <input type="text" class="form-control border-0 fw-bold bg-light" value="${{ total_transferencia|cop }}" readonly disabled>
+                        <input type="text" class="form-control border-0 fw-bold bg-light" value="${{ total_transferencia|cop|replace(',', '.') }}" readonly disabled>
                     </div>
                 </div>
 
@@ -243,7 +243,7 @@
                     <label class="form-label fw-bold text-dark mb-1">Base Inicial <span class="text-danger">*</span></label>
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-white border-end-0 text-muted">$</span>
-                        <input type="number" id="base_inicial" name="base_inicial" class="form-control border-start-0 ps-0 fw-bold fs-5 calc-input" value="0" min="0" step="100" required {% if arqueo_existente %}disabled{% endif %}>
+                        <input type="text" inputmode="numeric" id="base_inicial" name="base_inicial" class="form-control border-start-0 ps-0 fw-bold fs-5 calc-input" value="{{ (arqueo_existente.base_inicial if arqueo_existente else (base_inicial_sugerida or 0))|cop|replace(',', '.') }}" required {% if arqueo_existente %}disabled{% endif %} autocomplete="off">
                     </div>
                 </div>
 
@@ -251,16 +251,16 @@
                     <label class="form-label fw-bold text-dark mb-1">Gastos del Día</label>
                     <div class="input-group shadow-sm mb-1">
                         <span class="input-group-text bg-white border-end-0 text-muted">$</span>
-                        <input type="number" id="gastos_del_dia" name="gastos_del_dia" class="form-control border-start-0 ps-0 fw-bold fs-5 text-danger calc-input" value="{{ gastos_automaticos + gastos_externos }}" min="0" step="100" required {% if arqueo_existente %}disabled{% endif %}>
+                        <input type="text" inputmode="numeric" id="gastos_del_dia" name="gastos_del_dia" class="form-control border-start-0 ps-0 fw-bold fs-5 text-danger calc-input" value="{{ (gastos_automaticos + gastos_externos)|cop|replace(',', '.') }}" required {% if arqueo_existente %}disabled{% endif %} autocomplete="off">
                     </div>
-                    <textarea name="observaciones_gastos" class="form-control form-control-sm border-0 shadow-sm mt-2" placeholder="Observaciones de gastos (Opcional)..." rows="1" {% if arqueo_existente %}disabled{% endif %}></textarea>
+                    <textarea name="observaciones_gastos" class="form-control form-control-sm border-0 shadow-sm mt-2" placeholder="Observaciones de gastos (Opcional)..." rows="1" {% if arqueo_existente %}disabled{% endif %}>{{ arqueo_existente.observaciones_gastos or '' if arqueo_existente else '' }}</textarea>
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label fw-bold text-success mb-1">Efectivo Físico Contado <span class="text-danger">*</span></label>
                     <div class="input-group shadow-sm">
                         <span class="input-group-text bg-success bg-opacity-10 border-success border-end-0 text-success"><i class="fa-solid fa-hand-holding-dollar fs-5"></i></span>
-                        <input type="number" id="efectivo_fisico" name="efectivo_fisico" class="form-control border-success border-start-0 ps-0 fw-bolder fs-3 text-success calc-input" placeholder="0" required {% if arqueo_existente %}disabled{% endif %} style="height: 60px;">
+                        <input type="text" inputmode="numeric" id="efectivo_fisico" name="efectivo_fisico" class="form-control border-success border-start-0 ps-0 fw-bolder fs-3 text-success calc-input" placeholder="0" value="{% if arqueo_existente %}{{ (arqueo_existente.efectivo_fisico or 0)|cop|replace(',', '.') }}{% endif %}" required {% if arqueo_existente %}disabled{% endif %} style="height: 60px;" autocomplete="off">
                     </div>
                 </div>
 
@@ -308,13 +308,29 @@
         const efectivoSistema = parseFloat("{{ total_efectivo }}") || 0;
 
         function formatCurrency(val) {
-            return '$' + Math.abs(val).toLocaleString('es-CO');
+            return '$' + Math.round(Math.abs(val)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+
+        function parseInputMiles(el) {
+            if (!el || !el.value) return 0;
+            const raw = el.value.toString().replace(/\D/g, '');
+            return raw ? parseInt(raw, 10) : 0;
+        }
+
+        function formatInputMiles(el) {
+            if (!el) return;
+            const raw = el.value.toString().replace(/\D/g, '');
+            if (!raw) {
+                el.value = '';
+                return;
+            }
+            el.value = parseInt(raw, 10).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
         }
 
         function calcularDiferencia() {
-            const base = parseFloat(inputBase.value) || 0;
-            const gastos = parseFloat(inputGastos.value) || 0;
-            const fisico = parseFloat(inputFisico.value) || 0;
+            const base = parseInputMiles(inputBase);
+            const gastos = parseInputMiles(inputGastos);
+            const fisico = parseInputMiles(inputFisico);
 
             // Diferencia = Físico - (Base + Efectivo Sistema - Gastos)
             const esperado = base + efectivoSistema - gastos;
@@ -330,7 +346,7 @@
             // Requerir justificación si != 0
             obsDiferencia.required = false;
 
-            if (inputFisico.value === "") {
+            if (inputFisico.value.trim() === "") {
                 // Estado inicial
                 boxDiferencia.style.backgroundColor = "#f8f9fa";
                 boxDiferencia.style.borderColor = "#ced4da";
@@ -368,10 +384,16 @@
             }
         }
 
-        // Agregar listeners
+        // Agregar listeners con formateo de puntos de miles en vivo
         const inputs = document.querySelectorAll('.calc-input');
         inputs.forEach(input => {
-            input.addEventListener('input', calcularDiferencia);
+            if (input.value && input.value.trim() !== '') {
+                formatInputMiles(input);
+            }
+            input.addEventListener('input', function() {
+                formatInputMiles(this);
+                calcularDiferencia();
+            });
         });
 
         // Calcular inicial

@@ -51,7 +51,7 @@
         <div class="col-md-6 col-lg-5 position-relative">
             <div class="input-group input-group-lg shadow-sm rounded-pill border">
                 <span class="input-group-text bg-white border-0 ps-4"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                <input type="text" id="inventarioSearch" data-custom-search="true" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por SKU o Nombre del producto..." autocomplete="off" style="border-radius: 0 50px 50px 0;">
+                <input type="text" id="inventarioSearch" data-custom-search="true" class="form-control border-0 bg-white shadow-none ps-2" placeholder="Busca por SKU o Nombre del producto..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="border-radius: 0 50px 50px 0;">
                 <button class="btn btn-light border-0 px-3 text-muted" type="button" id="clearSearch" title="Limpiar búsqueda" style="border-radius: 0 50px 50px 0;">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -232,12 +232,9 @@
                             <a href="{{ url_for('inventory_bp.editar_producto', id=p.id) }}" class="btn btn-sm text-brand-black bg-light border border-dark rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Editar Maestro">
                                 <i class="fa-solid fa-pen"></i>
                             </a>
-                            <form method="POST" action="{{ url_for('inventory_bp.eliminar_producto', id=p.id) }}" class="d-inline m-0 flex-shrink-0" onsubmit="return confirm('ATENCIÓN: ¿Está seguro de que desea ELIMINAR PERMANENTEMENTE este producto del sistema en la Nube? Esto no se puede deshacer.');">
-                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="btn btn-sm text-white bg-brand-pink rounded-circle shadow-sm" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Eliminar Producto">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm text-white bg-brand-pink rounded-circle shadow-sm flex-shrink-0" style="width: 32px; height: 32px; padding: 0; line-height: 30px;" title="Eliminar Producto" onclick="confirmarEliminarAccesorio({{ p.id }})">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -438,7 +435,22 @@
     </div>
 </div>
 
+<!-- Formulario único compartido para eliminar producto (evita renderizar 800+ <form> en el DOM que congelan Safari/Mac/iOS al enfocar el buscador) -->
+<form id="formEliminarAccesorioCompartido" method="POST" action="" class="d-none">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
 <script>
+function confirmarEliminarAccesorio(prodId) {
+    if (confirm('ATENCIÓN: ¿Está seguro de que desea ELIMINAR PERMANENTEMENTE este producto del sistema? Esto no se puede deshacer.')) {
+        const f = document.getElementById('formEliminarAccesorioCompartido');
+        if (f) {
+            f.action = '/inventory/eliminar/' + prodId;
+            f.submit();
+        }
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('inventarioSearch');
     const clearBtn = document.getElementById('clearSearch');
@@ -460,9 +472,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const PAGE_SIZE = 50;
     let currentPage = 1;
     let filteredRows = allRows;
-    // Guardamos únicamente las filas actualmente visibles en el DOM (máximo 50)
-    // para que limpiar con la X o cambiar de búsqueda jamás tenga que tocar las 774 filas a la vez
-    let currentlyVisibleRows = allRows.slice(0, PAGE_SIZE);
 
     // Crear fila de "No hay resultados" si no existe
     const noResultsRow = document.createElement('tr');
@@ -471,21 +480,34 @@ document.addEventListener('DOMContentLoaded', function() {
         <i class="fa-solid fa-magnifying-glass-minus fs-1 mb-3 opacity-25"></i>
         <p class="mb-0">No se encontraron productos que coincidan con tu búsqueda.</p>
     </td>`;
-    if (tbody) tbody.appendChild(noResultsRow);
 
     function normalizarTexto(str) {
         return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
 
-    // Pre-indexar cada fila una sola vez al cargar (< 5ms en total)
-    allRows.forEach(row => {
+    // Vincular fila collapse (si tiene variantes) y DESACOPLAR del DOM vivo las filas > 50
+    // Esto reduce el DOM activo de ~28,000 nodos (806 filas) a solo 50 filas, eliminando
+    // por completo el congelamiento en Mac (Safari/Chrome), iPad, iPhone y Android al hacer clic en el buscador.
+    for (let i = 0; i < allRows.length; i++) {
+        const row = allRows[i];
+        const prodId = row.dataset.prodId;
+        row._collapseRow = prodId ? document.getElementById('collapseVariantes' + prodId) : null;
+        row.style.display = '';
+        if (i >= PAGE_SIZE) {
+            row.remove();
+            if (row._collapseRow) row._collapseRow.remove();
+        }
+    }
+    if (tbody) tbody.appendChild(noResultsRow);
+
+    function getRowSearchStr(row) {
+        if (typeof row._searchStr === 'string') return row._searchStr;
         const skuText = normalizarTexto(row.dataset.sku || '');
         const nombreText = normalizarTexto(row.dataset.nombre || '');
         const varText = normalizarTexto(row.dataset.variantes || '');
         row._searchStr = `${skuText} ${skuText.replace(/-/g, '')} ${nombreText} ${varText}`;
-        const prodId = row.dataset.prodId;
-        row._collapseRow = prodId ? document.getElementById('collapseVariantes' + prodId) : null;
-    });
+        return row._searchStr;
+    }
 
     function renderPage(page) {
         const total = filteredRows.length;
@@ -495,38 +517,31 @@ document.addEventListener('DOMContentLoaded', function() {
         const startIdx = (currentPage - 1) * PAGE_SIZE;
         const endIdx = Math.min(startIdx + PAGE_SIZE, total);
         const nextVisibleRows = filteredRows.slice(startIdx, endIdx);
-        const nextVisibleSet = new Set(nextVisibleRows);
 
-        // 1. Ocultar solo las filas que estaban visibles y ya no deben estarlo (máx 50 operaciones)
-        for (let i = 0; i < currentlyVisibleRows.length; i++) {
-            const r = currentlyVisibleRows[i];
-            if (!nextVisibleSet.has(r)) {
-                r.style.display = 'none';
-                if (r._collapseRow && r._collapseRow.classList.contains('show')) {
+        // Reemplazar en el DOM vivo ÚNICAMENTE las 50 filas de la página actual
+        if (tbody) {
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < nextVisibleRows.length; i++) {
+                const r = nextVisibleRows[i];
+                r.style.display = '';
+                frag.appendChild(r);
+                if (r._collapseRow) {
                     r._collapseRow.classList.remove('show');
+                    frag.appendChild(r._collapseRow);
                 }
             }
-        }
-
-        // 2. Mostrar solo las filas de la página actual (máx 50 operaciones)
-        for (let i = 0; i < nextVisibleRows.length; i++) {
-            const r = nextVisibleRows[i];
-            if (r.style.display === 'none') {
-                r.style.display = '';
+            if (total === 0) {
+                noResultsRow.classList.remove('d-none');
+            } else {
+                noResultsRow.classList.add('d-none');
             }
+            frag.appendChild(noResultsRow);
+            tbody.replaceChildren(frag);
         }
-
-        currentlyVisibleRows = nextVisibleRows;
 
         // Actualizar contadores
         if (visibleCount) visibleCount.textContent = nextVisibleRows.length;
         if (totalFilteredCount) totalFilteredCount.textContent = total;
-
-        if (total === 0) {
-            noResultsRow.classList.remove('d-none');
-        } else {
-            noResultsRow.classList.add('d-none');
-        }
 
         if (paginationBar) {
             if (total > PAGE_SIZE) {
@@ -564,9 +579,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const matches = [];
         for (let i = 0; i < allRows.length; i++) {
             const row = allRows[i];
+            const sStr = getRowSearchStr(row);
             let isMatch = true;
             for (let j = 0; j < tokens.length; j++) {
-                if (!row._searchStr.includes(tokens[j])) {
+                if (!sStr.includes(tokens[j])) {
                     isMatch = false;
                     break;
                 }

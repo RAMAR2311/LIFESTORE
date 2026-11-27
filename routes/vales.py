@@ -117,6 +117,47 @@ def _calcular_saldos_por_local_y_metodo():
     return locales, resultado
 
 
+def _sincronizar_arqueo_cerrado_por_vale(branch_id, fecha_dt):
+    """
+    Si el vale pertenece a un día y local que YA tenía un cierre de caja (ArqueoCaja),
+    actualiza automáticamente gastos_del_dia en ese ArqueoCaja sin necesidad de reabrir la caja.
+    Además, si la caja había sido cerrada como 'Cuadrada' (diferencia == 0) porque el cajero
+    sumó el vale como si aún estuviera en efectivo, ajusta efectivo_fisico en la misma proporción
+    para que el arqueo refleje el gasto real sin generar un descuadre artificial.
+    """
+    if not branch_id or not fecha_dt:
+        return False
+    from models import ArqueoCaja
+    fecha_d = fecha_dt.date() if hasattr(fecha_dt, 'date') else fecha_dt
+    arqueo = ArqueoCaja.query.filter_by(
+        fecha_arqueo=fecha_d,
+        branch_id=branch_id,
+        tipo_arqueo='general'
+    ).first()
+    if not arqueo:
+        return False
+
+    gastos_efec = Expense.query.filter(
+        db.func.date(Expense.fecha_gasto) == fecha_d,
+        Expense.tipo_gasto == 'Gasto Diario',
+        Expense.branch_id == branch_id
+    ).all()
+    nuevo_gastos_dia = float(sum(g.monto for g in gastos_efec if (g.metodo_pago or 'efectivo').lower() == 'efectivo'))
+    gastos_ant = float(arqueo.gastos_del_dia or 0)
+    delta_gastos = nuevo_gastos_dia - gastos_ant
+
+    arqueo.gastos_del_dia = Decimal(str(round(nuevo_gastos_dia, 2)))
+    esperado_nuevo = float(arqueo.base_inicial or 0) + float(arqueo.total_efectivo_sistema or 0) - nuevo_gastos_dia
+
+    # Si estaba cuadrada (porque contaron el dinero como si no hubiera salido el vale),
+    # descontamos el delta del efectivo_fisico registrado para que siga cuadrada con el gasto incluido.
+    if abs(float(arqueo.diferencia or 0)) < 1.0 and delta_gastos != 0:
+        arqueo.efectivo_fisico = Decimal(str(round(max(0.0, float(arqueo.efectivo_fisico or 0) - delta_gastos), 2)))
+
+    arqueo.diferencia = Decimal(str(round(float(arqueo.efectivo_fisico or 0) - esperado_nuevo, 2)))
+    return True
+
+
 def _sincronizar_gasto_vale(vale, branch_obj, metodo_pago, user_id):
     """Crea o actualiza el registro de Gasto (Expense) asociado a un Vale aprobado."""
     nombre_asesor = vale.asesor.nombre if vale.asesor else f'Asesor #{vale.asesor_id}'
@@ -127,14 +168,21 @@ def _sincronizar_gasto_vale(vale, branch_obj, metodo_pago, user_id):
         desc_gasto += f" ({vale.observacion_resolucion})"
     desc_gasto = desc_gasto[:255]
 
+    fecha_ref = vale.fecha_resolucion or vale.fecha_solicitud or obtener_hora_bogota()
+
     if vale.expense_id:
         gasto_existente = Expense.query.get(vale.expense_id)
         if gasto_existente:
+            branch_ant_id = gasto_existente.branch_id
             gasto_existente.monto = vale.monto
             gasto_existente.metodo_pago = metodo_pago
             gasto_existente.branch_id = branch_obj.id
             gasto_existente.sucursal = branch_obj.nombre
             gasto_existente.descripcion = desc_gasto
+            db.session.flush()
+            if branch_ant_id and branch_ant_id != branch_obj.id:
+                _sincronizar_arqueo_cerrado_por_vale(branch_ant_id, gasto_existente.fecha_gasto or fecha_ref)
+            _sincronizar_arqueo_cerrado_por_vale(branch_obj.id, gasto_existente.fecha_gasto or fecha_ref)
             return gasto_existente
 
     nuevo_gasto = Expense(
@@ -146,11 +194,12 @@ def _sincronizar_gasto_vale(vale, branch_obj, metodo_pago, user_id):
         metodo_pago=metodo_pago,
         sucursal=branch_obj.nombre,
         branch_id=branch_obj.id,
-        fecha_gasto=vale.fecha_resolucion or obtener_hora_bogota()
+        fecha_gasto=fecha_ref
     )
     db.session.add(nuevo_gasto)
     db.session.flush()
     vale.expense_id = nuevo_gasto.id
+    _sincronizar_arqueo_cerrado_por_vale(branch_obj.id, fecha_ref)
     return nuevo_gasto
 
 
@@ -460,9 +509,32 @@ def actualizar_origen_pago(id):
         return redirect(url_for('vales_bp.index'))
 
     try:
+        metodo_ant = (vale.metodo_pago or 'efectivo').strip().lower()
         vale.branch_id = branch_obj.id
         vale.metodo_pago = metodo_pago
         gasto_vale = _sincronizar_gasto_vale(vale, branch_obj, metodo_pago, current_user.id)
+
+        if metodo_ant != metodo_pago and (vale.monto or 0) > 0:
+            from services.bank_service import registrar_movimiento_banco
+            nombre_asesor = vale.asesor.nombre if vale.asesor else 'Asesor'
+            registrar_movimiento_banco(
+                codigo_metodo=metodo_ant,
+                monto=vale.monto,
+                tipo_movimiento='INGRESO',
+                origen='AJUSTE_MANUAL',
+                descripcion=f'Cambio método de Vale #VAL-{vale.id:04d} ({nombre_asesor})',
+                referencia_id=gasto_vale.id,
+                usuario_id=current_user.id
+            )
+            registrar_movimiento_banco(
+                codigo_metodo=metodo_pago,
+                monto=vale.monto,
+                tipo_movimiento='EGRESO',
+                origen='GASTO',
+                descripcion=f'Vale #VAL-{vale.id:04d} a {nombre_asesor} [Desde: {branch_obj.nombre}]',
+                referencia_id=gasto_vale.id,
+                usuario_id=current_user.id
+            )
 
         AuditLog.registrar(
             action='ACTUALIZACION_PAGO_VALE',
@@ -472,7 +544,11 @@ def actualizar_origen_pago(id):
             target_type='VALE'
         )
         db.session.commit()
-        flash(f"Origen de pago del vale #VAL-{vale.id:04d} actualizado a {branch_obj.nombre} ({metodo_pago.capitalize()}) y sincronizado en Gastos.", 'success')
+        flash(
+            f"✅ Origen de pago del vale #VAL-{vale.id:04d} actualizado a {branch_obj.nombre} ({metodo_pago.capitalize()}). "
+            f"El Gasto y el Cierre de Caja (Arqueo) de ese día se actualizaron automáticamente sin necesidad de reabrir caja.",
+            'success'
+        )
     except Exception as e:
         db.session.rollback()
         flash(f'Error al actualizar el vale: {str(e)}', 'danger')
@@ -582,13 +658,21 @@ def reversar(id):
         sede_nombre = vale.branch.nombre if vale.branch else 'Local'
         gasto_id_eliminado = vale.expense_id
 
-        # 1. Si tenía Gasto (Expense) asociado, eliminarlo
+        # 1. Si tenía Gasto (Expense) asociado, eliminarlo y sincronizar arqueo cerrado si existía
+        fecha_gasto_ant = vale.fecha_resolucion or vale.fecha_solicitud
+        branch_id_ant = vale.branch_id
         if vale.expense_id:
             gasto_asociado = Expense.query.get(vale.expense_id)
+            if gasto_asociado:
+                fecha_gasto_ant = gasto_asociado.fecha_gasto or fecha_gasto_ant
+                branch_id_ant = gasto_asociado.branch_id or branch_id_ant
             vale.expense_id = None
             db.session.flush()
             if gasto_asociado:
                 db.session.delete(gasto_asociado)
+                db.session.flush()
+            if branch_id_ant and fecha_gasto_ant:
+                _sincronizar_arqueo_cerrado_por_vale(branch_id_ant, fecha_gasto_ant)
 
         # 2. Si estaba APROBADO, devolver el saldo en Bancos / Métodos de pago
         if estado_anterior == 'APROBADO' and monto_val > 0:

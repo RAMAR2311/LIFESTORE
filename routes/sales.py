@@ -1672,18 +1672,103 @@ def api_gift_combos():
     return jsonify({'success': True, 'combos': combos_data})
 
 
-# Endpoint para Editar Métodos de Pago y Valor de Venta
+# Endpoint para Editar Métodos de Pago, Valor de Venta y Modificar/Eliminar Retomas (con PIN 1234)
 @sales_bp.route('/editar_pago/<int:sale_id>', methods=['POST'])
 @login_required
 @admin_required
 def editar_pago_venta(sale_id):
     venta = Sale.query.get_or_404(sale_id)
-    
+
     try:
-        # Extraer listas dinámicas de métodos y montos si se enviaron
+        from models import AuditLog, ArqueoCaja, BranchStock, StockAdjustment, TechnicalService
+        from services.stock_service import sync_global_product_stock
+
+        # 0. Capturar desglose antiguo de pagos por método (para sincronizar Bancos si ya había cierre)
+        pagos_antiguos_map = {}
+        if venta.pagos:
+            for p_old in venta.pagos:
+                m_old = (p_old.metodo_pago or 'efectivo').lower().strip()
+                if m_old == 'bolt':
+                    m_old = 'bold'
+                if m_old != 'retoma':
+                    pagos_antiguos_map[m_old] = pagos_antiguos_map.get(m_old, Decimal('0')) + Decimal(str(p_old.monto or 0))
+        else:
+            m_old = (venta.metodo_pago or 'efectivo').lower().strip()
+            if m_old != 'retoma':
+                pagos_antiguos_map[m_old] = Decimal(str(venta.monto_total or 0))
+
+        # 1. Revisar si la venta tiene Retomas y si el usuario solicitó eliminar o cambiar el valor de alguna
+        retomas_originales = list(venta.retomas_asociadas or [])
+        total_retomas_original = sum(Decimal(str(r.valor_retoma or 0)) for r in retomas_originales)
+        hubo_cambio_retoma = False
+        cambios_retoma_plan = []
+
+        for r in retomas_originales:
+            del_flag = request.form.get(f'retoma_delete_{r.id}') == '1'
+            raw_amt = request.form.get(f'retoma_amount_{r.id}')
+            nuevo_val_r = Decimal(str(r.valor_retoma or 0))
+            if raw_amt is not None and str(raw_amt).strip() != '':
+                limpio_r = str(raw_amt).replace('$', '').replace('.', '').replace(',', '').strip()
+                if limpio_r.isdigit():
+                    nuevo_val_r = Decimal(limpio_r)
+
+            if del_flag or nuevo_val_r != Decimal(str(r.valor_retoma or 0)):
+                hubo_cambio_retoma = True
+            cambios_retoma_plan.append((r, del_flag, nuevo_val_r))
+
+        if hubo_cambio_retoma:
+            token_esperado = os.environ.get('DELETE_TOKEN', '1234').strip()
+            token_recibido = (request.form.get('token_secreto_retoma') or '').strip()
+            if not token_recibido or token_recibido != token_esperado:
+                flash('🚫 PIN de seguridad (1234) incorrecto o no suministrado. No se modificó ni eliminó la retoma.', 'danger')
+                return redirect(url_for('sales_bp.historial'))
+
+            for r_obj, del_flag, nuevo_val_r in cambios_retoma_plan:
+                if del_flag:
+                    # Si la retoma ya había generado o reactivado un producto en inventario, retirarlo siempre que no se haya vendido
+                    prod_gen = r_obj.producto_generado
+                    if prod_gen:
+                        if prod_gen.detalles_venta and len(prod_gen.detalles_venta) > 0:
+                            raise ValueError(
+                                f"No se puede eliminar la retoma '{r_obj.modelo}' (IMEI: {r_obj.imei1}) porque el equipo retomado ya fue vendido en otra factura."
+                            )
+                        r_obj.producto_generado_id = None
+                        db.session.flush()
+                        BranchStock.query.filter_by(product_id=prod_gen.id).delete()
+                        StockAdjustment.query.filter_by(product_id=prod_gen.id).delete()
+                        TechnicalService.query.filter_by(product_id=prod_gen.id).delete()
+                        db.session.delete(prod_gen)
+
+                    TechnicalService.query.filter_by(retoma_id=r_obj.id).delete()
+                    AuditLog.registrar(
+                        action='ELIMINACION_RETOMA_FACTURA',
+                        user_id=current_user.id,
+                        motivo=f"Eliminación de retoma #{r_obj.id} ({r_obj.modelo} - IMEI: {r_obj.imei1}) por ${float(r_obj.valor_retoma or 0):,.0f} de la Factura #{venta.id} [PIN Autorizado].",
+                        target_id=venta.id,
+                        target_type='SALE'
+                    )
+                    db.session.delete(r_obj)
+                else:
+                    if nuevo_val_r <= 0:
+                        raise ValueError(f"El valor de la retoma '{r_obj.modelo}' debe ser mayor a $0 (o selecciona 'Quitar Retoma').")
+                    val_ant_r = Decimal(str(r_obj.valor_retoma or 0))
+                    if nuevo_val_r != val_ant_r:
+                        r_obj.valor_retoma = nuevo_val_r
+                        if r_obj.producto_generado:
+                            r_obj.producto_generado.precio_costo = nuevo_val_r + Decimal(str(r_obj.arreglos or 0))
+                        AuditLog.registrar(
+                            action='MODIFICACION_VALOR_RETOMA',
+                            user_id=current_user.id,
+                            motivo=f"Cambio de valor de retoma #{r_obj.id} ({r_obj.modelo} - IMEI: {r_obj.imei1}) en Factura #{venta.id}: de ${float(val_ant_r):,.0f} a ${float(nuevo_val_r):,.0f} [PIN Autorizado].",
+                            target_id=venta.id,
+                            target_type='SALE'
+                        )
+            db.session.flush()
+
+        # 2. Extraer listas dinámicas de métodos y montos de pago
         metodos_lista = request.form.getlist('payment_method[]')
         montos_lista = request.form.getlist('payment_amount[]')
-        
+
         pagos_procesados = []
         if metodos_lista and montos_lista:
             for met, mon in zip(metodos_lista, montos_lista):
@@ -1694,9 +1779,9 @@ def editar_pago_venta(sale_id):
                         mon_val = Decimal(mon_str)
                         if mon_val > 0:
                             pagos_procesados.append((met, mon_val))
-                    except:
+                    except Exception:
                         pass
-        
+
         # Si no vino como lista (caso fallback o llamada legacy directa con IDs)
         if not pagos_procesados:
             if venta.pagos:
@@ -1723,36 +1808,128 @@ def editar_pago_venta(sale_id):
             flash('Debes ingresar al menos un método de pago con monto mayor a 0.', 'warning')
             return redirect(url_for('sales_bp.historial'))
 
+        # Preservar comprobantes existentes por método si los había
+        comprobantes_previos = {}
+        for p_old in (venta.pagos or []):
+            if p_old.comprobante:
+                comprobantes_previos[p_old.metodo_pago] = p_old.comprobante
+
         # Limpiar pagos antiguos de la venta y recrearlos con los nuevos datos
         SalePayment.query.filter_by(sale_id=venta.id).delete()
-        
+
         nuevo_total = Decimal('0')
+        pagos_nuevos_map = {}
         for met, mon_val in pagos_procesados:
             nuevo_pago = SalePayment(
                 sale_id=venta.id,
                 metodo_pago=met,
-                monto=mon_val
+                monto=mon_val,
+                comprobante=comprobantes_previos.get(met)
             )
             db.session.add(nuevo_pago)
             nuevo_total += mon_val
+            m_norm = met.lower().strip()
+            if m_norm == 'bolt':
+                m_norm = 'bold'
+            if m_norm != 'retoma':
+                pagos_nuevos_map[m_norm] = pagos_nuevos_map.get(m_norm, Decimal('0')) + mon_val
 
         monto_anterior = Decimal(str(venta.monto_total)) if venta.monto_total else Decimal('0')
         venta.monto_total = nuevo_total
         venta.metodo_pago = pagos_procesados[0][0] if len(pagos_procesados) == 1 else 'mixto'
+        venta.ingreso_neto_real = max(Decimal('0.00'), nuevo_total - Decimal(str(venta.costo_total_obsequios or 0)))
 
-        # Ajustar detalles de venta si cambió el total
-        if venta.detalles and nuevo_total != monto_anterior and monto_anterior > 0:
-            factor = nuevo_total / monto_anterior
+        # Calcular el nuevo total de retomas activas después de la edición/eliminación
+        retomas_activas = [r for r, del_flag, _ in cambios_retoma_plan if not del_flag] if hubo_cambio_retoma else retomas_originales
+        nuevo_total_retomas = sum(Decimal(str(r.valor_retoma or 0)) for r in retomas_activas)
+
+        # Ajustar precios de detalles de venta SOLO si cambió el valor total comercial (Pagos + Retomas != Subtotal Productos)
+        subtotal_productos_actual = sum(
+            Decimal(str(d.precio_venta_final or 0)) * Decimal(str(d.cantidad_vendida or 1))
+            for d in (venta.detalles or [])
+        )
+        nuevo_valor_comercial = nuevo_total + nuevo_total_retomas
+
+        if venta.detalles and nuevo_valor_comercial != subtotal_productos_actual and subtotal_productos_actual > 0:
+            factor = nuevo_valor_comercial / subtotal_productos_actual
             for d in venta.detalles:
-                d.precio_venta_final = (Decimal(str(d.precio_venta_final)) * factor).quantize(Decimal('1'))
-        elif venta.detalles and len(venta.detalles) == 1 and nuevo_total != monto_anterior:
-            venta.detalles[0].precio_venta_final = nuevo_total
+                if not getattr(d, 'es_obsequio', False) and Decimal(str(d.precio_venta_final or 0)) > 0:
+                    d.precio_venta_final = (Decimal(str(d.precio_venta_final)) * factor).quantize(Decimal('1'))
+        elif venta.detalles and len(venta.detalles) == 1 and nuevo_valor_comercial != subtotal_productos_actual:
+            venta.detalles[0].precio_venta_final = nuevo_valor_comercial
+
+        db.session.flush()
+
+        # 3. Sincronización automática con Cierre de Caja (ArqueoCaja) y Bancos si la venta es de un día ya cerrado
+        arqueo_actualizado = False
+        if venta.fecha_venta and venta.branch_id:
+            fecha_v = venta.fecha_venta.date()
+            arqueo_cerrado = ArqueoCaja.query.filter_by(
+                fecha_arqueo=fecha_v,
+                branch_id=venta.branch_id,
+                tipo_arqueo='general'
+            ).first()
+            if arqueo_cerrado:
+                from routes.arqueo import calcular_totales_dia
+                from services.bank_service import registrar_movimiento_banco
+                ventas_dia_sede = Sale.query.filter(
+                    db.func.date(Sale.fecha_venta) == fecha_v,
+                    Sale.tipo_venta.in_(['general', 'celulares']),
+                    Sale.branch_id == venta.branch_id
+                ).all()
+                t_efec, t_transf, t_ret = calcular_totales_dia(ventas_dia_sede)
+                efec_ant = Decimal(str(arqueo_cerrado.total_efectivo_sistema or 0))
+                delta_efec = t_efec - efec_ant
+
+                arqueo_cerrado.total_efectivo_sistema = t_efec
+                arqueo_cerrado.total_transferencia_sistema = t_transf
+                arqueo_cerrado.total_retomas_sistema = t_ret
+
+                # Si el cierre estaba cuadrado y se modificó el efectivo del ticket, actualizar efectivo_fisico y diferencia
+                esperado_efec = float(arqueo_cerrado.base_inicial or 0) + float(t_efec) - float(arqueo_cerrado.gastos_del_dia or 0)
+                if abs(float(arqueo_cerrado.diferencia or 0)) < 1.0 and delta_efec != 0:
+                    arqueo_cerrado.efectivo_fisico = Decimal(str(round(max(0.0, float(arqueo_cerrado.efectivo_fisico or 0) + float(delta_efec)), 2)))
+                arqueo_cerrado.diferencia = Decimal(str(round(float(arqueo_cerrado.efectivo_fisico or 0) - esperado_efec, 2)))
+
+                # Ajustar diferencias en Bancos por cada método que haya cambiado
+                todos_metodos = set(pagos_antiguos_map.keys()) | set(pagos_nuevos_map.keys())
+                for m_cod in todos_metodos:
+                    m_old_val = pagos_antiguos_map.get(m_cod, Decimal('0'))
+                    m_new_val = pagos_nuevos_map.get(m_cod, Decimal('0'))
+                    diff_m = m_new_val - m_old_val
+                    if diff_m > 0:
+                        registrar_movimiento_banco(
+                            codigo_metodo=m_cod,
+                            monto=diff_m,
+                            tipo_movimiento='INGRESO',
+                            origen='AJUSTE_MANUAL',
+                            descripcion=f'Ajuste al editar Factura #{venta.id} (Arqueo #{arqueo_cerrado.id})',
+                            referencia_id=venta.id,
+                            usuario_id=current_user.id
+                        )
+                    elif diff_m < 0:
+                        registrar_movimiento_banco(
+                            codigo_metodo=m_cod,
+                            monto=abs(diff_m),
+                            tipo_movimiento='EGRESO',
+                            origen='AJUSTE_MANUAL',
+                            descripcion=f'Reversión/Ajuste al editar Factura #{venta.id} (Arqueo #{arqueo_cerrado.id})',
+                            referencia_id=venta.id,
+                            usuario_id=current_user.id
+                        )
+                arqueo_actualizado = True
 
         db.session.commit()
-        flash('Venta y métodos de pago actualizados correctamente.', 'success')
-        
+        if arqueo_actualizado:
+            flash('✅ Venta, retoma y métodos de pago actualizados. El Cierre de Caja (Arqueo) y los saldos en Bancos de ese día se actualizaron automáticamente.', 'success')
+        else:
+            flash('✅ Venta, retoma y métodos de pago actualizados correctamente (reflejado en el cuadre del día).', 'success')
+
+    except ValueError as ve:
+        db.session.rollback()
+        flash(str(ve), 'warning')
     except Exception as e:
         db.session.rollback()
         flash(f'Ocurrió un error al actualizar la venta: {str(e)}', 'danger')
-        
+
     return redirect(url_for('sales_bp.historial'))

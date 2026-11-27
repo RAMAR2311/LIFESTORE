@@ -362,8 +362,17 @@ def nuevo():
             flash('Ya existe un arqueo cerrado para esta fecha en esta sucursal. No se puede duplicar.', 'warning')
             return redirect(url_for('arqueo_bp.reporte', fecha_inicio=fecha_str, fecha_fin=fecha_str))
 
-        base_inicial = float(request.form.get('base_inicial', base_inicial_sugerida))
-        efectivo_fisico_val = float(request.form.get('efectivo_fisico', 0.0) or 0.0)
+        def _clean_num_arqueo(raw_val, default_val=0.0):
+            if raw_val is None:
+                return float(default_val)
+            s = str(raw_val).replace('$', '').replace('.', '').replace(',', '').strip()
+            try:
+                return float(s) if s else float(default_val)
+            except Exception:
+                return float(default_val)
+
+        base_inicial = _clean_num_arqueo(request.form.get('base_inicial'), base_inicial_sugerida)
+        efectivo_fisico_val = _clean_num_arqueo(request.form.get('efectivo_fisico'), 0.0)
         observacion_diferencia = request.form.get('observacion_diferencia', '').strip()
         
         # Recalcular gastos automáticos en EFECTIVO por seguridad en el backend (incluyendo abonos a proveedores en efectivo desde esta sucursal)
@@ -463,6 +472,7 @@ def nuevo():
         total_efectivo=total_efectivo,
         total_transferencia=total_transferencia,
         arqueo_existente=arqueo_existente,
+        base_inicial_sugerida=base_inicial_sugerida,
         gastos_automaticos=gastos_automaticos,
         gastos_digitales=gastos_digitales,
         gastos_externos=gastos_externos,

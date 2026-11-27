@@ -60,7 +60,7 @@
                     <div class="card p-3 border rounded shadow-sm text-center h-100 bg-white" style="border-color: #E5E7EB !important; border-top: 3px solid #1A1A1A !important;">
                         <small class="fw-bold text-uppercase d-block mb-1 text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">Venta + Banco Neto</small>
                         <h4 class="mb-0 fw-bold font-mono" style="color: #0F172A;">
-                            ${{ (resumen.total_recaudado_neto)|cop }}
+                            ${{ (resumen.total_recaudado_neto)|cop|replace(',', '.') }}
                         </h4>
                         <small class="d-block mt-1 text-muted" style="font-size:0.7rem;">Total - Gastos</small>
                     </div>
@@ -68,21 +68,21 @@
                 <div class="col-12 col-md-3">
                     <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #dc3545 !important;">
                         <small class="text-secondary fw-bold text-uppercase d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Total Gastos Operativos</small>
-                        <h4 class="mb-0 text-danger fw-bold font-mono">$-{{ (resumen.total_gastos)|cop }}</h4>
-                        <small class="text-muted d-block mt-1" style="font-size:0.7rem;">(Efectivo: ${{ (resumen.total_gastos_efectivo)|cop }})</small>
+                        <h4 class="mb-0 text-danger fw-bold font-mono">$-{{ (resumen.total_gastos)|cop|replace(',', '.') }}</h4>
+                        <small class="text-muted d-block mt-1" style="font-size:0.7rem;">(Efectivo: ${{ (resumen.total_gastos_efectivo)|cop|replace(',', '.') }})</small>
                     </div>
                 </div>
                 <div class="col-12 col-md-3">
                     <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #475569 !important;">
                         <small class="text-secondary fw-bold text-uppercase d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Venta Total</small>
-                        <h4 class="mb-0 fw-bold font-mono" style="font-size: 1.6rem; color: #0F172A;">${{ (resumen.total_recaudado_bruto)|cop }}</h4>
+                        <h4 class="mb-0 fw-bold font-mono" style="font-size: 1.6rem; color: #0F172A;">${{ (resumen.total_recaudado_bruto)|cop|replace(',', '.') }}</h4>
                         <small class="text-muted d-block mt-1" style="font-size:0.7rem;">Suma de Cash + Bancos</small>
                     </div>
                 </div>
                 <div class="col-12 col-md-3">
                     <div class="card p-3 border rounded shadow-sm bg-white text-center h-100" style="border-color: #E5E7EB !important; border-top: 3px solid #94A3B8 !important;">
                         <small class="text-secondary fw-bold d-block mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">SOBRANTES ACUMULADOS</small>
-                        <h4 class="mb-0 fw-bold font-mono" style="color: #0F172A;">${{ (resumen.total_sobrantes)|cop }}</h4>
+                        <h4 class="mb-0 fw-bold font-mono" style="color: #0F172A;">${{ (resumen.total_sobrantes)|cop|replace(',', '.') }}</h4>
                         <small class="text-muted d-block mt-1" style="font-size:0.7rem;">Acumulado a favor en cierres</small>
                     </div>
                 </div>
@@ -113,24 +113,24 @@
                         <tr>
                             <td class="text-center text-secondary">{{ arqueo.fecha_arqueo }}</td>
                             <td class="text-truncate" style="max-width:130px;" title="{{ arqueo.cajero.nombre }}">{{ arqueo.cajero.nombre }}</td>
-                            <td class="text-end text-primary fw-bold">${{ (arqueo.base_inicial)|cop }}</td>
-                            <td class="text-end text-dark fw-bolder bg-light border-start border-end">${{ (arqueo.total_efectivo_sistema + arqueo.total_transferencia_sistema)|cop }}</td>
-                            <td class="text-end text-success fw-bold">${{ (arqueo.total_efectivo_sistema)|cop }}</td>
-                            <td class="text-end text-info fw-bold">${{ (arqueo.total_transferencia_sistema)|cop }}</td>
+                            <td class="text-end text-primary fw-bold">${{ (arqueo.base_inicial)|cop|replace(',', '.') }}</td>
+                            <td class="text-end text-dark fw-bolder bg-light border-start border-end">${{ (arqueo.total_efectivo_sistema + arqueo.total_transferencia_sistema)|cop|replace(',', '.') }}</td>
+                            <td class="text-end text-success fw-bold">${{ (arqueo.total_efectivo_sistema)|cop|replace(',', '.') }}</td>
+                            <td class="text-end text-info fw-bold">${{ (arqueo.total_transferencia_sistema)|cop|replace(',', '.') }}</td>
                             <td class="text-end {% if arqueo.gastos_del_dia > 0 %}text-danger{% else %}text-muted{% endif %} fw-bold">
-                                ${{ (arqueo.gastos_del_dia)|cop }}
+                                ${{ (arqueo.gastos_del_dia)|cop|replace(',', '.') }}
                             </td>
                             <td class="text-end text-dark fw-bold">
-                                ${{ (arqueo.efectivo_fisico or 0)|cop }}
+                                ${{ (arqueo.efectivo_fisico or 0)|cop|replace(',', '.') }}
                             </td>
                             <td class="text-center">
                                 {% if arqueo.diferencia and arqueo.diferencia > 0 %}
                                     <span class="badge bg-warning bg-opacity-20 text-dark border border-warning fw-bold" title="{{ arqueo.observacion_diferencia or 'Sobrante en caja' }}">
-                                        +${{ arqueo.diferencia|cop }} (Sobrante)
+                                        +${{ arqueo.diferencia|cop|replace(',', '.') }} (Sobrante)
                                     </span>
                                 {% elif arqueo.diferencia and arqueo.diferencia < 0 %}
                                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger fw-bold" title="{{ arqueo.observacion_diferencia or 'Faltante en caja' }}">
-                                        -${{ arqueo.diferencia|abs|cop }} (Faltante)
+                                        -${{ arqueo.diferencia|abs|cop|replace(',', '.') }} (Faltante)
                                     </span>
                                 {% else %}
                                     <span class="badge bg-light text-secondary border fw-normal">Cuadrada ($0)</span>
@@ -202,7 +202,7 @@
                                     </span>
                                     <div style="font-size: 0.7rem; margin-top: 3px; color: #888;">
                                         {% for p in v.pagos %}
-                                            {{ p.metodo_pago|capitalize }}: ${{ (p.monto)|cop }}{% if not loop.last %}<br>{% endif %}
+                                            {{ p.metodo_pago|capitalize }}: ${{ (p.monto)|cop|replace(',', '.') }}{% if not loop.last %}<br>{% endif %}
                                         {% endfor %}
                                     </div>
                                 {% elif v.pagos|length == 1 %}
@@ -234,7 +234,7 @@
                                     {% endfor %}
                                 </ul>
                             </td>
-                            <td class="text-end fw-bold text-brand-black fs-6">${{ (v.monto_total)|cop }}</td>
+                            <td class="text-end fw-bold text-brand-black fs-6">${{ (v.monto_total)|cop|replace(',', '.') }}</td>
                         </tr>
                         {% else %}
                         <tr>
@@ -284,7 +284,7 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-end fw-bold {% if gasto.metodo_pago == 'efectivo' %}text-danger{% endif %}">
-                                    ${{ (gasto.monto)|cop }}
+                                    ${{ (gasto.monto)|cop|replace(',', '.') }}
                                 </td>
                             </tr>
                             {% endfor %}

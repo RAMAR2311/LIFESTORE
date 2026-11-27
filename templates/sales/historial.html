@@ -603,10 +603,10 @@
                                 </div>
                             </div>
                             
-                            <!-- Modal Editar Venta / Pago -->
+                            <!-- Modal Editar Venta / Pago (Incluye Edición o Eliminación de Retomas con PIN 1234) -->
                             <div class="modal fade text-start" id="editPaymentModal{{ venta.id }}" tabindex="-1" aria-labelledby="editPaymentModalLabel{{ venta.id }}" aria-hidden="true">
                                 <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content">
+                                    <div class="modal-content border-0 shadow-lg rounded-4">
                                         <div class="modal-header bg-light">
                                             <h5 class="modal-title text-brand-black fw-bold" id="editPaymentModalLabel{{ venta.id }}">
                                                 <i class="fa-solid fa-pen text-primary me-2"></i> Editar Venta / Pago - Ticket #{{ "%05d"|format(venta.id) }}
@@ -616,6 +616,96 @@
                                         <form action="{{ url_for('sales_bp.editar_pago_venta', sale_id=venta.id) }}" method="POST">
                                             <div class="modal-body">
                                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                                                {% set ns_sub = namespace(subtotal_prod=0, total_ret=0) %}
+                                                {% for det in venta.detalles %}
+                                                    {% set ns_sub.subtotal_prod = ns_sub.subtotal_prod + ((det.precio_venta_final or 0) * (det.cantidad_vendida or 1)) %}
+                                                {% endfor %}
+                                                {% for r_it in venta.retomas_asociadas %}
+                                                    {% set ns_sub.total_ret = ns_sub.total_ret + (r_it.valor_retoma or 0) %}
+                                                {% endfor %}
+
+                                                <!-- Resumen de Subtotal de Productos en la Factura -->
+                                                <div class="d-flex justify-content-between align-items-center p-2 px-3 mb-3 rounded-3 bg-light border">
+                                                    <span class="small fw-bold text-muted">Subtotal Productos Factura:</span>
+                                                    <strong class="text-brand-black fs-6" id="lblSubtotalProd{{ venta.id }}" data-subtotal="{{ ns_sub.subtotal_prod|int }}">${{ (ns_sub.subtotal_prod)|cop }}</strong>
+                                                </div>
+
+                                                {% if venta.retomas_asociadas and venta.retomas_asociadas|length > 0 %}
+                                                <!-- Sección de Retomas Asociadas a esta Factura (Protegida con PIN 1234) -->
+                                                <div class="p-3 mb-3 rounded-3 border border-danger border-opacity-25" style="background-color: #fff5f5;">
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <span class="fw-bold small text-danger">
+                                                            <i class="fa-solid fa-recycle me-1"></i> Retoma(s) Recibida(s) en Parte de Pago
+                                                        </span>
+                                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill extra-small">
+                                                            Requiere PIN 1234
+                                                        </span>
+                                                    </div>
+
+                                                    <div id="contenedorRetomas{{ venta.id }}">
+                                                        {% for ret in venta.retomas_asociadas %}
+                                                        <div class="p-2 mb-2 bg-white rounded-3 border shadow-sm fila-retoma-edit" id="filaRetoma{{ ret.id }}" data-retoma-id="{{ ret.id }}" data-orig-val="{{ ret.valor_retoma|int }}">
+                                                            <input type="hidden" name="retoma_delete_{{ ret.id }}" id="inputDeleteRetoma{{ ret.id }}" value="0">
+                                                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                <div>
+                                                                    <strong class="small text-dark d-block">{{ ret.marca or '' }} {{ ret.modelo }}</strong>
+                                                                    <span class="extra-small text-muted font-monospace">IMEI: {{ ret.imei1 }}</span>
+                                                                    {% if ret.estado == 'aprobado' %}
+                                                                        <span class="badge bg-success-subtle text-success extra-small ms-1">En Inventario</span>
+                                                                    {% else %}
+                                                                        <span class="badge bg-warning-subtle text-dark extra-small ms-1">En Cuarentena</span>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <button type="button"
+                                                                        class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0.5 fw-bold"
+                                                                        id="btnToggleDeleteRetoma{{ ret.id }}"
+                                                                        onclick="toggleEliminarRetomaModal({{ venta.id }}, {{ ret.id }})"
+                                                                        title="Eliminar esta retoma de la factura y del inventario">
+                                                                    <i class="fa-solid fa-trash-can me-1"></i> Quitar Retoma
+                                                                </button>
+                                                            </div>
+                                                            <div class="row g-2 align-items-center mt-1" id="boxValorRetoma{{ ret.id }}">
+                                                                <div class="col-5">
+                                                                    <label class="extra-small fw-bold text-muted mb-0">Valor Retoma ($):</label>
+                                                                </div>
+                                                                <div class="col-7">
+                                                                    <input type="text"
+                                                                           inputmode="numeric"
+                                                                           name="retoma_amount_{{ ret.id }}"
+                                                                           id="inputMontoRetoma{{ ret.id }}"
+                                                                           class="form-control form-control-sm fw-bold text-danger text-end input-monto-retoma"
+                                                                           value="{{ ret.valor_retoma|int }}"
+                                                                           data-orig="{{ ret.valor_retoma|int }}"
+                                                                           oninput="formatearMontoInput(this); onCambioRetomaModal({{ venta.id }});">
+                                                                </div>
+                                                            </div>
+                                                            <div id="msgEliminadaRetoma{{ ret.id }}" class="d-none mt-1 p-1.5 rounded bg-danger bg-opacity-10 text-danger extra-small fw-bold text-center">
+                                                                <i class="fa-solid fa-triangle-exclamation me-1"></i> Se eliminará esta retoma y el equipo retomado saldrá del sistema.
+                                                            </div>
+                                                        </div>
+                                                        {% endfor %}
+                                                    </div>
+
+                                                    <!-- Campo de PIN 1234 obligatorio cuando se modifica o elimina una retoma -->
+                                                    <div id="boxPinRetoma{{ venta.id }}" class="d-none mt-2 pt-2 border-top border-danger border-opacity-25">
+                                                        <label class="form-label fw-bold extra-small text-danger mb-1">
+                                                            <i class="fa-solid fa-key me-1"></i> PIN de Seguridad Obligatorio (1234) para modificar/eliminar retoma *
+                                                        </label>
+                                                        <input type="password"
+                                                               name="token_secreto_retoma"
+                                                               id="inputPinRetoma{{ venta.id }}"
+                                                               class="form-control form-control-sm text-center fw-bold border-danger bg-white"
+                                                               placeholder="Ingresa el PIN 1234"
+                                                               autocomplete="off"
+                                                               inputmode="numeric">
+                                                        <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">
+                                                            <i class="fa-solid fa-circle-info text-primary me-1"></i>El saldo a pagar sugerido abajo se ajustó automáticamente. Verifica el valor del método de pago antes de guardar.
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                {% endif %}
+
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                                     <p class="text-muted small mb-0"><i class="fa-solid fa-circle-info text-primary me-1"></i> Modifica o agrega métodos de pago y sus valores:</p>
                                                     <button type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold" onclick="agregarFilaPago({{ venta.id }})">
@@ -961,12 +1051,89 @@
         }
     }
 
-    // Al cargar la página, dar formato inicial a los inputs de monto
+    // Al cargar la página, dar formato inicial a los inputs de monto y de retomas
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.input-monto-pago').forEach(input => {
+        document.querySelectorAll('.input-monto-pago, .input-monto-retoma').forEach(input => {
             formatearMontoInput(input);
         });
     });
+
+    function toggleEliminarRetomaModal(ventaId, retomaId) {
+        const inpDel = document.getElementById(`inputDeleteRetoma${retomaId}`);
+        const btn = document.getElementById(`btnToggleDeleteRetoma${retomaId}`);
+        const boxVal = document.getElementById(`boxValorRetoma${retomaId}`);
+        const msgElim = document.getElementById(`msgEliminadaRetoma${retomaId}`);
+        if (!inpDel) return;
+
+        if (inpDel.value === '1') {
+            inpDel.value = '0';
+            if (boxVal) boxVal.classList.remove('d-none');
+            if (msgElim) msgElim.classList.add('d-none');
+            if (btn) {
+                btn.className = 'btn btn-xs btn-outline-danger rounded-pill px-2 py-0.5 fw-bold';
+                btn.innerHTML = '<i class="fa-solid fa-trash-can me-1"></i> Quitar Retoma';
+            }
+        } else {
+            inpDel.value = '1';
+            if (boxVal) boxVal.classList.add('d-none');
+            if (msgElim) msgElim.classList.remove('d-none');
+            if (btn) {
+                btn.className = 'btn btn-xs btn-secondary rounded-pill px-2 py-0.5 fw-bold';
+                btn.innerHTML = '<i class="fa-solid fa-rotate-left me-1"></i> Restaurar';
+            }
+        }
+        onCambioRetomaModal(ventaId);
+    }
+
+    function onCambioRetomaModal(ventaId) {
+        const contRet = document.getElementById(`contenedorRetomas${ventaId}`);
+        const lblSub = document.getElementById(`lblSubtotalProd${ventaId}`);
+        const boxPin = document.getElementById(`boxPinRetoma${ventaId}`);
+        const inpPin = document.getElementById(`inputPinRetoma${ventaId}`);
+        if (!contRet) return;
+
+        const subtotalProd = lblSub ? (parseInt(lblSub.dataset.subtotal, 10) || 0) : 0;
+        let totalRetomasActivas = 0;
+        let huboCambio = false;
+
+        contRet.querySelectorAll('.fila-retoma-edit').forEach(fila => {
+            const rId = fila.dataset.retomaId;
+            const origVal = parseInt(fila.dataset.origVal, 10) || 0;
+            const isDel = document.getElementById(`inputDeleteRetoma${rId}`)?.value === '1';
+            const inpMonto = document.getElementById(`inputMontoRetoma${rId}`);
+            const currVal = inpMonto ? (parseInt(inpMonto.value.replace(/\D/g, ''), 10) || 0) : 0;
+
+            if (isDel) {
+                huboCambio = true;
+            } else {
+                totalRetomasActivas += currVal;
+                if (currVal !== origVal) huboCambio = true;
+            }
+        });
+
+        if (boxPin && inpPin) {
+            if (huboCambio) {
+                boxPin.classList.remove('d-none');
+                inpPin.required = true;
+            } else {
+                boxPin.classList.add('d-none');
+                inpPin.required = false;
+                inpPin.value = '';
+            }
+        }
+
+        // Si solo hay 1 fila de método de pago en el modal, ajustar su valor automáticamente al nuevo saldo a pagar
+        const contPagos = document.getElementById(`contenedorPagos${ventaId}`);
+        if (contPagos && subtotalProd > 0) {
+            const inputsPago = contPagos.querySelectorAll('.input-monto-pago');
+            const nuevoSaldoPagar = Math.max(0, subtotalProd - totalRetomasActivas);
+            if (inputsPago.length === 1) {
+                inputsPago[0].value = nuevoSaldoPagar.toString();
+                formatearMontoInput(inputsPago[0]);
+            }
+        }
+        recalcularTotalModal(ventaId);
+    }
 
     function recalcularTotalModal(ventaId) {
         const contenedor = document.getElementById(`contenedorPagos${ventaId}`);

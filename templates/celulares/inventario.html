@@ -678,10 +678,20 @@
             return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         }
 
-        // Pre-indexar cada fila una sola vez al cargar (< 3ms)
-        allCelRows.forEach(row => {
+        // Desacoplar del DOM vivo las filas > 50 para que la tabla en Mac/iOS/Android solo tenga máx 50 filas renderizadas
+        for (let i = 0; i < allCelRows.length; i++) {
+            allCelRows[i].style.display = '';
+            if (i >= PAGE_SIZE) {
+                allCelRows[i].remove();
+            }
+        }
+        if (tbody) tbody.appendChild(noResultsRow);
+
+        function getCelSearchStr(row) {
+            if (typeof row._searchStr === 'string') return row._searchStr;
             row._searchStr = normalizarTexto(row.dataset.search || row.textContent || '');
-        });
+            return row._searchStr;
+        }
 
         function renderCelPage(page) {
             const total = filteredRows.length;
@@ -691,30 +701,21 @@
             const startIdx = (currentPage - 1) * PAGE_SIZE;
             const endIdx = Math.min(startIdx + PAGE_SIZE, total);
             const nextVisibleRows = filteredRows.slice(startIdx, endIdx);
-            const nextVisibleSet = new Set(nextVisibleRows);
 
-            // Ocultar únicamente las que estaban visibles y ya no pertenecen a la página actual (máx 50)
-            for (let i = 0; i < currentlyVisibleRows.length; i++) {
-                const r = currentlyVisibleRows[i];
-                if (!nextVisibleSet.has(r)) {
-                    r.style.display = 'none';
-                }
-            }
-
-            // Mostrar únicamente las de la página actual (máx 50)
-            for (let i = 0; i < nextVisibleRows.length; i++) {
-                const r = nextVisibleRows[i];
-                if (r.style.display === 'none') {
+            if (tbody) {
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i < nextVisibleRows.length; i++) {
+                    const r = nextVisibleRows[i];
                     r.style.display = '';
+                    frag.appendChild(r);
                 }
-            }
-
-            currentlyVisibleRows = nextVisibleRows;
-
-            if (total === 0 && allCelRows.length > 0) {
-                noResultsRow.classList.remove('d-none');
-            } else {
-                noResultsRow.classList.add('d-none');
+                if (total === 0 && allCelRows.length > 0) {
+                    noResultsRow.classList.remove('d-none');
+                } else {
+                    noResultsRow.classList.add('d-none');
+                }
+                frag.appendChild(noResultsRow);
+                tbody.replaceChildren(frag);
             }
 
             if (paginationBar) {
@@ -735,7 +736,7 @@
 
         function performCelSearch() {
             const rawQuery = (searchInput ? searchInput.value : '').trim();
-            const queryNorm = normalizarTexto(rawQuery);
+            const queryNorm = normalizarTexto(rawQuery).replace(/['’´`]+/g, '-');
 
             if (queryNorm.length < 2) {
                 filteredRows = allCelRows;
@@ -743,13 +744,14 @@
                 return;
             }
 
-            const tokens = queryNorm.split(/\s+/).filter(t => t.length > 0);
+            const tokens = queryNorm.split(/[\s\-'’´`]+/).filter(t => t.length > 0);
             const matches = [];
             for (let i = 0; i < allCelRows.length; i++) {
                 const row = allCelRows[i];
+                const sStr = getCelSearchStr(row);
                 let isMatch = true;
                 for (let j = 0; j < tokens.length; j++) {
-                    if (!row._searchStr.includes(tokens[j])) {
+                    if (!sStr.includes(tokens[j])) {
                         isMatch = false;
                         break;
                     }
