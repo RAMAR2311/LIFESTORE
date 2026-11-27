@@ -125,6 +125,24 @@
                     <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill ms-2">
                         <i class="fa-solid fa-circle text-success me-1" style="font-size: 8px;"></i>Turno Abierto ({{ turno_activo.fecha_apertura.strftime('%I:%M %p') }})
                     </span>
+                    {% set asesores_turno_actual = turno_activo.asesores_obj %}
+                    {% set mapa_ing_turno = turno_activo.mapa_ingresos_asesores %}
+                    <span class="badge bg-light text-dark border rounded-pill ms-1" title="Asesores registrados en el turno actual">
+                        <i class="fa-solid fa-users text-primary me-1"></i>
+                        {% if asesores_turno_actual %}
+                            {{ asesores_turno_actual|map(attribute='nombre')|join(', ') }}
+                        {% else %}
+                            Sin asesores
+                        {% endif %}
+                    </span>
+                    <button type="button"
+                            class="btn btn-xs btn-outline-primary rounded-pill px-2.5 py-0.5 fw-bold ms-1 shadow-sm"
+                            style="font-size: 0.75rem;"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalIncorporarAsesorTurno"
+                            title="Agregar un asesor que llegó después de la apertura de caja">
+                        <i class="fa-solid fa-user-plus me-1"></i> + Asesor Tarde
+                    </button>
                     {% elif sucursal_actual.tipo == 'bodega' %}
                     <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill ms-2">
                         <i class="fa-solid fa-boxes-stacked text-info me-1" style="font-size: 8px;"></i>Bodega (Exenta de Turno)
@@ -190,7 +208,7 @@
                     <div class="ratio ratio-1x1 product-img-box rounded-top">
                         {% set img_mostrar = p.imagen or (ref_images_map.get(p.modelo_celular) if (ref_images_map is defined and p.modelo_celular) else None) %}
                         {% if img_mostrar %}
-                            <img src="{{ url_for('static', filename='uploads/' + img_mostrar) }}" alt="{{ p.nombre }}" style="object-fit: cover; width: 100%; height: 100%;">
+                            <img src="{{ url_for('static', filename='uploads/' + img_mostrar) }}" alt="{{ p.nombre }}" loading="lazy" decoding="async" style="object-fit: cover; width: 100%; height: 100%;">
                         {% else %}
                             <span class="small text-center pt-2 placeholder-icon"><i class="fa-solid fa-image fa-2x mb-1 d-block opacity-50"></i>Sin Imagen</span>
                         {% endif %}
@@ -1076,6 +1094,24 @@
         filtrarProductosCaja();
     }
 
+    let allPosCards = null;
+    const MAX_VISIBLE_POS_CARDS = 60;
+
+    function getPosCards() {
+        if (!allPosCards) {
+            allPosCards = Array.from(document.querySelectorAll('.product-card-container'));
+            allPosCards.forEach(card => {
+                const name = (card.dataset.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const sku = (card.dataset.sku || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’´`]+/g, '-');
+                const imei = (card.dataset.imei || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const imei2 = (card.dataset.imei2 || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const memoria = (card.dataset.memoria || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                card._posSearchStr = `${name} ${sku} ${sku.replace(/-/g, '')} ${imei} ${imei2} ${memoria}`;
+            });
+        }
+        return allPosCards;
+    }
+
     function filtrarProductosCaja() {
         const searchEl = document.getElementById('productSearch');
         if (searchEl && /['’´`]/.test(searchEl.value)) {
@@ -1085,27 +1121,27 @@
         }
         const rawQuery = searchEl ? searchEl.value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’´`]+/g, '-') : '';
         const tokens = rawQuery.split(/[\s\-'’´`]+/).filter(t => t.length > 0);
-        document.querySelectorAll('.product-card-container').forEach(card => {
-            const name = (card.dataset.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            const sku = (card.dataset.sku || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’´`]+/g, '-');
-            const imei = (card.dataset.imei || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            const imei2 = (card.dataset.imei2 || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            const memoria = (card.dataset.memoria || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const cards = getPosCards();
+        let shownCount = 0;
+
+        for (let i = 0; i < cards.length; i++) {
+            const card = cards[i];
             const cat = card.dataset.categoria || '';
+            let matches = false;
 
             if (rawQuery.length > 0) {
-                // Si hay texto en la barra de búsqueda, busca en AMBOS (Equipos y Accesorios) por nombre, SKU (con o sin guiones), IMEI o capacidad
-                const combined = `${name} ${sku} ${sku.replace(/-/g, '')} ${imei} ${imei2} ${memoria}`;
-                if (tokens.every(tok => combined.includes(tok))) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
+                matches = tokens.every(tok => card._posSearchStr.includes(tok));
             } else {
-                // Sin texto de búsqueda, filtra por el botón seleccionado (Equipos o Accesorios)
-                card.style.display = (cat === categoriaActivaCaja) ? 'block' : 'none';
+                matches = (cat === categoriaActivaCaja);
             }
-        });
+
+            if (matches && shownCount < MAX_VISIBLE_POS_CARDS) {
+                if (card.style.display !== 'block') card.style.display = 'block';
+                shownCount++;
+            } else {
+                if (card.style.display !== 'none') card.style.display = 'none';
+            }
+        }
     }
 
     const productSearchEl = document.getElementById('productSearch');
@@ -2998,5 +3034,86 @@ function eliminarRetomaActual() {
         }
     });
 </script>
+
+{% if turno_activo %}
+<!-- Modal para Incorporar un Asesor que llegó más tarde al Turno Abierto -->
+<div class="modal fade text-start" id="modalIncorporarAsesorTurno" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <form method="POST" action="{{ url_for('arqueo_bp.incorporar_asesor_turno') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <input type="hidden" name="branch_id" value="{{ turno_activo.branch_id }}"/>
+                <div class="modal-header bg-dark text-white border-0 py-3">
+                    <h5 class="modal-title fw-bold mb-0">
+                        <i class="fa-solid fa-user-clock text-warning me-2"></i> Incorporar Asesor al Turno
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="p-3 rounded-3 bg-light border mb-3">
+                        <div class="small fw-bold text-dark mb-1">
+                            <i class="fa-solid fa-users text-primary me-1"></i> Asesores actualmente en el turno ({{ sucursal_actual.nombre if sucursal_actual else 'Local' }}):
+                        </div>
+                        {% set ids_en_turno = turno_activo.lista_asesores_ids %}
+                        {% set mapa_ing = turno_activo.mapa_ingresos_asesores %}
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                            {% for asr_act in turno_activo.asesores_obj %}
+                                {% set info_i = mapa_ing.get(asr_act.id, {}) %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1">
+                                    <i class="fa-solid fa-user-check me-1"></i>{{ asr_act.nombre }}
+                                    {% if info_i.get('hora') %}
+                                        <small class="opacity-75">({{ info_i.get('hora')[11:16] }})</small>
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <span class="text-muted small">Sin asesores registrados</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-brand-black">
+                            1. Seleccionar Asesor que se incorpora <span class="text-danger">*</span>
+                        </label>
+                        <select name="asesor_id" class="form-select fw-semibold" required>
+                            <option value="" disabled selected>-- Elegir Asesor --</option>
+                            {% for a in asesores %}
+                                {% if a.id not in ids_en_turno %}
+                                <option value="{{ a.id }}">{{ a.nombre }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-brand-black">
+                            2. Código Personal del Asesor <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-dark text-warning border-0"><i class="fa-solid fa-key"></i></span>
+                            <input type="password" name="codigo_asesor" class="form-control fw-bold"
+                                   placeholder="Ingresa el código del asesor (Ej: ASE-001)" required autocomplete="off">
+                        </div>
+                        <small class="text-muted extra-small d-block mt-1">
+                            El sistema registrará la hora exacta de llegada y el asesor empezará a participar en las ventas desde este momento.
+                        </small>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label fw-bold small text-brand-black">Observación / Justificación (Opcional)</label>
+                        <input type="text" name="nota_ingreso" class="form-control bg-light" placeholder="Ej: Llegó más tarde con permiso / cita médica...">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                        <i class="fa-solid fa-user-plus me-1"></i> Validar Código e Incorporar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% endblock %}

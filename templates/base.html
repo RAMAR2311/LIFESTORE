@@ -2413,6 +2413,7 @@
         let currentApprovalId = null;
 
         async function pollApprovals() {
+            if (document.hidden) return;
             try {
                 const res = await fetch('/api/aprobaciones/pendientes');
                 if(res.ok) {
@@ -2478,10 +2479,10 @@
             }
         }
 
-        // Poll every 5 seconds
-        setInterval(pollApprovals, 5000);
+        // Poll every 8 seconds only when tab is active
+        setInterval(pollApprovals, 8000);
         // Initial poll
-        setTimeout(pollApprovals, 2000);
+        setTimeout(pollApprovals, 2500);
     </script>
     {% endif %}
 

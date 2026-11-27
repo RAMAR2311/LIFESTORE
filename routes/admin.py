@@ -1281,7 +1281,7 @@ def ventas_vendedores():
                             or_(CashShift.fecha_cierre >= v.fecha_venta, CashShift.fecha_cierre == None)
                         ).first()
 
-                    asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
+                    asesores_turno_ids = shift_obj.asesores_presentes_en_hora(v.fecha_venta) if shift_obj else []
                     if not asesores_turno_ids and v.asesor_id:
                         asesores_turno_ids = [v.asesor_id]
 
@@ -1355,7 +1355,7 @@ def ventas_vendedores():
                             or_(CashShift.fecha_cierre >= v_mes.fecha_venta, CashShift.fecha_cierre == None)
                         ).first()
 
-                    asesores_venta_ids = shift_venta.lista_asesores_ids if shift_venta else []
+                    asesores_venta_ids = shift_venta.asesores_presentes_en_hora(v_mes.fecha_venta) if shift_venta else []
                     if not asesores_venta_ids and v_mes.asesor_id:
                         asesores_venta_ids = [v_mes.asesor_id]
 
@@ -2153,7 +2153,7 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
                 or_(CashShift.fecha_cierre >= v.fecha_venta, CashShift.fecha_cierre == None)
             ).first()
 
-        asesores_turno_ids = shift_obj.lista_asesores_ids if shift_obj else []
+        asesores_turno_ids = shift_obj.asesores_presentes_en_hora(v.fecha_venta) if shift_obj else []
         if not asesores_turno_ids and v.asesor_id:
             asesores_turno_ids = [v.asesor_id]
 
@@ -2185,7 +2185,7 @@ def calcular_liquidacion_asesor(asesor_id, start_date, end_date, comision_fija_n
                 or_(CashShift.fecha_cierre >= v_mes.fecha_venta, CashShift.fecha_cierre == None)
             ).first()
 
-        asesores_venta_ids = shift_venta.lista_asesores_ids if shift_venta else []
+        asesores_venta_ids = shift_venta.asesores_presentes_en_hora(v_mes.fecha_venta) if shift_venta else []
         if not asesores_venta_ids and v_mes.asesor_id:
             asesores_venta_ids = [v_mes.asesor_id]
 

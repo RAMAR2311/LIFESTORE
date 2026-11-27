@@ -93,11 +93,23 @@ def abrir_turno():
             dt_limite_apertura = datetime.combine(ahora_apertura.date(), time(9, 30))
             minutos_retraso = max(0, int((ahora_apertura - dt_limite_apertura).total_seconds() // 60))
 
+        ids_int = [int(x) for x in asesores_ids if str(x).isdigit()]
+        hora_ap_str = ahora_apertura.strftime('%Y-%m-%d %H:%M:%S')
+        ingresos_map = {
+            str(aid): {
+                'hora': hora_ap_str,
+                'tarde': apertura_tardia,
+                'minutos_retraso': minutos_retraso
+            }
+            for aid in ids_int
+        }
+
         nuevo_turno = CashShift(
             branch_id=branch_id,
             opened_by_id=current_user.id,
             base_inicial_efectivo=base_inicial,
-            asesores_ids=json.dumps([int(x) for x in asesores_ids if str(x).isdigit()]),
+            asesores_ids=json.dumps(ids_int),
+            ingresos_asesores_json=json.dumps(ingresos_map),
             estado='ABIERTA',
             fecha_apertura=ahora_apertura,
             notas_apertura=notas or None,
@@ -119,6 +131,98 @@ def abrir_turno():
 
     asesores_activos = Asesor.query.filter_by(activo=True).order_by(Asesor.nombre.asc()).all()
     return render_template('arqueo/abrir_turno.html', sucursal=sucursal, asesores=asesores_activos)
+
+
+@arqueo_bp.route('/turnos/incorporar-asesor', methods=['POST'])
+@login_required
+def incorporar_asesor_turno():
+    """
+    Permite incorporar un asesor que llegó más tarde a un turno de caja YA ABIERTO en el local,
+    validando obligatoriamente su Código Personal de Asesor (ASE-XXX).
+    - Registra su hora exacta de llegada y si llegó después de las 9:30 AM.
+    - A partir de su hora de ingreso empieza a participar en las comisiones de las ventas del turno.
+    """
+    from models import AuditLog
+    branch_id = request.form.get('branch_id', type=int) or get_current_branch_id()
+    asesor_id = request.form.get('asesor_id', type=int)
+    codigo_ingresado = (request.form.get('codigo_asesor') or '').strip().upper()
+    nota_ingreso = (request.form.get('nota_ingreso') or '').strip()
+
+    turno = obtener_turno_abierto(branch_id)
+    if not turno:
+        flash('No hay un turno de caja abierto actualmente en este local. Debes abrir turno primero.', 'warning')
+        return redirect(url_for('arqueo_bp.abrir_turno', branch_id=branch_id))
+
+    if not asesor_id:
+        flash('Debes seleccionar el asesor que se va a incorporar al turno.', 'danger')
+        return redirect(request.referrer or url_for('sales_bp.caja_visual'))
+
+    asesor = Asesor.query.get(asesor_id)
+    if not asesor or not asesor.activo:
+        flash('El asesor seleccionado no existe o no está activo.', 'danger')
+        return redirect(request.referrer or url_for('sales_bp.caja_visual'))
+
+    codigo_esperado = (asesor.codigo or f"ASE-{asesor.id:03d}").strip().upper()
+    if not codigo_ingresado or codigo_ingresado != codigo_esperado:
+        flash(f"🚫 El código personal ingresado para el asesor '{asesor.nombre}' es incorrecto.", 'danger')
+        return redirect(request.referrer or url_for('sales_bp.caja_visual'))
+
+    ids_actuales = turno.lista_asesores_ids
+    if asesor.id in ids_actuales:
+        flash(f"El asesor '{asesor.nombre}' ya se encuentra registrado en el turno actual.", 'info')
+        return redirect(request.referrer or url_for('sales_bp.caja_visual'))
+
+    try:
+        ahora_ingreso = obtener_hora_bogota()
+        llegada_tardia = False
+        min_retraso = 0
+        if ahora_ingreso.time() > time(9, 30):
+            llegada_tardia = True
+            dt_limite = datetime.combine(ahora_ingreso.date(), time(9, 30))
+            min_retraso = max(0, int((ahora_ingreso - dt_limite).total_seconds() // 60))
+
+        ids_actuales.append(asesor.id)
+        turno.asesores_ids = json.dumps(ids_actuales)
+
+        mapa_ing = {str(k): v for k, v in turno.mapa_ingresos_asesores.items()}
+        mapa_ing[str(asesor.id)] = {
+            'hora': ahora_ingreso.strftime('%Y-%m-%d %H:%M:%S'),
+            'tarde': llegada_tardia,
+            'minutos_retraso': min_retraso,
+            'nota': nota_ingreso or None
+        }
+        turno.ingresos_asesores_json = json.dumps(mapa_ing)
+
+        nota_extra = f" | Ingreso {asesor.nombre}: {ahora_ingreso.strftime('%I:%M %p')}"
+        if llegada_tardia:
+            nota_extra += f" (+{min_retraso}m tras 9:30 AM)"
+        if nota_ingreso:
+            nota_extra += f" [{nota_ingreso}]"
+        turno.notas_apertura = ((turno.notas_apertura or '') + nota_extra).strip(' |')
+
+        suc_nom = turno.branch.nombre if turno.branch else 'Local'
+        AuditLog.registrar(
+            action='INCORPORACION_ASESOR_TURNO',
+            user_id=current_user.id,
+            motivo=(
+                f"Incorporación de asesor '{asesor.nombre}' al turno #{turno.id} en {suc_nom} a las {ahora_ingreso.strftime('%I:%M %p')}. "
+                f"{('Llegada tardía: +' + str(min_retraso) + ' min.') if llegada_tardia else 'En horario.'} "
+                f"{('Nota: ' + nota_ingreso) if nota_ingreso else ''}"
+            ),
+            target_id=turno.id,
+            target_type='CASH_SHIFT'
+        )
+        db.session.commit()
+        flash(
+            f"✅ Asesor '{asesor.nombre}' incorporado exitosamente al turno de {suc_nom} a las {ahora_ingreso.strftime('%I:%M %p')}. "
+            f"Participará en las ventas realizadas a partir de este momento.",
+            'success'
+        )
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al incorporar asesor al turno: {str(e)}', 'danger')
+
+    return redirect(request.referrer or url_for('sales_bp.caja_visual'))
 
 @arqueo_bp.route('/turnos/auditoria', methods=['GET'])
 @login_required
@@ -461,7 +565,7 @@ def nuevo():
 
             db.session.commit()
             flash(f'Arqueo de caja guardado exitosamente para {arqueo_branch_nombre}, turno cerrado y acreditado a Bancos.', 'success')
-            return redirect(url_for('arqueo_bp.reporte', fecha_inicio=fecha_str, fecha_fin=fecha_str))
+            return redirect(url_for('arqueo_bp.comprobante_arqueo', id=nuevo_arqueo.id, fecha=fecha_str, branch_id=arqueo_branch_id))
         except Exception as e:
             db.session.rollback()
             flash(f'Ocurrió un error al guardar el arqueo de caja: {str(e)}', 'danger')
@@ -761,5 +865,5 @@ def imprimir_ticket_arqueo():
         total_transferencia=total_transferencia,
         total_ventas=total_ventas,
         total_gastos=total_gastos,
-        sucursal=sucursal_nombre
-    )
+        sucursal=sucursal_nombre,
+      

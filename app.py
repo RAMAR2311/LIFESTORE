@@ -164,92 +164,122 @@ def create_app():
             return current_user.branch_id
         return None
 
+    # Caché ligero en memoria para contadores de notificaciones del sidebar (evita 8 consultas SQL en cada clic)
+    _sidebar_context_cache = {}
+
     @app.context_processor
     def inject_branch_context():
         """Inyecta el helper de sucursal activa, las sucursales y traslados pendientes en todas las plantillas."""
+        import time as _time
         active_id = get_active_branch_id()
-        active_branch = Branch.query.get(active_id) if active_id else None
-        
+
+        if not current_user.is_authenticated:
+            return {
+                'get_active_branch_id': get_active_branch_id,
+                'active_branch_id': None,
+                'active_branch': None,
+                'all_branches': [],
+                'pending_transfers_count': 0,
+                'pending_vales_count': 0,
+                'pending_support_count': 0,
+                'pending_exchanges_count': 0,
+                'equipos_estancados_count': 0
+            }
+
+        cache_key = (current_user.id, current_user.rol, current_user.branch_id, active_id)
+        now_ts = _time.time()
+        cached_entry = _sidebar_context_cache.get(cache_key)
+        if cached_entry and (now_ts - cached_entry['ts'] < 12.0):
+            all_b = Branch.query.filter_by(activa=True).all()
+            act_b = next((b for b in all_b if b.id == active_id), None) if active_id else None
+            return {
+                'get_active_branch_id': get_active_branch_id,
+                'active_branch_id': active_id,
+                'active_branch': act_b,
+                'all_branches': all_b,
+                **cached_entry['counts']
+            }
+
+        all_branches_list = Branch.query.filter_by(activa=True).all()
+        active_branch = next((b for b in all_branches_list if b.id == active_id), None) if active_id else None
+
         # Conteo de traslados pendientes por recibir para la sucursal activa o usuario
-        pending_transfers_count = 0
-        pending_vales_count = 0
-        pending_support_count = 0
-        pending_exchanges_count = 0
-        if current_user.is_authenticated:
-            from models import StockTransfer, Vale, TechnicalService, DeviceExchange
-            q_pend = StockTransfer.query.filter_by(status='PENDIENTE')
-            if current_user.rol not in ['admin', 'coordinador']:
-                if current_user.branch_id:
-                    q_pend = q_pend.filter(StockTransfer.destination_branch_id == current_user.branch_id)
-            elif active_id:
-                q_pend = q_pend.filter(StockTransfer.destination_branch_id == active_id)
-            pending_transfers_count = q_pend.count()
+        from models import StockTransfer, Vale, TechnicalService, DeviceExchange, SystemSetting, Product, BranchStock
+        from datetime import datetime, timedelta
 
-            q_vales = Vale.query.filter_by(estado='PENDIENTE')
-            if current_user.rol not in ['admin', 'coordinador']:
-                if current_user.branch_id:
-                    q_vales = q_vales.filter(
-                        (Vale.branch_id == current_user.branch_id) | (Vale.solicitado_por_id == current_user.id)
-                    )
-                else:
-                    q_vales = q_vales.filter(Vale.solicitado_por_id == current_user.id)
-            elif active_id:
-                q_vales = q_vales.filter(Vale.branch_id == active_id)
-            pending_vales_count = q_vales.count()
+        q_pend = StockTransfer.query.filter_by(status='PENDIENTE')
+        if current_user.rol not in ['admin', 'coordinador']:
+            if current_user.branch_id:
+                q_pend = q_pend.filter(StockTransfer.destination_branch_id == current_user.branch_id)
+        elif active_id:
+            q_pend = q_pend.filter(StockTransfer.destination_branch_id == active_id)
+        pending_transfers_count = q_pend.count()
 
-            q_sup = TechnicalService.query.filter(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
-            if current_user.rol not in ['admin', 'coordinador']:
-                if current_user.branch_id:
-                    q_sup = q_sup.filter(TechnicalService.branch_id == current_user.branch_id)
-            elif active_id:
-                q_sup = q_sup.filter(TechnicalService.branch_id == active_id)
-            pending_support_count = q_sup.count()
+        q_vales = Vale.query.filter_by(estado='PENDIENTE')
+        if current_user.rol not in ['admin', 'coordinador']:
+            if current_user.branch_id:
+                q_vales = q_vales.filter(
+                    (Vale.branch_id == current_user.branch_id) | (Vale.solicitado_por_id == current_user.id)
+                )
+            else:
+                q_vales = q_vales.filter(Vale.solicitado_por_id == current_user.id)
+        elif active_id:
+            q_vales = q_vales.filter(Vale.branch_id == active_id)
+        pending_vales_count = q_vales.count()
 
-            q_ex = DeviceExchange.query.filter_by(estado='PENDIENTE')
-            if current_user.rol not in ['admin', 'coordinador']:
-                if current_user.branch_id:
-                    q_ex = q_ex.filter(DeviceExchange.branch_id == current_user.branch_id)
-            elif active_id:
-                q_ex = q_ex.filter(DeviceExchange.branch_id == active_id)
-            pending_exchanges_count = q_ex.count()
+        q_sup = TechnicalService.query.filter(TechnicalService.estado.in_(['EN_REVISION', 'EN_REPARACION']))
+        if current_user.rol not in ['admin', 'coordinador']:
+            if current_user.branch_id:
+                q_sup = q_sup.filter(TechnicalService.branch_id == current_user.branch_id)
+        elif active_id:
+            q_sup = q_sup.filter(TechnicalService.branch_id == active_id)
+        pending_support_count = q_sup.count()
 
-            # Conteo de equipos estancados en inventario (> meses configurados sin venderse)
-            from models import SystemSetting, Product, BranchStock
-            from datetime import datetime, timedelta
-            try:
-                meses_alert = int(SystemSetting.get_value('meses_alerta_estancados', '3'))
-            except Exception:
-                meses_alert = 3
-            fecha_umbral_estancado = datetime.now() - timedelta(days=int(meses_alert * 30.4375))
-            q_estancados = Product.query.filter(
-                Product.tipo_inventario == 'celulares',
-                Product.cantidad_stock > 0,
-                Product.fecha_creacion <= fecha_umbral_estancado
+        q_ex = DeviceExchange.query.filter_by(estado='PENDIENTE')
+        if current_user.rol not in ['admin', 'coordinador']:
+            if current_user.branch_id:
+                q_ex = q_ex.filter(DeviceExchange.branch_id == current_user.branch_id)
+        elif active_id:
+            q_ex = q_ex.filter(DeviceExchange.branch_id == active_id)
+        pending_exchanges_count = q_ex.count()
+
+        try:
+            meses_alert = int(SystemSetting.get_value('meses_alerta_estancados', '3'))
+        except Exception:
+            meses_alert = 3
+        fecha_umbral_estancado = datetime.now() - timedelta(days=int(meses_alert * 30.4375))
+        q_estancados = Product.query.filter(
+            Product.tipo_inventario == 'celulares',
+            Product.cantidad_stock > 0,
+            Product.fecha_creacion <= fecha_umbral_estancado
+        )
+        if current_user.rol not in ['admin', 'coordinador'] and current_user.branch_id:
+            q_estancados = q_estancados.join(BranchStock).filter(
+                BranchStock.branch_id == current_user.branch_id,
+                BranchStock.cantidad > 0
             )
-            if current_user.rol not in ['admin', 'coordinador'] and current_user.branch_id:
-                q_estancados = q_estancados.join(BranchStock).filter(
-                    BranchStock.branch_id == current_user.branch_id,
-                    BranchStock.cantidad > 0
-                )
-            elif active_id:
-                q_estancados = q_estancados.join(BranchStock).filter(
-                    BranchStock.branch_id == active_id,
-                    BranchStock.cantidad > 0
-                )
-            equipos_estancados_count = q_estancados.count()
-        else:
-            equipos_estancados_count = 0
+        elif active_id:
+            q_estancados = q_estancados.join(BranchStock).filter(
+                BranchStock.branch_id == active_id,
+                BranchStock.cantidad > 0
+            )
+        equipos_estancados_count = q_estancados.count()
 
-        return {
-            'get_active_branch_id': get_active_branch_id,
-            'active_branch_id': active_id,
-            'active_branch': active_branch,
-            'all_branches': Branch.query.filter_by(activa=True).all() if current_user.is_authenticated else [],
+        counts_dict = {
             'pending_transfers_count': pending_transfers_count,
             'pending_vales_count': pending_vales_count,
             'pending_support_count': pending_support_count,
             'pending_exchanges_count': pending_exchanges_count,
             'equipos_estancados_count': equipos_estancados_count
+        }
+        _sidebar_context_cache[cache_key] = {'ts': now_ts, 'counts': counts_dict}
+
+        return {
+            'get_active_branch_id': get_active_branch_id,
+            'active_branch_id': active_id,
+            'active_branch': active_branch,
+            'all_branches': all_branches_list,
+            **counts_dict
         }
 
     @app.before_request
@@ -368,7 +398,8 @@ def create_app():
             "ALTER TABLE vales ADD COLUMN metodo_pago VARCHAR(50) DEFAULT 'efectivo';",
             "ALTER TABLE vales ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;",
             "ALTER TABLE commission_payments ADD COLUMN branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;",
-            "ALTER TABLE commission_payments ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;"
+            "ALTER TABLE commission_payments ADD COLUMN expense_id INTEGER REFERENCES expenses(id) ON DELETE SET NULL;",
+            "ALTER TABLE cash_shifts ADD COLUMN ingresos_asesores_json TEXT;"
         ]
         for q in queries:
             try:

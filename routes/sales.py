@@ -1537,57 +1537,60 @@ def caja_visual():
         flash(f"Debes abrir turno de caja antes de realizar ventas en la tienda '{sucursal_obj.nombre}'.", "warning")
         return redirect(url_for('arqueo_bp.abrir_turno'))
 
-    from services.stock_service import get_or_create_branch_stock
-    
-    candidatos = Product.query.filter(
+    from sqlalchemy.orm import selectinload, joinedload
+    candidatos = Product.query.options(
+        selectinload(Product.variantes)
+    ).filter(
         Product.tipo_inventario.in_(['tienda', 'celulares'])
     ).order_by(Product.nombre.asc()).all()
-    
+
     productos = []
-    
+
     if user_branch_id:
-        # Modo Sucursal Específica: filtrar productos y variantes solo de esta sede
+        # 1 sola consulta por lote para obtener todo el BranchStock de esta sede (evita 800+ consultas N+1)
+        bs_rows = BranchStock.query.filter(
+            BranchStock.branch_id == user_branch_id,
+            BranchStock.cantidad > 0
+        ).all()
+        bs_map = {(b.product_id, b.variant_id): (b.cantidad or 0) for b in bs_rows}
+
         for p in candidatos:
             if p.variantes:
                 stock_total_local = 0
                 for v in p.variantes:
-                    bs_var = BranchStock.query.filter_by(
-                        branch_id=user_branch_id,
-                        product_id=p.id,
-                        variant_id=v.id
-                    ).first()
-                    v.stock_local = bs_var.cantidad if bs_var else 0
+                    v.stock_local = bs_map.get((p.id, v.id), 0)
                     stock_total_local += v.stock_local
                 p.stock_local = stock_total_local
                 if stock_total_local > 0:
                     productos.append(p)
             else:
-                bs = BranchStock.query.filter_by(
-                    branch_id=user_branch_id,
-                    product_id=p.id,
-                    variant_id=None
-                ).first()
-                p.stock_local = bs.cantidad if bs else 0
+                p.stock_local = bs_map.get((p.id, None), 0)
                 if p.stock_local > 0:
                     productos.append(p)
     else:
-        # Modo Admin "Todas las Sedes (Global)":
-        # Mostrar todos los productos con stock disponible en el sistema e identificar de qué sede son
+        # Modo Admin "Todas las Sedes (Global)": 1 sola consulta por lote de BranchStock con cantidad > 0
+        bs_all_rows = BranchStock.query.options(
+            joinedload(BranchStock.branch)
+        ).filter(
+            BranchStock.cantidad > 0
+        ).all()
+        sedes_por_prod = {}
+        for b_row in bs_all_rows:
+            if b_row.branch:
+                sedes_por_prod.setdefault(b_row.product_id, set()).add(b_row.branch.nombre)
+
         for p in candidatos:
-            if p.total_stock > 0:
-                p.stock_local = p.total_stock
-                stocks_en_sedes = BranchStock.query.filter(
-                    BranchStock.product_id == p.id,
-                    BranchStock.cantidad > 0
-                ).all()
-                sedes_unicas = list({s.branch.nombre for s in stocks_en_sedes if s.branch})
+            t_stock = sum((v.cantidad_stock or 0) for v in p.variantes) if p.variantes else (p.cantidad_stock or 0)
+            if t_stock > 0:
+                p.stock_local = t_stock
+                sedes_unicas = list(sedes_por_prod.get(p.id, set()))
                 if len(sedes_unicas) == 1:
                     p.sede_nombre = sedes_unicas[0]
                 elif len(sedes_unicas) > 1:
                     p.sede_nombre = "Múltiples Sedes"
                 else:
                     p.sede_nombre = None
-                    
+
                 if p.variantes:
                     for v in p.variantes:
                         v.stock_local = v.cantidad_stock

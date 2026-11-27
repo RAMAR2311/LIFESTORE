@@ -354,7 +354,8 @@
         </div>
 
         <button class="btn-print" onclick="window.print()">🖨️ IMPRIMIR TICKET (80mm)</button>
-        <button class="btn-print d-print-none" style="background-color: #6c757d; border-color: #6c757d; margin-top: 10px;" onclick="window.close()">VOLVER</button>
+        <a class="btn-print d-print-none" style="background-color: #1E293B; border-color: #1E293B; margin-top: 10px; text-align: center; text-decoration: none;" href="{{ url_for('arqueo_bp.comprobante_arqueo', fecha=fecha_str, branch_id=(branch_id or '')) }}">📄 VER COMPROBANTE (1 CARA)</a>
+        <a class="btn-print d-print-none" style="background-color: #6c757d; border-color: #6c757d; margin-top: 10px; text-align: center; text-decoration: none;" href="{{ url_for('arqueo_bp.nuevo', fecha=fecha_str) }}">VOLVER A ARQUEO</a>
     </div>
 
     <script>

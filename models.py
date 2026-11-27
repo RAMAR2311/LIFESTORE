@@ -55,6 +55,7 @@ class CashShift(db.Model):
     closed_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     base_inicial_efectivo = db.Column(db.Numeric(14, 2), nullable=False, default=0.0)
     asesores_ids = db.Column(db.Text, nullable=True) # JSON o lista separada por comas de IDs de asesores de turno
+    ingresos_asesores_json = db.Column(db.Text, nullable=True) # JSON {"asesor_id": {"hora": "YYYY-MM-DD HH:MM:SS", "tarde": bool, "minutos_retraso": int}}
     estado = db.Column(db.String(20), nullable=False, default='ABIERTA', index=True) # 'ABIERTA', 'CERRADA'
     fecha_apertura = db.Column(db.DateTime, default=obtener_hora_bogota, nullable=False)
     fecha_cierre = db.Column(db.DateTime, nullable=True)
@@ -78,9 +79,61 @@ class CashShift(db.Model):
             return []
         import json
         try:
-            return json.loads(self.asesores_ids)
+            return [int(x) for x in json.loads(self.asesores_ids) if str(x).isdigit()]
         except Exception:
             return [int(x.strip()) for x in self.asesores_ids.split(',') if x.strip().isdigit()]
+
+    @property
+    def mapa_ingresos_asesores(self):
+        """Retorna dict {int(asesor_id): {'hora': str, 'tarde': bool, 'minutos_retraso': int}}."""
+        import json
+        default_hora = self.fecha_apertura.strftime('%Y-%m-%d %H:%M:%S') if self.fecha_apertura else ''
+        res = {}
+        if self.ingresos_asesores_json:
+            try:
+                raw = json.loads(self.ingresos_asesores_json)
+                if isinstance(raw, dict):
+                    for k, v in raw.items():
+                        if str(k).isdigit():
+                            if isinstance(v, dict):
+                                res[int(k)] = v
+                            else:
+                                res[int(k)] = {'hora': str(v), 'tarde': False, 'minutos_retraso': 0}
+            except Exception:
+                pass
+        for aid in self.lista_asesores_ids:
+            if aid not in res:
+                res[aid] = {
+                    'hora': default_hora,
+                    'tarde': bool(self.apertura_tardia),
+                    'minutos_retraso': int(self.minutos_retraso_apertura or 0)
+                }
+        return res
+
+    def asesores_presentes_en_hora(self, fecha_evento):
+        """
+        Retorna la lista de IDs de asesores que YA se habían incorporado al turno
+        en el momento de `fecha_evento` (evita asignar comisiones de ventas de la mañana
+        a un asesor que llegó más tarde en el día).
+        """
+        todos_ids = self.lista_asesores_ids
+        if not todos_ids or not fecha_evento or not self.ingresos_asesores_json:
+            return todos_ids
+        mapa = self.mapa_ingresos_asesores
+        presentes = []
+        for aid in todos_ids:
+            info = mapa.get(aid)
+            if not info or not info.get('hora'):
+                presentes.append(aid)
+                continue
+            try:
+                dt_ing = datetime.strptime(info['hora'], '%Y-%m-%d %H:%M:%S')
+                # Tolerancia de 60 segundos por reloj
+                if dt_ing <= fecha_evento:
+                    presentes.append(aid)
+            except Exception:
+                presentes.append(aid)
+        return presentes if presentes else todos_ids
 
     @property
     def asesores_obj(self):

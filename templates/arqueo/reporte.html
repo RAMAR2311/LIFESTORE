@@ -103,9 +103,7 @@
                             <th width="10%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Gastos</th>
                             <th width="11%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Físico Contado</th>
                             <th width="13%" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Diferencia / Sobrante</th>
-                            {% if current_user.rol == 'admin' %}
-                            <th width="8%" class="d-print-none" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Acciones</th>
-                            {% endif %}
+                            <th width="10%" class="d-print-none" style="color: #64748B; border-bottom: 2px solid #CBD5E1;">Imprimir</th>
                         </tr>
                     </thead>
                     <tbody style="font-size: 0.9rem;">
@@ -136,21 +134,24 @@
                                     <span class="badge bg-light text-secondary border fw-normal">Cuadrada ($0)</span>
                                 {% endif %}
                             </td>
-                            {% if current_user.rol == 'admin' %}
                             <td class="text-center d-print-none">
                                 <div class="d-flex justify-content-center gap-1">
-                                    <a href="{{ url_for('arqueo_bp.imprimir_ticket_arqueo', fecha=arqueo.fecha_arqueo, autoprint=1) }}" target="_blank" class="btn btn-sm btn-outline-dark py-1 px-2 rounded-3 text-nowrap" title="Imprimir Ticket Térmico 80mm">
+                                    <a href="{{ url_for('arqueo_bp.comprobante_arqueo', id=arqueo.id, fecha=arqueo.fecha_arqueo) }}" target="_blank" class="btn btn-sm btn-dark py-1 px-2 rounded-3 text-nowrap" title="Imprimir Comprobante (1 Cara - Formato Factura)">
+                                        <i class="fa-solid fa-print"></i>
+                                    </a>
+                                    <a href="{{ url_for('arqueo_bp.imprimir_ticket_arqueo', fecha=arqueo.fecha_arqueo, branch_id=arqueo.branch_id, autoprint=1) }}" target="_blank" class="btn btn-sm btn-outline-dark py-1 px-2 rounded-3 text-nowrap" title="Imprimir Ticket Térmico 80mm">
                                         <i class="fa-solid fa-receipt"></i>
                                     </a>
+                                    {% if current_user.rol == 'admin' %}
                                     <form action="{{ url_for('arqueo_bp.revertir_arqueo', id=arqueo.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas revertir este arqueo de caja? Esto eliminará el cierre y permitirá volver a crear/modificar el arqueo para esta fecha.');" class="d-inline">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2 rounded-3 text-nowrap" title="Revertir Cierre">
                                             <i class="fa-solid fa-rotate-left"></i>
                                         </button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </td>
-                            {% endif %}
                         </tr>
                         {% else %}
                         <tr>
