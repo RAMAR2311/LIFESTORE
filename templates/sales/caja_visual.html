@@ -1078,11 +1078,16 @@
 
     function filtrarProductosCaja() {
         const searchEl = document.getElementById('productSearch');
-        const rawQuery = searchEl ? searchEl.value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-        const tokens = rawQuery.split(/[\s\-]+/).filter(t => t.length > 0);
+        if (searchEl && /['’´`]/.test(searchEl.value)) {
+            const pos = searchEl.selectionStart;
+            searchEl.value = searchEl.value.replace(/['’´`]+/g, '-');
+            try { searchEl.setSelectionRange(pos, pos); } catch (e) {}
+        }
+        const rawQuery = searchEl ? searchEl.value.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’´`]+/g, '-') : '';
+        const tokens = rawQuery.split(/[\s\-'’´`]+/).filter(t => t.length > 0);
         document.querySelectorAll('.product-card-container').forEach(card => {
             const name = (card.dataset.name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            const sku = (card.dataset.sku || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const sku = (card.dataset.sku || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’´`]+/g, '-');
             const imei = (card.dataset.imei || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             const imei2 = (card.dataset.imei2 || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             const memoria = (card.dataset.memoria || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -1103,7 +1108,41 @@
         });
     }
 
-    document.getElementById('productSearch').addEventListener('input', filtrarProductosCaja);
+    const productSearchEl = document.getElementById('productSearch');
+    if (productSearchEl) {
+        productSearchEl.addEventListener('input', filtrarProductosCaja);
+        // Al escanear con pistola QR/Barras (que envía Enter al final), seleccionar automáticamente el producto
+        productSearchEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                filtrarProductosCaja();
+                const qNorm = this.value.toLowerCase().trim().replace(/['’´`]+/g, '-');
+                if (!qNorm) return;
+                const qCompact = qNorm.replace(/[\s\-]+/g, '');
+                let exactCard = null;
+                const visibleCards = [];
+                document.querySelectorAll('.product-card-container').forEach(card => {
+                    if (card.style.display !== 'none') {
+                        visibleCards.push(card);
+                        const cardSku = (card.dataset.sku || '').toLowerCase().trim().replace(/['’´`]+/g, '-');
+                        const cardImei = (card.dataset.imei || '').toLowerCase().trim();
+                        const cardImei2 = (card.dataset.imei2 || '').toLowerCase().trim();
+                        if ((cardSku && (cardSku === qNorm || cardSku.replace(/-/g, '') === qCompact)) ||
+                            (cardImei && cardImei === qNorm) ||
+                            (cardImei2 && cardImei2 === qNorm)) {
+                            exactCard = card;
+                        }
+                    }
+                });
+                const targetContainer = exactCard || (visibleCards.length === 1 ? visibleCards[0] : null);
+                if (targetContainer) {
+                    const clickable = targetContainer.querySelector('.product-card') || targetContainer;
+                    handleProductClick(clickable);
+                    this.select();
+                }
+            }
+        });
+    }
     document.addEventListener('DOMContentLoaded', filtrarProductosCaja);
 
     function handleProductClick(el) {

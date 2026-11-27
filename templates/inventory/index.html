@@ -545,8 +545,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function performSearch() {
+        if (/['’´`]/.test(searchInput.value)) {
+            const pos = searchInput.selectionStart;
+            searchInput.value = searchInput.value.replace(/['’´`]+/g, '-');
+            try { searchInput.setSelectionRange(pos, pos); } catch (e) {}
+        }
         const rawQuery = searchInput.value.trim();
-        const queryNorm = normalizarTexto(rawQuery);
+        const queryNorm = normalizarTexto(rawQuery).replace(/['’´`]+/g, '-');
 
         // Si tiene menos de 2 letras, restaurar vista paginada completa al instante (< 1ms)
         if (queryNorm.length < 2) {
@@ -555,7 +560,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const tokens = queryNorm.split(/[\s\-]+/).filter(t => t.length > 0);
+        const tokens = queryNorm.split(/[\s\-'’´`]+/).filter(t => t.length > 0);
         const matches = [];
         for (let i = 0; i < allRows.length; i++) {
             const row = allRows[i];

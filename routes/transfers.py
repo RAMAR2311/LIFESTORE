@@ -11,14 +11,14 @@ def index():
     tab = request.args.get('tab', 'pendientes').strip()
 
     active_b_id = None
-    if current_user.rol == 'admin':
+    if current_user.rol in ['admin', 'coordinador']:
         active_b_id = session.get('active_branch_id')
     else:
         active_b_id = current_user.branch_id
 
     # 1. Pendientes por recibir
     query_pendientes = StockTransfer.query.filter_by(status='PENDIENTE')
-    if current_user.rol != 'admin':
+    if current_user.rol not in ['admin', 'coordinador']:
         query_pendientes = query_pendientes.filter(StockTransfer.destination_branch_id == active_b_id)
     elif active_b_id:
         query_pendientes = query_pendientes.filter(StockTransfer.destination_branch_id == active_b_id)
@@ -26,7 +26,7 @@ def index():
 
     # 2. Enviados
     query_enviados = StockTransfer.query
-    if current_user.rol != 'admin':
+    if current_user.rol not in ['admin', 'coordinador']:
         query_enviados = query_enviados.filter(StockTransfer.origin_branch_id == active_b_id)
     elif active_b_id:
         query_enviados = query_enviados.filter(StockTransfer.origin_branch_id == active_b_id)
@@ -34,7 +34,7 @@ def index():
 
     # 3. Historial (Aceptados y Rechazados)
     query_historial = StockTransfer.query.filter(StockTransfer.status.in_(['ACEPTADO', 'RECHAZADO']))
-    if current_user.rol != 'admin':
+    if current_user.rol not in ['admin', 'coordinador']:
         query_historial = query_historial.filter(
             (StockTransfer.origin_branch_id == active_b_id) | (StockTransfer.destination_branch_id == active_b_id)
         )
@@ -60,12 +60,12 @@ def nuevo():
 
     # Determinar origen permitido según el rol
     user_branch_id = current_user.branch_id
-    if current_user.rol != 'admin' and not user_branch_id:
+    if current_user.rol not in ['admin', 'coordinador'] and not user_branch_id:
         default_tienda = Branch.query.filter_by(tipo='tienda', activa=True).first()
         user_branch_id = default_tienda.id if default_tienda else 1
 
     if request.method == 'POST':
-        if current_user.rol == 'admin':
+        if current_user.rol in ['admin', 'coordinador']:
             origin_branch_id = request.form.get('origin_branch_id', type=int)
         else:
             origin_branch_id = user_branch_id
@@ -166,12 +166,12 @@ def nuevo():
             return redirect(url_for('transfers_bp.nuevo'))
 
     # Para el formulario GET: lista de productos disponibles en el origen
-    origen_id_inicial = user_branch_id if current_user.rol != 'admin' else (session.get('active_branch_id') or 1)
+    origen_id_inicial = user_branch_id if current_user.rol not in ['admin', 'coordinador'] else (session.get('active_branch_id') or user_branch_id or 1)
     
     # Parámetros para pre-cargar ítems desde inventario
     pre_product_id = request.args.get('product_id', type=int)
     pre_variant_id = request.args.get('variant_id', type=int)
-    pre_imei = request.args.get('imei', '').strip()
+    pre_imei = request.args.get('imei', '').strip().replace("'", "-").replace("’", "-").replace("´", "-")
 
     return render_template(
         'transfers/nuevo.html',
@@ -192,8 +192,8 @@ def accept(id):
         flash('Este traslado ya no se encuentra en estado PENDIENTE.', 'warning')
         return redirect(url_for('transfers_bp.index'))
 
-    # Validar permisos: Destino o Admin
-    es_admin = (current_user.rol == 'admin')
+    # Validar permisos: Destino, Admin o Coordinador
+    es_admin = (current_user.rol in ['admin', 'coordinador'])
     es_destino = (current_user.branch_id == traslado.destination_branch_id)
 
     if not (es_admin or es_destino):
@@ -255,7 +255,7 @@ def reject(id):
         flash('Este traslado ya no se encuentra en estado PENDIENTE.', 'warning')
         return redirect(url_for('transfers_bp.index'))
 
-    es_admin = (current_user.rol == 'admin')
+    es_admin = (current_user.rol in ['admin', 'coordinador'])
     es_destino = (current_user.branch_id == traslado.destination_branch_id)
 
     if not (es_admin or es_destino):

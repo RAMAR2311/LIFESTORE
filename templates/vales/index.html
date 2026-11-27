@@ -457,11 +457,18 @@
                                     </div>
                                 </div>
                                 {% elif v.estado == 'APROBADO' %}
-                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-1 fw-semibold"
-                                        data-bs-toggle="modal" data-bs-target="#modalEditarPagoVale{{ v.id }}"
-                                        title="Cambiar Local o Método de Pago del Vale">
-                                    <i class="fa-solid fa-pen-to-square me-1"></i> Origen Pago
-                                </button>
+                                <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-1 fw-semibold"
+                                            data-bs-toggle="modal" data-bs-target="#modalEditarPagoVale{{ v.id }}"
+                                            title="Cambiar Local o Método de Pago del Vale">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i> Origen Pago
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 fw-semibold"
+                                            data-bs-toggle="modal" data-bs-target="#modalReversarVale{{ v.id }}"
+                                            title="Reversar Vale con PIN de Seguridad">
+                                        <i class="fa-solid fa-rotate-left me-1"></i> Revertir
+                                    </button>
+                                </div>
                                 {% set edit_b_id = v.branch_id if (v.branch and v.branch.tipo == 'tienda') else (locales_tienda[0].id if locales_tienda else 1) %}
                                 <div class="modal fade text-start" id="modalEditarPagoVale{{ v.id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered">
@@ -509,10 +516,80 @@
                                     </div>
                                 </div>
                                 {% else %}
-                                <span class="text-muted small">
-                                    <i class="fa-solid fa-lock me-1"></i> Procesado
-                                </span>
+                                <div class="d-flex justify-content-center align-items-center gap-2">
+                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 fw-semibold"
+                                            data-bs-toggle="modal" data-bs-target="#modalReversarVale{{ v.id }}"
+                                            title="Reversar Vale con PIN de Seguridad">
+                                        <i class="fa-solid fa-rotate-left me-1"></i> Revertir
+                                    </button>
+                                </div>
                                 {% endif %}
+
+                                <!-- Modal Reversar / Eliminar Vale con PIN Obligatorio (1234) -->
+                                <div class="modal fade text-start" id="modalReversarVale{{ v.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow-lg rounded-4">
+                                            <form method="POST" action="{{ url_for('vales_bp.reversar', id=v.id) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                                <div class="modal-header bg-danger text-white border-0 py-3">
+                                                    <h5 class="modal-title fw-bold mb-0">
+                                                        <i class="fa-solid fa-rotate-left me-2"></i> Reversar Vale #VAL-{{ '%04d' % v.id }}
+                                                    </h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body p-4">
+                                                    <div class="bg-light rounded-3 p-3 mb-3 border">
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted small">Asesor:</span>
+                                                            <strong class="text-brand-black">{{ v.asesor.nombre if v.asesor else 'N/A' }}</strong>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between mb-1">
+                                                            <span class="text-muted small">Monto del Vale:</span>
+                                                            <strong class="text-danger fs-5">${{ v.monto|cop }}</strong>
+                                                        </div>
+                                                        <div class="d-flex justify-content-between">
+                                                            <span class="text-muted small">Estado Actual:</span>
+                                                            <span class="badge bg-secondary rounded-pill">{{ v.estado }}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-brand-black">¿Qué deseas hacer con este vale? <span class="text-danger">*</span></label>
+                                                        <select name="accion_reversion" class="form-select fw-semibold border-danger">
+                                                            <option value="pendiente" selected>🔄 Devolver a PENDIENTE (Anular gasto y poder aprobarlo de nuevo)</option>
+                                                            <option value="eliminar">🗑️ Eliminar solicitud definitivamente (Anular gasto y borrar vale)</option>
+                                                        </select>
+                                                        <small class="text-muted extra-small d-block mt-1">
+                                                            Si el vale tenía un Gasto generado, este se eliminará automáticamente y el saldo regresará al local/método de pago.
+                                                        </small>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold small text-brand-black">Motivo de la reversión (Opcional)</label>
+                                                        <input type="text" name="motivo_reversion" class="form-control bg-light" placeholder="Ej: Reprocesar seleccionando el local y método correcto...">
+                                                    </div>
+
+                                                    <div class="mb-0">
+                                                        <label class="form-label fw-bold small text-danger">
+                                                            <i class="fa-solid fa-key me-1"></i> PIN de Seguridad Obligatorio <span class="text-danger">*</span>
+                                                        </label>
+                                                        <input type="password" name="token_secreto" class="form-control form-control-lg text-center fw-bold border-danger"
+                                                               placeholder="••••" maxlength="10" required autocomplete="off" inputmode="numeric">
+                                                        <small class="text-muted extra-small d-block mt-1">
+                                                            Ingresa el PIN de seguridad de administrador para autorizar la reversión.
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-0 pt-0">
+                                                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold shadow-sm">
+                                                        <i class="fa-solid fa-rotate-left me-1"></i> Confirmar Reversión
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                             {% endif %}
                         </tr>

@@ -21,7 +21,7 @@
                         <label class="form-label fw-bold small text-uppercase checkout-label">
                             <i class="fa-solid fa-arrow-up-from-bracket text-danger me-1"></i> Sucursal de Origen (Remitente)
                         </label>
-                        {% if current_user.rol == 'admin' %}
+                        {% if current_user.rol in ['admin', 'coordinador'] %}
                             <select name="origin_branch_id" id="originBranchSelect" class="form-select pos-select fw-semibold" onchange="onCambioSucursalOrigen(this.value)" required>
                                 {% for b in sucursales %}
                                     <option value="{{ b.id }}" {% if origen_id_inicial == b.id %}selected{% endif %}>
@@ -158,8 +158,8 @@ function cargarProductosOrigen(branchId) {
 }
 
 function actualizarOpcionesSelect(sel, currentVal = "", filtroQuery = "") {
-    const rawQ = (filtroQuery || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const tokens = rawQ.split(/[\s\-]+/).filter(t => t.length > 0);
+    const rawQ = (filtroQuery || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['’´`]+/g, '-');
+    const tokens = rawQ.split(/[\s\-'’´`]+/).filter(t => t.length > 0);
 
     sel.innerHTML = '<option value="">-- Seleccionar Accesorio / Producto con Stock --</option>';
     let filtrados = productosDisponibles;

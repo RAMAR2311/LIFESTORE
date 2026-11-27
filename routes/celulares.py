@@ -37,7 +37,7 @@ def obtener_hora_bogota():
 @celulares_bp.route('/inventario')
 @login_required
 def inventario():
-    q = request.args.get('q', '').strip()
+    q = request.args.get('q', '').strip().replace("'", "-").replace("’", "-").replace("´", "-").replace("`", "-")
     # Permitir filtrar por múltiples referencias
     referencias_seleccionadas = request.args.getlist('referencias')
     # Soporte por si viene una sola referencia como 'referencia' o separada por comas

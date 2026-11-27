@@ -550,3 +550,103 @@ def adjuntar_comprobante(id):
         flash(f'Error al subir el comprobante: {str(e)}', 'danger')
 
     return redirect(url_for('vales_bp.index'))
+
+
+@vales_bp.route('/<int:id>/reversar', methods=['POST'])
+@login_required
+@admin_required
+def reversar(id):
+    """
+    Permite al Administrador reversar un vale ya aprobado/rechazado (o eliminarlo)
+    exigiendo obligatoriamente el PIN de seguridad (1234).
+    - Elimina el Gasto (Expense) asociado para que deje de descontar en el local.
+    - Reversa el movimiento en Bancos si estaba aprobado.
+    - Puede devolver el vale a estado PENDIENTE (para volver a aprobarlo eligiendo local y método)
+      o eliminarlo definitivamente.
+    """
+    token_ingresado = (request.form.get('token_secreto') or '').strip()
+    expected_token = os.environ.get('DELETE_TOKEN', '1234').strip()
+    if not token_ingresado or token_ingresado != expected_token:
+        flash('🚫 PIN de seguridad incorrecto. Operación de reversión cancelada.', 'danger')
+        return redirect(url_for('vales_bp.index'))
+
+    vale = Vale.query.get_or_404(id)
+    accion = (request.form.get('accion_reversion') or 'pendiente').strip().lower()
+    motivo = (request.form.get('motivo_reversion') or 'Reversión autorizada con PIN para reprocesar vale.').strip()
+
+    try:
+        nombre_asesor = vale.asesor.nombre if vale.asesor else 'Asesor'
+        monto_val = vale.monto or Decimal('0')
+        estado_anterior = vale.estado
+        metodo_anterior = (vale.metodo_pago or 'efectivo').strip().lower()
+        sede_nombre = vale.branch.nombre if vale.branch else 'Local'
+        gasto_id_eliminado = vale.expense_id
+
+        # 1. Si tenía Gasto (Expense) asociado, eliminarlo
+        if vale.expense_id:
+            gasto_asociado = Expense.query.get(vale.expense_id)
+            vale.expense_id = None
+            db.session.flush()
+            if gasto_asociado:
+                db.session.delete(gasto_asociado)
+
+        # 2. Si estaba APROBADO, devolver el saldo en Bancos / Métodos de pago
+        if estado_anterior == 'APROBADO' and monto_val > 0:
+            from services.bank_service import registrar_movimiento_banco
+            registrar_movimiento_banco(
+                codigo_metodo=metodo_anterior,
+                monto=monto_val,
+                tipo_movimiento='INGRESO',
+                origen='AJUSTE_MANUAL',
+                descripcion=f'Reversión de Vale #VAL-{vale.id:04d} ({nombre_asesor}) [PIN Autorizado - {sede_nombre}]',
+                referencia_id=vale.id,
+                usuario_id=current_user.id
+            )
+
+        if accion == 'eliminar':
+            vale_num = vale.id
+            AuditLog.registrar(
+                action='ELIMINACION_VALE',
+                user_id=current_user.id,
+                motivo=(
+                    f"Eliminación definitiva de vale #VAL-{vale_num:04d} ({nombre_asesor}) por ${float(monto_val):,.0f} "
+                    f"[Estado previo: {estado_anterior}, Gasto eliminado: #{gasto_id_eliminado or 'N/A'}]. Motivo: {motivo}"
+                ),
+                target_id=vale_num,
+                target_type='VALE'
+            )
+            db.session.delete(vale)
+            db.session.commit()
+            flash(
+                f"🗑️ Vale #VAL-{vale_num:04d} de '{nombre_asesor}' eliminado definitivamente y gasto/saldo revertido.",
+                'warning'
+            )
+        else:
+            # Devolver a PENDIENTE para que el Administrador pueda aceptarlo nuevamente
+            vale.estado = 'PENDIENTE'
+            vale.resuelto_por_id = None
+            vale.fecha_resolucion = None
+            vale.observacion_resolucion = None
+            vale.metodo_pago = None
+
+            AuditLog.registrar(
+                action='REVERSION_VALE',
+                user_id=current_user.id,
+                motivo=(
+                    f"Reversión a PENDIENTE del vale #VAL-{vale.id:04d} ({nombre_asesor}) por ${float(monto_val):,.0f} "
+                    f"[Estado previo: {estado_anterior}, Gasto anulado: #{gasto_id_eliminado or 'N/A'}]. Motivo: {motivo}"
+                ),
+                target_id=vale.id,
+                target_type='VALE'
+            )
+            db.session.commit()
+            flash(
+                f"🔄 Vale #VAL-{vale.id:04d} de '{nombre_asesor}' por ${int(monto_val):,} revertido a PENDIENTE. "
+                f"El gasto previo fue anulado y ya puedes darle 'Aceptar' nuevamente.".replace(',', '.'),
+                'success'
+            )
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al reversar el vale: {str(e)}', 'danger')
+
+    return redirect(url_for('vales_bp.index'))
