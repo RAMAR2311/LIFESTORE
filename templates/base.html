@@ -300,8 +300,21 @@
 
         @media (max-width: 768px) {
             .navbar-custom .brand-logo-img {
-                height: 40px;
-                max-width: 220px;
+                height: 36px;
+                max-width: 175px;
+            }
+        }
+        @media (max-width: 575.98px) {
+            .navbar-custom .brand-logo-img {
+                height: 28px;
+                max-width: 125px;
+            }
+            #adminBranchDropdown {
+                padding: 4px 10px !important;
+                font-size: 0.72rem !important;
+            }
+            #adminBranchDropdown .branch-label-text {
+                max-width: 92px !important;
             }
         }
 
@@ -1465,10 +1478,10 @@
                 <!-- SUCURSAL SELECTOR (ADMIN & COORDINADOR) / SUCURSAL BADGE (VENDEDOR/BODEGA) -->
                 {% if current_user.is_authenticated %}
                     {% if current_user.rol in ['admin', 'coordinador'] %}
-                    <div class="dropdown d-none d-sm-block">
-                        <button class="btn btn-sm btn-light border rounded-pill dropdown-toggle px-3 py-1 shadow-sm d-flex align-items-center gap-2" type="button" id="adminBranchDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.8rem; font-weight: 600;">
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-light border rounded-pill dropdown-toggle px-3 py-1 shadow-sm d-flex align-items-center gap-1.5" type="button" id="adminBranchDropdown" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.8rem; font-weight: 600;">
                             <i class="fa-solid fa-location-dot text-primary"></i>
-                            <span class="text-truncate" style="max-width: 170px;">
+                            <span class="text-truncate branch-label-text" style="max-width: 170px;">
                                 {% if active_branch %}
                                     {{ active_branch.nombre }} ({{ active_branch.codigo }})
                                 {% else %}
@@ -1476,7 +1489,7 @@
                                 {% endif %}
                             </span>
                         </button>
-                        <ul class="dropdown-menu shadow-lg border-0 rounded-3 p-2" aria-labelledby="adminBranchDropdown" style="min-width: 240px; font-size: 0.85rem;">
+                        <ul class="dropdown-menu shadow-lg border-0 rounded-3 p-2" aria-labelledby="adminBranchDropdown" style="min-width: 240px; font-size: 0.85rem; z-index: 1090;">
                             <li><h6 class="dropdown-header text-uppercase small fw-bold">Filtrar por Sucursal</h6></li>
                             <li>
                                 <form method="POST" action="{{ url_for('admin_bp.switch_branch') }}">
@@ -1516,15 +1529,15 @@
                     </div>
                     {% else %}
                     <!-- Badge fijo para Vendedor o Bodeguero -->
-                    <div class="d-none d-sm-flex align-items-center">
-                        <span class="badge rounded-pill px-3 py-1 shadow-sm d-flex align-items-center gap-1.5" 
-                              style="font-size: 0.78rem; font-weight: 700; color: #1e293b !important; background-color: #f1f5f9 !important; border: 1px solid #cbd5e1 !important;">
+                    <div class="d-flex align-items-center">
+                        <span class="badge rounded-pill px-2.5 py-1 shadow-sm d-flex align-items-center gap-1" 
+                              style="font-size: 0.75rem; font-weight: 700; color: #1e293b !important; background-color: #f1f5f9 !important; border: 1px solid #cbd5e1 !important;">
                             {% if current_user.branch and current_user.branch.tipo == 'bodega' %}
                                 <span style="font-size: 0.85rem;">📦</span>
                             {% else %}
                                 <i class="fa-solid fa-location-dot text-primary"></i>
                             {% endif %}
-                            <span style="color: #0f172a !important; font-weight: 700;">{{ current_user.branch.nombre if current_user.branch else ('Todas las Sedes (Global)' if current_user.rol == 'coordinador' else 'Sede Principal') }}</span>
+                            <span class="text-truncate" style="color: #0f172a !important; font-weight: 700; max-width: 110px;">{{ current_user.branch.nombre if current_user.branch else 'Sede Principal' }}</span>
                         </span>
                     </div>
                     {% endif %}
@@ -1573,6 +1586,26 @@
         </div>
 
         <div class="offcanvas-body d-flex flex-column p-0">
+            {% if current_user.rol in ['admin', 'coordinador'] %}
+            <!-- Selector Rápido de Sede / Local dentro del Menú Lateral (Celular, Tablet y PWA) -->
+            <div class="px-3 pt-3 pb-1">
+                <form method="POST" action="{{ url_for('admin_bp.switch_branch') }}" class="m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <label class="text-uppercase fw-bold text-muted d-block mb-1" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                        <i class="fa-solid fa-location-dot text-primary me-1"></i> Sede / Local Activo:
+                    </label>
+                    <select name="branch_id" class="form-select form-select-sm fw-bold rounded-pill shadow-sm" onchange="this.form.submit()" style="font-size: 0.8rem;">
+                        <option value="all" {% if not active_branch %}selected{% endif %}>🌐 Todas las Sedes (Global)</option>
+                        {% for b in all_branches %}
+                        <option value="{{ b.id }}" {% if active_branch and active_branch.id == b.id %}selected{% endif %}>
+                            {{ '📦' if b.tipo == 'bodega' else '📍' }} {{ b.nombre }} ({{ b.codigo }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+            {% endif %}
+
             <!-- Buscador Rápido de Módulos (Spotlight Style) -->
             <div class="sidebar-search-box">
                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
